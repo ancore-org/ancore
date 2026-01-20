@@ -4,23 +4,45 @@ updates:
   - package-ecosystem: "npm"
     directory: "/"
     schedule:
-      interval: "weekly"
-    open-pull-requests-limit: 10
+      interval: "monthly"
+    open-pull-requests-limit: 3
     groups:
-      ancore-packages:
-        patterns:
-          - "@ancore/*"
+      # Group all production dependencies together
+      production-dependencies:
+        dependency-type: "production"
+      # Group all development dependencies together
       dev-dependencies:
         dependency-type: "development"
     labels:
       - "dependencies"
       - "automated"
 
+  # Enable version updates for Cargo (Rust)
+  - package-ecosystem: "cargo"
+    directory: "/contracts"
+    schedule:
+      interval: "monthly"
+    open-pull-requests-limit: 2
+    groups:
+      # Group all Cargo dependencies together
+      cargo-dependencies:
+        patterns:
+          - "*"
+    labels:
+      - "dependencies"
+      - "rust"
+
   # Enable version updates for GitHub Actions
   - package-ecosystem: "github-actions"
     directory: "/"
     schedule:
-      interval: "weekly"
+      interval: "monthly"
+    open-pull-requests-limit: 1
+    groups:
+      # Group all GitHub Actions updates into a single PR
+      github-actions:
+        patterns:
+          - "*"
     labels:
       - "dependencies"
       - "github-actions"
