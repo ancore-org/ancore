@@ -84,7 +84,7 @@ jobs:
           fetch-depth: 0
 
       - name: Download contract artifacts
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v7
         with:
           name: contracts
           path: contracts-build
