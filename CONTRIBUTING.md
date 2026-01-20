@@ -322,7 +322,7 @@ Major changes require an RFC:
 
 ## Getting Help
 
-- **Telegram**: [https://t.me/+OqlAx-gQx3M4YzJk](https://t.me/+OqlAx-gQx3M4YzJk)
+- **Telegram**: [Ancore](https://t.me/+OqlAx-gQx3M4YzJk)
 - **Issues**: Open a GitHub issue
 
 ## Recognition

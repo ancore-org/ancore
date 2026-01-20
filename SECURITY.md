@@ -100,7 +100,7 @@ The following components undergo rigorous security review:
 
 ### Disclosure Process
 
-1. **Report**: Contact us via Telegram at [https://t.me/+OqlAx-gQx3M4YzJk](https://t.me/+OqlAx-gQx3M4YzJk) with:
+1. **Report**: Contact us via Telegram at [Ancore TG](https://t.me/+OqlAx-gQx3M4YzJk) with:
    - Description of the vulnerability
    - Steps to reproduce
    - Potential impact
@@ -144,14 +144,6 @@ The following components undergo rigorous security review:
 - Cosmetic issues
 - Best practice violations
 
-## Bug Bounty Program
-
-**Status**: Coming soon
-
-We will launch a bug bounty program before mainnet with:
-- Up to $100,000 for critical vulnerabilities
-- Rewards for all severity levels
-- Public leaderboard
 
 ## Security Audits
 
@@ -204,7 +196,7 @@ High-security code must pass:
 
 ### Emergency Contacts
 
-- Telegram: [https://t.me/+OqlAx-gQx3M4YzJk](https://t.me/+OqlAx-gQx3M4YzJk)
+- Telegram: [Ancore TG](https://t.me/+OqlAx-gQx3M4YzJk)
 
 ## Security Best Practices for Users
 

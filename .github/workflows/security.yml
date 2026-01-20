@@ -11,25 +11,25 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      
+
       - name: Setup pnpm
         uses: pnpm/action-setup@v2
         with:
           version: 9
-      
+
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
           node-version: '20'
           cache: 'pnpm'
-      
+
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
-      
+
       - name: Security audit
         run: pnpm audit --audit-level=high
         continue-on-error: true
-      
+
       - name: Check for known vulnerabilities
         uses: actions/dependency-review-action@v3
         if: github.event_name == 'pull_request'
@@ -46,11 +46,11 @@ jobs:
         language: ['javascript', 'typescript']
     steps:
       - uses: actions/checkout@v4
-      
+
       - name: Initialize CodeQL
         uses: github/codeql-action/init@v2
         with:
           languages: ${{ matrix.language }}
-      
+
       - name: Perform CodeQL Analysis
         uses: github/codeql-action/analyze@v2

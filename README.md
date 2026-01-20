@@ -184,7 +184,7 @@ For a deep dive into Ancore's architecture, see:
 
 ## Community
 
-- **Telegram**: [https://t.me/+OqlAx-gQx3M4YzJk](https://t.me/+OqlAx-gQx3M4YzJk)
+- **Telegram**: [Ancore TG](https://t.me/+OqlAx-gQx3M4YzJk)
 
 ## Acknowledgments
 
