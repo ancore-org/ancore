@@ -78,22 +78,22 @@ jobs:
 
       - name: Ensure Cargo cache directories exist
         run: |
-          mkdir -p ~/.cargo/bin
-          mkdir -p ~/.cargo/registry/index
-          mkdir -p ~/.cargo/registry/cache
-          mkdir -p ~/.cargo/git/db
-          mkdir -p target
+          mkdir -p $HOME/.cargo/bin
+          mkdir -p $HOME/.cargo/registry/index
+          mkdir -p $HOME/.cargo/registry/cache
+          mkdir -p $HOME/.cargo/git/db
+          mkdir -p ${{ github.workspace }}/contracts/target
 
       - name: Cache Cargo
         uses: actions/cache@v3
         with:
           path: |
-            ~/.cargo/bin/
-            ~/.cargo/registry/index/
-            ~/.cargo/registry/cache/
-            ~/.cargo/git/db/
-            target/
-          key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
+            ~/.cargo/bin
+            ~/.cargo/registry/index
+            ~/.cargo/registry/cache
+            ~/.cargo/git/db
+            ${{ github.workspace }}/contracts/target
+          key: ${{ runner.os }}-cargo-${{ hashFiles('contracts/Cargo.lock') }}
 
       - name: Add wasm32 target
         run: rustup target add wasm32-unknown-unknown
