@@ -15,11 +15,15 @@
   "scripts": {
     "build": "tsup src/index.ts --format cjs,esm --dts",
     "dev": "tsup src/index.ts --format cjs,esm --dts --watch",
-    "test": "jest",
+    "test": "echo 'No tests yet'",
     "lint": "eslint src/",
     "clean": "rm -rf dist"
   },
-  "keywords": ["ancore", "types", "typescript"],
+  "keywords": [
+    "ancore",
+    "types",
+    "typescript"
+  ],
   "author": "Ancore Contributors",
   "license": "Apache-2.0",
   "devDependencies": {
