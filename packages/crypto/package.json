@@ -21,8 +21,12 @@
     "@noble/hashes": "^1.4.0"
   },
   "devDependencies": {
+    "@eslint/js": "^9.0.0",
+    "@typescript-eslint/eslint-plugin": "^8.0.0",
+    "@typescript-eslint/parser": "^8.0.0",
+    "eslint": "^9.0.0",
+    "jest": "^30.2.0",
     "tsup": "^8.0.0",
-    "typescript": "^5.6.0",
-    "jest": "^30.2.0"
+    "typescript": "^5.6.0"
   }
 }

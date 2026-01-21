@@ -34,6 +34,18 @@ importers:
         specifier: workspace:*
         version: link:../types
     devDependencies:
+      '@eslint/js':
+        specifier: ^9.0.0
+        version: 9.39.2
+      '@typescript-eslint/eslint-plugin':
+        specifier: ^8.0.0
+        version: 8.53.1(@typescript-eslint/parser@8.53.1(eslint@9.39.2)(typescript@5.9.3))(eslint@9.39.2)(typescript@5.9.3)
+      '@typescript-eslint/parser':
+        specifier: ^8.0.0
+        version: 8.53.1(eslint@9.39.2)(typescript@5.9.3)
+      eslint:
+        specifier: ^9.0.0
+        version: 9.39.2
       jest:
         specifier: ^30.2.0
         version: 30.2.0(@types/node@25.0.9)(ts-node@10.9.2(@types/node@25.0.9)(typescript@5.9.3))
@@ -56,9 +68,18 @@ importers:
         specifier: workspace:*
         version: link:../types
     devDependencies:
+      '@eslint/js':
+        specifier: ^9.0.0
+        version: 9.39.2
       '@types/node':
         specifier: ^25.0.9
         version: 25.0.9
+      '@typescript-eslint/eslint-plugin':
+        specifier: ^8.0.0
+        version: 8.53.1(@typescript-eslint/parser@8.53.1(eslint@9.39.2)(typescript@5.9.3))(eslint@9.39.2)(typescript@5.9.3)
+      '@typescript-eslint/parser':
+        specifier: ^8.0.0
+        version: 8.53.1(eslint@9.39.2)(typescript@5.9.3)
       eslint:
         specifier: ^9.39.2
         version: 9.39.2
@@ -84,6 +105,18 @@ importers:
         specifier: ^1.4.0
         version: 1.8.0
     devDependencies:
+      '@eslint/js':
+        specifier: ^9.0.0
+        version: 9.39.2
+      '@typescript-eslint/eslint-plugin':
+        specifier: ^8.0.0
+        version: 8.53.1(@typescript-eslint/parser@8.53.1(eslint@9.39.2)(typescript@5.9.3))(eslint@9.39.2)(typescript@5.9.3)
+      '@typescript-eslint/parser':
+        specifier: ^8.0.0
+        version: 8.53.1(eslint@9.39.2)(typescript@5.9.3)
+      eslint:
+        specifier: ^9.0.0
+        version: 9.39.2
       jest:
         specifier: ^30.2.0
         version: 30.2.0(@types/node@25.0.9)(ts-node@10.9.2(@types/node@25.0.9)(typescript@5.9.3))
@@ -103,6 +136,18 @@ importers:
         specifier: ^13.0.0
         version: 13.3.0
     devDependencies:
+      '@eslint/js':
+        specifier: ^9.0.0
+        version: 9.39.2
+      '@typescript-eslint/eslint-plugin':
+        specifier: ^8.0.0
+        version: 8.53.1(@typescript-eslint/parser@8.53.1(eslint@9.39.2)(typescript@5.9.3))(eslint@9.39.2)(typescript@5.9.3)
+      '@typescript-eslint/parser':
+        specifier: ^8.0.0
+        version: 8.53.1(eslint@9.39.2)(typescript@5.9.3)
+      eslint:
+        specifier: ^9.0.0
+        version: 9.39.2
       tsup:
         specifier: ^8.0.0
         version: 8.5.1(typescript@5.9.3)
@@ -112,6 +157,18 @@ importers:
 
   packages/types:
     devDependencies:
+      '@eslint/js':
+        specifier: ^9.0.0
+        version: 9.39.2
+      '@typescript-eslint/eslint-plugin':
+        specifier: ^8.0.0
+        version: 8.53.1(@typescript-eslint/parser@8.53.1(eslint@9.39.2)(typescript@5.9.3))(eslint@9.39.2)(typescript@5.9.3)
+      '@typescript-eslint/parser':
+        specifier: ^8.0.0
+        version: 8.53.1(eslint@9.39.2)(typescript@5.9.3)
+      eslint:
+        specifier: ^9.0.0
+        version: 9.39.2
       tsup:
         specifier: ^8.0.0
         version: 8.5.1(typescript@5.9.3)
