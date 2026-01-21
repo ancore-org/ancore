@@ -16,7 +16,7 @@
 
 ## Detailed Design
 
-<!-- 
+<!--
 Explain the design in enough detail for someone familiar with Ancore to understand and implement.
 
 Include:
@@ -57,7 +57,7 @@ Include:
 
 ## Security Considerations
 
-<!-- 
+<!--
 CRITICAL: All RFCs must address security implications.
 
 - What are the security implications?
@@ -68,7 +68,7 @@ CRITICAL: All RFCs must address security implications.
 
 ## Adoption Strategy
 
-<!-- 
+<!--
 How will existing users adopt this feature?
 
 - Is this a breaking change?
@@ -90,7 +90,7 @@ How will existing users adopt this feature?
 
 ---
 
-<!-- 
+<!--
 Before submitting:
 - [ ] Read RFC.md for the full process
 - [ ] Discussed informally in Telegram

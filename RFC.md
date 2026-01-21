@@ -42,6 +42,7 @@ Before writing an RFC:
 ### 2. Writing
 
 1. Copy the template:
+
    ```bash
    cp docs/rfcs/0000-template.md docs/rfcs/0000-my-feature.md
    ```
@@ -80,6 +81,7 @@ Possible outcomes:
 - **Withdrawn**: Author decides not to proceed
 
 Decision makers:
+
 - Relevant component maintainers
 - Core team for major changes
 - Lead maintainer for final call if needed
@@ -125,6 +127,7 @@ Why is this change needed? What problem does it solve?
 ## Detailed Design
 
 Thorough explanation of the feature:
+
 - API surface
 - Implementation approach
 - Examples
@@ -132,7 +135,7 @@ Thorough explanation of the feature:
 
 ## Drawbacks
 
-Why should we *not* do this?
+Why should we _not_ do this?
 
 ## Alternatives
 
@@ -145,6 +148,7 @@ Security implications and mitigations.
 ## Adoption Strategy
 
 How will this be rolled out?
+
 - Migration path
 - Backward compatibility
 - Documentation needs
@@ -170,45 +174,51 @@ Related issues, discussions, external resources.
 # RFC: Session Key Management
 
 ## Summary
+
 Add time-limited, permission-scoped signing keys to enable seamless UX.
 
 ## Motivation
+
 Users shouldn't need to sign every transaction. Enable "logged in" experience
 while maintaining security.
 
 ## Detailed Design
 
 ### API
+
 \`\`\`typescript
 interface SessionKey {
-  publicKey: string;
-  permissions: Permission[];
-  expiresAt: number;
+publicKey: string;
+permissions: Permission[];
+expiresAt: number;
 }
 
 async function createSession(
-  account: Account,
-  permissions: Permission[],
-  duration: number
+account: Account,
+permissions: Permission[],
+duration: number
 ): Promise<SessionKey>;
 \`\`\`
 
 ### Contract Interface
-\`\`\`rust
-#[external(v0)]
+
+\`\`\`rust #[external(v0)]
 fn add_session_key(
-    ref self: ContractState,
-    key: PublicKey,
-    permissions: Permissions,
-    expiry: u64
+ref self: ContractState,
+key: PublicKey,
+permissions: Permissions,
+expiry: u64
 );
 \`\`\`
 
 ### Storage
+
 Sessions stored on-chain in a sparse merkle tree...
 
 ### Validation
+
 On transaction validation, check:
+
 1. Session key is registered
 2. Not expired
 3. Transaction matches permissions
@@ -264,7 +274,7 @@ On transaction validation, check:
 ✅ Discuss trade-offs honestly  
 ✅ Address security implications  
 ✅ Consider backward compatibility  
-✅ Explain the "why" not just the "what"  
+✅ Explain the "why" not just the "what"
 
 ### Don't
 
@@ -273,7 +283,7 @@ On transaction validation, check:
 ❌ Skip the drawbacks section  
 ❌ Assume everyone has context  
 ❌ Write a novel (be concise)  
-❌ Propose multiple changes at once  
+❌ Propose multiple changes at once
 
 ## Questions?
 

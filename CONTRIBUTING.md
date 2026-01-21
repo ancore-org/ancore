@@ -65,6 +65,7 @@ We are committed to providing a welcoming and inclusive environment. Please:
 ### Making Changes
 
 1. Create a new branch:
+
    ```bash
    git checkout -b feat/my-feature
    ```
@@ -72,23 +73,27 @@ We are committed to providing a welcoming and inclusive environment. Please:
 2. Make your changes following our [code style](#code-style)
 
 3. Run tests:
+
    ```bash
    pnpm test
    ```
 
 4. Run linting:
+
    ```bash
    pnpm lint
    ```
 
 5. Commit your changes:
+
    ```bash
    git commit -m "feat: add awesome feature"
    ```
-   
+
    Follow [Conventional Commits](https://www.conventionalcommits.org/)
 
 6. Push to your fork:
+
    ```bash
    git push origin feat/my-feature
    ```
@@ -108,6 +113,7 @@ These areas require core team approval and formal security review:
 - `packages/account-abstraction/**` - Account abstraction core logic
 
 **If you want to contribute here:**
+
 1. Open an issue first to discuss the change
 2. Expect rigorous review
 3. Sign our CLA
@@ -119,6 +125,7 @@ These areas require core team approval and formal security review:
 - `services/**` - Backend services
 
 **Requirements:**
+
 - Demonstrated understanding of the codebase
 - Comprehensive test coverage
 - Security considerations documented
@@ -151,7 +158,7 @@ Example:
 ```typescript
 /**
  * Creates a new session key with the specified permissions.
- * 
+ *
  * @param account - The account to create the session for
  * @param permissions - Permissions for the session key
  * @returns A promise resolving to the session key
@@ -177,12 +184,12 @@ Example:
 
 ```rust
 /// Validates a transaction signature.
-/// 
+///
 /// # Arguments
 /// * `env` - The contract environment
 /// * `tx_hash` - Hash of the transaction to validate
 /// * `signature` - Signature to verify
-/// 
+///
 /// # Security
 /// Must verify the signer has appropriate permissions
 pub fn validate_signature(
@@ -205,7 +212,7 @@ describe('SessionKey', () => {
   it('should create a valid session key', async () => {
     const account = await createTestAccount();
     const sessionKey = await createSessionKey(account, defaultPermissions);
-    
+
     expect(sessionKey).toBeDefined();
     expect(sessionKey.isValid()).toBe(true);
   });
@@ -267,23 +274,28 @@ When opening a PR, please include:
 
 ```markdown
 ## Description
+
 Brief description of changes
 
 ## Type of Change
+
 - [ ] Bug fix
 - [ ] New feature
 - [ ] Breaking change
 - [ ] Documentation update
 
 ## Testing
+
 - [ ] Unit tests added/updated
 - [ ] Integration tests added/updated
 - [ ] Manual testing performed
 
 ## Security Considerations
+
 Describe any security implications
 
 ## Checklist
+
 - [ ] Code follows project style guidelines
 - [ ] Self-review completed
 - [ ] Comments added for complex logic
@@ -305,6 +317,7 @@ Issues labeled `help-wanted` are priorities where we need community help.
 ### Documentation
 
 Improving documentation is always appreciated:
+
 - Fix typos
 - Clarify confusing sections
 - Add examples
@@ -328,6 +341,7 @@ Major changes require an RFC:
 ## Recognition
 
 Contributors are recognized in:
+
 - Release notes
 - `CONTRIBUTORS.md`
 - Monthly community highlights
@@ -335,6 +349,7 @@ Contributors are recognized in:
 ## License
 
 By contributing, you agree that your contributions will be licensed under:
+
 - Apache 2.0 (for contracts and core SDK)
 - MIT (for applications and UI)
 

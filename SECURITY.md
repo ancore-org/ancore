@@ -50,6 +50,7 @@ The following components undergo rigorous security review:
 - `contracts/upgrade/` - Upgrade mechanisms
 
 **Process**:
+
 - Internal security review
 - External security audit
 - Formal verification (where applicable)
@@ -60,6 +61,7 @@ The following components undergo rigorous security review:
 - `packages/crypto/` - Key generation, signing, encryption
 
 **Requirements**:
+
 - Use audited cryptographic libraries only
 - No custom crypto primitives without expert review
 - Constant-time operations for sensitive data
@@ -69,6 +71,7 @@ The following components undergo rigorous security review:
 - `packages/account-abstraction/` - Account abstraction primitives
 
 **Requirements**:
+
 - Comprehensive test coverage (>90%)
 - Fuzz testing for validation logic
 - Integration tests with actual contracts
@@ -79,6 +82,7 @@ The following components undergo rigorous security review:
 - `services/relayer/` - Transaction relay service
 
 **Requirements**:
+
 - Standard code review
 - Security considerations documented
 - Input validation and sanitization
@@ -90,6 +94,7 @@ The following components undergo rigorous security review:
 - `docs/**` - Documentation
 
 **Requirements**:
+
 - Standard code review
 - XSS prevention
 - CSRF protection
@@ -125,25 +130,28 @@ The following components undergo rigorous security review:
 ### Severity Levels
 
 #### Critical
+
 - Loss of funds
 - Unauthorized account access
 - Contract upgrade attacks
 
 #### High
+
 - DOS attacks on critical functionality
 - Session key bypass
 - Authorization flaws
 
 #### Medium
+
 - Information disclosure
 - Limited DOS attacks
 - Client-side vulnerabilities
 
 #### Low
+
 - Non-exploitable bugs
 - Cosmetic issues
 - Best practice violations
-
 
 ## Security Audits
 
@@ -255,12 +263,14 @@ Your code is insecure
 ## Security Updates
 
 Subscribe to security updates:
+
 - GitHub Watch → Custom → Security alerts
 - Telegram: [https://t.me/+OqlAx-gQx3M4YzJk](https://t.me/+OqlAx-gQx3M4YzJk)
 
 ## Acknowledgments
 
 We thank the following security researchers:
+
 - (Hall of fame will be populated as issues are reported)
 
 ## Contact

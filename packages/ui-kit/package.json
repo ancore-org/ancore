@@ -11,7 +11,12 @@
     "lint": "eslint src/",
     "clean": "rm -rf dist"
   },
-  "keywords": ["ancore", "ui", "components", "react"],
+  "keywords": [
+    "ancore",
+    "ui",
+    "components",
+    "react"
+  ],
   "author": "Ancore Contributors",
   "license": "MIT",
   "peerDependencies": {

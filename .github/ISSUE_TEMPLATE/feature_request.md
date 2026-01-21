@@ -40,16 +40,16 @@ As a [type of user], I want [goal] so that [benefit].
 
 <!-- What are the benefits of implementing this feature? -->
 
-- 
-- 
-- 
+-
+-
+-
 
 ## Potential Drawbacks
 
 <!-- Are there any downsides or risks? -->
 
-- 
-- 
+-
+-
 
 ## Impact Area
 
@@ -62,7 +62,7 @@ As a [type of user], I want [goal] so that [benefit].
 - [ ] Web Dashboard
 - [ ] Documentation
 - [ ] Infrastructure
-- [ ] Other: ___________
+- [ ] Other: \***\*\_\_\_\*\***
 
 ## Priority
 
@@ -92,7 +92,7 @@ As a [type of user], I want [goal] so that [benefit].
 
 ---
 
-<!-- 
+<!--
 💡 NOTE
 
 For major features, consider writing an RFC first.

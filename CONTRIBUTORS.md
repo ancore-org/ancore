@@ -19,6 +19,7 @@ See [CONTRIBUTING.md](CONTRIBUTING.md) for guidelines on how to contribute.
 ## Recognition
 
 Contributors are recognized in:
+
 - This file
 - Release notes
 - Monthly community highlights

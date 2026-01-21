@@ -14,9 +14,9 @@ assignees: ''
 
 Steps to reproduce the behavior:
 
-1. 
-2. 
-3. 
+1.
+2.
+3.
 
 ## Expected Behavior
 
@@ -29,10 +29,13 @@ Steps to reproduce the behavior:
 ## Environment
 
 **Ancore Version:**
+
 <!-- e.g., 0.1.0 -->
 
 **Platform:**
+
 <!-- Check all that apply -->
+
 - [ ] Extension Wallet (Chrome/Firefox/etc.)
 - [ ] Mobile Wallet (iOS/Android)
 - [ ] Web Dashboard
@@ -40,6 +43,7 @@ Steps to reproduce the behavior:
 - [ ] Smart Contracts
 
 **Environment Details:**
+
 - OS: <!-- e.g., macOS 14.0, Windows 11, iOS 17 -->
 - Browser: <!-- if applicable, e.g., Chrome 120 -->
 - Node version: <!-- if applicable, e.g., v20.10.0 -->
@@ -80,7 +84,7 @@ Paste logs here
 
 ---
 
-<!-- 
+<!--
 ⚠️ SECURITY NOTICE ⚠️
 
 If this bug is a security vulnerability, DO NOT open a public issue.

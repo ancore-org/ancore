@@ -43,6 +43,7 @@ This document provides a high-level overview of the Ancore system architecture.
 Smart accounts are the foundation of Ancore. Unlike traditional accounts that use a single private key for all operations, smart accounts are programmable contracts that can implement custom validation logic.
 
 **Key Features:**
+
 - Custom signature validation
 - Multi-signature support
 - Session keys for seamless UX
@@ -132,6 +133,7 @@ Session keys enable seamless UX by allowing time-limited, permission-scoped sign
 ### Relayer Network
 
 Optional relayer network for:
+
 - Meta-transactions
 - Gasless transactions
 - Transaction batching

@@ -41,8 +41,8 @@
 
 <!-- Provide test coverage metrics if applicable -->
 
-- Current coverage: __%
-- New/modified code coverage: __%
+- Current coverage: \_\_%
+- New/modified code coverage: \_\_%
 
 ### Manual Testing Steps
 
@@ -99,8 +99,8 @@ Related to #
 
 ---
 
-<!-- 
-Thank you for contributing to Ancore! 
+<!--
+Thank you for contributing to Ancore!
 
 Please ensure you have read:
 - CONTRIBUTING.md
