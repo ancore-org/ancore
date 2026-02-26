@@ -31,6 +31,7 @@ coverage/
 *.swo
 *~
 .DS_Store
+.kiro
 
 # Logs
 *.log

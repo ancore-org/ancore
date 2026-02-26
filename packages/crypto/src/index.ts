@@ -3,10 +3,16 @@
  * Cryptographic utilities for Ancore wallet
  */
 
-// Placeholder export - implement as package develops
+// Type exports
+export type {
+  Keypair,
+  EncryptedData,
+  PasswordStrength,
+  MnemonicOptions,
+  DerivationOptions,
+} from './types';
+
 export const CRYPTO_VERSION = '0.1.0';
 
-// Example exports (implement as needed):
-// export { generateKeyPair } from './keypair';
-// export { sign, verify } from './signatures';
-// export { encrypt, decrypt } from './encryption';
+// Password module exports
+export { validatePassword, generateSalt, deriveEncryptionKey } from './password';
