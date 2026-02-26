@@ -35,7 +35,7 @@
     "typescript": "^5.6.0",
     "jest": "^30.2.0",
     "ts-jest": "^30.0.0",
-    "@types/jest": "^29.5.0"
+    "@types/jest": "^30.0.0"
   },
   "dependencies": {
     "zod": "^3.22.0",
