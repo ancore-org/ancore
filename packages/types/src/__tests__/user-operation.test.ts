@@ -1,11 +1,5 @@
-import {
-  UserOperationSchema,
-  TransactionResultSchema,
-} from '../user-operation';
-import {
-  isUserOperation,
-  isTransactionResult,
-} from '../guards';
+import { UserOperationSchema, TransactionResultSchema } from '../user-operation';
+import { isUserOperation, isTransactionResult } from '../guards';
 
 describe('UserOperation', () => {
   describe('UserOperationSchema', () => {

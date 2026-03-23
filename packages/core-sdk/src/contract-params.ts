@@ -23,9 +23,7 @@ import { Address, nativeToScVal, xdr } from '@stellar/stellar-sdk';
  */
 export function toScAddress(publicKey: string): xdr.ScVal {
   if (!publicKey || !publicKey.startsWith('G')) {
-    throw new Error(
-      `Invalid Stellar public key: expected a G… address, received "${publicKey}"`,
-    );
+    throw new Error(`Invalid Stellar public key: expected a G… address, received "${publicKey}"`);
   }
 
   return xdr.ScVal.scvAddress(Address.fromString(publicKey).toScAddress());
@@ -44,9 +42,7 @@ export function toScAddress(publicKey: string): xdr.ScVal {
  */
 export function toScU64(value: number): xdr.ScVal {
   if (!Number.isInteger(value) || value < 0) {
-    throw new Error(
-      `Invalid u64 value: expected a non-negative integer, received ${value}`,
-    );
+    throw new Error(`Invalid u64 value: expected a non-negative integer, received ${value}`);
   }
 
   return nativeToScVal(value, { type: 'u64' });
@@ -61,9 +57,7 @@ export function toScU64(value: number): xdr.ScVal {
  */
 export function toScU32(value: number): xdr.ScVal {
   if (!Number.isInteger(value) || value < 0 || value > 0xffff_ffff) {
-    throw new Error(
-      `Invalid u32 value: expected 0 ≤ n ≤ ${0xffff_ffff}, received ${value}`,
-    );
+    throw new Error(`Invalid u32 value: expected 0 ≤ n ≤ ${0xffff_ffff}, received ${value}`);
   }
 
   return nativeToScVal(value, { type: 'u32' });
@@ -99,9 +93,7 @@ export function toScPermissionsVec(permissions: number[]): xdr.ScVal {
  */
 export function toScOperationsVec(operations: xdr.Operation[]): xdr.ScVal {
   if (!Array.isArray(operations) || operations.length === 0) {
-    throw new Error(
-      'Operations must be a non-empty array of xdr.Operation values',
-    );
+    throw new Error('Operations must be a non-empty array of xdr.Operation values');
   }
 
   const items = operations.map((op) => {

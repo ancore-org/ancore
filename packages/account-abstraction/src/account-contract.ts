@@ -4,12 +4,7 @@
  */
 
 import type { SessionKey } from '@ancore/types';
-import {
-  Account,
-  Contract,
-  TransactionBuilder,
-  xdr,
-} from '@stellar/stellar-sdk';
+import { Account, Contract, TransactionBuilder, xdr } from '@stellar/stellar-sdk';
 import { mapContractError } from './errors';
 import {
   addressToScVal,
@@ -67,12 +62,7 @@ export class AccountContract {
    * Build invocation for execute(to, function, args, expected_nonce).
    * Caller must pass the current nonce (e.g. from getNonce()) for replay protection.
    */
-  execute(
-    to: string,
-    fn: string,
-    args: xdr.ScVal[],
-    expectedNonce: number
-  ): InvocationArgs {
+  execute(to: string, fn: string, args: xdr.ScVal[], expectedNonce: number): InvocationArgs {
     return {
       method: 'execute',
       args: [
@@ -197,10 +187,7 @@ export class AccountContract {
     const { server, sourceAccount } = options;
 
     const accountResponse = await server.getAccount(sourceAccount);
-    const account = new Account(
-      accountResponse.id,
-      accountResponse.sequence ?? '0'
-    );
+    const account = new Account(accountResponse.id, accountResponse.sequence ?? '0');
 
     const txBuilder = new TransactionBuilder(account, {
       fee: '100',
@@ -211,7 +198,7 @@ export class AccountContract {
 
     const raw = txBuilder.build();
 
-    const sim: any = await server.simulateTransaction(raw);
+    const sim = (await server.simulateTransaction(raw)) as Record<string, unknown>;
 
     if (sim && typeof sim === 'object' && ('error' in sim || 'message' in sim)) {
       const errMsg =
@@ -221,7 +208,7 @@ export class AccountContract {
       throw mapContractError(String(errMsg), sim);
     }
 
-    const result = (sim as any)?.result?.retval as xdr.ScVal | undefined;
+    const result = (sim as { result?: { retval?: xdr.ScVal } })?.result?.retval;
     if (result === undefined) {
       throw mapContractError('No return value from simulation', sim);
     }

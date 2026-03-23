@@ -1,12 +1,5 @@
 import type { Meta, StoryObj } from '@storybook/react';
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardFooter,
-  CardHeader,
-  CardTitle,
-} from './card';
+import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from './card';
 import { Button } from './button';
 
 const meta = {
@@ -55,9 +48,7 @@ export const WithFooter: Story = {
     <Card className="w-[350px]">
       <CardHeader>
         <CardTitle>Send Transaction</CardTitle>
-        <CardDescription>
-          Send XLM to another Stellar address
-        </CardDescription>
+        <CardDescription>Send XLM to another Stellar address</CardDescription>
       </CardHeader>
       <CardContent>
         <p>Transaction details go here</p>

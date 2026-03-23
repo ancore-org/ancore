@@ -18,7 +18,7 @@ describe('Input', () => {
     const user = userEvent.setup();
     render(<Input placeholder="Type here" />);
     const input = screen.getByPlaceholderText('Type here');
-    
+
     await user.type(input, 'Hello');
     expect(input).toHaveValue('Hello');
   });

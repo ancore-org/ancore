@@ -24,8 +24,7 @@ const DEFAULT_OPTIONS: Required<Omit<RetryOptions, 'isRetryable'>> = {
 /**
  * Sleep for a specified duration
  */
-const sleep = (ms: number): Promise<void> =>
-  new Promise((resolve) => setTimeout(resolve, ms));
+const sleep = (ms: number): Promise<void> => new Promise((resolve) => setTimeout(resolve, ms));
 
 /**
  * Calculate delay for a given attempt using exponential backoff
@@ -58,10 +57,7 @@ export const calculateDelay = (
  * );
  * ```
  */
-export async function withRetry<T>(
-  fn: () => Promise<T>,
-  options: RetryOptions = {}
-): Promise<T> {
+export async function withRetry<T>(fn: () => Promise<T>, options: RetryOptions = {}): Promise<T> {
   const { maxRetries, baseDelayMs, exponential } = {
     ...DEFAULT_OPTIONS,
     ...options,

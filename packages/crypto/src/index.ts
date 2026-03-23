@@ -1,9 +1,12 @@
 /**
  * @ancore/crypto
- * Cryptographic utilities for Ancore wallet
+ * Cryptographic utilities for Ancore wallet — single public entry point.
  */
 
-// Placeholder export - implement as package develops
 export const CRYPTO_VERSION = '0.1.0';
 
-export { verifySignature } from './signing';
+export * from './signing';
+export * from './hashing';
+export * from './keys';
+export * from './mnemonic';
+export * from './encoding';

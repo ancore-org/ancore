@@ -79,10 +79,7 @@ export const ShortAddress: Story = {
 export const MultipleAddresses: Story = {
   render: () => (
     <div className="w-[400px] space-y-4">
-      <AddressDisplay
-        address={sampleAddress}
-        label="From Address"
-      />
+      <AddressDisplay address={sampleAddress} label="From Address" />
       <AddressDisplay
         address="GBVFCZE3VZQJPTXDZH3UZEJWIXJLXGCQFXHZCEBR3Q2RVCZ3QGYQJKGH"
         label="To Address"
@@ -100,10 +97,7 @@ export const InCard: Story = {
   render: () => (
     <div className="w-[400px] rounded-lg border bg-card text-card-foreground shadow-sm p-6 space-y-4">
       <h3 className="text-lg font-semibold">Account Information</h3>
-      <AddressDisplay
-        address={sampleAddress}
-        label="Your Wallet Address"
-      />
+      <AddressDisplay address={sampleAddress} label="Your Wallet Address" />
       <div className="flex justify-between text-sm">
         <span className="text-muted-foreground">Balance:</span>
         <span className="font-semibold">100.50 XLM</span>

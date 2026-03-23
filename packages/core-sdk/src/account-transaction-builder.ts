@@ -28,18 +28,9 @@ import {
   xdr,
 } from '@stellar/stellar-sdk';
 
-import {
-  toScAddress,
-  toScOperationsVec,
-  toScPermissionsVec,
-  toScU64,
-} from './contract-params';
+import { toScAddress, toScOperationsVec, toScPermissionsVec, toScU64 } from './contract-params';
 
-import {
-  BuilderValidationError,
-  SimulationExpiredError,
-  SimulationFailedError,
-} from './errors';
+import { BuilderValidationError, SimulationExpiredError, SimulationFailedError } from './errors';
 
 // ---------------------------------------------------------------------------
 // Options
@@ -81,7 +72,6 @@ export class AccountTransactionBuilder {
   private readonly txBuilder: TransactionBuilder;
   private readonly server: rpc.Server;
   private readonly contract: Contract;
-  private readonly networkPassphrase: string;
   private readonly timeoutSeconds: number;
 
   /** Track whether at least one operation has been added. */
@@ -90,10 +80,7 @@ export class AccountTransactionBuilder {
   /** Whether setTimeout has already been applied to the inner builder. */
   private timeoutApplied = false;
 
-  constructor(
-    sourceAccount: Account,
-    options: AccountTransactionBuilderOptions,
-  ) {
+  constructor(sourceAccount: Account, options: AccountTransactionBuilderOptions) {
     const {
       server,
       accountContractId,
@@ -105,13 +92,12 @@ export class AccountTransactionBuilder {
     if (!accountContractId) {
       throw new BuilderValidationError(
         'accountContractId is required. Provide the C… contract ID of your ' +
-          'deployed Ancore account contract.',
+          'deployed Ancore account contract.'
       );
     }
 
     this.server = server;
     this.contract = new Contract(accountContractId);
-    this.networkPassphrase = networkPassphrase;
     this.timeoutSeconds = timeoutSeconds;
 
     // Delegate to Stellar SDK's TransactionBuilder
@@ -135,16 +121,12 @@ export class AccountTransactionBuilder {
    * @param expiresAt   - Expiration timestamp (unix ms)
    * @returns `this` for chaining
    */
-  addSessionKey(
-    publicKey: string,
-    permissions: number[],
-    expiresAt: number,
-  ): this {
+  addSessionKey(publicKey: string, permissions: number[], expiresAt: number): this {
     const operation = this.contract.call(
       'add_session_key',
       toScAddress(publicKey),
       toScPermissionsVec(permissions),
-      toScU64(expiresAt),
+      toScU64(expiresAt)
     );
 
     this.txBuilder.addOperation(operation);
@@ -161,10 +143,7 @@ export class AccountTransactionBuilder {
    * @returns `this` for chaining
    */
   revokeSessionKey(publicKey: string): this {
-    const operation = this.contract.call(
-      'revoke_session_key',
-      toScAddress(publicKey),
-    );
+    const operation = this.contract.call('revoke_session_key', toScAddress(publicKey));
 
     this.txBuilder.addOperation(operation);
     this.operationCount++;
@@ -180,14 +159,11 @@ export class AccountTransactionBuilder {
    * @param operations          - Array of Stellar XDR operations to execute
    * @returns `this` for chaining
    */
-  execute(
-    sessionKeyPublicKey: string,
-    operations: xdr.Operation[],
-  ): this {
+  execute(sessionKeyPublicKey: string, operations: xdr.Operation[]): this {
     const operation = this.contract.call(
       'execute',
       toScAddress(sessionKeyPublicKey),
-      toScOperationsVec(operations),
+      toScOperationsVec(operations)
     );
 
     this.txBuilder.addOperation(operation);
@@ -280,7 +256,7 @@ export class AccountTransactionBuilder {
     // Handle simulation failure
     if (rpc.Api.isSimulationError(simulation)) {
       throw new SimulationFailedError(
-        (simulation as rpc.Api.SimulateTransactionErrorResponse).error,
+        (simulation as rpc.Api.SimulateTransactionErrorResponse).error
       );
     }
 
@@ -296,7 +272,7 @@ export class AccountTransactionBuilder {
 
     // Fallback – should not happen, but guard defensively
     throw new SimulationFailedError(
-      'Unexpected simulation response shape. Please check Soroban RPC health.',
+      'Unexpected simulation response shape. Please check Soroban RPC health.'
     );
   }
 
@@ -321,7 +297,7 @@ export class AccountTransactionBuilder {
     if (this.operationCount === 0) {
       throw new BuilderValidationError(
         'Cannot simulate or build a transaction with zero operations. ' +
-          'Use addSessionKey(), revokeSessionKey(), execute(), or addOperation() first.',
+          'Use addSessionKey(), revokeSessionKey(), execute(), or addOperation() first.'
       );
     }
   }

@@ -25,6 +25,20 @@ function decodeSignature(signature: SignableValue): Uint8Array {
 }
 
 /**
+ * Signs a message with a Stellar secret key.
+ * Returns the raw signature bytes.
+ */
+export async function signMessage(message: SignableValue, secretKey: string): Promise<Uint8Array> {
+  try {
+    const messageBytes = toMessageBytes(message);
+    const keypair = Keypair.fromSecret(secretKey);
+    return keypair.sign(Buffer.from(messageBytes));
+  } catch {
+    throw new Error('failed to sign message');
+  }
+}
+
+/**
  * Verify an Ed25519 signature against a message using a Stellar public key.
  */
 export async function verifySignature(

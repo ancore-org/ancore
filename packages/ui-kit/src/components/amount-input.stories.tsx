@@ -23,11 +23,7 @@ export const Default: Story = {
     const [value, setValue] = useState('');
     return (
       <div className="w-[350px]">
-        <AmountInput
-          {...args}
-          value={value}
-          onChange={(e) => setValue(e.target.value)}
-        />
+        <AmountInput {...args} value={value} onChange={(e) => setValue(e.target.value)} />
       </div>
     );
   },
@@ -42,11 +38,7 @@ export const WithValue: Story = {
     const [value, setValue] = useState('25.00');
     return (
       <div className="w-[350px]">
-        <AmountInput
-          {...args}
-          value={value}
-          onChange={(e) => setValue(e.target.value)}
-        />
+        <AmountInput {...args} value={value} onChange={(e) => setValue(e.target.value)} />
       </div>
     );
   },
@@ -62,11 +54,7 @@ export const WithError: Story = {
     const [value, setValue] = useState('150.00');
     return (
       <div className="w-[350px]">
-        <AmountInput
-          {...args}
-          value={value}
-          onChange={(e) => setValue(e.target.value)}
-        />
+        <AmountInput {...args} value={value} onChange={(e) => setValue(e.target.value)} />
       </div>
     );
   },
@@ -76,7 +64,7 @@ export const DifferentAssets: Story = {
   render: () => {
     const [xlmValue, setXlmValue] = useState('');
     const [usdcValue, setUsdcValue] = useState('');
-    
+
     return (
       <div className="w-[350px] space-y-4">
         <AmountInput
@@ -108,11 +96,7 @@ export const CustomLabel: Story = {
     const [value, setValue] = useState('');
     return (
       <div className="w-[350px]">
-        <AmountInput
-          {...args}
-          value={value}
-          onChange={(e) => setValue(e.target.value)}
-        />
+        <AmountInput {...args} value={value} onChange={(e) => setValue(e.target.value)} />
       </div>
     );
   },
@@ -128,11 +112,7 @@ export const Disabled: Story = {
     const [value, setValue] = useState('10.00');
     return (
       <div className="w-[350px]">
-        <AmountInput
-          {...args}
-          value={value}
-          onChange={(e) => setValue(e.target.value)}
-        />
+        <AmountInput {...args} value={value} onChange={(e) => setValue(e.target.value)} />
       </div>
     );
   },
