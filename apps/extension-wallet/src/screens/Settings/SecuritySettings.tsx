@@ -3,12 +3,7 @@ import { AlertTriangle, Eye, EyeOff, Check, Copy } from 'lucide-react';
 import { Button, Input } from '@ancore/ui-kit';
 import { ScreenHeader } from './NetworkSettings';
 
-type SecurityView =
-  | 'menu'
-  | 'change-password'
-  | 'auto-lock'
-  | 'export-key'
-  | 'export-mnemonic';
+type SecurityView = 'menu' | 'change-password' | 'auto-lock' | 'export-key' | 'export-mnemonic';
 
 interface SecuritySettingsProps {
   autoLockTimeout: number;
@@ -35,8 +30,14 @@ function ChangePasswordView({ onDone }: { onDone: () => void }) {
   function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     setError('');
-    if (form.next.length < 8) { setError('Password must be at least 8 characters.'); return; }
-    if (form.next !== form.confirm) { setError('Passwords do not match.'); return; }
+    if (form.next.length < 8) {
+      setError('Password must be at least 8 characters.');
+      return;
+    }
+    if (form.next !== form.confirm) {
+      setError('Passwords do not match.');
+      return;
+    }
     setSuccess(true);
   }
 
@@ -48,9 +49,13 @@ function ChangePasswordView({ onDone }: { onDone: () => void }) {
         </div>
         <div>
           <p className="font-semibold text-base">Password Updated</p>
-          <p className="text-sm text-muted-foreground mt-1">Your wallet password has been changed successfully.</p>
+          <p className="text-sm text-muted-foreground mt-1">
+            Your wallet password has been changed successfully.
+          </p>
         </div>
-        <Button className="w-full mt-2" onClick={onDone}>Done</Button>
+        <Button className="w-full mt-2" onClick={onDone}>
+          Done
+        </Button>
       </div>
     );
   }
@@ -58,22 +63,30 @@ function ChangePasswordView({ onDone }: { onDone: () => void }) {
   return (
     <form onSubmit={handleSubmit} className="flex flex-col gap-4 p-4">
       <div className="space-y-1">
-        <label className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Current Password</label>
+        <label className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
+          Current Password
+        </label>
         <Input
           type="password"
           placeholder="Enter current password"
           value={form.current}
-          onChange={(e) => setForm((f) => ({ ...f, current: e.target.value }))}
+          onChange={(event: React.ChangeEvent<HTMLInputElement>) =>
+            setForm((formState) => ({ ...formState, current: event.target.value }))
+          }
         />
       </div>
       <div className="space-y-1">
-        <label className="text-xs font-medium text-muted-foreground uppercase tracking-wide">New Password</label>
+        <label className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
+          New Password
+        </label>
         <div className="relative">
           <Input
             type={showNext ? 'text' : 'password'}
             placeholder="Min. 8 characters"
             value={form.next}
-            onChange={(e) => setForm((f) => ({ ...f, next: e.target.value }))}
+            onChange={(event: React.ChangeEvent<HTMLInputElement>) =>
+              setForm((formState) => ({ ...formState, next: event.target.value }))
+            }
             className="pr-10"
           />
           <button
@@ -86,12 +99,16 @@ function ChangePasswordView({ onDone }: { onDone: () => void }) {
         </div>
       </div>
       <div className="space-y-1">
-        <label className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Confirm New Password</label>
+        <label className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
+          Confirm New Password
+        </label>
         <Input
           type="password"
           placeholder="Repeat new password"
           value={form.confirm}
-          onChange={(e) => setForm((f) => ({ ...f, confirm: e.target.value }))}
+          onChange={(event: React.ChangeEvent<HTMLInputElement>) =>
+            setForm((formState) => ({ ...formState, confirm: event.target.value }))
+          }
         />
       </div>
       {error && (
@@ -100,14 +117,24 @@ function ChangePasswordView({ onDone }: { onDone: () => void }) {
           <p className="text-xs text-destructive">{error}</p>
         </div>
       )}
-      <Button type="submit" className="w-full mt-1">Update Password</Button>
+      <Button type="submit" className="w-full mt-1">
+        Update Password
+      </Button>
     </form>
   );
 }
 
 // ── Auto-lock ────────────────────────────────────────────────────────────────
 
-function AutoLockView({ value, onChange, onDone }: { value: number; onChange: (v: number) => void; onDone: () => void }) {
+function AutoLockView({
+  value,
+  onChange,
+  onDone,
+}: {
+  value: number;
+  onChange: (v: number) => void;
+  onDone: () => void;
+}) {
   return (
     <div className="flex flex-col gap-2 p-4">
       <p className="text-xs text-muted-foreground mb-1">
@@ -118,7 +145,10 @@ function AutoLockView({ value, onChange, onDone }: { value: number; onChange: (v
           <button
             key={opt.value}
             className="flex w-full items-center justify-between px-4 py-3.5 text-sm hover:bg-accent/50 transition-colors"
-            onClick={() => { onChange(opt.value); onDone(); }}
+            onClick={() => {
+              onChange(opt.value);
+              onDone();
+            }}
           >
             <span className="font-medium">{opt.label}</span>
             {value === opt.value && (
@@ -136,9 +166,14 @@ function AutoLockView({ value, onChange, onDone }: { value: number; onChange: (v
 // ── Export warning wrapper ───────────────────────────────────────────────────
 
 function ExportWarningView({
-  warningText, onConfirm, onCancel,
+  warningText,
+  onConfirm,
+  onCancel,
 }: {
-  title: string; warningText: string; onConfirm: () => void; onCancel: () => void;
+  title: string;
+  warningText: string;
+  onConfirm: () => void;
+  onCancel: () => void;
 }) {
   const [password, setPassword] = React.useState('');
   const [confirmed, setConfirmed] = React.useState(false);
@@ -149,7 +184,10 @@ function ExportWarningView({
 
   function handleReveal(e: React.FormEvent) {
     e.preventDefault();
-    if (!password) { setError('Enter your password.'); return; }
+    if (!password) {
+      setError('Enter your password.');
+      return;
+    }
     // TODO: decrypt vault with crypto package
     setConfirmed(true);
     setError('');
@@ -166,7 +204,9 @@ function ExportWarningView({
       <div className="flex flex-col gap-4 p-4">
         <div className="flex items-start gap-3 rounded-xl border border-destructive/30 bg-destructive/5 p-3">
           <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-destructive" />
-          <p className="text-xs text-destructive leading-relaxed">Never share this with anyone. Anyone with this can steal all your funds.</p>
+          <p className="text-xs text-destructive leading-relaxed">
+            Never share this with anyone. Anyone with this can steal all your funds.
+          </p>
         </div>
         <div className="relative rounded-xl border border-border bg-muted p-4 font-mono text-xs break-all leading-relaxed">
           {show ? secret : '•'.repeat(secret.length)}
@@ -184,12 +224,18 @@ function ExportWarningView({
               onClick={handleCopy}
               className="flex items-center gap-1.5 rounded-lg bg-background border border-border px-3 py-1.5 text-xs font-medium hover:bg-accent transition-colors"
             >
-              {copied ? <Check className="h-3.5 w-3.5 text-green-500" /> : <Copy className="h-3.5 w-3.5" />}
+              {copied ? (
+                <Check className="h-3.5 w-3.5 text-green-500" />
+              ) : (
+                <Copy className="h-3.5 w-3.5" />
+              )}
               {copied ? 'Copied' : 'Copy'}
             </button>
           </div>
         </div>
-        <Button variant="outline" className="w-full" onClick={onConfirm}>Done</Button>
+        <Button variant="outline" className="w-full" onClick={onConfirm}>
+          Done
+        </Button>
       </div>
     );
   }
@@ -206,20 +252,24 @@ function ExportWarningView({
         </div>
       </div>
       <div className="space-y-1">
-        <label className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Confirm Password</label>
+        <label className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
+          Confirm Password
+        </label>
         <Input
           type="password"
           placeholder="Enter password to continue"
           value={password}
-          onChange={(e) => setPassword(e.target.value)}
+          onChange={(event: React.ChangeEvent<HTMLInputElement>) => setPassword(event.target.value)}
         />
       </div>
-      {error && (
-        <p className="text-xs text-destructive">{error}</p>
-      )}
+      {error && <p className="text-xs text-destructive">{error}</p>}
       <div className="flex gap-2 mt-1">
-        <Button type="button" variant="outline" className="flex-1" onClick={onCancel}>Cancel</Button>
-        <Button type="submit" variant="destructive" className="flex-1">Reveal</Button>
+        <Button type="button" variant="outline" className="flex-1" onClick={onCancel}>
+          Cancel
+        </Button>
+        <Button type="submit" variant="destructive" className="flex-1">
+          Reveal
+        </Button>
       </div>
     </form>
   );
@@ -227,7 +277,11 @@ function ExportWarningView({
 
 // ── SecuritySettings root ────────────────────────────────────────────────────
 
-export function SecuritySettings({ autoLockTimeout, onAutoLockChange, onBack }: SecuritySettingsProps) {
+export function SecuritySettings({
+  autoLockTimeout,
+  onAutoLockChange,
+  onBack,
+}: SecuritySettingsProps) {
   const [view, setView] = React.useState<SecurityView>('menu');
 
   const titles: Record<SecurityView, string> = {
@@ -247,15 +301,14 @@ export function SecuritySettings({ autoLockTimeout, onAutoLockChange, onBack }: 
     <div className="flex flex-col min-h-screen bg-background">
       <ScreenHeader title={titles[view]} onBack={handleBack} />
 
-      {view === 'menu' && (
-        <SecurityMenu
-          autoLockTimeout={autoLockTimeout}
-          onNavigate={setView}
-        />
-      )}
+      {view === 'menu' && <SecurityMenu autoLockTimeout={autoLockTimeout} onNavigate={setView} />}
       {view === 'change-password' && <ChangePasswordView onDone={() => setView('menu')} />}
       {view === 'auto-lock' && (
-        <AutoLockView value={autoLockTimeout} onChange={onAutoLockChange} onDone={() => setView('menu')} />
+        <AutoLockView
+          value={autoLockTimeout}
+          onChange={onAutoLockChange}
+          onDone={() => setView('menu')}
+        />
       )}
       {view === 'export-key' && (
         <ExportWarningView
@@ -289,20 +342,51 @@ function SecurityMenu({
   return (
     <div className="flex flex-col gap-4 p-4">
       <div className="rounded-xl border border-border bg-card overflow-hidden divide-y divide-border">
-        <MenuItem label="Change Password" description="Update your wallet password" onClick={() => onNavigate('change-password')} />
-        <MenuItem label="Auto-lock Timeout" description="Lock after inactivity" value={timeoutLabel} onClick={() => onNavigate('auto-lock')} />
+        <MenuItem
+          label="Change Password"
+          description="Update your wallet password"
+          onClick={() => onNavigate('change-password')}
+        />
+        <MenuItem
+          label="Auto-lock Timeout"
+          description="Lock after inactivity"
+          value={timeoutLabel}
+          onClick={() => onNavigate('auto-lock')}
+        />
       </div>
-      <p className="px-1 text-[11px] font-semibold uppercase tracking-widest text-muted-foreground">Danger Zone</p>
+      <p className="px-1 text-[11px] font-semibold uppercase tracking-widest text-muted-foreground">
+        Danger Zone
+      </p>
       <div className="rounded-xl border border-destructive/30 bg-card overflow-hidden divide-y divide-destructive/10">
-        <MenuItem label="Export Private Key" description="Reveal your raw private key" onClick={() => onNavigate('export-key')} danger />
-        <MenuItem label="Export Recovery Phrase" description="Reveal your 12-word mnemonic" onClick={() => onNavigate('export-mnemonic')} danger />
+        <MenuItem
+          label="Export Private Key"
+          description="Reveal your raw private key"
+          onClick={() => onNavigate('export-key')}
+          danger
+        />
+        <MenuItem
+          label="Export Recovery Phrase"
+          description="Reveal your 12-word mnemonic"
+          onClick={() => onNavigate('export-mnemonic')}
+          danger
+        />
       </div>
     </div>
   );
 }
 
-function MenuItem({ label, description, value, onClick, danger = false }: {
-  label: string; description?: string; value?: string; onClick: () => void; danger?: boolean;
+function MenuItem({
+  label,
+  description,
+  value,
+  onClick,
+  danger = false,
+}: {
+  label: string;
+  description?: string;
+  value?: string;
+  onClick: () => void;
+  danger?: boolean;
 }) {
   return (
     <button
@@ -311,12 +395,15 @@ function MenuItem({ label, description, value, onClick, danger = false }: {
     >
       <span className="text-left">
         <span className="block font-medium">{label}</span>
-        {description && <span className="block text-xs text-muted-foreground mt-0.5">{description}</span>}
+        {description && (
+          <span className="block text-xs text-muted-foreground mt-0.5">{description}</span>
+        )}
       </span>
-      {value
-        ? <span className="text-xs text-muted-foreground ml-2 shrink-0">{value}</span>
-        : <span className="text-muted-foreground/40 ml-2">›</span>
-      }
+      {value ? (
+        <span className="text-xs text-muted-foreground ml-2 shrink-0">{value}</span>
+      ) : (
+        <span className="text-muted-foreground/40 ml-2">›</span>
+      )}
     </button>
   );
 }
