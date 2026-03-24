@@ -14,6 +14,9 @@ const parserOptions = {
 };
 
 module.exports = [
+  {
+    ignores: ['.storybook/**'],
+  },
   js.configs.recommended,
   {
     files: ['**/*.{ts,tsx}'],

@@ -25,6 +25,6 @@ describe('guards', () => {
     expect(isValidPermission(0)).toBe(true);
     expect(isValidPermission(2)).toBe(true);
     expect(isValidPermission(99)).toBe(false);
-    expect(isValidPermission('x' as any)).toBe(false);
+    expect(isValidPermission('x')).toBe(false);
   });
 });

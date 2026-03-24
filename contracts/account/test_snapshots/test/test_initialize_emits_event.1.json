@@ -3,9 +3,7 @@
     "address": 2,
     "nonce": 0
   },
-  "auth": [
-    []
-  ],
+  "auth": [[]],
   "ledger": {
     "protocol_version": 21,
     "sequence_number": 0,
@@ -70,7 +68,7 @@
             },
             "ext": "v0"
           },
-          4095
+          518400
         ]
       ],
       [
@@ -91,7 +89,7 @@
             },
             "ext": "v0"
           },
-          4095
+          518400
         ]
       ]
     ]
