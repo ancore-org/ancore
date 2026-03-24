@@ -1,11 +1,11 @@
 /**
  * Error Handler Module
- * 
+ *
  * Provides global error classification and handling functionality.
  * Classifies errors into network, validation, or contract errors and logs them locally.
  */
 
-import { ErrorMessage, getErrorMessage, getFallbackErrorMessage } from './error-messages';
+import { ErrorMessage, getErrorMessage } from './error-messages';
 
 /**
  * Error categories for classification
@@ -122,17 +122,17 @@ export class ErrorHandler {
     const errorString = this.errorToString(error).toLowerCase();
 
     // Check for network errors
-    if (NETWORK_ERROR_PATTERNS.some(pattern => errorString.includes(pattern.toLowerCase()))) {
+    if (NETWORK_ERROR_PATTERNS.some((pattern) => errorString.includes(pattern.toLowerCase()))) {
       return ErrorCategory.NETWORK;
     }
 
     // Check for contract errors
-    if (CONTRACT_ERROR_PATTERNS.some(pattern => errorString.includes(pattern.toLowerCase()))) {
+    if (CONTRACT_ERROR_PATTERNS.some((pattern) => errorString.includes(pattern.toLowerCase()))) {
       return ErrorCategory.CONTRACT;
     }
 
     // Check for validation errors
-    if (VALIDATION_ERROR_PATTERNS.some(pattern => errorString.includes(pattern.toLowerCase()))) {
+    if (VALIDATION_ERROR_PATTERNS.some((pattern) => errorString.includes(pattern.toLowerCase()))) {
       return ErrorCategory.VALIDATION;
     }
 
@@ -151,13 +151,13 @@ export class ErrorHandler {
       if (codeMatch) {
         return codeMatch[1];
       }
-      
+
       // Check for HTTP status codes
       const statusMatch = error.message.match(/\b(4\d{2}|5\d{2})\b/);
       if (statusMatch) {
         return statusMatch[1];
       }
-      
+
       // Check for node error code property
       if ('code' in error && typeof error.code === 'string') {
         return error.code;
@@ -203,9 +203,11 @@ export class ErrorHandler {
    * @returns Whether the error is recoverable
    */
   isRecoverable(category: ErrorCategory): boolean {
-    return category === ErrorCategory.NETWORK || 
-           category === ErrorCategory.VALIDATION || 
-           category === ErrorCategory.CONTRACT;
+    return (
+      category === ErrorCategory.NETWORK ||
+      category === ErrorCategory.VALIDATION ||
+      category === ErrorCategory.CONTRACT
+    );
   }
 
   /**
@@ -242,12 +244,12 @@ export class ErrorHandler {
 
     if (this.config.logToStorage) {
       this.errorLog.push(errorInfo);
-      
+
       // Trim log if it exceeds max size
       if (this.errorLog.length > this.config.maxStoredErrors) {
         this.errorLog = this.errorLog.slice(-this.config.maxStoredErrors);
       }
-      
+
       this.saveErrorLog();
     }
   }
@@ -287,10 +289,7 @@ export class ErrorHandler {
    */
   private saveErrorLog(): void {
     try {
-      localStorage.setItem(
-        this.config.storageKey,
-        JSON.stringify(this.errorLog)
-      );
+      localStorage.setItem(this.config.storageKey, JSON.stringify(this.errorLog));
     } catch {
       // Ignore storage errors (e.g., quota exceeded)
     }
@@ -367,7 +366,7 @@ export function withErrorHandling<T extends (...args: unknown[]) => Promise<unkn
 ): (...args: Parameters<T>) => Promise<ErrorInfo | ReturnType<T>> {
   return async (...args: Parameters<T>): Promise<ErrorInfo | ReturnType<T>> => {
     try {
-      return await fn(...args) as ReturnType<T>;
+      return (await fn(...args)) as ReturnType<T>;
     } catch (error) {
       const errorInfo = handleError(error, context);
       return errorInfo as ErrorInfo;
@@ -389,27 +388,27 @@ export function createRetryable<T extends (...args: unknown[]) => Promise<unknow
 ): (...args: Parameters<T>) => Promise<ErrorInfo | ReturnType<T>> {
   return async (...args: Parameters<T>): Promise<ErrorInfo | ReturnType<T>> => {
     let lastError: unknown;
-    
+
     for (let attempt = 0; attempt <= maxRetries; attempt++) {
       try {
-        return await fn(...args) as ReturnType<T>;
+        return (await fn(...args)) as ReturnType<T>;
       } catch (error) {
         lastError = error;
-        
+
         // Don't retry on validation errors
         const category = classifyError(error);
         if (category === ErrorCategory.VALIDATION) {
           const errorInfo = handleError(error);
           return errorInfo as ErrorInfo;
         }
-        
+
         // Wait before retrying
         if (attempt < maxRetries) {
-          await new Promise(resolve => setTimeout(resolve, delay * (attempt + 1)));
+          await new Promise((resolve) => setTimeout(resolve, delay * (attempt + 1)));
         }
       }
     }
-    
+
     // All retries failed
     const errorInfo = handleError(lastError!, `Retry failed after ${maxRetries} attempts`);
     return errorInfo as ErrorInfo;

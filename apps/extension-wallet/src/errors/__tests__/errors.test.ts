@@ -1,6 +1,6 @@
 /**
  * Error Handling System Tests
- * 
+ *
  * Unit tests for:
  * - ErrorBoundary catching errors
  * - ErrorScreen UI rendering
@@ -8,8 +8,18 @@
  * - Recovery functionality
  */
 
-import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { ErrorHandler, ErrorCategory, handleError, classifyError, getErrorUserMessage, withErrorHandling, createRetryable, getErrorHandler } from '../error-handler';
+import { describe, it, expect, beforeEach } from 'vitest';
+import {
+  ErrorHandler,
+  ErrorCategory,
+  handleError,
+  classifyError,
+  getErrorUserMessage,
+  withErrorHandling,
+  createRetryable,
+  getErrorHandler,
+  type ErrorInfo,
+} from '../error-handler';
 import { getErrorMessage, ERROR_MESSAGES } from '../error-messages';
 
 describe('ErrorHandler', () => {
@@ -90,7 +100,8 @@ describe('ErrorHandler', () => {
 
     it('should extract node error code property', () => {
       const error = new Error('Test error');
-      (error as any).code = 'ENOENT';
+      const errorWithCode = error as Error & { code?: string };
+      errorWithCode.code = 'ENOENT';
       const code = errorHandler.extractErrorCode(error);
       expect(code).toBe('ENOENT');
     });
@@ -282,9 +293,10 @@ describe('Recovery functionality', () => {
 
       const retryableFn = createRetryable(validationErrorFn, 3, 10);
       const result = await retryableFn();
+      const errorInfo = result as ErrorInfo;
 
       expect(result).toHaveProperty('category');
-      expect((result as any).category).toBe(ErrorCategory.VALIDATION);
+      expect(errorInfo.category).toBe(ErrorCategory.VALIDATION);
     });
   });
 });
