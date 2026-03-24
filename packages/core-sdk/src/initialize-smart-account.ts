@@ -99,7 +99,6 @@ function defaultCreateAccountContract<TOperation = unknown>(
 ): SmartAccountInitializerContract<TOperation> {
   // Lazy-load to keep tests independent from workspace package type resolution.
   // In normal runtime, this resolves to @ancore/account-abstraction's AccountContract.
-  // eslint-disable-next-line @typescript-eslint/no-require-imports, no-undef
   const { AccountContract } = require('@ancore/account-abstraction') as {
     AccountContract: new (id: string) => SmartAccountInitializerContract<TOperation>;
   };

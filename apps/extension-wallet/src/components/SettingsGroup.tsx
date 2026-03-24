@@ -51,7 +51,9 @@ export function SettingItem({
       onClick={onClick}
     >
       {icon && (
-        <span className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-lg ${danger ? 'bg-destructive/10 text-destructive' : 'bg-primary/10 text-primary'}`}>
+        <span
+          className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-lg ${danger ? 'bg-destructive/10 text-destructive' : 'bg-primary/10 text-primary'}`}
+        >
           {icon}
         </span>
       )}
@@ -63,9 +65,7 @@ export function SettingItem({
       </span>
       {rightSlot ?? (
         <>
-          {value !== undefined && (
-            <span className="text-xs text-muted-foreground">{value}</span>
-          )}
+          {value !== undefined && <span className="text-xs text-muted-foreground">{value}</span>}
           {onClick && <ChevronRight className="h-4 w-4 text-muted-foreground/50 shrink-0" />}
         </>
       )}

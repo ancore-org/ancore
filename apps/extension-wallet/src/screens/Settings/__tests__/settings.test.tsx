@@ -30,7 +30,10 @@ describe('useSettings', () => {
   });
 
   it('rehydrates settings from localStorage', () => {
-    localStorage.setItem('ancore_settings', JSON.stringify({ network: 'mainnet', autoLockTimeout: 15 }));
+    localStorage.setItem(
+      'ancore_settings',
+      JSON.stringify({ network: 'mainnet', autoLockTimeout: 15 })
+    );
     const { result } = renderHook(() => useSettings());
     expect(result.current.settings.network).toBe('mainnet');
     expect(result.current.settings.autoLockTimeout).toBe(15);
@@ -78,9 +81,7 @@ describe('SettingItem', () => {
 
 describe('NetworkSettings', () => {
   it('shows current network as active', () => {
-    render(
-      <NetworkSettings value="testnet" onChange={vi.fn()} onBack={vi.fn()} />
-    );
+    render(<NetworkSettings value="testnet" onChange={vi.fn()} onBack={vi.fn()} />);
     expect(screen.getByText('Testnet')).toBeInTheDocument();
     // active network has a check icon inside a primary-colored circle
     expect(screen.getByText('Testnet').closest('button')).toHaveClass('border-primary');
@@ -89,18 +90,14 @@ describe('NetworkSettings', () => {
   it('switches to testnet without confirmation', async () => {
     const onChange = vi.fn();
     const onBack = vi.fn();
-    render(
-      <NetworkSettings value="mainnet" onChange={onChange} onBack={onBack} />
-    );
+    render(<NetworkSettings value="mainnet" onChange={onChange} onBack={onBack} />);
     await userEvent.click(screen.getByText('Testnet'));
     expect(onChange).toHaveBeenCalledWith('testnet');
     expect(onBack).toHaveBeenCalled();
   });
 
   it('shows mainnet warning before switching', async () => {
-    render(
-      <NetworkSettings value="testnet" onChange={vi.fn()} onBack={vi.fn()} />
-    );
+    render(<NetworkSettings value="testnet" onChange={vi.fn()} onBack={vi.fn()} />);
     await userEvent.click(screen.getByText('Mainnet'));
     expect(screen.getByText(/switch to mainnet\?/i)).toBeInTheDocument();
   });
@@ -108,9 +105,7 @@ describe('NetworkSettings', () => {
   it('confirms mainnet switch', async () => {
     const onChange = vi.fn();
     const onBack = vi.fn();
-    render(
-      <NetworkSettings value="testnet" onChange={onChange} onBack={onBack} />
-    );
+    render(<NetworkSettings value="testnet" onChange={onChange} onBack={onBack} />);
     await userEvent.click(screen.getByText('Mainnet'));
     await userEvent.click(screen.getByRole('button', { name: /switch to mainnet/i }));
     expect(onChange).toHaveBeenCalledWith('mainnet');
@@ -119,9 +114,7 @@ describe('NetworkSettings', () => {
 
   it('cancels mainnet switch', async () => {
     const onChange = vi.fn();
-    render(
-      <NetworkSettings value="testnet" onChange={onChange} onBack={vi.fn()} />
-    );
+    render(<NetworkSettings value="testnet" onChange={onChange} onBack={vi.fn()} />);
     await userEvent.click(screen.getByText('Mainnet'));
     await userEvent.click(screen.getByRole('button', { name: /cancel/i }));
     expect(onChange).not.toHaveBeenCalled();
@@ -130,9 +123,7 @@ describe('NetworkSettings', () => {
 
   it('calls onBack when back button clicked', async () => {
     const onBack = vi.fn();
-    render(
-      <NetworkSettings value="testnet" onChange={vi.fn()} onBack={onBack} />
-    );
+    render(<NetworkSettings value="testnet" onChange={vi.fn()} onBack={onBack} />);
     await userEvent.click(screen.getByRole('button', { name: /go back/i }));
     expect(onBack).toHaveBeenCalled();
   });
@@ -254,7 +245,9 @@ describe('SettingsScreen', () => {
     render(<SettingsScreen />);
     // click the Network row button (the SettingItem, not the section heading)
     const networkButtons = screen.getAllByRole('button');
-    const networkRowBtn = networkButtons.find((b) => b.textContent?.includes('Network') && b.textContent?.includes('Testnet'));
+    const networkRowBtn = networkButtons.find(
+      (b) => b.textContent?.includes('Network') && b.textContent?.includes('Testnet')
+    );
     await userEvent.click(networkRowBtn!);
     expect(screen.getByText('Testnet')).toBeInTheDocument();
     expect(screen.getByText('Mainnet')).toBeInTheDocument();
@@ -273,7 +266,10 @@ describe('SettingsScreen', () => {
   });
 
   it('shows current network in root view', () => {
-    localStorage.setItem('ancore_settings', JSON.stringify({ network: 'mainnet', autoLockTimeout: 5 }));
+    localStorage.setItem(
+      'ancore_settings',
+      JSON.stringify({ network: 'mainnet', autoLockTimeout: 5 })
+    );
     render(<SettingsScreen />);
     expect(screen.getAllByText('Mainnet').length).toBeGreaterThanOrEqual(1);
   });

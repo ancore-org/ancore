@@ -6,11 +6,11 @@
   "module": "./dist/index.mjs",
   "types": "./dist/index.d.ts",
   "scripts": {
-  "build": "tsup src/index.ts --format cjs,esm --dts --tsconfig tsconfig.json",
-  "dev": "tsup src/index.ts --format cjs,esm --dts --watch",
-  "test": "jest",
-  "lint": "eslint src/",
-  "clean": "rm -rf dist"
+    "build": "tsup src/index.ts --format cjs,esm --dts --tsconfig tsconfig.json",
+    "dev": "tsup src/index.ts --format cjs,esm --dts --watch",
+    "test": "jest",
+    "lint": "eslint src/",
+    "clean": "rm -rf dist"
   },
   "keywords": [
     "ancore",

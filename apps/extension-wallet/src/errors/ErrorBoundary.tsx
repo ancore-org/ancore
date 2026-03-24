@@ -1,12 +1,12 @@
 /**
  * ErrorBoundary Component
- * 
+ *
  * A reusable React ErrorBoundary that wraps the app and catches rendering errors.
  * Uses react-error-boundary library for robust error handling.
  */
 
 import { ErrorBoundary as ReactErrorBoundary, useErrorBoundary } from 'react-error-boundary';
-import type { ErrorInfo, ReactNode } from 'react';
+import type { ComponentType, ErrorInfo, JSX, ReactNode } from 'react';
 import { ErrorScreen } from './ErrorScreen';
 import { ErrorCategory, handleError } from './error-handler';
 
@@ -23,7 +23,7 @@ export interface ErrorBoundaryProps {
 
 /**
  * ErrorBoundary component that catches React rendering errors
- * 
+ *
  * @example
  * ```tsx
  * <ErrorBoundary>
@@ -31,11 +31,7 @@ export interface ErrorBoundaryProps {
  * </ErrorBoundary>
  * ```
  */
-export function ErrorBoundary({ 
-  children, 
-  fallback,
-  onError,
-}: ErrorBoundaryProps): JSX.Element {
+export function ErrorBoundary({ children, fallback, onError }: ErrorBoundaryProps): JSX.Element {
   // If there's a custom fallback component provided, use it
   if (fallback) {
     return (
@@ -87,20 +83,21 @@ interface ErrorFallbackProps {
 /**
  * Internal ErrorFallback component that displays the error
  */
-function ErrorFallback({ 
-  error, 
-  resetErrorBoundary, 
+function ErrorFallback({
+  error,
+  resetErrorBoundary,
   onError,
   customFallback,
 }: ErrorFallbackProps): JSX.Element {
   // Convert unknown error to Error object
-  const err = error && typeof error === 'object' && 'message' in error 
-    ? error as globalThis.Error 
-    : new Error(String(error));
+  const err =
+    error && typeof error === 'object' && 'message' in error
+      ? (error as globalThis.Error)
+      : new Error(String(error));
 
   // Handle the error through our error handler
   const errorInfo = handleError(err, 'React ErrorBoundary');
-  
+
   // Call onError callback if provided
   if (onError) {
     onError(err, { componentStack: err.stack || '' } as ErrorInfo);
@@ -125,11 +122,11 @@ function ErrorFallback({
 /**
  * Hook for handling async errors in components
  * Use this to catch errors in event handlers and async functions
- * 
+ *
  * @example
  * ```tsx
  * const { reset, dispatch } = useErrorHandler();
- * 
+ *
  * const handleClick = async () => {
  *   try {
  *     await someAsyncOperation();
@@ -147,9 +144,10 @@ export function useErrorHandler() {
   return {
     /** Dispatch an error to the boundary */
     dispatch: (error: unknown) => {
-      const err = error && typeof error === 'object' && 'message' in error 
-        ? error as globalThis.Error 
-        : new Error(String(error));
+      const err =
+        error && typeof error === 'object' && 'message' in error
+          ? (error as globalThis.Error)
+          : new Error(String(error));
       showBoundary(err);
     },
     /** Clear the error boundary state */
@@ -161,16 +159,16 @@ export function useErrorHandler() {
 
 /**
  * Higher-order component wrapper for error handling async operations
- * 
+ *
  * @example
  * ```tsx
  * const WrappedComponent = withErrorBoundary(MyComponent);
  * ```
  */
 export function withErrorBoundary<P extends object>(
-  Component: React.ComponentType<P>,
+  Component: ComponentType<P>,
   errorBoundaryProps?: Partial<ErrorBoundaryProps>
-): React.ComponentType<P> {
+): ComponentType<P> {
   return function WrappedComponent(props: P): JSX.Element {
     return (
       <ErrorBoundary {...errorBoundaryProps}>
@@ -194,18 +192,11 @@ interface ErrorBoundaryResetProps {
  * A button component that resets the ErrorBoundary when clicked
  * Useful for triggering error recovery
  */
-export function ErrorBoundaryReset({ 
-  children, 
-  className 
-}: ErrorBoundaryResetProps): JSX.Element {
+export function ErrorBoundaryReset({ children, className }: ErrorBoundaryResetProps): JSX.Element {
   const { reset } = useErrorHandler();
 
   return (
-    <button 
-      onClick={reset} 
-      className={className}
-      type="button"
-    >
+    <button onClick={reset} className={className} type="button">
       {children || 'Reset'}
     </button>
   );

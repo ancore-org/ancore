@@ -1,4 +1,3 @@
-/* global describe, it, expect, jest */
 import {
   AncoreClient,
   BuilderValidationError,

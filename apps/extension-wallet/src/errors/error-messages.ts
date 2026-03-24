@@ -1,6 +1,6 @@
 /**
  * Error Messages Module
- * 
+ *
  * Defines structured, user-friendly error messages for each type of error.
  * These messages are used by the ErrorScreen component and error handler.
  */
@@ -46,7 +46,8 @@ export const ERROR_MESSAGES: Record<ErrorCategory, ErrorMessage> = {
   },
   [ErrorCategory.CONTRACT]: {
     title: 'Contract Error',
-    description: 'A smart contract interaction failed. This may be due to insufficient funds or contract constraints.',
+    description:
+      'A smart contract interaction failed. This may be due to insufficient funds or contract constraints.',
     recoveryHint: 'Ensure you have enough balance and try again',
     canRetry: true,
     canReset: false,
@@ -65,76 +66,76 @@ export const ERROR_MESSAGES: Record<ErrorCategory, ErrorMessage> = {
  */
 export const SPECIFIC_ERROR_MESSAGES: Record<string, ErrorMessage> = {
   // Network-specific errors
-  'ECONNREFUSED': {
+  ECONNREFUSED: {
     title: 'Server Unavailable',
     description: 'The server is not responding. Please try again later.',
     recoveryHint: 'Check your internet connection',
     canRetry: true,
     canReset: false,
   },
-  'ETIMEDOUT': {
+  ETIMEDOUT: {
     title: 'Request Timeout',
     description: 'The request took too long and was cancelled.',
     recoveryHint: 'Check your connection and try again',
     canRetry: true,
     canReset: false,
   },
-  'ENOTFOUND': {
+  ENOTFOUND: {
     title: 'Page Not Found',
     description: 'The requested resource could not be found.',
     recoveryHint: 'The URL may be incorrect or outdated',
     canRetry: true,
     canReset: false,
   },
-  
+
   // Validation-specific errors
-  'INVALID_ADDRESS': {
+  INVALID_ADDRESS: {
     title: 'Invalid Address',
     description: 'The wallet address format is invalid.',
     recoveryHint: 'Check the address and try again',
     canRetry: true,
     canReset: true,
   },
-  'INSUFFICIENT_BALANCE': {
+  INSUFFICIENT_BALANCE: {
     title: 'Insufficient Balance',
     description: 'You do not have enough balance to complete this transaction.',
     recoveryHint: 'Add more funds to your wallet',
     canRetry: true,
     canReset: false,
   },
-  'INVALID_AMOUNT': {
+  INVALID_AMOUNT: {
     title: 'Invalid Amount',
     description: 'The amount entered is invalid.',
     recoveryHint: 'Enter a valid positive number',
     canRetry: true,
     canReset: true,
   },
-  
+
   // Contract-specific errors
-  'CONTRACT_CALL_FAILED': {
+  CONTRACT_CALL_FAILED: {
     title: 'Transaction Failed',
     description: 'The smart contract call failed.',
     recoveryHint: 'Check your balance and try again',
     canRetry: true,
     canReset: false,
   },
-  'CONTRACT_NOT_FOUND': {
+  CONTRACT_NOT_FOUND: {
     title: 'Contract Not Found',
     description: 'The smart contract could not be found.',
     recoveryHint: 'The contract may not be deployed',
     canRetry: true,
     canReset: false,
   },
-  
+
   // Authentication errors
-  'UNAUTHORIZED': {
+  UNAUTHORIZED: {
     title: 'Unauthorized',
     description: 'You are not authorized to perform this action.',
     recoveryHint: 'Please log in again',
     canRetry: true,
     canReset: true,
   },
-  'SESSION_EXPIRED': {
+  SESSION_EXPIRED: {
     title: 'Session Expired',
     description: 'Your session has expired. Please log in again.',
     recoveryHint: 'Log in to continue',
@@ -154,7 +155,7 @@ export function getErrorMessage(category: ErrorCategory, errorCode?: string): Er
   if (errorCode && SPECIFIC_ERROR_MESSAGES[errorCode]) {
     return SPECIFIC_ERROR_MESSAGES[errorCode];
   }
-  
+
   // Fall back to category-level message
   return ERROR_MESSAGES[category] || ERROR_MESSAGES[ErrorCategory.UNKNOWN];
 }

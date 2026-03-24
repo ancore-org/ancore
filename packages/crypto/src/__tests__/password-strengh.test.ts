@@ -25,7 +25,6 @@ function assertNoPasswordLeak(password: string, result: PasswordValidationResult
 }
 
 describe('validatePasswordStrength()', () => {
-
   describe('input edge cases', () => {
     it('rejects an empty string', () => {
       const result = validatePasswordStrength('');

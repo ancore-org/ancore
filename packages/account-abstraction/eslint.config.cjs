@@ -12,6 +12,18 @@ module.exports = [
         ecmaVersion: 2020,
         sourceType: 'module',
       },
+      globals: {
+        describe: 'readonly',
+        it: 'readonly',
+        expect: 'readonly',
+        beforeEach: 'readonly',
+        afterEach: 'readonly',
+        beforeAll: 'readonly',
+        afterAll: 'readonly',
+        jest: 'readonly',
+        Buffer: 'readonly',
+        console: 'readonly',
+      },
     },
     plugins: {
       '@typescript-eslint': tseslint,

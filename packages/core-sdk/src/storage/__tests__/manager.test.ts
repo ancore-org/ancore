@@ -53,7 +53,7 @@ describe('SecureStorageManager', () => {
 
     const storedData = await storage.get('account');
     expect(storedData).toBeDefined();
-    
+
     // Ensure it's not plaintext
     const jsonStr = JSON.stringify(storedData);
     expect(jsonStr).not.toContain(accountData.privateKey);
@@ -95,7 +95,7 @@ describe('SecureStorageManager', () => {
   it('should fail gracefully with the wrong password', async () => {
     await manager.unlock(password);
     await manager.saveAccount(accountData);
-    
+
     manager.lock();
     const newManager = new SecureStorageManager(storage);
     await newManager.unlock('wrong_password');
@@ -105,14 +105,14 @@ describe('SecureStorageManager', () => {
 
   it('should return null for non-existent items', async () => {
     await manager.unlock(password);
-    
+
     const account = await manager.getAccount();
     expect(account).toBeNull();
-    
+
     const sessionKeys = await manager.getSessionKeys();
     expect(sessionKeys).toBeNull();
   });
-  
+
   it('should not throw on unlock if already unlocked', async () => {
     await manager.unlock(password);
     await manager.unlock(password); // Should return early

@@ -1,24 +1,10 @@
 import * as React from 'react';
-import {
-  Button,
-  Card,
-  CardContent,
-  CardHeader,
-  CardTitle,
-  Separator,
-  cn,
-} from '@ancore/ui-kit';
+import { Button, Card, CardContent, CardHeader, CardTitle, Separator, cn } from '@ancore/ui-kit';
 import { format } from 'date-fns';
 import { ArrowLeft, Copy, ExternalLink } from 'lucide-react';
 
-import {
-  TransactionStatus,
-  type TransactionStatusKind,
-} from '@/components/TransactionStatus';
-import {
-  getTransactionExplorerLink,
-  type StellarNetwork,
-} from '@/utils/explorer-links';
+import { TransactionStatus, type TransactionStatusKind } from '@/components/TransactionStatus';
+import { getTransactionExplorerLink, type StellarNetwork } from '@/utils/explorer-links';
 
 export interface TransactionDetailData {
   id?: string;
@@ -76,11 +62,7 @@ function truncateHash(hash: string): string {
   return `${hash.slice(0, 8)}...${hash.slice(-8)}`;
 }
 
-export function TransactionDetail({
-  transaction,
-  onBack,
-  className,
-}: TransactionDetailProps) {
+export function TransactionDetail({ transaction, onBack, className }: TransactionDetailProps) {
   const [copied, setCopied] = React.useState(false);
 
   const explorerLink = getTransactionExplorerLink(
@@ -98,13 +80,7 @@ export function TransactionDetail({
     <Card className={cn('mx-auto w-full max-w-md border-slate-200', className)}>
       <CardHeader className="space-y-4 pb-4">
         <div className="flex items-center gap-3">
-          <Button
-            type="button"
-            variant="ghost"
-            size="icon"
-            aria-label="Go back"
-            onClick={onBack}
-          >
+          <Button type="button" variant="ghost" size="icon" aria-label="Go back" onClick={onBack}>
             <ArrowLeft className="h-4 w-4" aria-hidden="true" />
           </Button>
           <CardTitle className="text-lg">Details</CardTitle>
@@ -158,9 +134,7 @@ export function TransactionDetail({
           </div>
           <div className="contents">
             <dt className="font-medium text-slate-500">Block</dt>
-            <dd className="text-slate-900">
-              {transaction.blockNumber ?? 'Not available'}
-            </dd>
+            <dd className="text-slate-900">{transaction.blockNumber ?? 'Not available'}</dd>
           </div>
           <div className="contents">
             <dt className="font-medium text-slate-500">TX Hash</dt>
@@ -196,10 +170,4 @@ export function TransactionDetail({
   );
 }
 
-export {
-  copyText,
-  formatDateTime,
-  getCounterpartyLabel,
-  getHeadline,
-  truncateHash,
-};
+export { copyText, formatDateTime, getCounterpartyLabel, getHeadline, truncateHash };
