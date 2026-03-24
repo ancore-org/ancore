@@ -5,11 +5,25 @@
 
 export const SDK_VERSION = '0.1.0';
 
+// SDK client
+export { AncoreClient } from './ancore-client';
+export type { AncoreClientOptions } from './ancore-client';
+
 // Account transaction builder (wrapper around Stellar SDK's TransactionBuilder)
 export {
   AccountTransactionBuilder,
   type AccountTransactionBuilderOptions,
 } from './account-transaction-builder';
+
+// Smart account initialization flow
+export {
+  initializeSmartAccount,
+  validateContractId,
+  type SmartAccountInitializerContract,
+  type SmartAccountInitializerBuilder,
+  type InitializeSmartAccountOptions,
+  type InitializeSmartAccountResult,
+} from './initialize-smart-account';
 
 // Contract parameter encoding helpers
 export {
