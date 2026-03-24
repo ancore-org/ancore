@@ -29,7 +29,7 @@ module.exports = [
     },
     plugins: {
       '@typescript-eslint': tseslint,
-      'react': react,
+      react,
       'react-hooks': reactHooks,
     },
     rules: {
@@ -38,8 +38,9 @@ module.exports = [
       ...reactHooks.configs.recommended.rules,
       'no-undef': 'off',
       'react/prop-types': 'off',
-      'react/react-in-jsx-scope': 'off', // Not needed in React 18+
-      '@typescript-eslint/no-unused-vars': ['warn', { argsIgnorePattern: '^_' }],
+      'react/react-in-jsx-scope': 'off',
+      '@typescript-eslint/no-unused-vars': ['warn', { argsIgnorePattern: '^_', varsIgnorePattern: '^_' }],
+      '@typescript-eslint/no-empty-object-type': 'off',
     },
     settings: {
       react: {
@@ -48,20 +49,29 @@ module.exports = [
     },
   },
   {
-    files: ['**/__tests__/**/*.{ts,tsx}', '**/*.test.{ts,tsx}'],
+    files: ['**/*.stories.{ts,tsx}'],
+    rules: {
+      'react-hooks/rules-of-hooks': 'off',
+    },
+  },
+  {
+    files: ['**/__tests__/**/*.{ts,tsx}', '**/*.test.{ts,tsx}', '**/*.spec.{ts,tsx}'],
     languageOptions: {
       parser: tsparser,
       parserOptions,
       globals: {
         ...globals.browser,
-        ...globals.jest,
+        describe: 'readonly',
+        test: 'readonly',
+        it: 'readonly',
+        expect: 'readonly',
+        beforeAll: 'readonly',
+        beforeEach: 'readonly',
+        afterAll: 'readonly',
+        afterEach: 'readonly',
+        jest: 'readonly',
+        vi: 'readonly',
       },
-    },
-  },
-  {
-    files: ['**/*.stories.tsx'],
-    rules: {
-      'react-hooks/rules-of-hooks': 'off',
     },
   },
 ];

@@ -70,8 +70,8 @@ export class SecureStorageManager {
   }
 
   private async encryptData(plaintext: string): Promise<EncryptedPayload> {
-    const salt = globalThis.crypto.getRandomValues(new Uint8Array(new ArrayBuffer(16)));
-    const iv = globalThis.crypto.getRandomValues(new Uint8Array(new ArrayBuffer(12)));
+    const salt = globalThis.crypto.getRandomValues(new Uint8Array(16));
+    const iv = globalThis.crypto.getRandomValues(new Uint8Array(12));
 
     const aesKey = await this.deriveAesKey(salt.buffer);
     const encoder = new TextEncoder();

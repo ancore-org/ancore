@@ -3,7 +3,9 @@
  * Provides a TypeScript API for initialize, execute, session keys, and read methods.
  */
 
+import type { SessionKey } from '@ancore/types';
 import { Account, Contract, TransactionBuilder, xdr } from '@stellar/stellar-sdk';
+import { mapContractError } from './errors';
 import {
   addressToScVal,
   permissionsToScVal,
@@ -14,9 +16,6 @@ import {
   symbolToScVal,
   u64ToScVal,
 } from './xdr-utils';
-
-import type { SessionKey } from '@ancore/types';
-import { mapContractError } from './errors';
 
 /** Options for read calls (getOwner, getNonce, getSessionKey) when using a server */
 export interface AccountContractReadOptions {

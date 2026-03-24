@@ -1,15 +1,15 @@
 import * as React from 'react';
 import * as ReactDOM from 'react-dom';
 
-import { Toast } from './Toast';
+import { Toast as ToastComponent } from './Toast';
 
 export type ToastVariant = 'success' | 'error' | 'info';
 
-// export interface Toast {
-//   id: string;
-//   message: string;
-//   variant: ToastVariant;
-// }
+export interface Toast {
+  id: string;
+  message: string;
+  variant: ToastVariant;
+}
 
 interface NotificationContextValue {
   toast: (message: string, variant?: ToastVariant, duration?: number) => void;
@@ -49,7 +49,7 @@ export function NotificationProvider({ children }: { children: React.ReactNode }
           className="fixed z-50 flex flex-col gap-2 pointer-events-none bottom-4 right-4"
         >
           {toasts.map((t) => (
-            <Toast
+            <ToastComponent
               key={t.id}
               id={t.id}
               message={t.message}

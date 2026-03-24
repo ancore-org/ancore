@@ -1,15 +1,15 @@
-import { SettingItem, SettingsGroup } from '../../../components/SettingsGroup';
-import { act, renderHook } from '@testing-library/react';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { fireEvent, render, screen } from '@testing-library/react';
+import { describe, it, expect, beforeEach, vi } from 'vitest';
+import { render, screen, fireEvent } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
+import { renderHook, act } from '@testing-library/react';
+import { NotificationProvider } from '@ancore/ui-kit';
 
 import { AboutScreen } from '../AboutScreen';
 import { NetworkSettings } from '../NetworkSettings';
-import { NotificationProvider } from '@ancore/ui-kit';
 import { SecuritySettings } from '../SecuritySettings';
 import { SettingsScreen } from '../SettingsScreen';
+import { SettingItem, SettingsGroup } from '../../../components/SettingsGroup';
 import { useSettings } from '../../../hooks/useSettings';
-import userEvent from '@testing-library/user-event';
 
 function renderSettingsScreen() {
   return render(
