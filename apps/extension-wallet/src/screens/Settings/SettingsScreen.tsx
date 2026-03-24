@@ -1,13 +1,5 @@
 import * as React from 'react';
-import {
-  Globe,
-  Lock,
-  Timer,
-  Key,
-  FileText,
-  Info,
-  Bell,
-} from 'lucide-react';
+import { Globe, Lock, Timer, Key, FileText, Info, Bell } from 'lucide-react';
 import { SettingsGroup, SettingItem } from '../../components/SettingsGroup';
 import { NetworkSettings } from './NetworkSettings';
 import { SecuritySettings } from './SecuritySettings';

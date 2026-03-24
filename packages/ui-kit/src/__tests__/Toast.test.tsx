@@ -5,11 +5,7 @@ import { useToast } from '../components/Toast/useToast';
 
 function Trigger({ variant }: { variant?: 'success' | 'error' | 'info' }) {
   const { toast } = useToast();
-  return (
-    <button onClick={() => toast('Test message', variant)}>
-      Show Toast
-    </button>
-  );
+  return <button onClick={() => toast('Test message', variant)}>Show Toast</button>;
 }
 
 function setup(variant?: 'success' | 'error' | 'info') {
