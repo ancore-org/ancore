@@ -1,12 +1,5 @@
 import * as React from 'react';
-import {
-  Globe,
-  Lock,
-  Timer,
-  Key,
-  FileText,
-  Info,
-} from 'lucide-react';
+import { Globe, Lock, Timer, Key, FileText, Info } from 'lucide-react';
 import { SettingsGroup, SettingItem } from '../../components/SettingsGroup';
 import { NetworkSettings } from './NetworkSettings';
 import { SecuritySettings } from './SecuritySettings';
@@ -48,13 +41,9 @@ export function SettingsScreen() {
     return <AboutScreen onBack={() => setView('root')} />;
   }
 
-  const networkLabel =
-    settings.network.charAt(0).toUpperCase() + settings.network.slice(1);
+  const networkLabel = settings.network.charAt(0).toUpperCase() + settings.network.slice(1);
 
-  const timeoutLabel =
-    settings.autoLockTimeout === 0
-      ? 'Never'
-      : `${settings.autoLockTimeout} min`;
+  const timeoutLabel = settings.autoLockTimeout === 0 ? 'Never' : `${settings.autoLockTimeout} min`;
 
   return (
     <div className="flex flex-col min-h-screen bg-background">
@@ -72,7 +61,9 @@ export function SettingsScreen() {
             <p className="text-sm font-semibold truncate">My Ancore Wallet</p>
             <p className="text-xs text-white/60 truncate">GBXXX...YYYY</p>
           </div>
-          <span className={`text-[10px] font-semibold px-2 py-0.5 rounded-full ${settings.network === 'mainnet' ? 'bg-green-400/20 text-green-300' : 'bg-yellow-400/20 text-yellow-300'}`}>
+          <span
+            className={`text-[10px] font-semibold px-2 py-0.5 rounded-full ${settings.network === 'mainnet' ? 'bg-green-400/20 text-green-300' : 'bg-yellow-400/20 text-yellow-300'}`}
+          >
             {networkLabel}
           </span>
         </div>

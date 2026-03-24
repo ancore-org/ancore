@@ -42,8 +42,8 @@ git branch -d feat/your-feature-name   # optional: delete local branch
 
 ## Branch naming
 
-- `feat/thing` — new feature  
-- `fix/thing` — bugfix  
-- `chore/thing` — config, deps, tooling  
+- `feat/thing` — new feature
+- `fix/thing` — bugfix
+- `chore/thing` — config, deps, tooling
 
 Example: `feat/contract-execute-nonce`, `fix/account-abstraction-types`.

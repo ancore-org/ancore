@@ -4,12 +4,7 @@
  */
 
 import type { SessionKey } from '@ancore/types';
-import {
-  Account,
-  Contract,
-  TransactionBuilder,
-  xdr,
-} from '@stellar/stellar-sdk';
+import { Account, Contract, TransactionBuilder, xdr } from '@stellar/stellar-sdk';
 import { mapContractError } from './errors';
 import {
   addressToScVal,
@@ -67,12 +62,7 @@ export class AccountContract {
    * Build invocation for execute(to, function, args, expected_nonce).
    * Caller must pass the current nonce (e.g. from getNonce()) for replay protection.
    */
-  execute(
-    to: string,
-    fn: string,
-    args: xdr.ScVal[],
-    expectedNonce: number
-  ): InvocationArgs {
+  execute(to: string, fn: string, args: xdr.ScVal[], expectedNonce: number): InvocationArgs {
     return {
       method: 'execute',
       args: [
@@ -197,10 +187,7 @@ export class AccountContract {
     const { server, sourceAccount } = options;
 
     const accountResponse = await server.getAccount(sourceAccount);
-    const account = new Account(
-      accountResponse.id,
-      accountResponse.sequence ?? '0'
-    );
+    const account = new Account(accountResponse.id, accountResponse.sequence ?? '0');
 
     const txBuilder = new TransactionBuilder(account, {
       fee: '100',

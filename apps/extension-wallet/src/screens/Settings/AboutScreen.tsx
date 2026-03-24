@@ -30,11 +30,25 @@ export function AboutScreen({ onBack }: AboutScreenProps) {
 
         {/* Links */}
         <div className="space-y-1.5">
-          <p className="px-1 text-[11px] font-semibold uppercase tracking-widest text-muted-foreground">Resources</p>
+          <p className="px-1 text-[11px] font-semibold uppercase tracking-widest text-muted-foreground">
+            Resources
+          </p>
           <div className="rounded-xl border border-border bg-card overflow-hidden divide-y divide-border">
-            <LinkItem icon={<Github className="h-4 w-4" />} label="Documentation" href="https://github.com/ancore-org/ancore" />
-            <LinkItem icon={<MessageCircle className="h-4 w-4" />} label="Telegram Community" href="https://t.me/+OqlAx-gQx3M4YzJk" />
-            <LinkItem icon={<Bug className="h-4 w-4" />} label="Report a Bug" href="https://github.com/ancore-org/ancore/issues" />
+            <LinkItem
+              icon={<Github className="h-4 w-4" />}
+              label="Documentation"
+              href="https://github.com/ancore-org/ancore"
+            />
+            <LinkItem
+              icon={<MessageCircle className="h-4 w-4" />}
+              label="Telegram Community"
+              href="https://t.me/+OqlAx-gQx3M4YzJk"
+            />
+            <LinkItem
+              icon={<Bug className="h-4 w-4" />}
+              label="Report a Bug"
+              href="https://github.com/ancore-org/ancore/issues"
+            />
           </div>
         </div>
 

@@ -18,9 +18,7 @@ export const Horizontal: Story = {
     <div className="w-[300px]">
       <div className="space-y-1">
         <h4 className="text-sm font-medium leading-none">Wallet Info</h4>
-        <p className="text-sm text-muted-foreground">
-          View your wallet details
-        </p>
+        <p className="text-sm text-muted-foreground">View your wallet details</p>
       </div>
       <Separator className="my-4" />
       <div className="flex h-5 items-center space-x-4 text-sm">

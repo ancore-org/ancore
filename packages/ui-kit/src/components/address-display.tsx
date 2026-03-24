@@ -2,8 +2,7 @@ import * as React from 'react';
 import { cn } from '@/lib/utils';
 import { Copy, Check } from 'lucide-react';
 
-export interface AddressDisplayProps
-  extends React.HTMLAttributes<HTMLDivElement> {
+export interface AddressDisplayProps extends React.HTMLAttributes<HTMLDivElement> {
   /**
    * The address to display
    */
@@ -27,10 +26,7 @@ export interface AddressDisplayProps
  * Features truncation, copy-to-clipboard functionality, and responsive design
  */
 const AddressDisplay = React.forwardRef<HTMLDivElement, AddressDisplayProps>(
-  (
-    { address, copyable = true, truncate = 6, label, className, ...props },
-    ref
-  ) => {
+  ({ address, copyable = true, truncate = 6, label, className, ...props }, ref) => {
     const [copied, setCopied] = React.useState(false);
 
     const displayAddress = React.useMemo(() => {
@@ -68,11 +64,7 @@ const AddressDisplay = React.forwardRef<HTMLDivElement, AddressDisplayProps>(
               className="inline-flex items-center justify-center rounded-md text-sm font-medium ring-offset-background transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 hover:bg-accent hover:text-accent-foreground h-8 w-8"
               aria-label="Copy address"
             >
-              {copied ? (
-                <Check className="h-4 w-4 text-green-500" />
-              ) : (
-                <Copy className="h-4 w-4" />
-              )}
+              {copied ? <Check className="h-4 w-4 text-green-500" /> : <Copy className="h-4 w-4" />}
             </button>
           )}
         </div>

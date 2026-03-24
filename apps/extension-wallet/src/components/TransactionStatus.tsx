@@ -2,11 +2,7 @@ import * as React from 'react';
 import { Badge, cn } from '@ancore/ui-kit';
 import { AlertCircle, CheckCircle2, Clock3, XCircle } from 'lucide-react';
 
-export type TransactionStatusKind =
-  | 'confirmed'
-  | 'pending'
-  | 'failed'
-  | 'cancelled';
+export type TransactionStatusKind = 'confirmed' | 'pending' | 'failed' | 'cancelled';
 
 const STATUS_STYLES: Record<
   TransactionStatusKind,
@@ -38,22 +34,21 @@ const STATUS_STYLES: Record<
   },
 };
 
-export interface TransactionStatusProps
-  extends React.HTMLAttributes<HTMLDivElement> {
+export interface TransactionStatusProps extends React.HTMLAttributes<HTMLDivElement> {
   status: TransactionStatusKind;
 }
 
-export function TransactionStatus({
-  status,
-  className,
-  ...props
-}: TransactionStatusProps) {
+export function TransactionStatus({ status, className, ...props }: TransactionStatusProps) {
   const { label, icon, className: statusClassName } = STATUS_STYLES[status];
 
   return (
     <Badge
       variant="outline"
-      className={cn('inline-flex items-center gap-2 rounded-full px-3 py-1', statusClassName, className)}
+      className={cn(
+        'inline-flex items-center gap-2 rounded-full px-3 py-1',
+        statusClassName,
+        className
+      )}
       {...props}
     >
       {icon}

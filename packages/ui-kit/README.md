@@ -91,7 +91,14 @@ import { Input } from '@ancore/ui-kit';
 Container component for grouping related content.
 
 ```tsx
-import { Card, CardHeader, CardTitle, CardDescription, CardContent, CardFooter } from '@ancore/ui-kit';
+import {
+  Card,
+  CardHeader,
+  CardTitle,
+  CardDescription,
+  CardContent,
+  CardFooter,
+} from '@ancore/ui-kit';
 
 <Card>
   <CardHeader>
@@ -104,7 +111,7 @@ import { Card, CardHeader, CardTitle, CardDescription, CardContent, CardFooter }
   <CardFooter>
     <Button>Action</Button>
   </CardFooter>
-</Card>
+</Card>;
 ```
 
 #### Badge
@@ -147,10 +154,11 @@ import { AmountInput } from '@ancore/ui-kit';
   value={amount}
   onChange={(e) => setAmount(e.target.value)}
   error={error}
-/>
+/>;
 ```
 
 **Props:**
+
 - `balance?: string` - Current balance to display
 - `asset?: string` - Asset symbol (e.g., 'XLM', 'USDC')
 - `label?: string` - Label for the input (default: 'Amount')
@@ -169,10 +177,11 @@ import { AddressDisplay } from '@ancore/ui-kit';
   label="Wallet Address"
   copyable={true}
   truncate={6}
-/>
+/>;
 ```
 
 **Props:**
+
 - `address: string` - The address to display (required)
 - `label?: string` - Label for the address
 - `copyable?: boolean` - Show copy button (default: true)
@@ -185,23 +194,28 @@ import { AddressDisplay } from '@ancore/ui-kit';
 The component library uses CSS variables for theming, supporting both light and dark modes.
 
 #### Primary (Stellar Purple)
+
 - Light: `hsl(262 83% 58%)`
 - Dark: `hsl(262 83% 58%)`
 
 #### Secondary
+
 - Light: `hsl(210 40% 96.1%)`
 - Dark: `hsl(217.2 32.6% 17.5%)`
 
 #### Destructive
+
 - Light: `hsl(0 84.2% 60.2%)`
 - Dark: `hsl(0 62.8% 30.6%)`
 
 ### Border Radius
+
 - `lg`: `0.5rem`
 - `md`: `calc(0.5rem - 2px)`
 - `sm`: `calc(0.5rem - 4px)`
 
 ### Typography
+
 Inherits from Tailwind's default typography scale.
 
 ## Dark Mode
@@ -209,9 +223,7 @@ Inherits from Tailwind's default typography scale.
 Enable dark mode by adding the `dark` class to your root element:
 
 ```tsx
-<html className="dark">
-  {/* Your app */}
-</html>
+<html className="dark">{/* Your app */}</html>
 ```
 
 Or toggle dynamically:
@@ -219,7 +231,7 @@ Or toggle dynamically:
 ```tsx
 function ThemeToggle() {
   const [isDark, setIsDark] = useState(false);
-  
+
   useEffect(() => {
     if (isDark) {
       document.documentElement.classList.add('dark');
@@ -227,7 +239,7 @@ function ThemeToggle() {
       document.documentElement.classList.remove('dark');
     }
   }, [isDark]);
-  
+
   return <Button onClick={() => setIsDark(!isDark)}>Toggle Theme</Button>;
 }
 ```
@@ -267,10 +279,7 @@ Extend the Tailwind configuration in your app:
 // tailwind.config.js
 module.exports = {
   presets: [require('@ancore/ui-kit/tailwind.config.js')],
-  content: [
-    './src/**/*.{ts,tsx}',
-    './node_modules/@ancore/ui-kit/dist/**/*.{js,mjs}',
-  ],
+  content: ['./src/**/*.{ts,tsx}', './node_modules/@ancore/ui-kit/dist/**/*.{js,mjs}'],
   // Your custom configuration
 };
 ```
@@ -285,7 +294,7 @@ import { cn } from '@ancore/ui-kit';
 
 <Button className={cn('my-custom-class', conditionalClass && 'conditional-class')}>
   Custom Button
-</Button>
+</Button>;
 ```
 
 ## Contributing

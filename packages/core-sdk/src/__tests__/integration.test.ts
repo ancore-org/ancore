@@ -14,13 +14,7 @@
  *   TESTNET_SECRET_KEY=S... TESTNET_CONTRACT_ID=C... pnpm test:integration
  */
 
-import {
-  Account,
-  Keypair,
-  Memo,
-  Networks,
-  rpc,
-} from '@stellar/stellar-sdk';
+import { Account, Keypair, Memo, Networks, rpc } from '@stellar/stellar-sdk';
 
 import { AccountTransactionBuilder } from '../account-transaction-builder';
 import { SimulationFailedError } from '../errors';
@@ -29,8 +23,7 @@ import { SimulationFailedError } from '../errors';
 // Configuration
 // ---------------------------------------------------------------------------
 
-const SOROBAN_RPC_URL =
-  process.env.SOROBAN_RPC_URL ?? 'https://soroban-testnet.stellar.org';
+const SOROBAN_RPC_URL = process.env.SOROBAN_RPC_URL ?? 'https://soroban-testnet.stellar.org';
 const SECRET_KEY = process.env.TESTNET_SECRET_KEY;
 const CONTRACT_ID = process.env.TESTNET_CONTRACT_ID;
 
@@ -50,10 +43,7 @@ describeIntegration('AccountTransactionBuilder – Testnet Integration', () => {
 
     // Fetch account from ledger
     const ledgerAccount = await server.getAccount(keypair.publicKey());
-    sourceAccount = new Account(
-      ledgerAccount.accountId(),
-      ledgerAccount.sequenceNumber(),
-    );
+    sourceAccount = new Account(ledgerAccount.accountId(), ledgerAccount.sequenceNumber());
   });
 
   // -----------------------------------------------------------------------
@@ -73,7 +63,7 @@ describeIntegration('AccountTransactionBuilder – Testnet Integration', () => {
       .addSessionKey(
         sessionKeypair.publicKey(),
         [0, 1], // SEND_PAYMENT, MANAGE_DATA
-        Math.floor(Date.now() / 1000) + 3600, // 1 hour from now
+        Math.floor(Date.now() / 1000) + 3600 // 1 hour from now
       )
       .addMemo(Memo.text('integration-test'))
       .simulate();
@@ -99,11 +89,7 @@ describeIntegration('AccountTransactionBuilder – Testnet Integration', () => {
 
     try {
       const tx = await builder
-        .addSessionKey(
-          sessionKeypair.publicKey(),
-          [0],
-          Math.floor(Date.now() / 1000) + 3600,
-        )
+        .addSessionKey(sessionKeypair.publicKey(), [0], Math.floor(Date.now() / 1000) + 3600)
         .build();
 
       // If the contract is deployed and the simulation succeeds, we get a
@@ -130,9 +116,7 @@ describeIntegration('AccountTransactionBuilder – Testnet Integration', () => {
       networkPassphrase: Networks.TESTNET,
     });
 
-    const response = await builder
-      .revokeSessionKey(sessionKeypair.publicKey())
-      .simulate();
+    const response = await builder.revokeSessionKey(sessionKeypair.publicKey()).simulate();
 
     expect(response).toBeDefined();
   });
@@ -152,11 +136,7 @@ describeIntegration('AccountTransactionBuilder – Testnet Integration', () => {
 
     try {
       const tx = await builder
-        .addSessionKey(
-          sessionKeypair.publicKey(),
-          [0, 1, 2],
-          Math.floor(Date.now() / 1000) + 7200,
-        )
+        .addSessionKey(sessionKeypair.publicKey(), [0, 1, 2], Math.floor(Date.now() / 1000) + 7200)
         .addMemo(Memo.text('submit-test'))
         .build();
 
@@ -167,9 +147,7 @@ describeIntegration('AccountTransactionBuilder – Testnet Integration', () => {
       const result = await server.sendTransaction(tx);
 
       expect(result).toBeDefined();
-      expect(['PENDING', 'DUPLICATE', 'TRY_AGAIN_LATER', 'ERROR']).toContain(
-        result.status,
-      );
+      expect(['PENDING', 'DUPLICATE', 'TRY_AGAIN_LATER', 'ERROR']).toContain(result.status);
 
       // If PENDING, we could poll for confirmation, but that's beyond the
       // scope of this test. We've validated the full build → sign → submit flow.

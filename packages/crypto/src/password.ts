@@ -4,14 +4,13 @@
  *
  */
 
-export type PasswordStrength = "weak" | "medium" | "strong";
+export type PasswordStrength = 'weak' | 'medium' | 'strong';
 
 export interface PasswordValidationResult {
   valid: boolean;
   strength: PasswordStrength;
   reasons: string[];
 }
-
 
 const MIN_LENGTH = 12;
 const STRONG_LENGTH = 16;
@@ -21,15 +20,13 @@ const STRONG_LENGTH = 16;
  * Stored as lowercase for case-insensitive comparison.
  */
 const COMMON_WEAK_PATTERNS: RegExp[] = [
-  /^(.)\1+$/,              // All same character: "aaaaaa", "111111"
+  /^(.)\1+$/, // All same character: "aaaaaa", "111111"
   /^(012|123|234|345|456|567|678|789|890|987|876|765|654|543|432|321|210)+$/i, // Pure numeric sequences
   /^(abc|bcd|cde|def|efg|fgh|ghi|hij|ijk|jkl|klm|lmn|mno|nop|opq|pqr|qrs|rst|stu|tuv|uvw|vwx|wxy|xyz)+$/i, // Pure alpha sequences
   /^(password|passw0rd|p@ssword|p@ssw0rd|qwerty|letmein|welcome|admin|login|iloveyou|monkey|dragon|master|sunshine|shadow|princess|football|baseball|superman|batman)+$/i, // Common dictionary passwords
-  /^[0-9]+$/,              // Digits only
-  /^[a-zA-Z]+$/,           // Letters only — no digits or symbols
+  /^[0-9]+$/, // Digits only
+  /^[a-zA-Z]+$/, // Letters only — no digits or symbols
 ];
-
-
 
 function hasUppercase(password: string): boolean {
   return /[A-Z]/.test(password);
@@ -51,7 +48,6 @@ function matchesWeakPattern(password: string): boolean {
   return COMMON_WEAK_PATTERNS.some((pattern) => pattern.test(password));
 }
 
-
 /**
  * Validates the strength of a password.
  *
@@ -70,12 +66,11 @@ function matchesWeakPattern(password: string): boolean {
 export function validatePasswordStrength(password: string): PasswordValidationResult {
   const reasons: string[] = [];
 
-
-  if (typeof password !== "string" || password.length === 0) {
+  if (typeof password !== 'string' || password.length === 0) {
     return {
       valid: false,
-      strength: "weak",
-      reasons: ["Password must be a non-empty string."],
+      strength: 'weak',
+      reasons: ['Password must be a non-empty string.'],
     };
   }
 
@@ -84,27 +79,27 @@ export function validatePasswordStrength(password: string): PasswordValidationRe
   }
 
   if (!hasUppercase(password)) {
-    reasons.push("Password must contain at least one uppercase letter.");
+    reasons.push('Password must contain at least one uppercase letter.');
   }
 
   if (!hasLowercase(password)) {
-    reasons.push("Password must contain at least one lowercase letter.");
+    reasons.push('Password must contain at least one lowercase letter.');
   }
 
   if (!hasDigit(password)) {
-    reasons.push("Password must contain at least one digit.");
+    reasons.push('Password must contain at least one digit.');
   }
 
   if (!hasSpecialChar(password)) {
-    reasons.push("Password must contain at least one special character.");
+    reasons.push('Password must contain at least one special character.');
   }
 
   if (matchesWeakPattern(password)) {
-    reasons.push("Password matches a commonly used or easily guessable pattern.");
+    reasons.push('Password matches a commonly used or easily guessable pattern.');
   }
 
   if (reasons.length > 0) {
-    return { valid: false, strength: "weak", reasons };
+    return { valid: false, strength: 'weak', reasons };
   }
 
   const isLongEnough = password.length >= STRONG_LENGTH;
@@ -115,7 +110,7 @@ export function validatePasswordStrength(password: string): PasswordValidationRe
     hasSpecialChar(password);
 
   if (isLongEnough && hasVariety) {
-    return { valid: true, strength: "strong", reasons: [] };
+    return { valid: true, strength: 'strong', reasons: [] };
   }
 
   // Passes minimums but could be stronger
@@ -126,5 +121,5 @@ export function validatePasswordStrength(password: string): PasswordValidationRe
     );
   }
 
-  return { valid: true, strength: "medium", reasons: suggestions };
+  return { valid: true, strength: 'medium', reasons: suggestions };
 }

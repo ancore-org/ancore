@@ -51,9 +51,9 @@ describe('AddressDisplay', () => {
 
     render(<AddressDisplay address={sampleAddress} />);
     const copyButton = screen.getByLabelText('Copy address');
-    
+
     await user.click(copyButton);
-    
+
     await waitFor(() => {
       expect(writeTextSpy).toHaveBeenCalledWith(sampleAddress);
     });

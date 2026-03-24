@@ -1,7 +1,8 @@
 import { webcrypto } from 'crypto';
+import type { EncryptedPayload, StorageAdapter } from '../types';
 
 if (!globalThis.crypto) {
-  // @ts-ignore
+  // @ts-expect-error Node test environment does not expose writable crypto typing.
   globalThis.crypto = webcrypto;
 }
 if (!globalThis.btoa) {
@@ -12,16 +13,16 @@ if (!globalThis.atob) {
 }
 
 import { SecureStorageManager } from '../secure-storage-manager';
-import { StorageAdapter, AccountData, SessionKeysData } from '../types';
+import type { AccountData, SessionKeysData } from '../types';
 
 class MockStorageAdapter implements StorageAdapter {
-  private store: Map<string, any> = new Map();
+  private store = new Map<string, unknown>();
 
-  async get(key: string): Promise<any> {
-    return this.store.get(key) || null;
+  async get<T>(key: string): Promise<T | null> {
+    return (this.store.get(key) as T | undefined) ?? null;
   }
 
-  async set(key: string, value: any): Promise<void> {
+  async set<T>(key: string, value: T): Promise<void> {
     this.store.set(key, value);
   }
 
@@ -29,7 +30,7 @@ class MockStorageAdapter implements StorageAdapter {
     this.store.delete(key);
   }
 
-  public inspectStore(): Map<string, any> {
+  public inspectStore(): Map<string, unknown> {
     return this.store;
   }
 }
@@ -51,9 +52,9 @@ describe('SecureStorageManager', () => {
     await manager.unlock(password);
     await manager.saveAccount(accountData);
 
-    const storedData = await storage.get('account');
+    const storedData = await storage.get<EncryptedPayload>('account');
     expect(storedData).toBeDefined();
-    
+
     // Ensure it's not plaintext
     const jsonStr = JSON.stringify(storedData);
     expect(jsonStr).not.toContain(accountData.privateKey);
@@ -95,7 +96,7 @@ describe('SecureStorageManager', () => {
   it('should fail gracefully with the wrong password', async () => {
     await manager.unlock(password);
     await manager.saveAccount(accountData);
-    
+
     manager.lock();
     const newManager = new SecureStorageManager(storage);
     await newManager.unlock('wrong_password');
@@ -105,14 +106,14 @@ describe('SecureStorageManager', () => {
 
   it('should return null for non-existent items', async () => {
     await manager.unlock(password);
-    
+
     const account = await manager.getAccount();
     expect(account).toBeNull();
-    
+
     const sessionKeys = await manager.getSessionKeys();
     expect(sessionKeys).toBeNull();
   });
-  
+
   it('should not throw on unlock if already unlocked', async () => {
     await manager.unlock(password);
     await manager.unlock(password); // Should return early

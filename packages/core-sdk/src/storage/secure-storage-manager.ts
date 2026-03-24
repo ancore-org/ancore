@@ -1,7 +1,10 @@
 import { AccountData, EncryptedPayload, SessionKeysData, StorageAdapter } from './types';
 
-function bufferToBase64(buffer: ArrayBuffer): string {
-  const bytes = new Uint8Array(buffer);
+function bufferToBase64(buffer: BufferSource): string {
+  const bytes =
+    buffer instanceof ArrayBuffer
+      ? new Uint8Array(buffer)
+      : new Uint8Array(buffer.buffer, buffer.byteOffset, buffer.byteLength);
   let binary = '';
   for (let i = 0; i < bytes.byteLength; i++) {
     binary += String.fromCharCode(bytes[i]);
@@ -53,12 +56,12 @@ export class SecureStorageManager {
     return this.baseKey !== null;
   }
 
-  private async deriveAesKey(salt: Uint8Array | any): Promise<CryptoKey> {
+  private async deriveAesKey(salt: BufferSource): Promise<CryptoKey> {
     if (!this.baseKey) throw new Error('Storage manager is locked');
     return globalThis.crypto.subtle.deriveKey(
       {
         name: 'PBKDF2',
-        salt: salt as any,
+        salt,
         iterations: 100000,
         hash: 'SHA-256',
       },
@@ -70,9 +73,9 @@ export class SecureStorageManager {
   }
 
   private async encryptData(plaintext: string): Promise<EncryptedPayload> {
-    const salt = globalThis.crypto.getRandomValues(new Uint8Array(16) as any);
-    const iv = globalThis.crypto.getRandomValues(new Uint8Array(12) as any);
-    
+    const salt = globalThis.crypto.getRandomValues(new Uint8Array(16));
+    const iv = globalThis.crypto.getRandomValues(new Uint8Array(12));
+
     const aesKey = await this.deriveAesKey(salt);
     const encoder = new TextEncoder();
 
@@ -85,7 +88,7 @@ export class SecureStorageManager {
     return {
       salt: bufferToBase64(salt),
       iv: bufferToBase64(iv),
-      data: bufferToBase64(ciphertext)
+      data: bufferToBase64(ciphertext),
     };
   }
 
@@ -94,16 +97,16 @@ export class SecureStorageManager {
     const iv = base64ToBuffer(payload.iv);
     const ciphertext = base64ToBuffer(payload.data);
 
-    const aesKey = await this.deriveAesKey(new Uint8Array(salt) as any);
+    const aesKey = await this.deriveAesKey(new Uint8Array(salt));
 
     try {
       const decryptedBuffer = await globalThis.crypto.subtle.decrypt(
-        { name: 'AES-GCM', iv: new Uint8Array(iv) as any },
+        { name: 'AES-GCM', iv: new Uint8Array(iv) },
         aesKey,
-        ciphertext as any
+        ciphertext
       );
       return new TextDecoder().decode(decryptedBuffer);
-    } catch (error: any) {
+    } catch {
       throw new Error('Invalid password or corrupted data');
     }
   }
@@ -114,7 +117,7 @@ export class SecureStorageManager {
   }
 
   public async getAccount(): Promise<AccountData | null> {
-    const payload = await this.storage.get('account') as EncryptedPayload | null;
+    const payload = await this.storage.get<EncryptedPayload>('account');
     if (!payload) return null;
     const json = await this.decryptData(payload);
     return JSON.parse(json);
@@ -126,7 +129,7 @@ export class SecureStorageManager {
   }
 
   public async getSessionKeys(): Promise<SessionKeysData | null> {
-    const payload = await this.storage.get('sessionKeys') as EncryptedPayload | null;
+    const payload = await this.storage.get<EncryptedPayload>('sessionKeys');
     if (!payload) return null;
     const json = await this.decryptData(payload);
     return JSON.parse(json);

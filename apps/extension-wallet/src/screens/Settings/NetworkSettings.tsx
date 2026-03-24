@@ -49,14 +49,23 @@ export function NetworkSettings({ value, onChange, onBack }: NetworkSettingsProp
             <div>
               <p className="font-semibold text-destructive text-sm">Switch to Mainnet?</p>
               <p className="text-xs text-muted-foreground mt-1 leading-relaxed">
-                Mainnet uses real funds. Transactions are irreversible. Only switch if you know what you are doing.
+                Mainnet uses real funds. Transactions are irreversible. Only switch if you know what
+                you are doing.
               </p>
             </div>
           </div>
           <Button variant="outline" className="w-full" onClick={() => setPending(null)}>
             Cancel
           </Button>
-          <Button variant="destructive" className="w-full" onClick={() => { onChange(pending); setPending(null); onBack(); }}>
+          <Button
+            variant="destructive"
+            className="w-full"
+            onClick={() => {
+              onChange(pending);
+              setPending(null);
+              onBack();
+            }}
+          >
             Yes, Switch to Mainnet
           </Button>
         </div>
@@ -80,7 +89,9 @@ export function NetworkSettings({ value, onChange, onBack }: NetworkSettingsProp
                   : 'border-border bg-card hover:border-primary/40 hover:bg-accent/30'
               }`}
             >
-              <div className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-full border ${n.color}`}>
+              <div
+                className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-full border ${n.color}`}
+              >
                 <Wifi className="h-4 w-4" />
               </div>
               <div className="flex-1">

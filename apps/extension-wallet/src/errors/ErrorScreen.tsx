@@ -1,13 +1,13 @@
 /**
  * ErrorScreen Component
- * 
+ *
  * Displays user-friendly error messages with recovery options
  * (retry or reset). Used by ErrorBoundary as the fallback UI.
  */
 
 import { Button } from '@ancore/ui-kit';
 import { AlertTriangle, RotateCcw, RefreshCw, Info } from 'lucide-react';
-import { ReactNode } from 'react';
+import type { ReactElement, ReactNode } from 'react';
 import { getErrorMessage, ErrorCategory } from './error-messages';
 import { ErrorInfo, handleError } from './error-handler';
 
@@ -34,7 +34,7 @@ export interface ErrorScreenProps {
 
 /**
  * ErrorScreen displays a user-friendly error page with recovery options
- * 
+ *
  * @example
  * ```tsx
  * <ErrorScreen
@@ -54,7 +54,7 @@ export function ErrorScreen({
   children,
   showDetails = false,
   className,
-}: ErrorScreenProps): JSX.Element {
+}: ErrorScreenProps): ReactElement {
   // Get user-friendly message from error info or fall back to defaults
   const userMessage = errorInfo
     ? getErrorMessage(errorInfo.category, errorInfo.code)
@@ -82,9 +82,7 @@ export function ErrorScreen({
           </h1>
 
           {/* Description */}
-          <p className="text-center text-gray-600 dark:text-gray-300 mb-6">
-            {displayDescription}
-          </p>
+          <p className="text-center text-gray-600 dark:text-gray-300 mb-6">{displayDescription}</p>
 
           {/* Recovery hint */}
           {userMessage.recoveryHint && (
@@ -144,20 +142,14 @@ export function ErrorScreen({
                   <p className="mb-2">
                     <strong>Error:</strong> {error?.message || 'Unknown error'}
                   </p>
-                  {error?.stack && (
-                    <p className="whitespace-pre-wrap">{error.stack}</p>
-                  )}
+                  {error?.stack && <p className="whitespace-pre-wrap">{error.stack}</p>}
                 </div>
               </details>
             </div>
           )}
 
           {/* Additional children content */}
-          {children && (
-            <div className="mt-6">
-              {children}
-            </div>
-          )}
+          {children && <div className="mt-6">{children}</div>}
         </div>
       </div>
     </div>
@@ -181,7 +173,7 @@ interface ErrorCardProps {
 /**
  * ErrorCard - A compact inline error display component
  * Use this for inline errors within forms or smaller contexts
- * 
+ *
  * @example
  * ```tsx
  * <ErrorCard
@@ -195,7 +187,7 @@ export function ErrorCard({
   onRetry,
   variant = 'error',
   className,
-}: ErrorCardProps): JSX.Element {
+}: ErrorCardProps): ReactElement {
   const variantStyles = {
     error: 'bg-red-50 dark:bg-red-900/20 border-red-200 dark:border-red-800',
     warning: 'bg-yellow-50 dark:bg-yellow-900/20 border-yellow-200 dark:border-yellow-800',
@@ -209,7 +201,7 @@ export function ErrorCard({
   };
 
   return (
-    <div 
+    <div
       className={`
         flex items-start gap-3 p-4 rounded-lg border
         ${variantStyles[variant]}
@@ -218,9 +210,7 @@ export function ErrorCard({
     >
       <AlertTriangle className={`w-5 h-5 mt-0.5 ${iconColor[variant]}`} />
       <div className="flex-1">
-        <p className="text-sm text-gray-700 dark:text-gray-300">
-          {message}
-        </p>
+        <p className="text-sm text-gray-700 dark:text-gray-300">{message}</p>
       </div>
       {onRetry && (
         <button
@@ -251,11 +241,11 @@ interface AsyncErrorHandlerProps {
 /**
  * AsyncErrorHandler - Handles errors from async operations
  * Use this in components that perform async operations
- * 
+ *
  * @example
  * ```tsx
  * const { data, error, refetch } = useQuery();
- * 
+ *
  * if (error) {
  *   return (
  *     <AsyncErrorHandler
@@ -271,24 +261,22 @@ export function AsyncErrorHandler({
   onRetry,
   onReset,
   compact = false,
-}: AsyncErrorHandlerProps): JSX.Element {
+}: AsyncErrorHandlerProps): ReactElement {
   // Handle the error through our error handler
   const errorInfo = handleError(error, 'Async operation');
   const userMessage = getErrorMessage(errorInfo.category, errorInfo.code);
 
   if (compact) {
-    return (
-      <ErrorCard
-        message={userMessage.description}
-        onRetry={onRetry}
-        variant="error"
-      />
-    );
+    return <ErrorCard message={userMessage.description} onRetry={onRetry} variant="error" />;
   }
 
   return (
     <ErrorScreen
-      error={error && typeof error === 'object' && 'message' in error ? error as globalThis.Error : new Error(String(error))}
+      error={
+        error && typeof error === 'object' && 'message' in error
+          ? (error as globalThis.Error)
+          : new Error(String(error))
+      }
       errorInfo={errorInfo}
       onRetry={onRetry}
       onReset={onReset}

@@ -9,8 +9,7 @@
     "skipLibCheck": true,
     "esModuleInterop": true,
     "rootDir": "./src",
-    "outDir": "./dist"
-    "moduleResolution": "node",
+    "outDir": "./dist",
     "composite": true
   },
   "include": ["src/**/*"],

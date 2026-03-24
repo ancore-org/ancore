@@ -5,16 +5,7 @@
  * offline and fast.
  */
 
-import {
-  Account,
-  Contract,
-  Keypair,
-  Memo,
-  Networks,
-  rpc,
-  StrKey,
-  xdr,
-} from '@stellar/stellar-sdk';
+import { Account, Contract, Keypair, Memo, Networks, rpc, StrKey, xdr } from '@stellar/stellar-sdk';
 
 import { AccountTransactionBuilder } from '../account-transaction-builder';
 import {
@@ -43,13 +34,10 @@ const SESSION_KEYPAIR = Keypair.random();
 const SESSION_PUBLIC_KEY = SESSION_KEYPAIR.publicKey();
 
 // Generate a valid contract strkey (C… address)
-const TEST_CONTRACT_ID: string = StrKey.encodeContract(
-  require('crypto').randomBytes(32),
-);
+const TEST_CONTRACT_ID: string = StrKey.encodeContract(require('crypto').randomBytes(32));
 
 // Valid ManageData operation XDR (hex) for operation passthrough tests
-const MANAGE_DATA_OP_HEX =
-  '000000000000000a0000000474657374000000010000000376616c00';
+const MANAGE_DATA_OP_HEX = '000000000000000a0000000474657374000000010000000376616c00';
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -72,7 +60,7 @@ function makeServer(simulateResult?: any): rpc.Server {
 }
 
 function makeBuilderOptions(
-  serverOverride?: rpc.Server,
+  serverOverride?: rpc.Server
 ): ConstructorParameters<typeof AccountTransactionBuilder>[1] {
   return {
     server: serverOverride ?? makeServer(),
@@ -168,9 +156,7 @@ describe('contract-params', () => {
     });
 
     it('throws for non-array input', () => {
-      expect(() => toScPermissionsVec('not-array' as any)).toThrow(
-        /Permissions must be an array/,
-      );
+      expect(() => toScPermissionsVec('not-array' as any)).toThrow(/Permissions must be an array/);
     });
 
     it('throws if a permission value is invalid', () => {
@@ -276,10 +262,7 @@ describe('AccountTransactionBuilder', () => {
 
   describe('constructor', () => {
     it('creates an instance with valid options', () => {
-      const builder = new AccountTransactionBuilder(
-        makeSourceAccount(),
-        makeBuilderOptions(),
-      );
+      const builder = new AccountTransactionBuilder(makeSourceAccount(), makeBuilderOptions());
       expect(builder).toBeInstanceOf(AccountTransactionBuilder);
     });
 
@@ -289,7 +272,7 @@ describe('AccountTransactionBuilder', () => {
           new AccountTransactionBuilder(makeSourceAccount(), {
             ...makeBuilderOptions(),
             accountContractId: '',
-          }),
+          })
       ).toThrow(BuilderValidationError);
     });
 
@@ -309,46 +292,30 @@ describe('AccountTransactionBuilder', () => {
 
   describe('addSessionKey', () => {
     it('returns this for chaining', () => {
-      const builder = new AccountTransactionBuilder(
-        makeSourceAccount(),
-        makeBuilderOptions(),
-      );
-      const result = builder.addSessionKey(
-        SESSION_PUBLIC_KEY,
-        [0, 1],
-        Date.now() + 60_000,
-      );
+      const builder = new AccountTransactionBuilder(makeSourceAccount(), makeBuilderOptions());
+      const result = builder.addSessionKey(SESSION_PUBLIC_KEY, [0, 1], Date.now() + 60_000);
       expect(result).toBe(builder);
     });
 
     it('throws for invalid public key', () => {
-      const builder = new AccountTransactionBuilder(
-        makeSourceAccount(),
-        makeBuilderOptions(),
-      );
+      const builder = new AccountTransactionBuilder(makeSourceAccount(), makeBuilderOptions());
       expect(() => builder.addSessionKey('BADKEY', [0], Date.now())).toThrow(
-        /Invalid Stellar public key/,
+        /Invalid Stellar public key/
       );
     });
 
     it('throws for invalid permissions', () => {
-      const builder = new AccountTransactionBuilder(
-        makeSourceAccount(),
-        makeBuilderOptions(),
+      const builder = new AccountTransactionBuilder(makeSourceAccount(), makeBuilderOptions());
+      expect(() => builder.addSessionKey(SESSION_PUBLIC_KEY, [-1], Date.now())).toThrow(
+        /Invalid u32 value/
       );
-      expect(() =>
-        builder.addSessionKey(SESSION_PUBLIC_KEY, [-1], Date.now()),
-      ).toThrow(/Invalid u32 value/);
     });
 
     it('throws for invalid expiration', () => {
-      const builder = new AccountTransactionBuilder(
-        makeSourceAccount(),
-        makeBuilderOptions(),
+      const builder = new AccountTransactionBuilder(makeSourceAccount(), makeBuilderOptions());
+      expect(() => builder.addSessionKey(SESSION_PUBLIC_KEY, [0], -100)).toThrow(
+        /Invalid u64 value/
       );
-      expect(() =>
-        builder.addSessionKey(SESSION_PUBLIC_KEY, [0], -100),
-      ).toThrow(/Invalid u64 value/);
     });
   });
 
@@ -358,22 +325,14 @@ describe('AccountTransactionBuilder', () => {
 
   describe('revokeSessionKey', () => {
     it('returns this for chaining', () => {
-      const builder = new AccountTransactionBuilder(
-        makeSourceAccount(),
-        makeBuilderOptions(),
-      );
+      const builder = new AccountTransactionBuilder(makeSourceAccount(), makeBuilderOptions());
       const result = builder.revokeSessionKey(SESSION_PUBLIC_KEY);
       expect(result).toBe(builder);
     });
 
     it('throws for invalid public key', () => {
-      const builder = new AccountTransactionBuilder(
-        makeSourceAccount(),
-        makeBuilderOptions(),
-      );
-      expect(() => builder.revokeSessionKey('')).toThrow(
-        /Invalid Stellar public key/,
-      );
+      const builder = new AccountTransactionBuilder(makeSourceAccount(), makeBuilderOptions());
+      expect(() => builder.revokeSessionKey('')).toThrow(/Invalid Stellar public key/);
     });
   });
 
@@ -383,34 +342,21 @@ describe('AccountTransactionBuilder', () => {
 
   describe('execute', () => {
     it('returns this for chaining', () => {
-      const builder = new AccountTransactionBuilder(
-        makeSourceAccount(),
-        makeBuilderOptions(),
-      );
+      const builder = new AccountTransactionBuilder(makeSourceAccount(), makeBuilderOptions());
       const op = makeValidXdrOperation();
       const result = builder.execute(SESSION_PUBLIC_KEY, [op]);
       expect(result).toBe(builder);
     });
 
     it('throws for empty operations array', () => {
-      const builder = new AccountTransactionBuilder(
-        makeSourceAccount(),
-        makeBuilderOptions(),
-      );
-      expect(() => builder.execute(SESSION_PUBLIC_KEY, [])).toThrow(
-        /non-empty array/,
-      );
+      const builder = new AccountTransactionBuilder(makeSourceAccount(), makeBuilderOptions());
+      expect(() => builder.execute(SESSION_PUBLIC_KEY, [])).toThrow(/non-empty array/);
     });
 
     it('throws for invalid session key', () => {
-      const builder = new AccountTransactionBuilder(
-        makeSourceAccount(),
-        makeBuilderOptions(),
-      );
+      const builder = new AccountTransactionBuilder(makeSourceAccount(), makeBuilderOptions());
       const op = makeValidXdrOperation();
-      expect(() => builder.execute('BADKEY', [op])).toThrow(
-        /Invalid Stellar public key/,
-      );
+      expect(() => builder.execute('BADKEY', [op])).toThrow(/Invalid Stellar public key/);
     });
   });
 
@@ -420,10 +366,7 @@ describe('AccountTransactionBuilder', () => {
 
   describe('addOperation', () => {
     it('returns this for chaining', () => {
-      const builder = new AccountTransactionBuilder(
-        makeSourceAccount(),
-        makeBuilderOptions(),
-      );
+      const builder = new AccountTransactionBuilder(makeSourceAccount(), makeBuilderOptions());
 
       const contract = new Contract(TEST_CONTRACT_ID);
       const op = contract.call('some_method');
@@ -439,10 +382,7 @@ describe('AccountTransactionBuilder', () => {
 
   describe('addMemo', () => {
     it('returns this for chaining', () => {
-      const builder = new AccountTransactionBuilder(
-        makeSourceAccount(),
-        makeBuilderOptions(),
-      );
+      const builder = new AccountTransactionBuilder(makeSourceAccount(), makeBuilderOptions());
       const result = builder.addMemo(Memo.text('hello'));
       expect(result).toBe(builder);
     });
@@ -454,10 +394,7 @@ describe('AccountTransactionBuilder', () => {
 
   describe('setTimeout', () => {
     it('returns this for chaining', () => {
-      const builder = new AccountTransactionBuilder(
-        makeSourceAccount(),
-        makeBuilderOptions(),
-      );
+      const builder = new AccountTransactionBuilder(makeSourceAccount(), makeBuilderOptions());
       const result = builder.setTimeout(600);
       expect(result).toBe(builder);
     });
@@ -469,10 +406,7 @@ describe('AccountTransactionBuilder', () => {
 
   describe('simulate', () => {
     it('throws BuilderValidationError when no operations added', async () => {
-      const builder = new AccountTransactionBuilder(
-        makeSourceAccount(),
-        makeBuilderOptions(),
-      );
+      const builder = new AccountTransactionBuilder(makeSourceAccount(), makeBuilderOptions());
 
       await expect(builder.simulate()).rejects.toThrow(BuilderValidationError);
     });
@@ -482,7 +416,7 @@ describe('AccountTransactionBuilder', () => {
       const server = makeServer(mockSimResponse);
       const builder = new AccountTransactionBuilder(
         makeSourceAccount(),
-        makeBuilderOptions(server),
+        makeBuilderOptions(server)
       );
 
       builder.addSessionKey(SESSION_PUBLIC_KEY, [0], Date.now() + 60_000);
@@ -499,19 +433,13 @@ describe('AccountTransactionBuilder', () => {
 
   describe('build', () => {
     it('throws BuilderValidationError when no operations added', async () => {
-      const builder = new AccountTransactionBuilder(
-        makeSourceAccount(),
-        makeBuilderOptions(),
-      );
+      const builder = new AccountTransactionBuilder(makeSourceAccount(), makeBuilderOptions());
 
       await expect(builder.build()).rejects.toThrow(BuilderValidationError);
     });
 
     it('includes actionable message when no operations added', async () => {
-      const builder = new AccountTransactionBuilder(
-        makeSourceAccount(),
-        makeBuilderOptions(),
-      );
+      const builder = new AccountTransactionBuilder(makeSourceAccount(), makeBuilderOptions());
 
       await expect(builder.build()).rejects.toThrow(/zero operations/);
     });
@@ -525,20 +453,14 @@ describe('AccountTransactionBuilder', () => {
       };
       const server = makeServer(errorResponse);
 
-      const isErrorSpy = jest
-        .spyOn(rpc.Api, 'isSimulationError')
-        .mockReturnValue(true);
-      const isRestoreSpy = jest
-        .spyOn(rpc.Api, 'isSimulationRestore')
-        .mockReturnValue(false);
-      const isSuccessSpy = jest
-        .spyOn(rpc.Api, 'isSimulationSuccess')
-        .mockReturnValue(false);
+      const isErrorSpy = jest.spyOn(rpc.Api, 'isSimulationError').mockReturnValue(true);
+      const isRestoreSpy = jest.spyOn(rpc.Api, 'isSimulationRestore').mockReturnValue(false);
+      const isSuccessSpy = jest.spyOn(rpc.Api, 'isSimulationSuccess').mockReturnValue(false);
 
       try {
         const builder = new AccountTransactionBuilder(
           makeSourceAccount(),
-          makeBuilderOptions(server),
+          makeBuilderOptions(server)
         );
         builder.addSessionKey(SESSION_PUBLIC_KEY, [0], Date.now() + 60_000);
 
@@ -554,20 +476,14 @@ describe('AccountTransactionBuilder', () => {
       const restoreResponse = { id: 'sim-restore', latestLedger: 100 };
       const server = makeServer(restoreResponse);
 
-      const isErrorSpy = jest
-        .spyOn(rpc.Api, 'isSimulationError')
-        .mockReturnValue(false);
-      const isRestoreSpy = jest
-        .spyOn(rpc.Api, 'isSimulationRestore')
-        .mockReturnValue(true);
-      const isSuccessSpy = jest
-        .spyOn(rpc.Api, 'isSimulationSuccess')
-        .mockReturnValue(false);
+      const isErrorSpy = jest.spyOn(rpc.Api, 'isSimulationError').mockReturnValue(false);
+      const isRestoreSpy = jest.spyOn(rpc.Api, 'isSimulationRestore').mockReturnValue(true);
+      const isSuccessSpy = jest.spyOn(rpc.Api, 'isSimulationSuccess').mockReturnValue(false);
 
       try {
         const builder = new AccountTransactionBuilder(
           makeSourceAccount(),
-          makeBuilderOptions(server),
+          makeBuilderOptions(server)
         );
         builder.addSessionKey(SESSION_PUBLIC_KEY, [0], Date.now() + 60_000);
 
@@ -582,15 +498,9 @@ describe('AccountTransactionBuilder', () => {
     it('returns assembled Transaction on successful simulation', async () => {
       const server = makeServer({ id: 'sim-ok', latestLedger: 100 });
 
-      const isErrorSpy = jest
-        .spyOn(rpc.Api, 'isSimulationError')
-        .mockReturnValue(false);
-      const isRestoreSpy = jest
-        .spyOn(rpc.Api, 'isSimulationRestore')
-        .mockReturnValue(false);
-      const isSuccessSpy = jest
-        .spyOn(rpc.Api, 'isSimulationSuccess')
-        .mockReturnValue(true);
+      const isErrorSpy = jest.spyOn(rpc.Api, 'isSimulationError').mockReturnValue(false);
+      const isRestoreSpy = jest.spyOn(rpc.Api, 'isSimulationRestore').mockReturnValue(false);
+      const isSuccessSpy = jest.spyOn(rpc.Api, 'isSimulationSuccess').mockReturnValue(true);
 
       // We can't spy on rpc.assembleTransaction directly (non-configurable),
       // so we mock the entire build flow by making the builder's internal
@@ -601,7 +511,7 @@ describe('AccountTransactionBuilder', () => {
       try {
         const builder = new AccountTransactionBuilder(
           makeSourceAccount(),
-          makeBuilderOptions(server),
+          makeBuilderOptions(server)
         );
         builder.addSessionKey(SESSION_PUBLIC_KEY, [0], Date.now() + 60_000);
 
@@ -629,26 +539,18 @@ describe('AccountTransactionBuilder', () => {
       const weirdResponse = { id: 'sim-weird', latestLedger: 100 };
       const server = makeServer(weirdResponse);
 
-      const isErrorSpy = jest
-        .spyOn(rpc.Api, 'isSimulationError')
-        .mockReturnValue(false);
-      const isRestoreSpy = jest
-        .spyOn(rpc.Api, 'isSimulationRestore')
-        .mockReturnValue(false);
-      const isSuccessSpy = jest
-        .spyOn(rpc.Api, 'isSimulationSuccess')
-        .mockReturnValue(false);
+      const isErrorSpy = jest.spyOn(rpc.Api, 'isSimulationError').mockReturnValue(false);
+      const isRestoreSpy = jest.spyOn(rpc.Api, 'isSimulationRestore').mockReturnValue(false);
+      const isSuccessSpy = jest.spyOn(rpc.Api, 'isSimulationSuccess').mockReturnValue(false);
 
       try {
         const builder = new AccountTransactionBuilder(
           makeSourceAccount(),
-          makeBuilderOptions(server),
+          makeBuilderOptions(server)
         );
         builder.addSessionKey(SESSION_PUBLIC_KEY, [0], Date.now() + 60_000);
 
-        await expect(builder.build()).rejects.toThrow(
-          /Unexpected simulation response/,
-        );
+        await expect(builder.build()).rejects.toThrow(/Unexpected simulation response/);
       } finally {
         isErrorSpy.mockRestore();
         isRestoreSpy.mockRestore();
@@ -663,10 +565,7 @@ describe('AccountTransactionBuilder', () => {
 
   describe('fluent API', () => {
     it('supports chaining multiple convenience methods', () => {
-      const builder = new AccountTransactionBuilder(
-        makeSourceAccount(),
-        makeBuilderOptions(),
-      );
+      const builder = new AccountTransactionBuilder(makeSourceAccount(), makeBuilderOptions());
 
       const thirdKey = Keypair.random().publicKey();
 
@@ -679,10 +578,7 @@ describe('AccountTransactionBuilder', () => {
     });
 
     it('supports mixing convenience methods with passthrough', () => {
-      const builder = new AccountTransactionBuilder(
-        makeSourceAccount(),
-        makeBuilderOptions(),
-      );
+      const builder = new AccountTransactionBuilder(makeSourceAccount(), makeBuilderOptions());
 
       const contract = new Contract(TEST_CONTRACT_ID);
       const customOp = contract.call('custom_method');

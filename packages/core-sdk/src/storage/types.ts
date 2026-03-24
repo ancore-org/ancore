@@ -8,17 +8,17 @@ export interface EncryptedPayload {
 }
 
 export interface StorageAdapter {
-  get(key: string): Promise<any>;
-  set(key: string, value: any): Promise<void>;
+  get<T>(key: string): Promise<T | null>;
+  set<T>(key: string, value: T): Promise<void>;
   remove(key: string): Promise<void>;
 }
 
 export interface AccountData {
   privateKey: string;
-  [key: string]: any;
+  [key: string]: unknown;
 }
 
 export interface SessionKeysData {
   keys: Record<string, string>;
-  [key: string]: any;
+  [key: string]: unknown;
 }
