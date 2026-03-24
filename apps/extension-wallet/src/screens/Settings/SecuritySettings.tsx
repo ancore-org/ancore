@@ -170,7 +170,6 @@ function ExportWarningView({
   onConfirm,
   onCancel,
 }: {
-  title: string;
   warningText: string;
   onConfirm: () => void;
   onCancel: () => void;
@@ -312,7 +311,6 @@ export function SecuritySettings({
       )}
       {view === 'export-key' && (
         <ExportWarningView
-          title="Export Private Key"
           warningText="Your private key grants full control of your account. Anyone with it can steal your funds immediately."
           onConfirm={() => setView('menu')}
           onCancel={() => setView('menu')}
@@ -320,7 +318,6 @@ export function SecuritySettings({
       )}
       {view === 'export-mnemonic' && (
         <ExportWarningView
-          title="Export Recovery Phrase"
           warningText="Your recovery phrase can restore your entire wallet. Keep it offline, never share it with anyone."
           onConfirm={() => setView('menu')}
           onCancel={() => setView('menu')}

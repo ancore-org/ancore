@@ -15,7 +15,7 @@ export class AncoreClient<TOperation = unknown, TTx = unknown, TTxResult = unkno
 
   async initializeSmartAccount(
     contractId: string
-  ): Promise<InitializeSmartAccountResult<TTxResult>> {
+  ): Promise<InitializeSmartAccountResult<TTx, TTxResult>> {
     return initializeSmartAccount(contractId, this.options);
   }
 }

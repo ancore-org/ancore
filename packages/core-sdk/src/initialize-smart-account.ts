@@ -15,14 +15,16 @@ export interface SmartAccountInitializerBuilder<TOperation = unknown, TTx = unkn
   build(): Promise<TTx>;
 }
 
-export type InitializeSmartAccountResult<TTxResult = unknown> =
-  | {
-      kind: 'contractAddress';
-      contractAddress: string;
-    }
+export type InitializeSmartAccountResult<TTx = unknown, TTxResult = unknown> =
   | {
       kind: 'transactionResult';
       txResult: TTxResult;
+      contractAddress: string;
+    }
+  | {
+      kind: 'builtTransaction';
+      transaction: TTx;
+      contractAddress: string;
     };
 
 export interface InitializeSmartAccountOptions<
@@ -36,7 +38,7 @@ export interface InitializeSmartAccountOptions<
   submitTransaction?: (transaction: TTx) => Promise<TTxResult>;
 }
 
-const CONTRACT_ID_STRKEY_REGEX = /^C[A-Z0-9]{55}$/;
+const CONTRACT_ID_STRKEY_REGEX = /^C[A-Z2-7]{55}$/;
 const CONTRACT_ID_HEX_REGEX = /^[A-Fa-f0-9]{64}$/;
 
 export function validateContractId(contractId: string): string {
@@ -68,7 +70,7 @@ export async function initializeSmartAccount<
 >(
   contractId: string,
   options: InitializeSmartAccountOptions<TOperation, TTx, TTxResult>
-): Promise<InitializeSmartAccountResult<TTxResult>> {
+): Promise<InitializeSmartAccountResult<TTx, TTxResult>> {
   const validContractId = validateContractId(contractId);
   const createAccountContract = options.createAccountContract ?? defaultCreateAccountContract;
 
@@ -85,11 +87,13 @@ export async function initializeSmartAccount<
     return {
       kind: 'transactionResult',
       txResult,
+      contractAddress: validContractId,
     };
   }
 
   return {
-    kind: 'contractAddress',
+    kind: 'builtTransaction',
+    transaction: builtTransaction,
     contractAddress: validContractId,
   };
 }

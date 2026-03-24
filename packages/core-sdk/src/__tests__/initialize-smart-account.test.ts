@@ -64,7 +64,7 @@ describe('initializeSmartAccount', () => {
     ).rejects.toThrow(/Invalid contractId format/);
   });
 
-  it('builds initialize operation and returns contract address by default', async () => {
+  it('builds initialize operation and returns built transaction by default', async () => {
     const builder = makeBuilder();
     const contract = makeContract();
     const createTransactionBuilder = jest.fn().mockReturnValue(builder);
@@ -83,7 +83,8 @@ describe('initializeSmartAccount', () => {
     expect(builder.addOperation).toHaveBeenCalledWith({ kind: 'invoke-op' });
     expect(builder.build).toHaveBeenCalledTimes(1);
     expect(result).toEqual({
-      kind: 'contractAddress',
+      kind: 'builtTransaction',
+      transaction: { hash: 'tx-1' },
       contractAddress: CONTRACT_ID,
     });
   });
@@ -115,6 +116,7 @@ describe('initializeSmartAccount', () => {
         id: 'tx-123',
         status: 'PENDING',
       },
+      contractAddress: CONTRACT_ID,
     });
   });
 });
@@ -142,6 +144,7 @@ describe('AncoreClient.initializeSmartAccount', () => {
         id: 'tx-456',
         status: 'SUCCESS',
       },
+      contractAddress: CONTRACT_ID,
     });
   });
 });
