@@ -62,7 +62,6 @@ Run tests with output:
 cargo test -- --nocapture
 ```
 
-
 ### Prerequisites
 
 - Rust toolchain (1.74.0+)
@@ -92,19 +91,25 @@ make deploy-testnet  # Deploy contract to Soroban testnet
 #### Example Workflow
 
 1. Build and optimize contract:
-  ```bash
-  make build
-  make optimize
-  ```
+
+```bash
+make build
+make optimize
+```
+
 2. Setup local sandbox (optional):
-  ```bash
-  bash scripts/setup-local.sh
-  ```
+
+```bash
+bash scripts/setup-local.sh
+```
+
 3. Deploy to testnet:
-  ```bash
-  make deploy-testnet
-  ```
-  - Contract ID will be written to `contract-deployment.json`.
+
+```bash
+make deploy-testnet
+```
+
+- Contract ID will be written to `contract-deployment.json`.
 
 #### Environment Variables
 
@@ -113,11 +118,13 @@ make deploy-testnet  # Deploy contract to Soroban testnet
 #### Manual Steps (for reference)
 
 You can still use Soroban CLI directly for custom deployments:
+
 ```bash
 soroban contract build
 soroban contract optimize --wasm target/wasm32-unknown-unknown/release/ancore_account.wasm
 soroban contract deploy --wasm target/wasm32-unknown-unknown/release/ancore_account.optimized.wasm --source <deployer> --network testnet
 ```
+
 - Ed25519 validation (native Stellar)
 - Multi-signature
 - WebAuthn support

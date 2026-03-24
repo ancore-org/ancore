@@ -50,10 +50,7 @@ describe('AccountContract', () => {
     it('returns method and to, function, args, expectedNonce', () => {
       const to = 'CDLZFC3SYJYDZT7K67VZ75HPJVIEUVNIXF47ZG2FB2RMQQVU2HHGCYSC';
       const fn = 'transfer';
-      const args: xdr.ScVal[] = [
-        new Address(OWNER_ADDRESS).toScVal(),
-        xdr.ScVal.scvU32(100),
-      ];
+      const args: xdr.ScVal[] = [new Address(OWNER_ADDRESS).toScVal(), xdr.ScVal.scvU32(100)];
       const inv = contract.execute(to, fn, args, 0);
       expect(inv.method).toBe('execute');
       expect(inv.args).toHaveLength(4);
@@ -215,9 +212,7 @@ describe('XDR encoding helpers', () => {
     });
 
     it('throws for wrong byte length', () => {
-      expect(() =>
-        publicKeyToBytes32ScVal(new Uint8Array(16))
-      ).toThrow(TypeError);
+      expect(() => publicKeyToBytes32ScVal(new Uint8Array(16))).toThrow(TypeError);
     });
   });
 

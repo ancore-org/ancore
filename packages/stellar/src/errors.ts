@@ -48,10 +48,7 @@ export class TransactionError extends StellarError {
   public readonly resultCode?: string;
   public readonly resultXdr?: string;
 
-  constructor(
-    message: string,
-    options?: { resultCode?: string; resultXdr?: string }
-  ) {
+  constructor(message: string, options?: { resultCode?: string; resultXdr?: string }) {
     super(message);
     this.name = 'TransactionError';
     this.resultCode = options?.resultCode;

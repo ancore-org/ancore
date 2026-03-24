@@ -7,10 +7,7 @@
 export const AA_VERSION = '0.1.0';
 
 export { AccountContract } from './account-contract';
-export type {
-  AccountContractReadOptions,
-  InvocationArgs,
-} from './account-contract';
+export type { AccountContractReadOptions, InvocationArgs } from './account-contract';
 
 export {
   AccountContractError,

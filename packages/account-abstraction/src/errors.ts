@@ -70,9 +70,7 @@ export class UnauthorizedError extends AccountContractError {
  */
 export class SessionKeyNotFoundError extends AccountContractError {
   constructor(publicKey?: string) {
-    const msg = publicKey
-      ? `Session key not found: ${publicKey}`
-      : 'Session key not found';
+    const msg = publicKey ? `Session key not found: ${publicKey}` : 'Session key not found';
     super(msg, 'SESSION_KEY_NOT_FOUND');
     this.name = 'SessionKeyNotFoundError';
     Object.setPrototypeOf(this, SessionKeyNotFoundError.prototype);

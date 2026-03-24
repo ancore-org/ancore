@@ -4,13 +4,7 @@
  */
 
 import type { SessionKey } from '@ancore/types';
-import {
-  Address,
-  nativeToScVal,
-  scValToNative,
-  StrKey,
-  xdr,
-} from '@stellar/stellar-sdk';
+import { Address, nativeToScVal, scValToNative, StrKey, xdr } from '@stellar/stellar-sdk';
 
 const BYTES_N_32_LENGTH = 32;
 
@@ -25,9 +19,7 @@ export function addressToScVal(address: string): xdr.ScVal {
  * Encode a 32-byte session public key to ScVal (BytesN<32>).
  * Accepts Stellar public key string (G...) or raw 32-byte Uint8Array.
  */
-export function publicKeyToBytes32ScVal(
-  publicKey: string | Uint8Array
-): xdr.ScVal {
+export function publicKeyToBytes32ScVal(publicKey: string | Uint8Array): xdr.ScVal {
   let bytes: Uint8Array;
   if (typeof publicKey === 'string') {
     if (!StrKey.isValidEd25519PublicKey(publicKey)) {
@@ -41,9 +33,7 @@ export function publicKeyToBytes32ScVal(
     bytes = publicKey;
   }
   if (bytes.length !== BYTES_N_32_LENGTH) {
-    throw new TypeError(
-      `Session key must be ${BYTES_N_32_LENGTH} bytes, got ${bytes.length}`
-    );
+    throw new TypeError(`Session key must be ${BYTES_N_32_LENGTH} bytes, got ${bytes.length}`);
   }
   return xdr.ScVal.scvBytes(Buffer.from(bytes));
 }
@@ -120,16 +110,12 @@ export function scValToSessionKey(scVal: xdr.ScVal): SessionKey {
   const permissions = map.permissions;
 
   if (publicKey == null || expiresAt == null || permissions == null) {
-    throw new TypeError(
-      'SessionKey map must have public_key, expires_at, permissions'
-    );
+    throw new TypeError('SessionKey map must have public_key, expires_at, permissions');
   }
 
   let publicKeyStr: string;
   if (publicKey instanceof Uint8Array || Buffer.isBuffer(publicKey)) {
-    publicKeyStr = StrKey.encodeEd25519PublicKey(
-      Buffer.from(publicKey as Uint8Array)
-    );
+    publicKeyStr = StrKey.encodeEd25519PublicKey(Buffer.from(publicKey as Uint8Array));
   } else {
     throw new TypeError('SessionKey.public_key must be 32 bytes');
   }
@@ -142,9 +128,7 @@ export function scValToSessionKey(scVal: xdr.ScVal): SessionKey {
         : Number(expiresAt);
 
   const permsArray = Array.isArray(permissions)
-    ? (permissions as number[]).map((p) =>
-        typeof p === 'bigint' ? Number(p) : (p as number)
-      )
+    ? (permissions as number[]).map((p) => (typeof p === 'bigint' ? Number(p) : (p as number)))
     : [];
 
   return {
@@ -158,9 +142,7 @@ export function scValToSessionKey(scVal: xdr.ScVal): SessionKey {
  * Decode optional SessionKey (Option<SessionKey>) from contract get_session_key.
  * Returns null if the option is None (void or missing).
  */
-export function scValToOptionalSessionKey(
-  scVal: xdr.ScVal
-): SessionKey | null {
+export function scValToOptionalSessionKey(scVal: xdr.ScVal): SessionKey | null {
   const native = scValToNative(scVal);
   if (native === null || native === undefined) return null;
   try {
