@@ -1,14 +1,23 @@
-import { describe, it, expect, beforeEach, vi } from 'vitest';
-import { render, screen, fireEvent } from '@testing-library/react';
-import userEvent from '@testing-library/user-event';
-import { renderHook, act } from '@testing-library/react';
+import { SettingItem, SettingsGroup } from '../../../components/SettingsGroup';
+import { act, renderHook } from '@testing-library/react';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { fireEvent, render, screen } from '@testing-library/react';
 
-import { useSettings } from '../../../hooks/useSettings';
-import { SettingsScreen } from '../SettingsScreen';
-import { NetworkSettings } from '../NetworkSettings';
-import { SecuritySettings } from '../SecuritySettings';
 import { AboutScreen } from '../AboutScreen';
-import { SettingsGroup, SettingItem } from '../../../components/SettingsGroup';
+import { NetworkSettings } from '../NetworkSettings';
+import { NotificationProvider } from '@ancore/ui-kit';
+import { SecuritySettings } from '../SecuritySettings';
+import { SettingsScreen } from '../SettingsScreen';
+import { useSettings } from '../../../hooks/useSettings';
+import userEvent from '@testing-library/user-event';
+
+function renderSettingsScreen() {
+  return render(
+    <NotificationProvider>
+      <SettingsScreen />
+    </NotificationProvider>
+  );
+}
 
 // ── useSettings ──────────────────────────────────────────────────────────────
 
@@ -234,7 +243,7 @@ describe('SettingsScreen', () => {
   beforeEach(() => localStorage.clear());
 
   it('renders all top-level groups', () => {
-    render(<SettingsScreen />);
+    renderSettingsScreen();
     expect(screen.getByText('Settings')).toBeInTheDocument();
     expect(screen.getAllByText('Network').length).toBeGreaterThanOrEqual(1);
     expect(screen.getByText('Security')).toBeInTheDocument();
@@ -242,7 +251,7 @@ describe('SettingsScreen', () => {
   });
 
   it('navigates to network settings', async () => {
-    render(<SettingsScreen />);
+    renderSettingsScreen();
     // click the Network row button (the SettingItem, not the section heading)
     const networkButtons = screen.getAllByRole('button');
     const networkRowBtn = networkButtons.find(
@@ -254,13 +263,13 @@ describe('SettingsScreen', () => {
   });
 
   it('navigates to security settings', async () => {
-    render(<SettingsScreen />);
+    renderSettingsScreen();
     await userEvent.click(screen.getByText('Change Password'));
     expect(screen.getByText('Export Private Key')).toBeInTheDocument();
   });
 
   it('navigates to about screen', async () => {
-    render(<SettingsScreen />);
+    renderSettingsScreen();
     await userEvent.click(screen.getByText('About Ancore'));
     expect(screen.getByText(/0\.1\.0/)).toBeInTheDocument();
   });
@@ -270,7 +279,7 @@ describe('SettingsScreen', () => {
       'ancore_settings',
       JSON.stringify({ network: 'mainnet', autoLockTimeout: 5 })
     );
-    render(<SettingsScreen />);
+    renderSettingsScreen();
     expect(screen.getAllByText('Mainnet').length).toBeGreaterThanOrEqual(1);
   });
 });

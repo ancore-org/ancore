@@ -33,5 +33,12 @@ export type { AmountInputProps } from './components/amount-input';
 export { AddressDisplay } from './components/address-display';
 export type { AddressDisplayProps } from './components/address-display';
 
+// Toast / Notifications
+export { Toast } from './components/Toast/Toast';
+export type { ToastProps } from './components/Toast/Toast';
+export { NotificationProvider } from './components/Toast/NotificationProvider';
+export type { Toast as ToastItem, ToastVariant } from './components/Toast/NotificationProvider';
+export { useToast } from './components/Toast/useToast';
+
 // Utility functions
 export { cn } from './lib/utils';

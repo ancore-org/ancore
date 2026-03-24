@@ -1,11 +1,14 @@
 import * as React from 'react';
-import { Globe, Lock, Timer, Key, FileText, Info } from 'lucide-react';
-import { SettingsGroup, SettingItem } from '../../components/SettingsGroup';
+
+import { Bell, FileText, Globe, Info, Key, Lock, Timer } from 'lucide-react';
+import { SettingItem, SettingsGroup } from '../../components/SettingsGroup';
+
+import { AboutScreen } from './AboutScreen';
+import type { Network } from '@ancore/types';
 import { NetworkSettings } from './NetworkSettings';
 import { SecuritySettings } from './SecuritySettings';
-import { AboutScreen } from './AboutScreen';
 import { useSettings } from '../../hooks/useSettings';
-import type { Network } from '@ancore/types';
+import { useToast } from '@ancore/ui-kit';
 
 type SettingsView = 'root' | 'network' | 'security' | 'about';
 
@@ -48,18 +51,18 @@ export function SettingsScreen() {
   return (
     <div className="flex flex-col min-h-screen bg-background">
       {/* Header */}
-      <div className="bg-gradient-to-br from-primary to-purple-800 px-5 pt-10 pb-8 text-white">
+      <div className="px-5 pt-10 pb-8 text-white bg-gradient-to-br from-primary to-purple-800">
         <h1 className="text-xl font-bold tracking-tight">Settings</h1>
         <p className="text-sm text-white/60 mt-0.5">Manage your wallet preferences</p>
 
         {/* Account card */}
-        <div className="mt-5 flex items-center gap-3 rounded-xl bg-white/10 backdrop-blur px-4 py-3">
-          <div className="flex h-10 w-10 items-center justify-center rounded-full bg-white/20 text-white font-bold text-lg select-none">
+        <div className="flex items-center gap-3 px-4 py-3 mt-5 rounded-xl bg-white/10 backdrop-blur">
+          <div className="flex items-center justify-center w-10 h-10 text-lg font-bold text-white rounded-full select-none bg-white/20">
             A
           </div>
           <div className="flex-1 min-w-0">
             <p className="text-sm font-semibold truncate">My Ancore Wallet</p>
-            <p className="text-xs text-white/60 truncate">GBXXX...YYYY</p>
+            <p className="text-xs truncate text-white/60">GBXXX...YYYY</p>
           </div>
           <span
             className={`text-[10px] font-semibold px-2 py-0.5 rounded-full ${settings.network === 'mainnet' ? 'bg-green-400/20 text-green-300' : 'bg-yellow-400/20 text-yellow-300'}`}
@@ -70,12 +73,12 @@ export function SettingsScreen() {
       </div>
 
       {/* Settings groups */}
-      <div className="flex-1 space-y-5 p-4 -mt-3 rounded-t-2xl bg-background">
+      <div className="flex-1 p-4 -mt-3 space-y-5 rounded-t-2xl bg-background">
         <SettingsGroup title="Network">
           <SettingItem
             label="Network"
             description={`Currently on ${networkLabel}`}
-            icon={<Globe className="h-4 w-4" />}
+            icon={<Globe className="w-4 h-4" />}
             value={networkLabel}
             onClick={() => setView('network')}
           />
@@ -85,27 +88,27 @@ export function SettingsScreen() {
           <SettingItem
             label="Change Password"
             description="Update your wallet password"
-            icon={<Lock className="h-4 w-4" />}
+            icon={<Lock className="w-4 h-4" />}
             onClick={() => setView('security')}
           />
           <SettingItem
             label="Auto-lock Timeout"
             description="Lock wallet after inactivity"
-            icon={<Timer className="h-4 w-4" />}
+            icon={<Timer className="w-4 h-4" />}
             value={timeoutLabel}
             onClick={() => setView('security')}
           />
           <SettingItem
             label="Export Private Key"
             description="Reveal your raw private key"
-            icon={<Key className="h-4 w-4" />}
+            icon={<Key className="w-4 h-4" />}
             onClick={() => setView('security')}
             danger
           />
           <SettingItem
             label="Export Recovery Phrase"
             description="Reveal your 12-word mnemonic"
-            icon={<FileText className="h-4 w-4" />}
+            icon={<FileText className="w-4 h-4" />}
             onClick={() => setView('security')}
             danger
           />
@@ -115,11 +118,39 @@ export function SettingsScreen() {
           <SettingItem
             label="About Ancore"
             description="Version, links & support"
-            icon={<Info className="h-4 w-4" />}
+            icon={<Info className="w-4 h-4" />}
             onClick={() => setView('about')}
           />
         </SettingsGroup>
+
+        <ToastDemo />
       </div>
     </div>
+  );
+}
+
+function ToastDemo() {
+  const { toast } = useToast();
+  return (
+    <SettingsGroup title="Notifications (Demo)">
+      <SettingItem
+        label="Success Toast"
+        description="Payment sent successfully"
+        icon={<Bell className="w-4 h-4" />}
+        onClick={() => toast('Payment sent successfully!', 'success')}
+      />
+      <SettingItem
+        label="Error Toast"
+        description="Simulate a transaction error"
+        icon={<Bell className="w-4 h-4" />}
+        onClick={() => toast('Transaction failed. Please retry.', 'error')}
+      />
+      <SettingItem
+        label="Info Toast"
+        description="Address copied to clipboard"
+        icon={<Bell className="w-4 h-4" />}
+        onClick={() => toast('Address copied to clipboard', 'info')}
+      />
+    </SettingsGroup>
   );
 }
