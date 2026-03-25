@@ -1,2 +1,2 @@
 # Run lint-staged to lint and format changed files
-pnpm exec lint-staged
+npx pnpm exec lint-staged

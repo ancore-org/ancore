@@ -1,10 +1,11 @@
 import * as React from 'react';
-import { Globe, Lock, Timer, Key, FileText, Info } from 'lucide-react';
+import { Globe, Lock, Timer, Key, FileText, Info, Bell } from 'lucide-react';
 import { SettingsGroup, SettingItem } from '../../components/SettingsGroup';
 import { NetworkSettings } from './NetworkSettings';
 import { SecuritySettings } from './SecuritySettings';
 import { AboutScreen } from './AboutScreen';
 import { useSettings } from '../../hooks/useSettings';
+import { useToast } from '@ancore/ui-kit';
 import type { Network } from '@ancore/types';
 
 type SettingsView = 'root' | 'network' | 'security' | 'about';
@@ -119,7 +120,35 @@ export function SettingsScreen() {
             onClick={() => setView('about')}
           />
         </SettingsGroup>
+
+        <ToastDemo />
       </div>
     </div>
+  );
+}
+
+function ToastDemo() {
+  const { toast } = useToast();
+  return (
+    <SettingsGroup title="Notifications (Demo)">
+      <SettingItem
+        label="Success Toast"
+        description="Payment sent successfully"
+        icon={<Bell className="h-4 w-4" />}
+        onClick={() => toast('Payment sent successfully!', 'success')}
+      />
+      <SettingItem
+        label="Error Toast"
+        description="Simulate a transaction error"
+        icon={<Bell className="h-4 w-4" />}
+        onClick={() => toast('Transaction failed. Please retry.', 'error')}
+      />
+      <SettingItem
+        label="Info Toast"
+        description="Address copied to clipboard"
+        icon={<Bell className="h-4 w-4" />}
+        onClick={() => toast('Address copied to clipboard', 'info')}
+      />
+    </SettingsGroup>
   );
 }

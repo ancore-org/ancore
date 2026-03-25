@@ -10,4 +10,7 @@ export default defineConfig({
   resolve: {
     alias: { '@': resolve(rootDir, 'src') },
   },
+  css: {
+    postcss: './postcss.config.js',
+  },
 });

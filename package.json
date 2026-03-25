@@ -33,12 +33,26 @@
     "typescript": "^5.6.0"
   },
   "lint-staged": {
-    "*.{ts,tsx,js,jsx}": [
-      "prettier --write",
-      "eslint --fix"
-    ],
-    "*.{json,md}": [
+    "*.{ts,tsx,js,jsx,json,md}": [
       "prettier --write"
+    ],
+    "packages/types/src/**/*.{ts,tsx,js,jsx}": [
+      "pnpm --dir packages/types exec eslint --fix"
+    ],
+    "packages/core-sdk/src/**/*.{ts,tsx,js,jsx}": [
+      "pnpm --dir packages/core-sdk exec eslint --fix"
+    ],
+    "packages/stellar/src/**/*.{ts,tsx,js,jsx}": [
+      "pnpm --dir packages/stellar exec eslint --fix"
+    ],
+    "packages/ui-kit/src/**/*.{ts,tsx,js,jsx}": [
+      "pnpm --dir packages/ui-kit exec eslint --fix"
+    ],
+    "packages/crypto/src/**/*.{ts,tsx,js,jsx}": [
+      "pnpm --dir packages/crypto exec eslint --fix"
+    ],
+    "packages/account-abstraction/src/**/*.{ts,tsx,js,jsx}": [
+      "pnpm --dir packages/account-abstraction exec eslint --fix"
     ]
   },
   "pnpm": {

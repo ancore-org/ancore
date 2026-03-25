@@ -2,6 +2,35 @@ const js = require('@eslint/js');
 const tseslint = require('@typescript-eslint/eslint-plugin');
 const tsparser = require('@typescript-eslint/parser');
 
+const nodeGlobals = {
+  Buffer: 'readonly',
+  console: 'readonly',
+  process: 'readonly',
+  TextEncoder: 'readonly',
+  setTimeout: 'readonly',
+  clearTimeout: 'readonly',
+  setInterval: 'readonly',
+  clearInterval: 'readonly',
+  __dirname: 'readonly',
+  __filename: 'readonly',
+  module: 'readonly',
+  require: 'readonly',
+  exports: 'writable',
+  global: 'readonly',
+};
+
+const jestGlobals = {
+  describe: 'readonly',
+  test: 'readonly',
+  it: 'readonly',
+  expect: 'readonly',
+  beforeAll: 'readonly',
+  beforeEach: 'readonly',
+  afterAll: 'readonly',
+  afterEach: 'readonly',
+  jest: 'readonly',
+};
+
 module.exports = [
   js.configs.recommended,
   {
@@ -13,8 +42,7 @@ module.exports = [
         sourceType: 'module',
       },
       globals: {
-        Buffer: 'readonly',
-        TextEncoder: 'readonly',
+        ...nodeGlobals,
       },
     },
     plugins: {
@@ -22,20 +50,19 @@ module.exports = [
     },
     rules: {
       ...tseslint.configs.recommended.rules,
+      '@typescript-eslint/no-unused-vars': ['warn', { argsIgnorePattern: '^_', varsIgnorePattern: '^_' }],
       '@typescript-eslint/no-explicit-any': 'warn',
-      '@typescript-eslint/no-unused-vars': ['warn', { argsIgnorePattern: '^_' }],
     },
   },
   {
-    files: ['src/__tests__/**/*.ts'],
+    files: ['**/__tests__/**/*.ts', '**/*.test.ts', '**/*.spec.ts'],
     languageOptions: {
       globals: {
-        describe: 'readonly',
-        beforeEach: 'readonly',
-        it: 'readonly',
-        expect: 'readonly',
-        jest: 'readonly',
+        ...jestGlobals,
       },
+    },
+    rules: {
+      '@typescript-eslint/no-explicit-any': 'off',
     },
   },
 ];
