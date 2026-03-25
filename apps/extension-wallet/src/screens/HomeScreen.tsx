@@ -1,5 +1,5 @@
-import React, { useState, useEffect } from 'react';
-import { Copy, RefreshCw, Settings, Wallet, Network, ChevronRight } from 'lucide-react';
+import { useState } from 'react';
+import { RefreshCw, Settings, Wallet, Network, ChevronRight } from 'lucide-react';
 import { Button } from '@ancore/ui-kit';
 import { Card, CardContent, CardHeader, CardTitle } from '@ancore/ui-kit';
 import { useAccountBalance } from '../hooks/useAccountBalance';

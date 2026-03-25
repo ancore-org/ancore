@@ -1,4 +1,3 @@
-import React from 'react';
 import { RefreshCw, TrendingUp, AlertCircle, Coins } from 'lucide-react';
 import { Button } from '@ancore/ui-kit';
 import { Card, CardContent, CardHeader, CardTitle } from '@ancore/ui-kit';

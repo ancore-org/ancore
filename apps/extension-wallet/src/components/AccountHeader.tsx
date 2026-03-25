@@ -1,4 +1,3 @@
-import React from 'react';
 import { Copy, Check, Globe } from 'lucide-react';
 import { Button } from '@ancore/ui-kit';
 import { Badge } from '@ancore/ui-kit';
