@@ -11,7 +11,6 @@ import { getPasswordStrength } from './validation';
 
 function useOptionalFormContext() {
   try {
-     
     return useFormContext();
   } catch {
     return null;

@@ -10,7 +10,6 @@ import { cn } from '@/lib/utils';
 /** Safely attempt to read the react-hook-form context without throwing. */
 function useOptionalFormContext() {
   try {
-     
     return useFormContext();
   } catch {
     return null;
