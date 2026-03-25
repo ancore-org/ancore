@@ -7,8 +7,8 @@ import { AboutScreen } from './AboutScreen';
 import type { Network } from '@ancore/types';
 import { NetworkSettings } from './NetworkSettings';
 import { SecuritySettings } from './SecuritySettings';
-import { useToast } from '@ancore/ui-kit';
 import { useSettings } from '../../hooks/useSettings';
+import { useToast } from '@ancore/ui-kit';
 
 type SettingsView = 'root' | 'network' | 'security' | 'about';
 

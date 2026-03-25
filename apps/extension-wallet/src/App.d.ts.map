@@ -1,1 +1,10 @@
-{"version":3,"file":"App.d.ts","sourceRoot":"","sources":["App.tsx"],"names":[],"mappings":"AAAA;;;;;;;;;GASG;AAmKH;;;GAGG;AACH,wBAAgB,GAAG,IAAI,GAAG,CAAC,OAAO,CAuCjC;AAoDD,eAAe,GAAG,CAAC"}
+{
+    "version": 3,
+    "file": "App.d.ts",
+    "sourceRoot": "",
+    "sources": [
+        "App.tsx"
+    ],
+    "names": [],
+    "mappings": "AAAA;;;;;;;;;GASG;AAmKH;;;GAGG;AACH,wBAAgB,GAAG,IAAI,GAAG,CAAC,OAAO,CAuCjC;AAoDD,eAAe,GAAG,CAAC"
+}
