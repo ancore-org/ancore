@@ -5,7 +5,7 @@
     "rootDir": "./src",
     "target": "ES2022",
     "module": "CommonJS",
-    "lib": ["ES2022"],
+    "lib": ["ES2022", "DOM"],
     "moduleResolution": "node",
     "types": ["node", "jest"],
     "composite": false

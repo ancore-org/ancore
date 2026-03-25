@@ -1,6 +1,7 @@
 const js = require('@eslint/js');
 const tseslint = require('@typescript-eslint/eslint-plugin');
 const tsparser = require('@typescript-eslint/parser');
+const globals = require('globals');
 
 const jestGlobals = {
   describe: 'readonly',
@@ -15,6 +16,9 @@ const jestGlobals = {
 };
 
 module.exports = [
+  {
+    ignores: ['dist/**', 'node_modules/**'],
+  },
   js.configs.recommended,
   {
     files: ['**/*.ts'],
@@ -24,12 +28,17 @@ module.exports = [
         ecmaVersion: 2020,
         sourceType: 'module',
       },
+      globals: {
+        ...globals.browser,
+        ...globals.node,
+      },
     },
     plugins: {
       '@typescript-eslint': tseslint,
     },
     rules: {
       ...tseslint.configs.recommended.rules,
+      'no-undef': 'off',
       '@typescript-eslint/no-unused-vars': ['warn', { argsIgnorePattern: '^_', varsIgnorePattern: '^_' }],
     },
   },
@@ -37,6 +46,8 @@ module.exports = [
     files: ['**/__tests__/**/*.ts', '**/*.test.ts', '**/*.spec.ts'],
     languageOptions: {
       globals: {
+        ...globals.browser,
+        ...globals.node,
         ...jestGlobals,
       },
     },

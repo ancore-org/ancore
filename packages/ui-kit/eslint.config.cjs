@@ -15,7 +15,7 @@ const parserOptions = {
 
 module.exports = [
   {
-    ignores: ['.storybook/**'],
+    ignores: ['.storybook/**', 'dist/**', 'node_modules/**', '*.config.js', '*.config.cjs', '*.config.ts'],
   },
   js.configs.recommended,
   {
