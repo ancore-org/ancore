@@ -1,11 +1,12 @@
-import { render, screen, waitFor } from '@testing-library/react';
-import { describe, it, expect, vi } from 'vitest';
-import userEvent from '@testing-library/user-event';
-import { z } from 'zod';
-import { Form } from '@/components/Form/Form';
+import { amountSchema, stellarAddressSchema } from '@/components/Form/validation';
+import { describe, expect, it, vi } from 'vitest';
+import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+
 import { AddressInput } from '@/components/Form/AddressInput';
 import { AmountInput } from '@/components/Form/AmountInput';
-import { stellarAddressSchema, amountSchema } from '@/components/Form/validation';
+import { Form } from '@/components/Form/Form';
+import userEvent from '@testing-library/user-event';
+import { z } from 'zod';
 
 const VALID_ADDRESS = 'GDQP2KPQGKIHYJGXNUIYOMHARUARCA7DJT5FO2FFOOKY3B2WSQHG4W37';
 
@@ -39,8 +40,12 @@ describe('Form', () => {
       </Form>
     );
 
-    await user.type(screen.getByLabelText('Recipient'), VALID_ADDRESS);
-    await user.type(screen.getByLabelText('Amount'), '10');
+    fireEvent.change(screen.getByLabelText('Recipient'), {
+      target: { value: VALID_ADDRESS },
+    });
+    fireEvent.change(screen.getByLabelText('Amount'), {
+      target: { value: '10' },
+    });
     await user.click(screen.getByRole('button', { name: /send/i }));
 
     await waitFor(() => {
