@@ -20,6 +20,7 @@ import {
   Sparkles,
   Wallet,
 } from 'lucide-react';
+import { NotificationProvider } from '@ancore/ui-kit';
 import { AuthGuard, ExtensionAuthProvider, PublicOnlyGuard, useExtensionAuth } from './AuthGuard';
 import { NavBar } from '../components/Navigation/NavBar';
 import { SettingsScreen } from '../screens/Settings/SettingsScreen';
@@ -524,9 +525,11 @@ export function ExtensionRouterContent() {
 export function ExtensionRouter() {
   return (
     <BrowserRouter>
-      <ExtensionAuthProvider>
-        <ExtensionRouterContent />
-      </ExtensionAuthProvider>
+      <NotificationProvider>
+        <ExtensionAuthProvider>
+          <ExtensionRouterContent />
+        </ExtensionAuthProvider>
+      </NotificationProvider>
     </BrowserRouter>
   );
 }
@@ -534,9 +537,11 @@ export function ExtensionRouter() {
 export function ExtensionRouterTestHarness({ initialEntries }: { initialEntries: string[] }) {
   return (
     <MemoryRouter initialEntries={initialEntries}>
-      <ExtensionAuthProvider>
-        <ExtensionRouterContent />
-      </ExtensionAuthProvider>
+      <NotificationProvider>
+        <ExtensionAuthProvider>
+          <ExtensionRouterContent />
+        </ExtensionAuthProvider>
+      </NotificationProvider>
     </MemoryRouter>
   );
 }
