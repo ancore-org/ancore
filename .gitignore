@@ -61,3 +61,8 @@ docs/issues
 tools/sync-github-issues.mjs
 docs/roadmap-issue-map.json
 docs/ROADMAP_TEMPLATES.md
+
+# Project-specific ignores
+@frontend-design/
+@brief.md
+.clinerules
