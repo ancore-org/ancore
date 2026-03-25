@@ -61,7 +61,7 @@ export function useAccountBalance(): UseAccountBalanceReturn {
   // Initial fetch on mount
   useEffect(() => {
     refreshBalance();
-  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+  }, []);
 
   // Simulate balance updates from network (polling)
   useEffect(() => {
