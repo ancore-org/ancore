@@ -53,3 +53,21 @@ temp/
 *.key
 *.pem
 secrets/
+
+# issues
+docs/issues
+
+# Admin-only tooling (local project management)
+tools/sync-github-issues.mjs
+docs/roadmap-issue-map.json
+docs/ROADMAP_TEMPLATES.md
+
+# extension-wallet generated artifacts (tsc/vitest outputs)
+apps/extension-wallet/src/**/*.d.ts
+apps/extension-wallet/src/**/*.d.ts.map
+apps/extension-wallet/src/**/*.js
+apps/extension-wallet/src/**/*.js.map
+apps/extension-wallet/vitest.config.d.ts
+apps/extension-wallet/vitest.config.d.ts.map
+apps/extension-wallet/vitest.config.js
+apps/extension-wallet/vitest.config.js.map

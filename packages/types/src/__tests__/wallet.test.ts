@@ -1,4 +1,4 @@
-import { WalletState, StorageKey, WalletStateSchema } from '../wallet';
+import { StorageKey, WalletStateSchema } from '../wallet';
 import { isWalletState } from '../guards';
 
 describe('WalletState', () => {
@@ -118,9 +118,9 @@ describe('StorageKey', () => {
       const key: StorageKey = StorageKey.ACCOUNTS;
       expect(typeof key).toBe('string');
 
-      // Accessing with invalid key should be caught by TypeScript
       // @ts-expect-error - Testing that invalid keys are caught
       const invalid: StorageKey = 'invalidKey';
+      expect(invalid).toBe('invalidKey');
     });
   });
 });

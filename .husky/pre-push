@@ -1,5 +1,5 @@
 echo "🔨 Running build..."
-pnpm build || {
+npx pnpm build || {
   echo "❌ Build failed. Please fix build errors before pushing."
   exit 1
 }
@@ -7,7 +7,7 @@ pnpm build || {
 echo "✅ Build successful!"
 
 echo "🧪 Running tests..."
-pnpm test || {
+npx pnpm test || {
   echo "❌ Tests failed. Please fix failing tests before pushing."
   exit 1
 }
@@ -15,7 +15,7 @@ pnpm test || {
 echo "✅ All tests passed!"
 
 echo "🔍 Running linter..."
-pnpm lint || {
+npx pnpm lint || {
   echo "❌ Lint failed. Please fix lint errors before pushing."
   exit 1
 }
@@ -23,7 +23,7 @@ pnpm lint || {
 echo "✅ Lint passed!"
 
 echo "🎨 Checking formatting..."
-pnpm format:check || {
+npx pnpm format:check || {
   echo "❌ Format check failed. Run 'pnpm format' to fix formatting."
   exit 1
 }

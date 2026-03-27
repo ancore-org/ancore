@@ -5,8 +5,10 @@
 
 export const CRYPTO_VERSION = '0.1.0';
 
-export * from './signing';
-export * from './hashing';
-export * from './keys';
-export * from './mnemonic';
-export * from './encoding';
+export { verifySignature, signTransaction } from './signing';
+export { validatePasswordStrength } from './password';
+export {
+  encryptSecretKey,
+  decryptSecretKey,
+} from './encryption';
+export type { EncryptedSecretKeyPayload } from './encryption';

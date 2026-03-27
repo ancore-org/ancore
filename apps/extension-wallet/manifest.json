@@ -1,0 +1,16 @@
+{
+  "manifest_version": 3,
+  "name": "Ancore Wallet",
+  "short_name": "Ancore",
+  "version": "0.1.0",
+  "description": "Ancore browser extension wallet scaffold.",
+  "action": {
+    "default_title": "Ancore Wallet",
+    "default_popup": "src/popup/index.html"
+  },
+  "background": {
+    "service_worker": "background/service-worker.js",
+    "type": "module"
+  },
+  "permissions": ["storage"]
+}

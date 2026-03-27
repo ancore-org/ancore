@@ -13,7 +13,7 @@
     }
   },
   "scripts": {
-    "build": "tsup src/index.ts --format cjs,esm --dts --tsconfig tsconfig.json",
+    "build": "tsup src/index.ts --format cjs,esm --tsconfig ./tsconfig.json",
     "dev": "tsup src/index.ts --format cjs,esm --dts --watch",
     "test": "jest --coverage",
     "test:integration": "jest --testPathPattern=integration --no-coverage",

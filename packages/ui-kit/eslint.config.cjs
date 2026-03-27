@@ -5,12 +5,6 @@ const react = require('eslint-plugin-react');
 const reactHooks = require('eslint-plugin-react-hooks');
 const globals = require('globals');
 
-const parserOptions = {
-  ecmaVersion: 2020,
-  sourceType: 'module',
-  ecmaFeatures: { jsx: true },
-};
-
 module.exports = [
   js.configs.recommended,
   {
@@ -21,6 +15,9 @@ module.exports = [
       globals: {
         ...globals.browser,
         ...globals.node,
+      },
+      globals: {
+        ...globals.browser,
       },
     },
     plugins: {
@@ -33,8 +30,8 @@ module.exports = [
       ...react.configs.recommended.rules,
       ...reactHooks.configs.recommended.rules,
       'react/react-in-jsx-scope': 'off',
-      'react/prop-types': 'off',
-      '@typescript-eslint/no-unused-vars': ['warn', { argsIgnorePattern: '^_' }],
+      '@typescript-eslint/no-unused-vars': ['warn', { argsIgnorePattern: '^_', varsIgnorePattern: '^_' }],
+      '@typescript-eslint/no-empty-object-type': 'off',
     },
     settings: {
       react: { version: 'detect' },
@@ -56,6 +53,28 @@ module.exports = [
         ...globals.browser,
         ...globals.node,
         ...globals.jest,
+      },
+    },
+  },
+  {
+    files: ['**/*.stories.{ts,tsx}'],
+    rules: {
+      'react-hooks/rules-of-hooks': 'off',
+    },
+  },
+  {
+    files: ['**/__tests__/**/*.{ts,tsx}', '**/*.test.{ts,tsx}', '**/*.spec.{ts,tsx}'],
+    languageOptions: {
+      globals: {
+        describe: 'readonly',
+        test: 'readonly',
+        it: 'readonly',
+        expect: 'readonly',
+        beforeAll: 'readonly',
+        beforeEach: 'readonly',
+        afterAll: 'readonly',
+        afterEach: 'readonly',
+        jest: 'readonly',
       },
     },
   },
