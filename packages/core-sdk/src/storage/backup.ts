@@ -3,6 +3,8 @@
  * Handles encrypted backup creation and restoration
  */
 
+//Added to open PR
+
 import { encrypt, decrypt, type EncryptedPayload } from './encryption-primitives';
 import type { AccountData, SessionKeysData, StorageAdapter } from './types';
 
