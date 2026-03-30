@@ -15,10 +15,7 @@
               "function_name": "add_session_key",
               "args": [
                 {
-                  "bytes": "679802846dcb16a6e1716a25fcb435274f65fb52f642931b8cfa571a5eb7c3f5"
-                  "bytes": "3c72cd59f60a31092bc7d9f7614e29122f8c6990c6ac292241edf8e080f63c02"
-                  "bytes": "f682e3a85049e574965fe10d57b64ea510ea2c183936fa1c959db6d4de08bc6c"
-                  "bytes": "b5b1237cb22a5e0e674e6ba67bd987f314f552ab6086f368375c29f43064400f"
+                  "bytes": "618ff6ebd414398dee9ae2552aacd2016134174d6b354dbf581dd6236f400843"
                 },
                 {
                   "u64": 10000
@@ -59,10 +56,7 @@
                   "symbol": "SessionKey"
                 },
                 {
-                  "bytes": "679802846dcb16a6e1716a25fcb435274f65fb52f642931b8cfa571a5eb7c3f5"
-                  "bytes": "3c72cd59f60a31092bc7d9f7614e29122f8c6990c6ac292241edf8e080f63c02"
-                  "bytes": "f682e3a85049e574965fe10d57b64ea510ea2c183936fa1c959db6d4de08bc6c"
-                  "bytes": "b5b1237cb22a5e0e674e6ba67bd987f314f552ab6086f368375c29f43064400f"
+                  "bytes": "618ff6ebd414398dee9ae2552aacd2016134174d6b354dbf581dd6236f400843"
                 }
               ]
             },
@@ -82,10 +76,7 @@
                       "symbol": "SessionKey"
                     },
                     {
-                      "bytes": "679802846dcb16a6e1716a25fcb435274f65fb52f642931b8cfa571a5eb7c3f5"
-                      "bytes": "3c72cd59f60a31092bc7d9f7614e29122f8c6990c6ac292241edf8e080f63c02"
-                      "bytes": "f682e3a85049e574965fe10d57b64ea510ea2c183936fa1c959db6d4de08bc6c"
-                      "bytes": "b5b1237cb22a5e0e674e6ba67bd987f314f552ab6086f368375c29f43064400f"
+                      "bytes": "618ff6ebd414398dee9ae2552aacd2016134174d6b354dbf581dd6236f400843"
                     }
                   ]
                 },
@@ -117,10 +108,7 @@
                         "symbol": "public_key"
                       },
                       "val": {
-                        "bytes": "679802846dcb16a6e1716a25fcb435274f65fb52f642931b8cfa571a5eb7c3f5"
-                        "bytes": "3c72cd59f60a31092bc7d9f7614e29122f8c6990c6ac292241edf8e080f63c02"
-                        "bytes": "f682e3a85049e574965fe10d57b64ea510ea2c183936fa1c959db6d4de08bc6c"
-                        "bytes": "b5b1237cb22a5e0e674e6ba67bd987f314f552ab6086f368375c29f43064400f"
+                        "bytes": "618ff6ebd414398dee9ae2552aacd2016134174d6b354dbf581dd6236f400843"
                       }
                     }
                   ]
@@ -378,10 +366,7 @@
             "data": {
               "vec": [
                 {
-                  "bytes": "679802846dcb16a6e1716a25fcb435274f65fb52f642931b8cfa571a5eb7c3f5"
-                  "bytes": "3c72cd59f60a31092bc7d9f7614e29122f8c6990c6ac292241edf8e080f63c02"
-                  "bytes": "f682e3a85049e574965fe10d57b64ea510ea2c183936fa1c959db6d4de08bc6c"
-                  "bytes": "b5b1237cb22a5e0e674e6ba67bd987f314f552ab6086f368375c29f43064400f"
+                  "bytes": "618ff6ebd414398dee9ae2552aacd2016134174d6b354dbf581dd6236f400843"
                 },
                 {
                   "u64": 10000
@@ -415,10 +400,7 @@
             "data": {
               "vec": [
                 {
-                  "bytes": "679802846dcb16a6e1716a25fcb435274f65fb52f642931b8cfa571a5eb7c3f5"
-                  "bytes": "3c72cd59f60a31092bc7d9f7614e29122f8c6990c6ac292241edf8e080f63c02"
-                  "bytes": "f682e3a85049e574965fe10d57b64ea510ea2c183936fa1c959db6d4de08bc6c"
-                  "bytes": "b5b1237cb22a5e0e674e6ba67bd987f314f552ab6086f368375c29f43064400f"
+                  "bytes": "618ff6ebd414398dee9ae2552aacd2016134174d6b354dbf581dd6236f400843"
                 },
                 {
                   "u64": 10000
@@ -477,10 +459,7 @@
                       "symbol": "SessionKey"
                     },
                     {
-                      "bytes": "679802846dcb16a6e1716a25fcb435274f65fb52f642931b8cfa571a5eb7c3f5"
-                      "bytes": "3c72cd59f60a31092bc7d9f7614e29122f8c6990c6ac292241edf8e080f63c02"
-                      "bytes": "f682e3a85049e574965fe10d57b64ea510ea2c183936fa1c959db6d4de08bc6c"
-                      "bytes": "b5b1237cb22a5e0e674e6ba67bd987f314f552ab6086f368375c29f43064400f"
+                      "bytes": "618ff6ebd414398dee9ae2552aacd2016134174d6b354dbf581dd6236f400843"
                     }
                   ]
                 },
@@ -497,22 +476,10 @@
                   "u64": 0
                 },
                 {
-                  "bytes": "679802846dcb16a6e1716a25fcb435274f65fb52f642931b8cfa571a5eb7c3f5"
+                  "bytes": "618ff6ebd414398dee9ae2552aacd2016134174d6b354dbf581dd6236f400843"
                 },
                 {
-                  "bytes": "de3f5fdbf6f4ce7018e4b6c9ca961f43f540b4ed949825fc19f07f53f7c9860a71a97d7b51ce768f435bede9f6d318d63b0ded62a57a34717db0ed17bd1faf06"
-                  "bytes": "3c72cd59f60a31092bc7d9f7614e29122f8c6990c6ac292241edf8e080f63c02"
-                },
-                {
-                  "bytes": "c996aee25aaac9db9ecefeaeafbc3e979108383de0b24c5dca6ec94ba234b748d21598920c1ba7a52282e4927eab486973172048fd21fbc0b9b3f7aab008e509"
-                  "bytes": "f682e3a85049e574965fe10d57b64ea510ea2c183936fa1c959db6d4de08bc6c"
-                },
-                {
-                  "bytes": "a6ad18ee917a7d96d7aeb126e78f4ad5970f2d712272e9ed6965bb4d5d224ec5cf74f9f2d46d823d93417a2be2d03d0073918b2ce2ff9cfd703713e83417e606"
-                  "bytes": "b5b1237cb22a5e0e674e6ba67bd987f314f552ab6086f368375c29f43064400f"
-                },
-                {
-                  "bytes": "7bdc146123ffdf48620664a6cfacb3a4c0bddaf59e98d9b8d8ab060358fdb69f8b42365b44df3be5a0533202eb67b71572803c5422e165614021343c6b922801"
+                  "bytes": "2465331079913b34e9b2ab5918d02e811e895b04945920d0944ffa0574c8c79423798808be4e8f5ab5032d276b8d4ccb1c3806eaee63217e24709112671a1b03"
                 },
                 {
                   "bytes": "000000120000000100000000000000000000000000000000000000000000000000000000000000030000000f000000096765745f6e6f6e6365000000000000100000000100000000000000050000000000000000"

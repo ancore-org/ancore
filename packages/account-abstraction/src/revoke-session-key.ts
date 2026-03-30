@@ -1,3 +1,4 @@
+/* eslint-disable no-redeclare */
 /**
  * revokeSessionKey — invoke AccountContract.revoke_session_key(publicKey).
  *
@@ -5,9 +6,13 @@
  * contract panics to typed errors.
  */
 
-import type { AccountContractReadOptions, AccountContractWriteResult, InvocationArgs } from './account-contract';
+import type {
+  AccountContractReadOptions,
+  AccountContractWriteResult,
+  InvocationArgs,
+} from './account-contract';
 import { AccountContract } from './account-contract';
-import { ContractInvocationError, mapContractError, SessionKeyNotFoundError, UnauthorizedError } from './errors';
+import { ContractInvocationError, mapContractError } from './errors';
 
 // ---------------------------------------------------------------------------
 // Public interfaces
@@ -89,13 +94,17 @@ function resolveContract(contract: AccountContract | string): AccountContract {
 
 function validateRevokeSessionKeyParams(params: RevokeSessionKeyParams): void {
   if (!params || typeof params !== 'object') {
-    throw new ContractInvocationError('revokeSessionKey requires a params object with a publicKey field.');
+    throw new ContractInvocationError(
+      'revokeSessionKey requires a params object with a publicKey field.'
+    );
   }
   if (
     (typeof params.publicKey !== 'string' || params.publicKey.trim().length === 0) &&
     !(params.publicKey instanceof Uint8Array)
   ) {
-    throw new ContractInvocationError('revokeSessionKey: "publicKey" must be a non-empty string or Uint8Array.');
+    throw new ContractInvocationError(
+      'revokeSessionKey: "publicKey" must be a non-empty string or Uint8Array.'
+    );
   }
 }
 
