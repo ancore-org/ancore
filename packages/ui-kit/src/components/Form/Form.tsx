@@ -42,8 +42,7 @@ FormError.displayName = 'FormError';
 // FormSubmit – submit button that reads loading state from form context
 // ---------------------------------------------------------------------------
 
-export interface FormSubmitProps
-  extends React.ButtonHTMLAttributes<HTMLButtonElement> {
+export interface FormSubmitProps extends React.ButtonHTMLAttributes<HTMLButtonElement> {
   /** Override the auto-derived isSubmitting state */
   loading?: boolean;
   children: React.ReactNode;

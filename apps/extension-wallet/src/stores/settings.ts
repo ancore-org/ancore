@@ -1,4 +1,12 @@
-import { useSyncExternalStore } from 'react';
+/**
+ * Settings Store (Zustand)
+ *
+ * Stores user preferences with persistence to extension storage.
+ */
+
+import { create } from 'zustand';
+import { persist, createJSONStorage } from 'zustand/middleware';
+import { extensionStorage } from './_storage';
 
 export type NetworkMode = 'mainnet' | 'testnet' | 'futurenet';
 export type ThemePreference = 'light' | 'dark' | 'system';
@@ -7,56 +15,41 @@ export interface SettingsState {
   network: NetworkMode;
   theme: ThemePreference;
   autoLockMinutes: number;
-  hydrated: boolean;
+
+  setNetwork: (network: NetworkMode) => void;
+  setTheme: (theme: ThemePreference) => void;
+  setAutoLockMinutes: (minutes: number) => void;
+  reset: () => void;
 }
 
-type SettingsUpdater = Partial<SettingsState> | ((state: SettingsState) => SettingsState);
-
-const listeners = new Set<() => void>();
-
-let settingsState: SettingsState = {
-  network: 'testnet',
-  theme: 'dark',
+const DEFAULTS = {
+  network: 'testnet' as NetworkMode,
+  theme: 'dark' as ThemePreference,
   autoLockMinutes: 15,
-  hydrated: false,
 };
 
-function emitChange() {
-  listeners.forEach((listener) => listener());
+export const useSettingsStore = create<SettingsState>()(
+  persist(
+    (set) => ({
+      ...DEFAULTS,
+
+      setNetwork: (network) => set({ network }),
+      setTheme: (theme) => set({ theme }),
+      setAutoLockMinutes: (autoLockMinutes) => set({ autoLockMinutes }),
+      reset: () => set(DEFAULTS),
+    }),
+    {
+      name: 'ancore-settings',
+      storage: createJSONStorage(() => extensionStorage),
+    }
+  )
+);
+
+export function getSettingsState() {
+  return useSettingsStore.getState();
 }
 
-function subscribe(listener: () => void) {
-  listeners.add(listener);
-
-  return () => {
-    listeners.delete(listener);
-  };
-}
-
-export function getSettingsState(): SettingsState {
-  return settingsState;
-}
-
-export function setSettingsState(next: SettingsUpdater) {
-  settingsState =
-    typeof next === 'function'
-      ? next(settingsState)
-      : {
-          ...settingsState,
-          ...next,
-        };
-
-  emitChange();
-}
-
+/** @deprecated Use useSettingsStore directly. Kept for router compatibility. */
 export function initializeSettingsStore() {
-  if (settingsState.hydrated) {
-    return;
-  }
-
-  setSettingsState({ hydrated: true });
-}
-
-export function useSettingsStore(): SettingsState {
-  return useSyncExternalStore(subscribe, getSettingsState, getSettingsState);
+  // No-op: Zustand persist handles hydration automatically.
 }

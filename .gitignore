@@ -71,3 +71,6 @@ apps/extension-wallet/vitest.config.d.ts
 apps/extension-wallet/vitest.config.d.ts.map
 apps/extension-wallet/vitest.config.js
 apps/extension-wallet/vitest.config.js.map
+
+issues.md
+pr.md

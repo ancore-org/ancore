@@ -1,22 +1,23 @@
 import * as bip39 from 'bip39';
 
-export interface SeedResult {
-  seed: Uint8Array; // 64-byte BIP39 seed
-  mnemonic: string; // space-separated word list
+/**
+ * Generates a standard BIP39 12-word mnemonic phrase.
+ * Uses secure randomness provided by the environment.
+ * 
+ * @returns {string} A 12-word mnemonic phrase.
+ */
+export function generateMnemonic(): string {
+  // bip39.generateMnemonic(128) generates a 12-word mnemonic.
+  // Entropy for 12 words is 128 bits.
+  return bip39.generateMnemonic(128);
 }
 
-/** Generates a new random 24-word BIP39 mnemonic and its seed */
-export async function generateMnemonic(): Promise<SeedResult> {
-  const mnemonic = bip39.generateMnemonic(256); // 256 bits = 24 words
-  const seedBuffer = await bip39.mnemonicToSeed(mnemonic);
-  return { mnemonic, seed: new Uint8Array(seedBuffer) };
-}
-
-/** Derives a 64-byte seed from an existing BIP39 mnemonic */
-export async function mnemonicToSeed(mnemonic: string): Promise<Uint8Array> {
-  if (!bip39.validateMnemonic(mnemonic)) {
-    throw new Error('invalid mnemonic phrase');
-  }
-  const seedBuffer = await bip39.mnemonicToSeed(mnemonic);
-  return new Uint8Array(seedBuffer);
+/**
+ * Validates a BIP39 mnemonic phrase.
+ * 
+ * @param {string} mnemonic - The mnemonic phrase to validate.
+ * @returns {boolean} True if valid, false otherwise.
+ */
+export function validateMnemonic(mnemonic: string): boolean {
+  return bip39.validateMnemonic(mnemonic);
 }

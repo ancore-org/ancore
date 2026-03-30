@@ -22,7 +22,9 @@ describe('isStellarAddress', () => {
   });
 
   it('returns false for an address that does not start with G', () => {
-    expect(isStellarAddress('SDQP2KPQGKIHYJGXNUIYOMHARUARCA7DJT5FO2FFOOKY3B2WSQHG4W37')).toBe(false);
+    expect(isStellarAddress('SDQP2KPQGKIHYJGXNUIYOMHARUARCA7DJT5FO2FFOOKY3B2WSQHG4W37')).toBe(
+      false
+    );
   });
 
   it('returns false for an address that is too short', () => {

@@ -10,7 +10,6 @@ import { cn } from '@/lib/utils';
 /** Safely attempt to read the react-hook-form context without throwing. */
 function useOptionalFormContext() {
   try {
-    // eslint-disable-next-line react-hooks/rules-of-hooks
     return useFormContext();
   } catch {
     return null;
@@ -21,8 +20,10 @@ function useOptionalFormContext() {
 // AddressInputBase – the pure presentational layer
 // ---------------------------------------------------------------------------
 
-export interface AddressInputBaseProps
-  extends Omit<React.InputHTMLAttributes<HTMLInputElement>, 'type'> {
+export interface AddressInputBaseProps extends Omit<
+  React.InputHTMLAttributes<HTMLInputElement>,
+  'type'
+> {
   /** Field label */
   label?: string;
   /** Validation error message */
@@ -58,11 +59,7 @@ const AddressInputBase = React.forwardRef<HTMLInputElement, AddressInputBaseProp
           {...props}
         />
         {error && (
-          <p
-            id={`${inputId}-error`}
-            role="alert"
-            className="text-sm font-medium text-destructive"
-          >
+          <p id={`${inputId}-error`} role="alert" className="text-sm font-medium text-destructive">
             {error}
           </p>
         )}

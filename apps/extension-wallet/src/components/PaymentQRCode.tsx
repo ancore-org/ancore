@@ -1,3 +1,4 @@
+// ...existing code...
 import { QRCodeSVG } from 'qrcode.react';
 import { cn } from '@ancore/ui-kit';
 

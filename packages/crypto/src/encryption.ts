@@ -1,3 +1,5 @@
+/* eslint-disable no-undef */
+
 import { Buffer } from 'node:buffer';
 
 const PBKDF2_ITERATIONS = 100000;
@@ -14,6 +16,10 @@ export interface EncryptedSecretKeyPayload {
   salt: string;
   iv: string;
   ciphertext: string;
+}
+
+function asBufferSource(value: Uint8Array): BufferSource {
+  return value as unknown as BufferSource;
 }
 
 function getCrypto(): Crypto {
@@ -50,7 +56,7 @@ async function deriveEncryptionKey(
   return cryptoApi.subtle.deriveKey(
     {
       name: 'PBKDF2',
-      salt,
+      salt: asBufferSource(salt),
       iterations,
       hash: 'SHA-256',
     },
@@ -130,7 +136,7 @@ export async function encryptSecretKey(
   const ciphertext = await cryptoApi.subtle.encrypt(
     {
       name: 'AES-GCM',
-      iv,
+      iv: asBufferSource(iv),
     },
     encryptionKey,
     new TextEncoder().encode(secretKey)
@@ -162,19 +168,15 @@ export async function decryptSecretKey(
     const salt = fromBase64(validatedPayload.salt);
     const iv = fromBase64(validatedPayload.iv);
     const ciphertext = fromBase64(validatedPayload.ciphertext);
-    const encryptionKey = await deriveEncryptionKey(
-      password,
-      salt,
-      validatedPayload.iterations
-    );
+    const encryptionKey = await deriveEncryptionKey(password, salt, validatedPayload.iterations);
 
     const plaintext = await cryptoApi.subtle.decrypt(
       {
         name: 'AES-GCM',
-        iv,
+        iv: asBufferSource(iv),
       },
       encryptionKey,
-      ciphertext
+      asBufferSource(ciphertext)
     );
 
     return new TextDecoder().decode(plaintext);

@@ -8,7 +8,11 @@ function Trigger({ variant }: { variant?: 'success' | 'error' | 'warning' | 'inf
   return <button onClick={() => toast('Test message', variant)}>Show Toast</button>;
 }
 
-function ConvenienceTrigger({ method }: { method: 'showSuccess' | 'showError' | 'showWarning' | 'showInfo' }) {
+function ConvenienceTrigger({
+  method,
+}: {
+  method: 'showSuccess' | 'showError' | 'showWarning' | 'showInfo';
+}) {
   const hook = useToast();
   return <button onClick={() => hook[method]('Test message')}>Show Toast</button>;
 }

@@ -1,5 +1,6 @@
 import { describe, expect, it } from '@jest/globals';
 import {
+  Account,
   Asset,
   Keypair,
   Memo,
@@ -13,21 +14,16 @@ import { signTransaction, verifySignature } from '../signing';
 describe('signTransaction', () => {
   const networkPassphrase = Networks.TESTNET;
 
-  // Helper to create a robust mock account that passes TransactionBuilder checks
-  const mockAccount = (publicKey: string, sequence: string) => ({
-    accountId: () => publicKey,
-    sequenceNumber: () => sequence,
-    incrementSequenceNumber: () => {},
-  } as any);
+  const mockAccount = (publicKey: string, sequence: string) => new Account(publicKey, sequence);
 
   it('produces a non-empty signature for a standard transaction', async () => {
     // Dynamically generate a valid test keypair to avoid "fake key" hallucinations
     const kp = Keypair.random();
-    
-    const tx = new TransactionBuilder(
-      mockAccount(kp.publicKey(), '1'),
-      { networkPassphrase }
-    )
+
+    const tx = new TransactionBuilder(mockAccount(kp.publicKey(), '1'), {
+      fee: '100',
+      networkPassphrase,
+    })
       .addOperation(
         Operation.payment({
           destination: Keypair.random().publicKey(),
@@ -43,18 +39,20 @@ describe('signTransaction', () => {
     expect(signature).toBeDefined();
     expect(signature.length).toBe(64); // Ed25519 signatures are 64 bytes
     expect(tx.signatures.length).toBe(1);
-    
+
     // Integrity check: the signature in the transaction should match the returned signature
     expect(Uint8Array.from(tx.signatures[0].signature())).toEqual(signature);
   });
 
   it('produces a signature that verifies correctly', async () => {
     const kp = Keypair.random();
-    const tx = new TransactionBuilder(
-      mockAccount(kp.publicKey(), '100'),
-      { networkPassphrase }
-    )
-      .addOperation(Operation.beginSponsoringFutureReserves({ sponsoredId: Keypair.random().publicKey() }))
+    const tx = new TransactionBuilder(mockAccount(kp.publicKey(), '100'), {
+      fee: '100',
+      networkPassphrase,
+    })
+      .addOperation(
+        Operation.beginSponsoringFutureReserves({ sponsoredId: Keypair.random().publicKey() })
+      )
       .addOperation(Operation.endSponsoringFutureReserves())
       .setTimeout(0)
       .build();
@@ -68,10 +66,10 @@ describe('signTransaction', () => {
 
   it('supports signing with a secret key string', async () => {
     const kp = Keypair.random();
-    const tx = new TransactionBuilder(
-      mockAccount(kp.publicKey(), '1'),
-      { networkPassphrase }
-    )
+    const tx = new TransactionBuilder(mockAccount(kp.publicKey(), '1'), {
+      fee: '100',
+      networkPassphrase,
+    })
       .addOperation(
         Operation.payment({
           destination: Keypair.random().publicKey(),
@@ -92,10 +90,10 @@ describe('signTransaction', () => {
 
   it('throws an error for a malformed secret key', async () => {
     const kp = Keypair.random();
-    const tx = new TransactionBuilder(
-      mockAccount(kp.publicKey(), '1'),
-      { networkPassphrase }
-    )
+    const tx = new TransactionBuilder(mockAccount(kp.publicKey(), '1'), {
+      fee: '100',
+      networkPassphrase,
+    })
       .addOperation(
         Operation.payment({
           destination: Keypair.random().publicKey(),
@@ -114,10 +112,10 @@ describe('signTransaction', () => {
 
   it('signs a FeeBumpTransaction correctly', async () => {
     const kp = Keypair.random();
-    const innerTx = new TransactionBuilder(
-      mockAccount(kp.publicKey(), '1'),
-      { networkPassphrase }
-    )
+    const innerTx = new TransactionBuilder(mockAccount(kp.publicKey(), '1'), {
+      fee: '100',
+      networkPassphrase,
+    })
       .addOperation(Operation.bumpSequence({ bumpTo: '2' }))
       .setTimeout(0)
       .build();
@@ -130,7 +128,7 @@ describe('signTransaction', () => {
     );
 
     const signature = await signTransaction(feeBumpTx, kp);
-    
+
     const isValid = await verifySignature(feeBumpTx.hash(), signature, kp.publicKey());
     expect(isValid).toBe(true);
     expect(feeBumpTx.signatures.length).toBe(1);

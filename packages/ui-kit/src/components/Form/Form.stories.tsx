@@ -50,22 +50,9 @@ export const SendTransaction: Story = {
     return (
       <div className="w-[400px] space-y-6">
         <Form onSubmit={handleSubmit} validationSchema={sendSchema}>
-          <AddressInput
-            name="recipient"
-            label="Send To"
-            placeholder="GABC..."
-          />
-          <AmountInput
-            name="amount"
-            label="Amount"
-            balance="100.50"
-            asset="XLM"
-          />
-          <PasswordInput
-            name="password"
-            label="Wallet Password"
-            showStrength
-          />
+          <AddressInput name="recipient" label="Send To" placeholder="GABC..." />
+          <AmountInput name="amount" label="Amount" balance="100.50" asset="XLM" />
+          <PasswordInput name="password" label="Wallet Password" showStrength />
           <Form.Submit loading={submitting}>Send Transaction</Form.Submit>
         </Form>
 

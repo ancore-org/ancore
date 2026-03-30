@@ -31,6 +31,10 @@ module.exports = [
         TextDecoder: 'readonly',
         CryptoKey: 'readonly',
         crypto: 'readonly',
+        // Browser extension globals
+        chrome: 'readonly',
+        browser: 'readonly',
+        localStorage: 'readonly',
       },
     },
     plugins: {
@@ -49,6 +53,8 @@ module.exports = [
         ...jestGlobals,
         process: 'readonly',
         require: 'readonly',
+        localStorage: 'readonly',
+        globalThis: 'readonly',
       },
     },
     rules: {

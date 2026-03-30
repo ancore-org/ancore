@@ -3,8 +3,8 @@
  * Maps between TypeScript types and Soroban ScVal for contracts/account.
  */
 
-import type { SessionKey } from '@ancore/types';
 import { Address, nativeToScVal, scValToNative, StrKey, xdr } from '@stellar/stellar-sdk';
+import type { SessionKey } from './session-key';
 
 const BYTES_N_32_LENGTH = 32;
 

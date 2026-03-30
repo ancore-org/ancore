@@ -15,6 +15,13 @@ const jestGlobals = {
   jest: 'readonly',
 };
 
+const webcryptoGlobals = {
+  Crypto: 'readonly',
+  CryptoKey: 'readonly',
+  TextEncoder: 'readonly',
+  TextDecoder: 'readonly',
+};
+
 module.exports = [
   js.configs.recommended,
   {
@@ -26,7 +33,7 @@ module.exports = [
         sourceType: 'module',
       },
       globals: {
-        ...globals.node,
+        ...webcryptoGlobals,
       },
     },
     plugins: {

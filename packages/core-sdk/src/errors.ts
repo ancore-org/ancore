@@ -63,8 +63,8 @@ export class SimulationExpiredError extends AncoreSdkError {
     super(
       'SIMULATION_EXPIRED',
       'The simulation result has expired or requires ledger entry restoration. ' +
-      'Please retry the transaction. If this persists the contract storage ' +
-      'may need to be restored first.'
+        'Please retry the transaction. If this persists the contract storage ' +
+        'may need to be restored first.'
     );
     this.name = 'SimulationExpiredError';
     Object.setPrototypeOf(this, new.target.prototype);

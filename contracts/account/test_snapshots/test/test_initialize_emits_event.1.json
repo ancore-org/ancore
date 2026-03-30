@@ -3,7 +3,9 @@
     "address": 2,
     "nonce": 0
   },
-  "auth": [[]],
+  "auth": [
+    []
+  ],
   "ledger": {
     "protocol_version": 21,
     "sequence_number": 0,
@@ -59,6 +61,18 @@
                         },
                         "val": {
                           "address": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAFCT4"
+                        }
+                      },
+                      {
+                        "key": {
+                          "vec": [
+                            {
+                              "symbol": "Version"
+                            }
+                          ]
+                        },
+                        "val": {
+                          "u32": 1
                         }
                       }
                     ]

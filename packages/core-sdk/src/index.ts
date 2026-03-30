@@ -10,6 +10,15 @@ export { AncoreClient, type AncoreClientOptions } from './ancore-client';
 
 // Session key helpers
 export { addSessionKey, type AddSessionKeyParams } from './add-session-key';
+export { revokeSessionKey, type RevokeSessionKeyParams } from './revoke-session-key';
+
+// Payment
+export {
+  sendPayment,
+  type SendPaymentParams,
+  type SendPaymentDeps,
+  type PaymentSigner,
+} from './send-payment';
 
 // Account transaction builder (wrapper around Stellar SDK's TransactionBuilder)
 export {
@@ -20,28 +29,26 @@ export {
 // Contract parameter encoding helpers
 export {
   toScAddress,
-  toScU64,
-  toScU32,
-  toScPermissionsVec,
   toScOperationsVec,
+  toScPermissionsVec,
+  toScU32,
+  toScU64,
 } from './contract-params';
 
 // Error types
 export {
   AncoreSdkError,
-  SimulationFailedError,
-  SimulationExpiredError,
   BuilderValidationError,
-  SessionKeyManagementError,
-  TransactionSubmissionError,
-  SessionKeyExecutionValidationError,
   SessionKeyExecutionError,
+  SessionKeyExecutionValidationError,
+  SessionKeyManagementError,
+  SimulationExpiredError,
+  SimulationFailedError,
+  TransactionSubmissionError,
 } from './errors';
 
 export {
-  AncoreClient,
   mapExecuteWithSessionKeyError,
-  type AncoreClientOptions,
   type ExecuteWithSessionKeyParams,
   type ExecuteWithSessionKeyResult,
   type SessionKeyExecutionLayer,
@@ -50,10 +57,34 @@ export {
 } from './execute-with-session-key';
 
 // Secure Storage
-export { SecureStorageManager } from './storage/secure-storage-manager';
+export {
+  SecureStorageManager,
+  type SecureStorageManagerOptions,
+} from './storage/secure-storage-manager';
 export type {
-  EncryptedPayload,
-  StorageAdapter,
   AccountData,
+  EncryptedPayload,
   SessionKeysData,
+  StorageAdapter,
 } from './storage/types';
+
+// Encryption Primitives
+export {
+  deriveKey,
+  encrypt,
+  decrypt,
+  type EncryptedPayload as EncryptionPayload,
+} from './storage/encryption-primitives';
+
+// Backup Export/Import
+export { exportBackup, importBackup, type BackupPayload } from './storage/backup';
+
+// Storage Adapter (Chrome/Firefox)
+export {
+  ChromeStorageAdapter,
+  BrowserStorageAdapter,
+  LocalStorageAdapter,
+  createStorageAdapter,
+  StorageError,
+  StorageErrorCode,
+} from './storage/storage-adapter';

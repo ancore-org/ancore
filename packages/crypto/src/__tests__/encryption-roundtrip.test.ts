@@ -1,9 +1,6 @@
 import { describe, expect, it } from '@jest/globals';
 
-import {
-  decryptSecretKey,
-  encryptSecretKey,
-} from '../encryption';
+import { decryptSecretKey, encryptSecretKey } from '../encryption';
 
 describe('encryptSecretKey()/decryptSecretKey() round-trip', () => {
   it('decrypts encrypted payload back to original secret key', async () => {

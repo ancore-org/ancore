@@ -10,7 +10,6 @@ import { cn } from '@/lib/utils';
 
 function useOptionalFormContext() {
   try {
-    // eslint-disable-next-line react-hooks/rules-of-hooks
     return useFormContext();
   } catch {
     return null;
@@ -21,8 +20,10 @@ function useOptionalFormContext() {
 // AmountInputBase – pure presentational layer
 // ---------------------------------------------------------------------------
 
-export interface AmountInputBaseProps
-  extends Omit<React.InputHTMLAttributes<HTMLInputElement>, 'type'> {
+export interface AmountInputBaseProps extends Omit<
+  React.InputHTMLAttributes<HTMLInputElement>,
+  'type'
+> {
   /** Field label */
   label?: string;
   /** Validation or runtime error message */
@@ -37,17 +38,7 @@ export interface AmountInputBaseProps
 
 const AmountInputBase = React.forwardRef<HTMLInputElement, AmountInputBaseProps>(
   (
-    {
-      label = 'Amount',
-      error,
-      balance,
-      asset = 'XLM',
-      onMax,
-      className,
-      id,
-      onChange,
-      ...props
-    },
+    { label = 'Amount', error, balance, asset = 'XLM', onMax, className, id, onChange, ...props },
     ref
   ) => {
     const inputId = id ?? label.toLowerCase().replace(/\s+/g, '-');

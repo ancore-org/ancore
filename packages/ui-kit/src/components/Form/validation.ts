@@ -97,7 +97,13 @@ const STRENGTH_BG_CLASSES: string[] = [
  */
 export function getPasswordStrength(password: string): PasswordStrength & { bgClass: string } {
   if (!password) {
-    return { score: 0, label: 'Very Weak', colorClass: STRENGTH_COLOR_CLASSES[0], bgClass: STRENGTH_BG_CLASSES[0], percent: 0 };
+    return {
+      score: 0,
+      label: 'Very Weak',
+      colorClass: STRENGTH_COLOR_CLASSES[0],
+      bgClass: STRENGTH_BG_CLASSES[0],
+      percent: 0,
+    };
   }
 
   let score = 0;
@@ -110,7 +116,11 @@ export function getPasswordStrength(password: string): PasswordStrength & { bgCl
 
   // Penalise trivial patterns
   if (/^(.)\1+$/.test(password)) score = Math.max(0, score - 2);
-  if (/^(012|123|234|345|456|567|678|789|890|abc|bcd|cde|def|efg|fgh|ghi|hij|ijk|jkl|klm|lmn|mno|nop|opq|pqr|qrs|rst|stu|tuv|uvw|vwx|wxy|xyz)/i.test(password)) {
+  if (
+    /^(012|123|234|345|456|567|678|789|890|abc|bcd|cde|def|efg|fgh|ghi|hij|ijk|jkl|klm|lmn|mno|nop|opq|pqr|qrs|rst|stu|tuv|uvw|vwx|wxy|xyz)/i.test(
+      password
+    )
+  ) {
     score = Math.max(0, score - 1);
   }
 

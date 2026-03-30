@@ -11,7 +11,6 @@ import { getPasswordStrength } from './validation';
 
 function useOptionalFormContext() {
   try {
-    // eslint-disable-next-line react-hooks/rules-of-hooks
     return useFormContext();
   } catch {
     return null;
@@ -50,9 +49,7 @@ function StrengthMeter({ password, id }: StrengthMeterProps) {
       </div>
 
       {/* Label */}
-      <p className={cn('text-xs font-medium mt-1', strength.colorClass)}>
-        {strength.label}
-      </p>
+      <p className={cn('text-xs font-medium mt-1', strength.colorClass)}>{strength.label}</p>
     </div>
   );
 }
@@ -61,8 +58,10 @@ function StrengthMeter({ password, id }: StrengthMeterProps) {
 // PasswordInputBase – pure presentational layer
 // ---------------------------------------------------------------------------
 
-export interface PasswordInputBaseProps
-  extends Omit<React.InputHTMLAttributes<HTMLInputElement>, 'type'> {
+export interface PasswordInputBaseProps extends Omit<
+  React.InputHTMLAttributes<HTMLInputElement>,
+  'type'
+> {
   /** Field label */
   label?: string;
   /** Validation error message */
@@ -101,10 +100,7 @@ const PasswordInputBase = React.forwardRef<HTMLInputElement, PasswordInputBasePr
                 .filter(Boolean)
                 .join(' ') || undefined
             }
-            className={cn(
-              'pr-10',
-              error && 'border-destructive focus-visible:ring-destructive'
-            )}
+            className={cn('pr-10', error && 'border-destructive focus-visible:ring-destructive')}
             value={value}
             {...props}
           />
@@ -114,11 +110,7 @@ const PasswordInputBase = React.forwardRef<HTMLInputElement, PasswordInputBasePr
             aria-label={visible ? 'Hide password' : 'Show password'}
             className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring rounded"
           >
-            {visible ? (
-              <EyeOff className="h-4 w-4" />
-            ) : (
-              <Eye className="h-4 w-4" />
-            )}
+            {visible ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
           </button>
         </div>
 
@@ -127,11 +119,7 @@ const PasswordInputBase = React.forwardRef<HTMLInputElement, PasswordInputBasePr
 
         {/* Error */}
         {error && (
-          <p
-            id={`${inputId}-error`}
-            role="alert"
-            className="text-sm font-medium text-destructive"
-          >
+          <p id={`${inputId}-error`} role="alert" className="text-sm font-medium text-destructive">
             {error}
           </p>
         )}

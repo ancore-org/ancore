@@ -9,7 +9,6 @@ function manifestPlugin(): Plugin {
     apply: 'build',
     generateBundle() {
       const source = fs.readFileSync(path.resolve(__dirname, 'manifest.json'), 'utf8');
-
       this.emitFile({
         type: 'asset',
         fileName: 'manifest.json',
@@ -21,6 +20,7 @@ function manifestPlugin(): Plugin {
 
 export default defineConfig({
   plugins: [react(), manifestPlugin()],
+  publicDir: 'public',
   resolve: {
     alias: {
       '@': path.resolve(__dirname, './src'),
@@ -30,6 +30,8 @@ export default defineConfig({
     postcss: './postcss.config.js',
   },
   build: {
+    outDir: 'dist',
+    emptyOutDir: true,
     rollupOptions: {
       input: {
         'popup/index': path.resolve(__dirname, 'src/popup/index.html'),
@@ -40,7 +42,6 @@ export default defineConfig({
           if (chunkInfo.name === 'background') {
             return 'background/service-worker.js';
           }
-
           return 'assets/[name]-[hash].js';
         },
         chunkFileNames: 'assets/[name]-[hash].js',

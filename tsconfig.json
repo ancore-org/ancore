@@ -1,0 +1,10 @@
+{
+  "files": [],
+  "references": [
+    { "path": "packages/types" },
+    { "path": "packages/crypto" },
+    { "path": "packages/stellar" },
+    { "path": "packages/account-abstraction" },
+    { "path": "packages/core-sdk" }
+  ]
+}

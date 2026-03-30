@@ -40,7 +40,7 @@ export async function signTransaction(
 
   try {
     kp = typeof keypair === 'string' ? Keypair.fromSecret(keypair) : keypair;
-  } catch (error) {
+  } catch {
     throw new Error('Invalid secret key or keypair provided for signing.');
   }
 

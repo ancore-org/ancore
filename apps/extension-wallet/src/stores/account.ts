@@ -1,4 +1,13 @@
-import { useSyncExternalStore } from 'react';
+/**
+ * Account Store (Zustand)
+ *
+ * Manages wallet accounts with persistence to chrome.storage via
+ * the webextension-polyfill storage adapter.
+ */
+
+import { create } from 'zustand';
+import { persist, createJSONStorage } from 'zustand/middleware';
+import { extensionStorage } from './_storage';
 
 export interface WalletAccount {
   id: string;
@@ -9,65 +18,55 @@ export interface WalletAccount {
 export interface AccountState {
   accounts: WalletAccount[];
   activeAccountId: string | null;
-  hydrated: boolean;
+
+  setAccount: (account: WalletAccount) => void;
+  setActiveAccount: (id: string) => void;
+  removeAccount: (id: string) => void;
+  clear: () => void;
 }
 
-type AccountUpdater = Partial<AccountState> | ((state: AccountState) => AccountState);
+export const useAccountStore = create<AccountState>()(
+  persist(
+    (set) => ({
+      accounts: [],
+      activeAccountId: null,
 
-const listeners = new Set<() => void>();
+      setAccount: (account) =>
+        set((state) => {
+          const exists = state.accounts.some((a) => a.id === account.id);
+          return {
+            accounts: exists
+              ? state.accounts.map((a) => (a.id === account.id ? account : a))
+              : [...state.accounts, account],
+            activeAccountId: state.activeAccountId ?? account.id,
+          };
+        }),
 
-let accountState: AccountState = {
-  accounts: [],
-  activeAccountId: null,
-  hydrated: false,
-};
+      setActiveAccount: (id) => set({ activeAccountId: id }),
 
-function emitChange() {
-  listeners.forEach((listener) => listener());
+      removeAccount: (id) =>
+        set((state) => {
+          const accounts = state.accounts.filter((a) => a.id !== id);
+          const activeAccountId =
+            state.activeAccountId === id ? (accounts[0]?.id ?? null) : state.activeAccountId;
+          return { accounts, activeAccountId };
+        }),
+
+      clear: () => set({ accounts: [], activeAccountId: null }),
+    }),
+    {
+      name: 'ancore-account',
+      storage: createJSONStorage(() => extensionStorage),
+    }
+  )
+);
+
+/** Convenience selector — avoids re-renders when unrelated state changes. */
+export function getAccountState() {
+  return useAccountStore.getState();
 }
 
-function subscribe(listener: () => void) {
-  listeners.add(listener);
-
-  return () => {
-    listeners.delete(listener);
-  };
-}
-
-export function getAccountState(): AccountState {
-  return accountState;
-}
-
-export function setAccountState(next: AccountUpdater) {
-  accountState =
-    typeof next === 'function'
-      ? next(accountState)
-      : {
-          ...accountState,
-          ...next,
-        };
-
-  emitChange();
-}
-
+/** @deprecated Use useAccountStore directly. Kept for router compatibility. */
 export function initializeAccountStore() {
-  if (accountState.hydrated) {
-    return;
-  }
-
-  setAccountState({
-    hydrated: true,
-    accounts: [
-      {
-        id: 'primary',
-        label: 'Primary wallet',
-        address: 'GXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX',
-      },
-    ],
-    activeAccountId: 'primary',
-  });
-}
-
-export function useAccountStore(): AccountState {
-  return useSyncExternalStore(subscribe, getAccountState, getAccountState);
+  // No-op: Zustand persist handles hydration automatically.
 }

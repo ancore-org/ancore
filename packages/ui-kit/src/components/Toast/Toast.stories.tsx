@@ -37,7 +37,13 @@ function ToastDemo() {
 const meta = {
   title: 'Notifications/Toast',
   component: ToastDemo,
-  decorators: [(Story) => <NotificationProvider><Story /></NotificationProvider>],
+  decorators: [
+    (Story) => (
+      <NotificationProvider>
+        <Story />
+      </NotificationProvider>
+    ),
+  ],
   parameters: { layout: 'centered' },
   tags: ['autodocs'],
 } satisfies Meta<typeof ToastDemo>;
