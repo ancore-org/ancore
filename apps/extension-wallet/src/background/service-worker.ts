@@ -9,30 +9,13 @@ type ChromeInstalledDetails = {
 
 type ChromeMessageSender = object;
 
-declare const chrome: {
-  runtime: {
-    getManifest(): ChromeRuntimeManifest;
-    onInstalled: {
-      addListener(callback: (details: ChromeInstalledDetails) => void): void;
-    };
-    onStartup: {
-      addListener(callback: () => void): void;
-    };
-    onMessage: {
-      addListener(
-        callback: (
-          message: unknown,
-          sender: ChromeMessageSender,
-          sendResponse: (response: unknown) => void
-        ) => boolean | void
-      ): void;
-    };
-  };
-};
-
 const logPrefix = '[ancore-extension/background]';
 
-const manifest = chrome.runtime.getManifest();
+const runtime = (globalThis as { chrome?: { runtime?: any } }).chrome?.runtime;
+const manifest = (runtime?.getManifest?.() as ChromeRuntimeManifest | undefined) ?? {
+  name: 'ancore-extension-wallet',
+  version: '0.0.0',
+};
 
 interface RuntimeMessage {
   type?: string;
@@ -43,15 +26,15 @@ console.info(`${logPrefix} booted`, {
   version: manifest.version,
 });
 
-chrome.runtime.onInstalled.addListener((details) => {
+runtime?.onInstalled?.addListener((details: ChromeInstalledDetails) => {
   console.info(`${logPrefix} installed`, { reason: details.reason });
 });
 
-chrome.runtime.onStartup.addListener(() => {
+runtime?.onStartup?.addListener(() => {
   console.info(`${logPrefix} startup`);
 });
 
-chrome.runtime.onMessage.addListener(
+runtime?.onMessage?.addListener(
   (message: unknown, _sender: ChromeMessageSender, sendResponse: (response: unknown) => void) => {
     const runtimeMessage = message as RuntimeMessage;
 

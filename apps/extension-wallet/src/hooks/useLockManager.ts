@@ -13,9 +13,10 @@ import { getSettingsState } from '../stores/settings';
 import { setSessionState } from '../stores/session';
 
 // Singleton storage manager shared across hook instances
-let _storageManager: SecureStorageManager | null = null;
+type StorageManagerInstance = InstanceType<typeof SecureStorageManager>;
+let _storageManager: StorageManagerInstance | null = null;
 
-function getStorageManager(): SecureStorageManager {
+function getStorageManager(): StorageManagerInstance {
   if (!_storageManager) {
     _storageManager = new SecureStorageManager(createStorageAdapter());
   }

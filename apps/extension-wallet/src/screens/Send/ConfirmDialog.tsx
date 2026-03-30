@@ -29,7 +29,7 @@ export function ConfirmDialog({ transaction, error, loading, onBack, onSign }: C
         <PasswordInput
           label="Wallet password"
           value={password}
-          onChange={(event) => setPassword(event.target.value)}
+          onChange={(event: React.ChangeEvent<HTMLInputElement>) => setPassword(event.target.value)}
           error={error}
         />
 

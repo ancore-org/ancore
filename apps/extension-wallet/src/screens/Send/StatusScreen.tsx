@@ -24,7 +24,9 @@ export function StatusScreen({ txId, status }: StatusScreenProps) {
           <span className="font-medium">Transaction ID:</span> {txId}
         </p>
         <div>
-          <Badge variant="outline">{STATUS_LABELS[status]}</Badge>
+          <Badge className="inline-flex" variant="outline">
+            {STATUS_LABELS[status]}
+          </Badge>
         </div>
         {status === 'pending' && <p>Waiting for network confirmation...</p>}
         {status === 'confirmed' && <p>Success! The transaction has been confirmed.</p>}

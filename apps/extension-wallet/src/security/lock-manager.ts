@@ -8,19 +8,21 @@
 import { SecureStorageManager } from '@ancore/core-sdk';
 import { InactivityDetector } from './inactivity-detector';
 
+type StorageManagerInstance = InstanceType<typeof SecureStorageManager>;
+
 export type LockStatus = 'locked' | 'unlocked';
 
 export interface LockManagerOptions {
   /** Auto-lock timeout in minutes. 0 = never. */
   autoLockMinutes: number;
-  storageManager: SecureStorageManager;
+  storageManager: StorageManagerInstance;
   onLock?: () => void;
   onUnlock?: () => void;
 }
 
 export class LockManager {
   private status: LockStatus = 'locked';
-  private readonly storageManager: SecureStorageManager;
+  private readonly storageManager: StorageManagerInstance;
   private readonly detector: InactivityDetector;
   private readonly onLock?: () => void;
   private readonly onUnlock?: () => void;

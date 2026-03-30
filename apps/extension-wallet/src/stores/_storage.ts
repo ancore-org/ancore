@@ -31,8 +31,9 @@ function isBrowserExtension(): boolean {
 const chromeExtensionStorage: StateStorage = {
   getItem: (name: string): Promise<string | null> => {
     return new Promise((resolve) => {
-      chrome.storage.local.get(name, (result) => {
-        resolve(result[name] ?? null);
+      chrome.storage.local.get(name, (result: Record<string, unknown>) => {
+        const value = result[name];
+        resolve(typeof value === 'string' ? value : null);
       });
     });
   },

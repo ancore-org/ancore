@@ -5,15 +5,8 @@ import { useSettingsStore } from '../stores/settings';
 
 // 1. Dynamic Imports (Corrected paths from your build log)
 const HomeScreen = lazy(() => import('../screens/HomeScreen'));
-const ReceiveScreen = lazy(() => import('../screens/ReceiveScreen'));
-const UnlockScreen = lazy(() => import('../screens/UnlockScreen'));
-const TransactionDetail = lazy(() => import('../screens/TransactionDetail'));
-
-// Folder-based components (pointing to the entry screens shown in your log)
-const OnboardingFlow = lazy(() => import('../screens/Onboarding/OnboardingFlow'));
-const SendScreen = lazy(() => import('../screens/Send/SendScreen'));
 const SettingsScreen = lazy(() =>
-  import('../screens/Settings/AboutScreen').then((m) => ({ default: m.AboutScreen }))
+  import('../screens/Settings/SettingsScreen').then((m) => ({ default: m.SettingsScreen }))
 );
 
 export function RouterShell(): JSX.Element {

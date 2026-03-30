@@ -1,8 +1,8 @@
 import React, { useState } from 'react';
 import ReactDOM from 'react-dom/client';
 import { NotificationProvider } from '@ancore/ui-kit';
-import { ReceiveScreen } from './screens/ReceiveScreen';
-import { SettingsScreen } from './screens/Settings/SettingsScreen';
+import ReceiveScreen from './screens/ReceiveScreen';
+import SettingsScreen from './screens/Settings/SettingsScreen';
 import './index.css';
 
 function App() {

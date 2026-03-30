@@ -9,7 +9,7 @@ vi.mock('qrcode.react', () => ({
   ),
 }));
 
-import { ReceiveScreen } from '@/screens/ReceiveScreen';
+import ReceiveScreen from '@/screens/ReceiveScreen';
 
 const MAINNET_ACCOUNT = {
   publicKey: 'GABC1234567890DEFGHIJKLMNOPQRSTUVWXYZ',
