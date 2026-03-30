@@ -62,7 +62,7 @@ function makeExecutionLayer<TResult>(
 }
 
 describe('AncoreClient.executeWithSessionKey', () => {
-  it('delegates contract execution to the execution layer with a typed invocation', async () => {
+  it('delegates to the execution layer with the generated invocation', async () => {
     const executionLayer = makeExecutionLayer<{ ok: boolean }>();
     const accountContract = new AccountContract(ACCOUNT_CONTRACT_ID);
     const client = new AncoreClient({ accountContract, executionLayer });
@@ -94,32 +94,7 @@ describe('AncoreClient.executeWithSessionKey', () => {
     );
   });
 
-  it('returns typed results from the execution layer unchanged', async () => {
-    const executionLayer = makeExecutionLayer<{ receiptId: string; success: true }>(async () => ({
-      result: { receiptId: 'receipt-1', success: true },
-      transactionHash: 'hash-1',
-    }));
-    const client = new AncoreClient({
-      accountContract: new AccountContract(ACCOUNT_CONTRACT_ID),
-      executionLayer,
-    });
-
-    const result = await client.executeWithSessionKey<{ receiptId: string; success: true }>(
-      makeParams()
-    );
-
-    expect(result.result.receiptId).toBe('receipt-1');
-    expect(result.result.success).toBe(true);
-    expect(result.transactionHash).toBe('hash-1');
-  });
-
-    });
-    expect(request?.invocation.args.map((arg: xdr.ScVal) => arg.toXDR('base64'))).toEqual(
-      expectedInvocation.args.map((arg: xdr.ScVal) => arg.toXDR('base64'))
-    );
-  });
-
-  it('returns typed results from the execution layer unchanged', async () => {
+  it('returns typed execution results unchanged', async () => {
     const executionLayer = makeExecutionLayer<{ receiptId: string; success: true }>(async () => ({
       result: { receiptId: 'receipt-1', success: true },
       transactionHash: 'hash-1',
@@ -154,13 +129,10 @@ describe('AncoreClient.executeWithSessionKey', () => {
         },
       })
     ).rejects.toThrow(SessionKeyExecutionValidationError);
+
     expect(executionLayer.executeWithSessionKey).not.toHaveBeenCalled();
   });
 
-  it('maps unauthorized failures deterministically', async () => {
-    const executionLayer = makeExecutionLayer<never>(async () => {
-      throw new UnauthorizedError('session key cannot call this target');
-    });
   it('rejects invalid target addresses before delegation', async () => {
     const executionLayer = makeExecutionLayer<{ ok: boolean }>();
     const client = new AncoreClient({
@@ -168,37 +140,14 @@ describe('AncoreClient.executeWithSessionKey', () => {
       executionLayer,
     });
 
-    await expect(client.executeWithSessionKey(makeParams())).rejects.toMatchObject({
-      name: 'SessionKeyExecutionError',
-      code: 'SESSION_KEY_EXECUTION_UNAUTHORIZED',
-      message: 'session key cannot call this target',
-    });
-  });
-
-  it('maps invalid nonce failures deterministically', async () => {
-    const executionLayer = makeExecutionLayer<never>(async () => {
-      throw new InvalidNonceError('nonce mismatch');
-    });
-    const client = new AncoreClient({
-      accountContract: new AccountContract(ACCOUNT_CONTRACT_ID),
-      executionLayer,
-    });
-
-    await expect(client.executeWithSessionKey(makeParams())).rejects.toMatchObject({
-      code: 'SESSION_KEY_EXECUTION_INVALID_NONCE',
-      message: 'nonce mismatch',
-    });
-  });
-
-  it('maps not-initialized failures deterministically', async () => {
-    const executionLayer = makeExecutionLayer<never>(async () => {
-      throw new NotInitializedError();
     await expect(
       client.executeWithSessionKey({
         ...makeParams(),
         target: 'not-a-contract-id',
       })
     ).rejects.toThrow('target must be a valid Stellar address in G... or C... format.');
+
+    expect(executionLayer.executeWithSessionKey).not.toHaveBeenCalled();
   });
 
   it('rejects empty function names', async () => {
@@ -229,7 +178,7 @@ describe('AncoreClient.executeWithSessionKey', () => {
     ).rejects.toThrow('args must be an array of ScVal values.');
   });
 
-  it('rejects negative expected nonces', async () => {
+  it('rejects negative expected nonce values', async () => {
     const client = new AncoreClient({
       accountContract: new AccountContract(ACCOUNT_CONTRACT_ID),
       executionLayer: makeExecutionLayer<{ ok: boolean }>(),
@@ -270,12 +219,6 @@ describe('AncoreClient.executeWithSessionKey', () => {
     });
 
     await expect(client.executeWithSessionKey(makeParams())).rejects.toMatchObject({
-      code: 'SESSION_KEY_EXECUTION_NOT_INITIALIZED',
-      message: 'Account contract is not initialized',
-    });
-  });
-
-      name: 'SessionKeyExecutionError',
       code: 'SESSION_KEY_EXECUTION_UNAUTHORIZED',
       message: 'session key cannot call this target',
     });

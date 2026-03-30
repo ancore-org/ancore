@@ -73,6 +73,10 @@ describe('addSessionKey', () => {
     expect(result).toBe(invocation);
   });
 
+  it('rejects missing accountContractId at client construction', () => {
+    expect(() => new AncoreClient({ accountContractId: '' })).toThrow(BuilderValidationError);
+  });
+
   it('supports direct helper usage with any session-key writer', () => {
     const invocation = { method: 'add_session_key', args: [] };
     const writer = {

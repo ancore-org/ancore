@@ -110,7 +110,7 @@ describe('SecureStorageManager', () => {
     expect(account).toBeNull();
 
     const sessionKeys = await manager.getSessionKeys();
-    expect(sessionKeys).toBeNull();
+    expect(sessionKeys).toEqual({ keys: {} });
   });
 
   it('should not throw on unlock if already unlocked', async () => {

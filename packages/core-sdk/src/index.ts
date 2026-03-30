@@ -61,6 +61,12 @@ export {
   SecureStorageManager,
   type SecureStorageManagerOptions,
 } from './storage/secure-storage-manager';
+export {
+  saveSessionKeys,
+  SESSION_KEYS_STORAGE_KEY,
+  type SaveSessionKeysDeps,
+} from './storage/save-session-keys';
+export { getSessionKeys, type GetSessionKeysDeps } from './storage/get-session-keys';
 export type {
   AccountData,
   EncryptedPayload,

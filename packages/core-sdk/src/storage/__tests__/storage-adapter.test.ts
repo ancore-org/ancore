@@ -7,6 +7,50 @@ import {
   createStorageAdapter,
 } from '../storage-adapter';
 
+interface LocalStorageLike {
+  readonly length: number;
+  clear(): void;
+  getItem(key: string): string | null;
+  key(index: number): string | null;
+  removeItem(key: string): void;
+  setItem(key: string, value: string): void;
+}
+
+function installLocalStorageMock(): void {
+  if ((globalThis as { localStorage?: LocalStorageLike }).localStorage) {
+    return;
+  }
+
+  const store = new Map<string, string>();
+  const localStorageMock: LocalStorageLike = {
+    get length() {
+      return store.size;
+    },
+    clear() {
+      store.clear();
+    },
+    getItem(key: string) {
+      return store.has(key) ? (store.get(key) ?? null) : null;
+    },
+    key(index: number) {
+      return Array.from(store.keys())[index] ?? null;
+    },
+    removeItem(key: string) {
+      store.delete(key);
+    },
+    setItem(key: string, value: string) {
+      store.set(key, String(value));
+    },
+  };
+
+  Object.defineProperty(globalThis, 'localStorage', {
+    configurable: true,
+    value: localStorageMock,
+  });
+}
+
+installLocalStorageMock();
+
 // ─── Mock chrome.storage ──────────────────────────────────────────────────────
 
 function makeChromeArea(store: Record<string, unknown> = {}) {

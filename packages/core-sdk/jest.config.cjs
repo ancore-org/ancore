@@ -2,8 +2,16 @@ module.exports = {
   preset: 'ts-jest',
   testEnvironment: 'node',
   roots: ['<rootDir>/src'],
+  moduleNameMapper: {
+    '^@ancore/account-abstraction$': '<rootDir>/../account-abstraction/src/index.ts',
+    '^@ancore/account-abstraction/(.*)$': '<rootDir>/../account-abstraction/src/$1',
+    '^@ancore/stellar$': '<rootDir>/../stellar/src/index.ts',
+    '^@ancore/stellar/(.*)$': '<rootDir>/../stellar/src/$1',
+    '^@ancore/types$': '<rootDir>/../types/src/index.ts',
+    '^@ancore/types/(.*)$': '<rootDir>/../types/src/$1',
+  },
   transform: {
-    '^.+\\.ts$': 'ts-jest',
+    '^.+\\.ts$': ['ts-jest', { tsconfig: '<rootDir>/tsconfig.test.json' }],
   },
   collectCoverage: true,
   collectCoverageFrom: [

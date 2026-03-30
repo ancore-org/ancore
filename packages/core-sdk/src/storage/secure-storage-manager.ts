@@ -1,8 +1,9 @@
 import { AccountData, EncryptedPayload, SessionKeysData, StorageAdapter } from './types';
+import { getSessionKeys as loadSessionKeys } from './get-session-keys';
+import { saveSessionKeys as persistSessionKeys } from './save-session-keys';
 
 const STORAGE_KEYS = {
   account: 'account',
-  sessionKeys: 'sessionKeys',
 } as const;
 
 export interface SecureStorageManagerOptions {
@@ -91,8 +92,19 @@ export class SecureStorageManager {
     }, this.autoLockMs);
   }
 
+  private assertUnlocked(): void {
+    if (!this.baseKey) {
+      throw new Error('Storage manager is locked');
+    }
+  }
+
   private async deriveAesKey(salt: Uint8Array | any): Promise<CryptoKey> {
-    if (!this.baseKey) throw new Error('Storage manager is locked');
+    this.assertUnlocked();
+    const baseKey = this.baseKey;
+    if (!baseKey) {
+      throw new Error('Storage manager is locked');
+    }
+
     return globalThis.crypto.subtle.deriveKey(
       {
         name: 'PBKDF2',
@@ -100,7 +112,7 @@ export class SecureStorageManager {
         iterations: 100000,
         hash: 'SHA-256',
       },
-      this.baseKey,
+      baseKey,
       { name: 'AES-GCM', length: 256 },
       false,
       ['encrypt', 'decrypt']
@@ -154,28 +166,26 @@ export class SecureStorageManager {
 
   public async getAccount(): Promise<AccountData | null> {
     this.touch();
-    
-    if (!this.baseKey) {
-      throw new Error('Storage manager is locked');
-    }
-    
+
+    this.assertUnlocked();
+
     const payload = (await this.storage.get(STORAGE_KEYS.account)) as EncryptedPayload | null;
-    if (!payload) return null;
-    
+    if (payload === null) return null;
+
     // Validate payload structure
     if (!payload.salt || !payload.iv || !payload.data) {
       throw new Error('Invalid password or corrupted data');
     }
-    
+
     try {
       const json = await this.decryptData(payload);
       const parsed = JSON.parse(json);
-      
+
       // Validate that the parsed data has the expected AccountData structure
       if (!parsed || typeof parsed !== 'object' || !('privateKey' in parsed)) {
         throw new Error('Invalid password or corrupted data');
       }
-      
+
       return parsed as AccountData;
     } catch (error) {
       // Re-throw decryption/parsing errors with a generic message to prevent information leakage
@@ -187,16 +197,20 @@ export class SecureStorageManager {
   }
 
   public async saveSessionKeys(sessionKeys: SessionKeysData): Promise<void> {
-    this.touch();
-    const payload = await this.encryptData(JSON.stringify(sessionKeys));
-    await this.storage.set(STORAGE_KEYS.sessionKeys, payload);
+    await persistSessionKeys(sessionKeys, {
+      storage: this.storage,
+      encryptData: this.encryptData.bind(this),
+      assertUnlocked: this.assertUnlocked.bind(this),
+      touch: this.touch.bind(this),
+    });
   }
 
-  public async getSessionKeys(): Promise<SessionKeysData | null> {
-    this.touch();
-    const payload = (await this.storage.get(STORAGE_KEYS.sessionKeys)) as EncryptedPayload | null;
-    if (!payload) return null;
-    const json = await this.decryptData(payload);
-    return JSON.parse(json);
+  public async getSessionKeys(): Promise<SessionKeysData> {
+    return loadSessionKeys({
+      storage: this.storage,
+      decryptData: this.decryptData.bind(this),
+      assertUnlocked: this.assertUnlocked.bind(this),
+      touch: this.touch.bind(this),
+    });
   }
 }

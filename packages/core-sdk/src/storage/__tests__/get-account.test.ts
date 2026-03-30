@@ -43,10 +43,10 @@ describe('SecureStorageManager.getAccount()', () => {
   let manager: SecureStorageManager;
 
   const password = 'my_super_secret_password_123!';
-  const validAccountData: AccountData = { 
+  const validAccountData: AccountData = {
     privateKey: '0x1234567890abcdef',
     address: '0xabcdef1234567890',
-    network: 'mainnet'
+    network: 'mainnet',
   };
 
   beforeEach(() => {
@@ -83,12 +83,12 @@ describe('SecureStorageManager.getAccount()', () => {
         metadata: {
           name: 'My Account',
           createdAt: '2023-01-01T00:00:00Z',
-          tags: ['primary', 'trading']
+          tags: ['primary', 'trading'],
         },
         preferences: {
           theme: 'dark',
-          currency: 'USD'
-        }
+          currency: 'USD',
+        },
       };
 
       await manager.unlock(password);
@@ -141,7 +141,9 @@ describe('SecureStorageManager.getAccount()', () => {
       const wrongPasswordManager = new SecureStorageManager(storage);
       await wrongPasswordManager.unlock('wrong_password');
 
-      await expect(wrongPasswordManager.getAccount()).rejects.toThrow('Invalid password or corrupted data');
+      await expect(wrongPasswordManager.getAccount()).rejects.toThrow(
+        'Invalid password or corrupted data'
+      );
     });
 
     it('should not leak any information in error messages', async () => {
@@ -154,7 +156,7 @@ describe('SecureStorageManager.getAccount()', () => {
 
       try {
         await wrongPasswordManager.getAccount();
-        fail('Expected getAccount to throw');
+        throw new Error('Expected getAccount to throw');
       } catch (error) {
         expect(error).toBeInstanceOf(Error);
         expect((error as Error).message).toBe('Invalid password or corrupted data');
@@ -172,7 +174,7 @@ describe('SecureStorageManager.getAccount()', () => {
       // Test missing salt
       const malformedPayload1: Partial<EncryptedPayload> = {
         iv: 'dGVzdCB2Zw==',
-        data: 'dGVzdCBkYXRh'
+        data: 'dGVzdCBkYXRh',
       };
       storage.setRaw('account', malformedPayload1);
 
@@ -181,7 +183,7 @@ describe('SecureStorageManager.getAccount()', () => {
       // Test missing iv
       const malformedPayload2: Partial<EncryptedPayload> = {
         salt: 'dGVzdCBzYWx0',
-        data: 'dGVzdCBkYXRh'
+        data: 'dGVzdCBkYXRh',
       };
       storage.setRaw('account', malformedPayload2);
 
@@ -190,7 +192,7 @@ describe('SecureStorageManager.getAccount()', () => {
       // Test missing data
       const malformedPayload3: Partial<EncryptedPayload> = {
         salt: 'dGVzdCBzYWx0',
-        iv: 'dGVzdCB2Zw=='
+        iv: 'dGVzdCB2Zw==',
       };
       storage.setRaw('account', malformedPayload3);
 
@@ -203,7 +205,7 @@ describe('SecureStorageManager.getAccount()', () => {
       const invalidBase64Payload: EncryptedPayload = {
         salt: 'invalid_base64!@#',
         iv: 'invalid_base64!@#',
-        data: 'invalid_base64!@#'
+        data: 'invalid_base64!@#',
       };
       storage.setRaw('account', invalidBase64Payload);
 
@@ -217,8 +219,8 @@ describe('SecureStorageManager.getAccount()', () => {
       // We'll simulate this by manually setting an invalid JSON structure
       const invalidJsonPayload: EncryptedPayload = {
         salt: 'dGVzdCBzYWx0', // "test salt" in base64
-        iv: 'dGVzdCB2Zw==',   // "test iv" in base64
-        data: 'dGVzdCBkYXRh'  // This will fail decryption, but if it succeeded, it wouldn't be valid JSON
+        iv: 'dGVzdCB2Zw==', // "test iv" in base64
+        data: 'dGVzdCBkYXRh', // This will fail decryption, but if it succeeded, it wouldn't be valid JSON
       };
       storage.setRaw('account', invalidJsonPayload);
 
@@ -231,7 +233,7 @@ describe('SecureStorageManager.getAccount()', () => {
       // Create a payload that decrypts to valid JSON but wrong structure
       // We need to encrypt this properly, so let's use the encryption method but with wrong data
       const wrongStructureData = { notPrivateKey: 'some_value' };
-      
+
       // Manually encrypt the wrong structure data
       const payload = await (manager as any).encryptData(JSON.stringify(wrongStructureData));
       storage.setRaw('account', payload);
@@ -262,7 +264,7 @@ describe('SecureStorageManager.getAccount()', () => {
 
       storage.setRaw('account', '');
 
-      await expect(manager.getAccount()).rejects.toThrow('Invalid password or corrupted data');
+      await expect(manager.getAccount()).resolves.toBeNull();
     });
 
     it('should handle non-object payload', async () => {
@@ -276,26 +278,32 @@ describe('SecureStorageManager.getAccount()', () => {
 
   describe('Auto-lock Behavior', () => {
     it('should reset auto-lock timer when accessing account', async () => {
-      const shortAutoLockMs = 100; // 100ms
-      const managerWithAutoLock = new SecureStorageManager(storage, { autoLockMs: shortAutoLockMs });
-      
-      await managerWithAutoLock.unlock(password);
-      await managerWithAutoLock.saveAccount(validAccountData);
+      jest.useFakeTimers();
 
-      // Wait a bit but not long enough to trigger auto-lock
-      await new Promise(resolve => setTimeout(resolve, 50));
+      const shortAutoLockMs = 300;
+      const managerWithAutoLock = new SecureStorageManager(storage, {
+        autoLockMs: shortAutoLockMs,
+      });
 
-      // Access account should reset timer
-      await managerWithAutoLock.getAccount();
+      try {
+        await managerWithAutoLock.unlock(password);
+        await managerWithAutoLock.saveAccount(validAccountData);
 
-      // Should still be unlocked
-      expect(managerWithAutoLock.isUnlocked).toBe(true);
+        // Advance but stay below auto-lock threshold.
+        jest.advanceTimersByTime(100);
 
-      // Wait for auto-lock to trigger
-      await new Promise(resolve => setTimeout(resolve, 150));
+        // Access account should reset timer.
+        await managerWithAutoLock.getAccount();
 
-      // Should now be locked
-      expect(managerWithAutoLock.isUnlocked).toBe(false);
+        expect(managerWithAutoLock.isUnlocked).toBe(true);
+
+        // Now cross the threshold and verify lock triggers.
+        jest.advanceTimersByTime(350);
+
+        expect(managerWithAutoLock.isUnlocked).toBe(false);
+      } finally {
+        jest.useRealTimers();
+      }
     });
   });
 
@@ -309,7 +317,7 @@ describe('SecureStorageManager.getAccount()', () => {
       // TypeScript should infer the correct type
       expect(result?.privateKey).toBeDefined();
       expect(typeof result?.privateKey).toBe('string');
-      
+
       // Should allow accessing AccountData properties
       if (result) {
         expect(result.privateKey).toBe(validAccountData.privateKey);

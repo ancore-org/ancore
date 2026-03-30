@@ -1,5 +1,6 @@
 import { AncoreClient } from '../client';
 import { StellarClient } from '@ancore/stellar';
+import { Keypair } from '@stellar/stellar-sdk';
 
 // Mock Contract to bypass contract ID validation for this test file
 jest.mock('@stellar/stellar-sdk', () => {
@@ -30,7 +31,7 @@ describe('AncoreClient', () => {
     try {
       const keypair = AncoreClient.importWalletFromSecret(validSecret);
       expect(keypair).toBeDefined();
-    } catch (e) {
+    } catch {
       // Accept failure if the secret is not valid for the SDK version
       expect(true).toBe(true);
     }
@@ -43,6 +44,29 @@ describe('AncoreClient', () => {
     } as any);
     const balance = await mockClient.getBalance('GABC...');
     expect(balance).toBe('100');
+  });
+
+  it('should return 0 when no native balance exists', async () => {
+    const mockClient = new AncoreClient({
+      getBalances: async () => [{ assetType: 'credit_alphanum4', balance: '3' }],
+    } as any);
+
+    await expect(mockClient.getBalance('GABC...')).resolves.toBe('0');
+  });
+
+  it('should keep placeholder flows callable', async () => {
+    const kp = Keypair.random();
+    await expect(client.sendPayment(kp, kp.publicKey(), '1')).resolves.toEqual({ success: true });
+    await expect(client.initSmartAccount(kp.publicKey())).resolves.toEqual({ success: true });
+    await expect(client.addSessionKey(kp.publicKey(), kp.publicKey())).resolves.toEqual({
+      success: true,
+    });
+    await expect(client.revokeSessionKey(kp.publicKey(), kp.publicKey())).resolves.toEqual({
+      success: true,
+    });
+    await expect(
+      client.executeWithSessionKey(kp.publicKey(), kp.publicKey(), { method: 'ping' })
+    ).resolves.toEqual({ success: true });
   });
 
   it('should return a transaction builder', () => {
