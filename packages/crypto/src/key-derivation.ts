@@ -24,9 +24,6 @@ export function deriveKeypairFromMnemonic(mnemonic: string, index: number): Keyp
   // Convert mnemonic to seed
   const seed = bip39.mnemonicToSeedSync(mnemonic);
 
-  // Derive the master key
-  const masterKey = ed25519HdKey.getMasterKeyFromSeed(seed);
-
   // Derive the path using BIP44 for Stellar: m/44'/148'/0'/0/{index}
   // 44' - BIP44 purpose
   // 148' - Stellar coin type (https://github.com/satoshilabs/slips/blob/master/slip-0044.md)
