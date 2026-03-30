@@ -5,7 +5,11 @@
  * contract panics to typed errors.
  */
 
-import type { AccountContractReadOptions, AccountContractWriteResult, InvocationArgs } from './account-contract';
+import type {
+  AccountContractReadOptions,
+  AccountContractWriteResult,
+  InvocationArgs,
+} from './account-contract';
 import { AccountContract } from './account-contract';
 import { AlreadyInitializedError, ContractInvocationError, mapContractError } from './errors';
 
@@ -70,7 +74,7 @@ function buildInitialize(contract: AccountContract, params: InitializeParams): I
 async function invokeInitialize(
   contract: AccountContract,
   params: InitializeParams,
-  options: AccountContractReadOptions
+  _options: AccountContractReadOptions
 ): Promise<AccountContractWriteResult> {
   try {
     const invocation = contract.initialize(params.owner);

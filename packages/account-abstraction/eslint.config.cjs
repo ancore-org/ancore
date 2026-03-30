@@ -49,6 +49,8 @@ module.exports = [
     },
     rules: {
       ...tseslint.configs.recommended.rules,
+      'no-redeclare': 'off',
+      '@typescript-eslint/no-redeclare': 'error',
       '@typescript-eslint/no-unused-vars': ['warn', { argsIgnorePattern: '^_', varsIgnorePattern: '^_' }],
       '@typescript-eslint/no-explicit-any': 'warn',
     },
