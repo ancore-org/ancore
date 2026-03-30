@@ -17,11 +17,12 @@ interface NotificationContextValue {
 export const NotificationContext = React.createContext<NotificationContextValue | null>(null);
 
 type Action = { type: 'ADD'; toast: Toast } | { type: 'REMOVE'; id: string };
+const MAX_TOASTS = 5;
 
 function reducer(state: Toast[], action: Action): Toast[] {
   switch (action.type) {
     case 'ADD':
-      return [...state, action.toast];
+      return [...state, action.toast].slice(-MAX_TOASTS);
     case 'REMOVE':
       return state.filter((t) => t.id !== action.id);
   }

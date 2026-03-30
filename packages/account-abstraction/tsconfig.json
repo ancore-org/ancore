@@ -2,7 +2,7 @@
   "extends": "../../tsconfig.base.json",
   "compilerOptions": {
     "outDir": "./dist",
-    "rootDir": "./src"
+    "composite": false
   },
   "references": [{ "path": "../types" }, { "path": "../crypto" }, { "path": "../stellar" }],
   "include": ["src/**/*"],

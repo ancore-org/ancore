@@ -4,7 +4,8 @@ import { Keypair } from '@stellar/stellar-sdk';
 
 /**
  * Derives a Stellar keypair from a BIP39 mnemonic phrase and account index.
- * Uses the standard BIP44 derivation path for Stellar: m/44'/148'/0'/0/{index}
+ * Uses a hardened Stellar BIP44-style path compatible with ed25519-hd-key:
+ * m/44'/148'/{index}'
  *
  * @param {string} mnemonic - The BIP39 mnemonic phrase (12 or 24 words)
  * @param {number} index - The account index (0-based)
@@ -24,8 +25,8 @@ export function deriveKeypairFromMnemonic(mnemonic: string, index: number): Keyp
   // Convert mnemonic to seed
   const seed = mnemonicToSeedSync(mnemonic);
 
-  // Derive the path using BIP44 for Stellar: m/44'/148'/0'/0/{index}
-  const path = `m/44'/148'/0'/0/${index}`;
+  // ed25519-hd-key only supports hardened segments.
+  const path = `m/44'/148'/${index}'`;
   const derivedKey = ed25519HdKey.derivePath(path, seed.toString('hex'));
 
   // Create Stellar keypair from the derived private key
