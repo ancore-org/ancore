@@ -2,13 +2,9 @@
   "extends": "../../tsconfig.base.json",
   "compilerOptions": {
     "outDir": "./dist",
-    "rootDir": "./src"
+    "composite": false,
+    "declarationDir": "./dist"
   },
-  "references": [
-    { "path": "../types" },
-    { "path": "../crypto" },
-    { "path": "../stellar" }
-  ],
   "include": ["src/**/*"],
   "exclude": ["node_modules", "dist", "**/*.test.ts"]
 }
