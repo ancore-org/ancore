@@ -3,7 +3,7 @@ import * as bip39 from 'bip39';
 /**
  * Generates a standard BIP39 12-word mnemonic phrase.
  * Uses secure randomness provided by the environment.
- * 
+ *
  * @returns {string} A 12-word mnemonic phrase.
  */
 export function generateMnemonic(): string {
@@ -14,7 +14,7 @@ export function generateMnemonic(): string {
 
 /**
  * Validates a BIP39 mnemonic phrase.
- * 
+ *
  * @param {string} mnemonic - The mnemonic phrase to validate.
  * @returns {boolean} True if valid, false otherwise.
  */

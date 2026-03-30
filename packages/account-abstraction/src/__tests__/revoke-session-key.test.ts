@@ -4,11 +4,7 @@
 
 import { revokeSessionKey } from '../revoke-session-key';
 import { AccountContract } from '../account-contract';
-import {
-  SessionKeyNotFoundError,
-  UnauthorizedError,
-  ContractInvocationError,
-} from '../errors';
+import { SessionKeyNotFoundError, UnauthorizedError, ContractInvocationError } from '../errors';
 
 jest.mock('../account-contract', () => {
   const mockRevokeSessionKey = jest.fn();

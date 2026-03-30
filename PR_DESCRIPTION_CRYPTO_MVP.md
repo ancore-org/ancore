@@ -1,22 +1,26 @@
 # Crypto Utilities Package MVP - Issue #60
 
 ## Summary
+
 Implements the complete crypto utilities package for Ancore, providing essential cryptographic functions needed for wallet onboarding and secure storage of wallet secrets.
 
 ## Features Implemented
 
 ### 🔑 Mnemonic Support
+
 - **BIP39 12-word mnemonic generation** using secure randomness
 - **Mnemonic validation** for BIP39 compliance
 - Full integration with `bip39` library for standards compliance
 
 ### 🔐 Key Derivation
+
 - **Stellar keypair derivation** from mnemonic using BIP44 path: `m/44'/148'/0'/0/{index}`
 - **Multiple keypair generation** with configurable count and start index
 - **Mnemonic validation** specifically for Stellar compatibility
 - Uses `ed25519-hd-key` for hierarchical deterministic key derivation
 
 ### 🛡️ Encryption & Decryption
+
 - **AES-256-GCM encryption** with authenticated encryption
 - **PBKDF2 key derivation** with 100,000 iterations for password-based encryption
 - **Secure random salt and IV generation** for each encryption
@@ -24,6 +28,7 @@ Implements the complete crypto utilities package for Ancore, providing essential
 - **Comprehensive input validation** and error handling
 
 ### ✍️ Digital Signing
+
 - **Transaction signing** for standard Stellar transactions
 - **Fee-bump transaction signing** support
 - **Message signing** for arbitrary data
@@ -31,6 +36,7 @@ Implements the complete crypto utilities package for Ancore, providing essential
 - Support for both Keypair objects and secret key strings
 
 ### 🔐 Password Security
+
 - **Password strength validation** with comprehensive rules
 - **Three-tier strength levels**: weak, medium, strong
 - **Common weak pattern detection** (sequences, dictionary words, etc.)
@@ -39,6 +45,7 @@ Implements the complete crypto utilities package for Ancore, providing essential
 ## Files Added/Modified
 
 ### Core Implementation
+
 - `packages/crypto/src/mnemonic.ts` - Mnemonic generation and validation
 - `packages/crypto/src/key-derivation.ts` - Stellar key derivation from mnemonic
 - `packages/crypto/src/encryption.ts` - AES-256-GCM encryption with PBKDF2
@@ -47,6 +54,7 @@ Implements the complete crypto utilities package for Ancore, providing essential
 - `packages/crypto/src/index.ts` - Package exports and version
 
 ### Comprehensive Test Suite
+
 - `packages/crypto/src/__tests__/mnemonic-generate.test.ts` - Mnemonic tests
 - `packages/crypto/src/__tests__/derive-keypair.test.ts` - Key derivation tests
 - `packages/crypto/src/__tests__/encryption-roundtrip.test.ts` - Encryption tests
@@ -57,6 +65,7 @@ Implements the complete crypto utilities package for Ancore, providing essential
 ## Technical Specifications
 
 ### Security Standards
+
 - **BIP39**: Standard mnemonic phrase generation
 - **BIP44**: Hierarchical deterministic wallet derivation path `m/44'/148'/0'/0/{index}`
 - **AES-256-GCM**: Authenticated encryption with associated data
@@ -64,6 +73,7 @@ Implements the complete crypto utilities package for Ancore, providing essential
 - **Ed25519**: Digital signature algorithm for Stellar
 
 ### Performance & Safety
+
 - **100,000 PBKDF2 iterations** for strong password-based encryption
 - **Secure random generation** for salts and IVs using WebCrypto API
 - **Input validation** on all public functions
@@ -73,7 +83,7 @@ Implements the complete crypto utilities package for Ancore, providing essential
 ## Definition of Done ✅
 
 - [x] **Encrypt/decrypt round-trip** restores the original secret
-- [x] **Signing produces verifiable signatures** 
+- [x] **Signing produces verifiable signatures**
 - [x] **Test suite passes** with comprehensive coverage
 - [x] **BIP39 12-word mnemonic** generation and validation
 - [x] **Stellar key derivation** from mnemonic
@@ -84,6 +94,7 @@ Implements the complete crypto utilities package for Ancore, providing essential
 ## Usage Examples
 
 ### Mnemonic Generation
+
 ```typescript
 import { generateMnemonic, validateMnemonic } from '@ancore/crypto';
 
@@ -92,6 +103,7 @@ const isValid = validateMnemonic(mnemonic); // true
 ```
 
 ### Key Derivation
+
 ```typescript
 import { deriveKeypairFromMnemonic } from '@ancore/crypto';
 
@@ -100,6 +112,7 @@ console.log(keypair.publicKey()); // Stellar public key
 ```
 
 ### Encryption
+
 ```typescript
 import { encryptSecretKey, decryptSecretKey } from '@ancore/crypto';
 
@@ -109,6 +122,7 @@ const decrypted = await decryptSecretKey(encrypted, password);
 ```
 
 ### Signing
+
 ```typescript
 import { signTransaction, verifySignature } from '@ancore/crypto';
 
@@ -117,6 +131,7 @@ const isValid = await verifySignature(message, signature, publicKey);
 ```
 
 ### Password Validation
+
 ```typescript
 import { validatePasswordStrength } from '@ancore/crypto';
 
@@ -127,6 +142,7 @@ if (!result.valid) {
 ```
 
 ## Dependencies
+
 - `@noble/ed25519` - Ed25519 cryptographic operations
 - `@noble/hashes` - Hashing functions
 - `@stellar/stellar-sdk` - Stellar SDK integration
@@ -134,7 +150,9 @@ if (!result.valid) {
 - `ed25519-hd-key` - Hierarchical deterministic key derivation
 
 ## Testing
+
 The package includes a comprehensive test suite covering:
+
 - Mnemonic generation and validation
 - Key derivation accuracy
 - Encryption/decryption round-trips
@@ -145,7 +163,9 @@ The package includes a comprehensive test suite covering:
 All tests pass and provide coverage for critical security functions.
 
 ## Impact
+
 This implementation enables:
+
 - **Secure wallet onboarding** with mnemonic-based key generation
 - **Safe storage** of encrypted wallet secrets in extension storage
 - **Local transaction signing** without exposing private keys
@@ -153,6 +173,7 @@ This implementation enables:
 - **Password security** enforcement for user data protection
 
 ## Security Considerations
+
 - All cryptographic operations use industry-standard libraries
 - Password-based encryption uses strong PBKDF2 iteration count
 - Random salts and IVs prevent rainbow table attacks

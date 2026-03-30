@@ -11,8 +11,8 @@ export { validatePasswordStrength } from './password';
 export { encryptSecretKey, decryptSecretKey } from './encryption';
 export type { EncryptedSecretKeyPayload } from './encryption';
 export { generateMnemonic, validateMnemonic } from './mnemonic';
-export { 
-  deriveKeypairFromMnemonic, 
-  validateMnemonicForStellar, 
-  deriveMultipleKeypairsFromMnemonic 
+export {
+  deriveKeypairFromMnemonic,
+  validateMnemonicForStellar,
+  deriveMultipleKeypairsFromMnemonic,
 } from './key-derivation';
