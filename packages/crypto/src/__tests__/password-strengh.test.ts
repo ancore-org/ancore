@@ -110,6 +110,7 @@ describe('validatePasswordStrength()', () => {
       const result = validatePasswordStrength('adminADMIN1234!');
       // matchesWeakPattern — "admin" repeated
       const result2 = validatePasswordStrength('adminadminadmin1!');
+      expectWeak(result);
       expectWeak(result2);
     });
   });

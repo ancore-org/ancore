@@ -44,8 +44,26 @@ function hasSpecialChar(password: string): boolean {
   return /[^a-zA-Z0-9]/.test(password);
 }
 
+/**
+ * Checks whether the letter-only base of the password is built entirely from
+ * repeated common dictionary words. Catches patterns like "adminADMIN1234!"
+ * where stripping digits/symbols leaves "adminadmin".
+ */
+function hasDictionaryWordBase(password: string): boolean {
+  const letterBase = password.toLowerCase().replace(/[^a-z]/g, '');
+  return (
+    letterBase.length > 0 &&
+    /^(password|qwerty|letmein|welcome|admin|login|iloveyou|monkey|dragon|master|sunshine|shadow|princess|football|baseball|superman|batman)+$/.test(
+      letterBase
+    )
+  );
+}
+
 function matchesWeakPattern(password: string): boolean {
-  return COMMON_WEAK_PATTERNS.some((pattern) => pattern.test(password));
+  return (
+    COMMON_WEAK_PATTERNS.some((pattern) => pattern.test(password)) ||
+    hasDictionaryWordBase(password)
+  );
 }
 
 /**

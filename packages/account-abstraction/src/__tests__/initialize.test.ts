@@ -4,11 +4,7 @@
 
 import { initialize } from '../initialize';
 import { AccountContract } from '../account-contract';
-import {
-  AlreadyInitializedError,
-  ContractInvocationError,
-  NotInitializedError,
-} from '../errors';
+import { AlreadyInitializedError, ContractInvocationError } from '../errors';
 
 jest.mock('../account-contract', () => {
   const mockInitialize = jest.fn();

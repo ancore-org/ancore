@@ -3,7 +3,7 @@
  */
 
 import { StellarClient } from '../client';
-import { NetworkError, AccountNotFoundError, TransactionError } from '../errors';
+import { AccountNotFoundError } from '../errors';
 import type { Horizon } from '@stellar/stellar-sdk';
 
 // Mock Horizon server responses
