@@ -1,6 +1,15 @@
-import { validateMnemonic, mnemonicToSeedSync } from 'bip39';
+import { validateMnemonic } from 'bip39';
+import { pbkdf2 } from '@noble/hashes/pbkdf2';
+import { sha512 } from '@noble/hashes/sha2';
 import * as ed25519HdKey from 'ed25519-hd-key';
 import { Keypair } from '@stellar/stellar-sdk';
+
+function mnemonicToSeedSync(mnemonic: string): Uint8Array {
+  const enc = new TextEncoder();
+  const mnemonicBytes = enc.encode(mnemonic.normalize('NFKD'));
+  const saltBytes = enc.encode('mnemonic');
+  return pbkdf2(sha512, mnemonicBytes, saltBytes, { c: 2048, dkLen: 64 });
+}
 
 /**
  * Derives a Stellar keypair from a BIP39 mnemonic phrase and account index.
@@ -12,7 +21,6 @@ import { Keypair } from '@stellar/stellar-sdk';
  * @throws {Error} If the mnemonic is invalid or index is negative
  */
 export function deriveKeypairFromMnemonic(mnemonic: string, index: number): Keypair {
-  // Validate inputs
   if (!validateMnemonic(mnemonic)) {
     throw new Error('Invalid mnemonic phrase');
   }
@@ -21,26 +29,18 @@ export function deriveKeypairFromMnemonic(mnemonic: string, index: number): Keyp
     throw new Error('Index must be a non-negative integer');
   }
 
-  // Convert mnemonic to seed
-  // @ts-expect-error - Bypassing incomplete local type definitions in crypto/src/types/bip39.d.ts
-  const seed = bip39.mnemonicToSeedSync(mnemonic);
-
-  // Derive the path using BIP44 for Stellar: m/44'/148'/{index}'
-  // 44' - BIP44 purpose
-  // 148' - Stellar coin type (https://github.com/satoshilabs/slips/blob/master/slip-0044.md)
-  // {index}' - account index
+  const seed = mnemonicToSeedSync(mnemonic);
   const path = `m/44'/148'/${index}'`;
-  const derivedKey = ed25519HdKey.derivePath(path, seed.toString('hex'));
+  const seedHex = Array.from(seed)
+    .map((b) => b.toString(16).padStart(2, '0'))
+    .join('');
+  const derivedKey = ed25519HdKey.derivePath(path, seedHex);
 
-  // Create Stellar keypair from the derived private key
   return Keypair.fromRawEd25519Seed(derivedKey.key);
 }
 
 /**
  * Validates if a mnemonic can derive a valid Stellar keypair.
- *
- * @param {string} mnemonic - The BIP39 mnemonic phrase to validate
- * @returns {boolean} True if the mnemonic is valid and can derive keys
  */
 export function validateMnemonicForStellar(mnemonic: string): boolean {
   try {
@@ -53,11 +53,6 @@ export function validateMnemonicForStellar(mnemonic: string): boolean {
 
 /**
  * Derives multiple Stellar keypairs from a mnemonic phrase.
- *
- * @param {string} mnemonic - The BIP39 mnemonic phrase
- * @param {number} count - Number of keypairs to derive
- * @param {number} startIndex - Starting index (default: 0)
- * @returns {Keypair[]} Array of derived Stellar keypairs
  */
 export function deriveMultipleKeypairsFromMnemonic(
   mnemonic: string,
@@ -73,11 +68,8 @@ export function deriveMultipleKeypairsFromMnemonic(
   }
 
   const keypairs: Keypair[] = [];
-
   for (let i = 0; i < count; i++) {
-    const keypair = deriveKeypairFromMnemonic(mnemonic, startIndex + i);
-    keypairs.push(keypair);
+    keypairs.push(deriveKeypairFromMnemonic(mnemonic, startIndex + i));
   }
-
   return keypairs;
 }
