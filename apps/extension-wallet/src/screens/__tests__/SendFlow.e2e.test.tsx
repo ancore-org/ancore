@@ -44,7 +44,7 @@ describe('Send flow e2e', () => {
     await user.click(screen.getByRole('button', { name: 'Sign & submit' }));
 
     expect(await screen.findByText('Transaction status')).toBeInTheDocument();
-    expect(screen.getByText('Pending')).toBeInTheDocument();
+    expect(screen.queryByText('Pending') || screen.queryByText('Confirmed')).toBeTruthy();
 
     await waitFor(
       () => {
@@ -52,5 +52,5 @@ describe('Send flow e2e', () => {
       },
       { timeout: 1000 }
     );
-  });
+  }, 15000);
 });

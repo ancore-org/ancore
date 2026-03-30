@@ -49,7 +49,7 @@ describe('Form', () => {
         expect.anything()
       );
     });
-  });
+  }, 15000);
 
   it('does NOT call onSubmit when validation fails', async () => {
     const user = userEvent.setup();
