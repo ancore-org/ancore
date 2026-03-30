@@ -98,13 +98,16 @@ describe('@ancore/crypto smoke test', () => {
   it('does not include secret bytes in error messages from encoding functions', () => {
     const secret = new Uint8Array(32).fill(0xab);
     const secretHex = Buffer.from(secret).toString('hex');
+    // Corrupt the secret hex to make it invalid (odd length triggers error)
+    const corruptedSecretHex = secretHex + 'z';
 
-    expect(() => CryptoAPI.fromHex('not-valid-hex!')).toThrow();
+    expect(() => CryptoAPI.fromHex(corruptedSecretHex)).toThrow();
 
     try {
-      CryptoAPI.fromHex('not-valid-hex!');
+      CryptoAPI.fromHex(corruptedSecretHex);
     } catch (e) {
       expect((e as Error).message).not.toContain(secretHex);
+      expect((e as Error).message).not.toContain(corruptedSecretHex);
     }
   });
 

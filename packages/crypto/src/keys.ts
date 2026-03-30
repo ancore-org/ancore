@@ -6,12 +6,15 @@ export interface KeyPair {
 }
 
 /**
- * Derives a Stellar KeyPair from a raw 32-byte seed.
- * The seed must not be logged or exposed.
+ * Derives a Stellar KeyPair from a seed.
+ * Accepts a 32-byte raw Ed25519 seed or a 64-byte BIP39 seed (uses first 32 bytes).
  */
 export function deriveKeyPair(seed: Uint8Array): KeyPair {
-  if (seed.length !== 32) {
-    throw new Error('seed must be exactly 32 bytes');
+  if (seed.length === 64) {
+    // BIP39 seed — use first 32 bytes as Ed25519 seed
+    seed = seed.slice(0, 32);
+  } else if (seed.length !== 32) {
+    throw new Error('seed must be 32 or 64 bytes');
   }
   const keypair = Keypair.fromRawEd25519Seed(Buffer.from(seed));
   return {

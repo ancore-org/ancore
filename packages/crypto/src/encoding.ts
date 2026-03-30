@@ -18,9 +18,11 @@ export function toBase64(bytes: Uint8Array): string {
 
 /** Decodes a base64 string to Uint8Array */
 export function fromBase64(b64: string): Uint8Array {
-  const decoded = Buffer.from(b64, 'base64');
-  // Validate round-trip to catch malformed input
-  if (decoded.toString('base64') !== b64) {
+  // Normalize padding before round-trip check so unpadded inputs are accepted
+  const normalized = b64.replace(/=+$/, '');
+  const padded = normalized + '==='.slice((normalized.length + 3) % 4);
+  const decoded = Buffer.from(padded, 'base64');
+  if (decoded.toString('base64') !== padded) {
     throw new TypeError('invalid base64 string');
   }
   return new Uint8Array(decoded);
