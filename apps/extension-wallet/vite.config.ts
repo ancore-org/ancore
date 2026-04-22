@@ -22,7 +22,9 @@ export default defineConfig({
   plugins: [react(), manifestPlugin()],
   publicDir: 'public',
   resolve: {
-    alias: { '@': resolve(rootDir, 'src') },
+    alias: {
+      '@': path.resolve(__dirname, './src'),
+    },
   },
   css: {
     postcss: './postcss.config.js',
