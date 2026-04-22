@@ -1,4 +1,5 @@
 #![no_std]
+#![allow(clippy::too_many_arguments)]
 
 //! # Ancore Account Contract
 //!
@@ -119,7 +120,6 @@ const INSTANCE_BUMP_THRESHOLD: u32 = 15 * DAY_IN_LEDGERS; // 15 days
 /// Issue #188: Session keys must have this permission to invoke transactions.
 /// Without this bit set, execute() returns InsufficientPermission error.
 pub const PERMISSION_EXECUTE: u32 = 1;
-
 
 #[contract]
 pub struct AncoreAccount;

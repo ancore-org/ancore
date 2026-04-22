@@ -15,33 +15,7 @@
               "function_name": "add_session_key",
               "args": [
                 {
-                  "bytes": "c4b1e055613d345b38ba8c6d54ceacc91a12a7fcfbbc3dd2a053d425d3d21392"
-                },
-                {
-                  "u64": 10000
-                },
-                {
-                  "vec": []
-                }
-              ]
-            }
-          },
-          "sub_invocations": []
-        }
-      ]
-    ],
-    [],
-    [
-      [
-        "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAFCT4",
-        {
-          "function": {
-            "contract_fn": {
-              "contract_address": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAD2KM",
-              "function_name": "add_session_key",
-              "args": [
-                {
-                  "bytes": "c4b1e055613d345b38ba8c6d54ceacc91a12a7fcfbbc3dd2a053d425d3d21392"
+                  "bytes": "173fab3ebd08bb8f170ff88b327ff5c7eab9d26b88c4d0eeb68bf1668681367e"
                 },
                 {
                   "u64": 10000
@@ -82,7 +56,7 @@
                   "symbol": "SessionKey"
                 },
                 {
-                  "bytes": "c4b1e055613d345b38ba8c6d54ceacc91a12a7fcfbbc3dd2a053d425d3d21392"
+                  "bytes": "173fab3ebd08bb8f170ff88b327ff5c7eab9d26b88c4d0eeb68bf1668681367e"
                 }
               ]
             },
@@ -102,7 +76,7 @@
                       "symbol": "SessionKey"
                     },
                     {
-                      "bytes": "c4b1e055613d345b38ba8c6d54ceacc91a12a7fcfbbc3dd2a053d425d3d21392"
+                      "bytes": "173fab3ebd08bb8f170ff88b327ff5c7eab9d26b88c4d0eeb68bf1668681367e"
                     }
                   ]
                 },
@@ -134,7 +108,7 @@
                         "symbol": "public_key"
                       },
                       "val": {
-                        "bytes": "c4b1e055613d345b38ba8c6d54ceacc91a12a7fcfbbc3dd2a053d425d3d21392"
+                        "bytes": "173fab3ebd08bb8f170ff88b327ff5c7eab9d26b88c4d0eeb68bf1668681367e"
                       }
                     }
                   ]
@@ -178,7 +152,7 @@
                           ]
                         },
                         "val": {
-                          "u64": 1
+                          "u64": 0
                         }
                       },
                       {
@@ -237,39 +211,6 @@
                 "key": {
                   "ledger_key_nonce": {
                     "nonce": 801925984706572462
-                  }
-                },
-                "durability": "temporary",
-                "val": "void"
-              }
-            },
-            "ext": "v0"
-          },
-          6311999
-        ]
-      ],
-      [
-        {
-          "contract_data": {
-            "contract": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAFCT4",
-            "key": {
-              "ledger_key_nonce": {
-                "nonce": 5541220902715666415
-              }
-            },
-            "durability": "temporary"
-          }
-        },
-        [
-          {
-            "last_modified_ledger_seq": 0,
-            "data": {
-              "contract_data": {
-                "ext": "v0",
-                "contract": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAFCT4",
-                "key": {
-                  "ledger_key_nonce": {
-                    "nonce": 5541220902715666415
                   }
                 },
                 "durability": "temporary",
@@ -425,266 +366,7 @@
             "data": {
               "vec": [
                 {
-                  "bytes": "c4b1e055613d345b38ba8c6d54ceacc91a12a7fcfbbc3dd2a053d425d3d21392"
-                },
-                {
-                  "u64": 10000
-                },
-                {
-                  "vec": []
-                }
-              ]
-            }
-          }
-        }
-      },
-      "failed_call": false
-    },
-    {
-      "event": {
-        "ext": "v0",
-        "contract_id": "0000000000000000000000000000000000000000000000000000000000000001",
-        "type_": "contract",
-        "body": {
-          "v0": {
-            "topics": [
-              {
-                "symbol": "session_key_added"
-              }
-            ],
-            "data": {
-              "vec": [
-                {
-                  "bytes": "c4b1e055613d345b38ba8c6d54ceacc91a12a7fcfbbc3dd2a053d425d3d21392"
-                },
-                {
-                  "u64": 10000
-                }
-              ]
-            }
-          }
-        }
-      },
-      "failed_call": false
-    },
-    {
-      "event": {
-        "ext": "v0",
-        "contract_id": "0000000000000000000000000000000000000000000000000000000000000001",
-        "type_": "diagnostic",
-        "body": {
-          "v0": {
-            "topics": [
-              {
-                "symbol": "fn_return"
-              },
-              {
-                "symbol": "add_session_key"
-              }
-            ],
-            "data": "void"
-          }
-        }
-      },
-      "failed_call": false
-    },
-    {
-      "event": {
-        "ext": "v0",
-        "contract_id": null,
-        "type_": "diagnostic",
-        "body": {
-          "v0": {
-            "topics": [
-              {
-                "symbol": "fn_call"
-              },
-              {
-                "bytes": "0000000000000000000000000000000000000000000000000000000000000001"
-              },
-              {
-                "symbol": "execute"
-              }
-            ],
-            "data": {
-              "vec": [
-                {
-                  "vec": [
-                    {
-                      "symbol": "SessionKey"
-                    },
-                    {
-                      "bytes": "c4b1e055613d345b38ba8c6d54ceacc91a12a7fcfbbc3dd2a053d425d3d21392"
-                    }
-                  ]
-                },
-                {
-                  "address": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAHK3M"
-                },
-                {
-                  "symbol": "get_nonce"
-                },
-                {
-                  "vec": []
-                },
-                {
-                  "u64": 0
-                },
-                {
-                  "bytes": "c4b1e055613d345b38ba8c6d54ceacc91a12a7fcfbbc3dd2a053d425d3d21392"
-                },
-                {
-                  "bytes": "55339082e0a201ecd245acd4ab1e9a8add0f820f18005f4af645ac016c61cc0ff49c8fbb7da33c571708cc6a31586483ba49d3e7397b97a65fa737d4a614e505"
-                },
-                {
-                  "bytes": "000000120000000100000000000000000000000000000000000000000000000000000000000000030000000f000000096765745f6e6f6e6365000000000000100000000100000000000000050000000000000000"
-                }
-              ]
-            }
-          }
-        }
-      },
-      "failed_call": false
-    },
-    {
-      "event": {
-        "ext": "v0",
-        "contract_id": "0000000000000000000000000000000000000000000000000000000000000001",
-        "type_": "diagnostic",
-        "body": {
-          "v0": {
-            "topics": [
-              {
-                "symbol": "fn_return"
-              },
-              {
-                "symbol": "execute"
-              }
-            ],
-            "data": {
-              "error": {
-                "contract": 7
-              }
-            }
-          }
-        }
-      },
-      "failed_call": true
-    },
-    {
-      "event": {
-        "ext": "v0",
-        "contract_id": "0000000000000000000000000000000000000000000000000000000000000001",
-        "type_": "diagnostic",
-        "body": {
-          "v0": {
-            "topics": [
-              {
-                "symbol": "error"
-              },
-              {
-                "error": {
-                  "contract": 7
-                }
-              }
-            ],
-            "data": {
-              "string": "escalating Ok(ScErrorType::Contract) frame-exit to Err"
-            }
-          }
-        }
-      },
-      "failed_call": true
-    },
-    {
-      "event": {
-        "ext": "v0",
-        "contract_id": null,
-        "type_": "diagnostic",
-        "body": {
-          "v0": {
-            "topics": [
-              {
-                "symbol": "error"
-              },
-              {
-                "error": {
-                  "contract": 7
-                }
-              }
-            ],
-            "data": {
-              "vec": [
-                {
-                  "string": "contract try_call failed"
-                },
-                {
-                  "symbol": "execute"
-                },
-                {
-                  "vec": [
-                    {
-                      "vec": [
-                        {
-                          "symbol": "SessionKey"
-                        },
-                        {
-                          "bytes": "c4b1e055613d345b38ba8c6d54ceacc91a12a7fcfbbc3dd2a053d425d3d21392"
-                        }
-                      ]
-                    },
-                    {
-                      "address": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAHK3M"
-                    },
-                    {
-                      "symbol": "get_nonce"
-                    },
-                    {
-                      "vec": []
-                    },
-                    {
-                      "u64": 0
-                    },
-                    {
-                      "bytes": "c4b1e055613d345b38ba8c6d54ceacc91a12a7fcfbbc3dd2a053d425d3d21392"
-                    },
-                    {
-                      "bytes": "55339082e0a201ecd245acd4ab1e9a8add0f820f18005f4af645ac016c61cc0ff49c8fbb7da33c571708cc6a31586483ba49d3e7397b97a65fa737d4a614e505"
-                    },
-                    {
-                      "bytes": "000000120000000100000000000000000000000000000000000000000000000000000000000000030000000f000000096765745f6e6f6e6365000000000000100000000100000000000000050000000000000000"
-                    }
-                  ]
-                }
-              ]
-            }
-          }
-        }
-      },
-      "failed_call": false
-    },
-    {
-      "event": {
-        "ext": "v0",
-        "contract_id": null,
-        "type_": "diagnostic",
-        "body": {
-          "v0": {
-            "topics": [
-              {
-                "symbol": "fn_call"
-              },
-              {
-                "bytes": "0000000000000000000000000000000000000000000000000000000000000001"
-              },
-              {
-                "symbol": "add_session_key"
-              }
-            ],
-            "data": {
-              "vec": [
-                {
-                  "bytes": "c4b1e055613d345b38ba8c6d54ceacc91a12a7fcfbbc3dd2a053d425d3d21392"
+                  "bytes": "173fab3ebd08bb8f170ff88b327ff5c7eab9d26b88c4d0eeb68bf1668681367e"
                 },
                 {
                   "u64": 10000
@@ -718,7 +400,7 @@
             "data": {
               "vec": [
                 {
-                  "bytes": "c4b1e055613d345b38ba8c6d54ceacc91a12a7fcfbbc3dd2a053d425d3d21392"
+                  "bytes": "173fab3ebd08bb8f170ff88b327ff5c7eab9d26b88c4d0eeb68bf1668681367e"
                 },
                 {
                   "u64": 10000
@@ -777,7 +459,7 @@
                       "symbol": "SessionKey"
                     },
                     {
-                      "bytes": "c4b1e055613d345b38ba8c6d54ceacc91a12a7fcfbbc3dd2a053d425d3d21392"
+                      "bytes": "173fab3ebd08bb8f170ff88b327ff5c7eab9d26b88c4d0eeb68bf1668681367e"
                     }
                   ]
                 },
@@ -794,92 +476,11 @@
                   "u64": 0
                 },
                 {
-                  "bytes": "c4b1e055613d345b38ba8c6d54ceacc91a12a7fcfbbc3dd2a053d425d3d21392"
+                  "bytes": "173fab3ebd08bb8f170ff88b327ff5c7eab9d26b88c4d0eeb68bf1668681367e"
                 },
-                {
-                  "bytes": "55339082e0a201ecd245acd4ab1e9a8add0f820f18005f4af645ac016c61cc0ff49c8fbb7da33c571708cc6a31586483ba49d3e7397b97a65fa737d4a614e505"
-                },
-                {
-                  "bytes": "000000120000000100000000000000000000000000000000000000000000000000000000000000030000000f000000096765745f6e6f6e6365000000000000100000000100000000000000050000000000000000"
-                }
+                "void",
+                "void"
               ]
-            }
-          }
-        }
-      },
-      "failed_call": false
-    },
-    {
-      "event": {
-        "ext": "v0",
-        "contract_id": "0000000000000000000000000000000000000000000000000000000000000001",
-        "type_": "contract",
-        "body": {
-          "v0": {
-            "topics": [
-              {
-                "symbol": "executed"
-              }
-            ],
-            "data": {
-              "vec": [
-                {
-                  "address": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAHK3M"
-                },
-                {
-                  "symbol": "get_nonce"
-                },
-                {
-                  "u64": 0
-                }
-              ]
-            }
-          }
-        }
-      },
-      "failed_call": false
-    },
-    {
-      "event": {
-        "ext": "v0",
-        "contract_id": "0000000000000000000000000000000000000000000000000000000000000001",
-        "type_": "diagnostic",
-        "body": {
-          "v0": {
-            "topics": [
-              {
-                "symbol": "fn_call"
-              },
-              {
-                "bytes": "0000000000000000000000000000000000000000000000000000000000000003"
-              },
-              {
-                "symbol": "get_nonce"
-              }
-            ],
-            "data": "void"
-          }
-        }
-      },
-      "failed_call": false
-    },
-    {
-      "event": {
-        "ext": "v0",
-        "contract_id": "0000000000000000000000000000000000000000000000000000000000000003",
-        "type_": "diagnostic",
-        "body": {
-          "v0": {
-            "topics": [
-              {
-                "symbol": "fn_return"
-              },
-              {
-                "symbol": "get_nonce"
-              }
-            ],
-            "data": {
-              "u64": 0
             }
           }
         }
@@ -902,7 +503,97 @@
               }
             ],
             "data": {
-              "u64": 0
+              "error": {
+                "contract": 3
+              }
+            }
+          }
+        }
+      },
+      "failed_call": true
+    },
+    {
+      "event": {
+        "ext": "v0",
+        "contract_id": "0000000000000000000000000000000000000000000000000000000000000001",
+        "type_": "diagnostic",
+        "body": {
+          "v0": {
+            "topics": [
+              {
+                "symbol": "error"
+              },
+              {
+                "error": {
+                  "contract": 3
+                }
+              }
+            ],
+            "data": {
+              "string": "escalating Ok(ScErrorType::Contract) frame-exit to Err"
+            }
+          }
+        }
+      },
+      "failed_call": true
+    },
+    {
+      "event": {
+        "ext": "v0",
+        "contract_id": null,
+        "type_": "diagnostic",
+        "body": {
+          "v0": {
+            "topics": [
+              {
+                "symbol": "error"
+              },
+              {
+                "error": {
+                  "contract": 3
+                }
+              }
+            ],
+            "data": {
+              "vec": [
+                {
+                  "string": "contract try_call failed"
+                },
+                {
+                  "symbol": "execute"
+                },
+                {
+                  "vec": [
+                    {
+                      "vec": [
+                        {
+                          "symbol": "SessionKey"
+                        },
+                        {
+                          "bytes": "173fab3ebd08bb8f170ff88b327ff5c7eab9d26b88c4d0eeb68bf1668681367e"
+                        }
+                      ]
+                    },
+                    {
+                      "address": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAHK3M"
+                    },
+                    {
+                      "symbol": "get_nonce"
+                    },
+                    {
+                      "vec": []
+                    },
+                    {
+                      "u64": 0
+                    },
+                    {
+                      "bytes": "173fab3ebd08bb8f170ff88b327ff5c7eab9d26b88c4d0eeb68bf1668681367e"
+                    },
+                    "void",
+                    "void"
+                  ]
+                }
+              ]
             }
           }
         }
