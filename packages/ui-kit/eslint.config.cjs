@@ -1,7 +1,9 @@
 const js = require('@eslint/js');
 const tseslint = require('@typescript-eslint/eslint-plugin');
 const tsparser = require('@typescript-eslint/parser');
+const react = require('eslint-plugin-react');
 const reactHooks = require('eslint-plugin-react-hooks');
+const globals = require('globals');
 
 module.exports = [
   js.configs.recommended,
@@ -21,10 +23,12 @@ module.exports = [
     },
     plugins: {
       '@typescript-eslint': tseslint,
+      'react': react,
       'react-hooks': reactHooks,
     },
     rules: {
       ...tseslint.configs.recommended.rules,
+      ...react.configs.recommended.rules,
       ...reactHooks.configs.recommended.rules,
       'react/react-in-jsx-scope': 'off',
       '@typescript-eslint/no-unused-vars': ['warn', { argsIgnorePattern: '^_', varsIgnorePattern: '^_' }],
@@ -58,7 +62,7 @@ module.exports = [
     },
   },
   {
-    files: ['**/*.stories.tsx'],
+    files: ['**/*.stories.{ts,tsx}'],
     rules: {
       'react-hooks/rules-of-hooks': 'off',
     },
