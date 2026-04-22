@@ -16,6 +16,12 @@ import {
   symbolToScVal,
   u64ToScVal,
 } from './xdr-utils';
+import {
+  executeContract,
+  simulateExecute,
+  type ExecuteOptions,
+  type ExecuteResult,
+} from './execute';
 
 /** Options for read calls (getOwner, getNonce, getSessionKey) when using a server */
 export interface AccountContractReadOptions {
@@ -32,6 +38,14 @@ export interface AccountContractReadOptions {
 export interface InvocationArgs {
   method: string;
   args: xdr.ScVal[];
+}
+
+interface SimulateErrorShape {
+  error?: string;
+  message?: string;
+  result?: {
+    retval?: xdr.ScVal;
+  };
 }
 
 /**
@@ -175,6 +189,34 @@ export class AccountContract {
   }
 
   /**
+   * Execute a contract method with full transaction submission.
+   * Encodes arguments, submits transaction, and returns typed result.
+   */
+  async executeContract<T = unknown>(
+    to: string,
+    functionName: string,
+    args: unknown[],
+    expectedNonce: number,
+    options: ExecuteOptions
+  ): Promise<ExecuteResult<T>> {
+    return executeContract(this, to, functionName, args, expectedNonce, options);
+  }
+
+  /**
+   * Simulate a contract execution without submitting the transaction.
+   * Useful for testing and gas estimation.
+   */
+  async simulateExecute<T = unknown>(
+    to: string,
+    functionName: string,
+    args: unknown[],
+    expectedNonce: number,
+    options: Omit<ExecuteOptions, 'fee'>
+  ): Promise<T> {
+    return simulateExecute(this, to, functionName, args, expectedNonce, options);
+  }
+
+  /**
    * Simulate a read-only contract call and return the result ScVal.
    * Throws typed errors on contract/host errors.
    */
@@ -198,7 +240,7 @@ export class AccountContract {
 
     const raw = txBuilder.build();
 
-    const sim: any = await server.simulateTransaction(raw);
+    const sim = (await server.simulateTransaction(raw)) as SimulateErrorShape;
 
     if (sim && typeof sim === 'object' && ('error' in sim || 'message' in sim)) {
       const errMsg =
@@ -208,7 +250,7 @@ export class AccountContract {
       throw mapContractError(String(errMsg), sim);
     }
 
-    const result = (sim as any)?.result?.retval as xdr.ScVal | undefined;
+    const result = sim.result?.retval;
     if (result === undefined) {
       throw mapContractError('No return value from simulation', sim);
     }

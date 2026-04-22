@@ -23,9 +23,32 @@ const COMMON_WEAK_PATTERNS: RegExp[] = [
   /^(.)\1+$/, // All same character: "aaaaaa", "111111"
   /^(012|123|234|345|456|567|678|789|890|987|876|765|654|543|432|321|210)+$/i, // Pure numeric sequences
   /^(abc|bcd|cde|def|efg|fgh|ghi|hij|ijk|jkl|klm|lmn|mno|nop|opq|pqr|qrs|rst|stu|tuv|uvw|vwx|wxy|xyz)+$/i, // Pure alpha sequences
-  /^(password|passw0rd|p@ssword|p@ssw0rd|qwerty|letmein|welcome|admin|login|iloveyou|monkey|dragon|master|sunshine|shadow|princess|football|baseball|superman|batman)+$/i, // Common dictionary passwords
+  /^(password|passw0rd|p@ssword|p@ssw0rd|qwerty|letmein|welcome|admin|login|iloveyou|monkey|dragon|master|sunshine|shadow|princess|football|baseball|superman|batman)+$/i, // Entire string is only weak dictionary tokens
   /^[0-9]+$/, // Digits only
   /^[a-zA-Z]+$/, // Letters only — no digits or symbols
+];
+
+/** Case-insensitive substrings — catches e.g. `adminADMIN1234!` where the anchored pattern above does not apply. */
+const COMMON_WEAK_SUBSTRINGS: string[] = [
+  'password',
+  'passw0rd',
+  // Intentionally omit leet variants like p@ssw0rd — strong passphrases may include them with high entropy.
+  'qwerty',
+  'letmein',
+  'welcome',
+  'admin',
+  'login',
+  'iloveyou',
+  'monkey',
+  'dragon',
+  'master',
+  'sunshine',
+  'shadow',
+  'princess',
+  'football',
+  'baseball',
+  'superman',
+  'batman',
 ];
 
 function hasUppercase(password: string): boolean {
@@ -46,6 +69,11 @@ function hasSpecialChar(password: string): boolean {
 
 function matchesWeakPattern(password: string): boolean {
   return COMMON_WEAK_PATTERNS.some((pattern) => pattern.test(password));
+}
+
+function containsWeakDictionarySubstring(password: string): boolean {
+  const lower = password.toLowerCase();
+  return COMMON_WEAK_SUBSTRINGS.some((word) => lower.includes(word));
 }
 
 /**
@@ -94,7 +122,7 @@ export function validatePasswordStrength(password: string): PasswordValidationRe
     reasons.push('Password must contain at least one special character.');
   }
 
-  if (matchesWeakPattern(password)) {
+  if (matchesWeakPattern(password) || containsWeakDictionarySubstring(password)) {
     reasons.push('Password matches a commonly used or easily guessable pattern.');
   }
 

@@ -26,6 +26,9 @@ export type { BadgeProps } from './components/ui/badge';
 
 export { Separator } from './components/ui/separator';
 
+export { Dialog } from './components/ui/dialog';
+export { Tooltip } from './components/ui/tooltip';
+
 // Custom wallet components
 export { AmountInput } from './components/amount-input';
 export type { AmountInputProps } from './components/amount-input';
@@ -33,12 +36,67 @@ export type { AmountInputProps } from './components/amount-input';
 export { AddressDisplay } from './components/address-display';
 export type { AddressDisplayProps } from './components/address-display';
 
+export { QRCode } from './components/QRCode';
+export type { QRCodeProps } from './components/QRCode';
+
+export { Identicon } from './components/Identicon';
+export type { IdenticonProps } from './components/Identicon';
+
+// Form system
+export { Form, FormSubmit, FormError } from './components/Form/Form';
+export type { FormProps, FormSubmitProps, FormErrorProps } from './components/Form/Form';
+
+export { AddressInput, AddressInputBase } from './components/Form/AddressInput';
+export type { AddressInputProps, AddressInputBaseProps } from './components/Form/AddressInput';
+
+export { AmountInput as FormAmountInput, AmountInputBase } from './components/Form/AmountInput';
+export type {
+  AmountInputProps as FormAmountInputProps,
+  AmountInputBaseProps,
+} from './components/Form/AmountInput';
+
+export { PasswordInput, PasswordInputBase } from './components/Form/PasswordInput';
+export type { PasswordInputProps, PasswordInputBaseProps } from './components/Form/PasswordInput';
+
+// Validation utilities
+export {
+  isStellarAddress,
+  stellarAddressSchema,
+  amountSchema,
+  passwordSchema,
+  parseAmount,
+  formatAmount,
+  getPasswordStrength,
+  STELLAR_ADDRESS_REGEX,
+} from './components/Form/validation';
+export type { PasswordStrength } from './components/Form/validation';
 // Toast / Notifications
 export { Toast } from './components/Toast/Toast';
 export type { ToastProps } from './components/Toast/Toast';
+export { ToastContainer } from './components/Toast/ToastContainer';
 export { NotificationProvider } from './components/Toast/NotificationProvider';
-export type { Toast as ToastItem, ToastVariant } from './components/Toast/NotificationProvider';
+export type { ToastItem, ToastVariant } from './components/Toast/NotificationProvider';
 export { useToast } from './components/Toast/useToast';
 
 // Utility functions
 export { cn } from './lib/utils';
+
+export { TransactionHistory } from './components/TransactionHistory';
+export type { TransactionHistoryProps } from './components/TransactionHistory';
+
+export { TransactionItem } from './components/TransactionItem';
+export type { TransactionItemProps } from './components/TransactionItem';
+
+export {
+  formatAddress,
+  formatTime,
+  formatTransactionAmount,
+  getDateGroupLabel,
+  groupTransactionsByDate,
+} from './utils/transaction-formatter';
+export type {
+  TransactionGroup,
+  TransactionRecord,
+  TransactionStatus,
+  TransactionType,
+} from './utils/transaction-formatter';

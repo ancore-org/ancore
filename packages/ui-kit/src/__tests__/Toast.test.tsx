@@ -3,12 +3,21 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { NotificationProvider } from '../components/Toast/NotificationProvider';
 import { useToast } from '../components/Toast/useToast';
 
-function Trigger({ variant }: { variant?: 'success' | 'error' | 'info' }) {
+function Trigger({ variant }: { variant?: 'success' | 'error' | 'warning' | 'info' }) {
   const { toast } = useToast();
   return <button onClick={() => toast('Test message', variant)}>Show Toast</button>;
 }
 
-function setup(variant?: 'success' | 'error' | 'info') {
+function ConvenienceTrigger({
+  method,
+}: {
+  method: 'showSuccess' | 'showError' | 'showWarning' | 'showInfo';
+}) {
+  const hook = useToast();
+  return <button onClick={() => hook[method]('Test message')}>Show Toast</button>;
+}
+
+function setup(variant?: 'success' | 'error' | 'warning' | 'info') {
   return render(
     <NotificationProvider>
       <Trigger variant={variant} />
@@ -39,6 +48,12 @@ describe('Toast', () => {
     expect(screen.getByRole('alert')).toHaveClass('bg-red-50');
   });
 
+  it('renders warning variant', () => {
+    setup('warning');
+    fireEvent.click(screen.getByText('Show Toast'));
+    expect(screen.getByRole('alert')).toHaveClass('bg-yellow-50');
+  });
+
   it('renders info variant', () => {
     setup('info');
     fireEvent.click(screen.getByText('Show Toast'));
@@ -66,5 +81,30 @@ describe('Toast', () => {
       'useToast must be used within a NotificationProvider'
     );
     spy.mockRestore();
+  });
+
+  it('limits queue to 5 toasts', () => {
+    const { getByText, getAllByRole } = render(
+      <NotificationProvider>
+        <Trigger />
+      </NotificationProvider>
+    );
+    for (let i = 0; i < 7; i++) fireEvent.click(getByText('Show Toast'));
+    expect(getAllByRole('alert').length).toBeLessThanOrEqual(5);
+  });
+
+  describe('convenience methods', () => {
+    it.each(['showSuccess', 'showError', 'showWarning', 'showInfo'] as const)(
+      '%s shows a toast',
+      (method) => {
+        render(
+          <NotificationProvider>
+            <ConvenienceTrigger method={method} />
+          </NotificationProvider>
+        );
+        fireEvent.click(screen.getByText('Show Toast'));
+        expect(screen.getByRole('alert')).toBeInTheDocument();
+      }
+    );
   });
 });

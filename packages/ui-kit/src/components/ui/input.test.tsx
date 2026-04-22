@@ -1,5 +1,6 @@
-import { fireEvent, render, screen } from '@testing-library/react';
+import { render, screen } from '@testing-library/react';
 import { describe, it, expect } from 'vitest';
+import userEvent from '@testing-library/user-event';
 import { Input } from './input';
 
 describe('Input', () => {
@@ -13,10 +14,12 @@ describe('Input', () => {
     expect(screen.getByDisplayValue('Test value')).toBeInTheDocument();
   });
 
-  it('handles user input', () => {
+  it('handles user input', async () => {
+    const user = userEvent.setup();
     render(<Input placeholder="Type here" />);
-    const input = screen.getByPlaceholderText('Type here') as HTMLInputElement;
-    fireEvent.change(input, { target: { value: 'Hello' } });
+    const input = screen.getByPlaceholderText('Type here');
+
+    await user.type(input, 'Hello');
     expect(input).toHaveValue('Hello');
   });
 

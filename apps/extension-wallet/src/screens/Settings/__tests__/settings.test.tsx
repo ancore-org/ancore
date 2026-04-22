@@ -11,6 +11,14 @@ import { SecuritySettings } from '../SecuritySettings';
 import { AboutScreen } from '../AboutScreen';
 import { SettingsGroup, SettingItem } from '../../../components/SettingsGroup';
 
+function renderSettingsScreen() {
+  return render(
+    <NotificationProvider>
+      <SettingsScreen />
+    </NotificationProvider>
+  );
+}
+
 // ── useSettings ──────────────────────────────────────────────────────────────
 
 describe('useSettings', () => {
@@ -233,14 +241,6 @@ describe('AboutScreen', () => {
 
 describe('SettingsScreen', () => {
   beforeEach(() => localStorage.clear());
-
-  function renderSettingsScreen() {
-    return render(
-      <NotificationProvider>
-        <SettingsScreen />
-      </NotificationProvider>
-    );
-  }
 
   it('renders all top-level groups', () => {
     renderSettingsScreen();

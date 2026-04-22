@@ -1,0 +1,60 @@
+{
+  "gettingStarted": [
+    {
+      "title": "Creating your account",
+      "content": "Create an account with a strong password and write your recovery phrase on paper before continuing."
+    },
+    {
+      "title": "First transaction",
+      "content": "Send a small test amount first, verify recipient details, and confirm settlement in activity history."
+    },
+    {
+      "title": "Backing up wallet",
+      "content": "Keep two offline recovery phrase backups in separate secure places and never share them online."
+    }
+  ],
+  "features": [
+    {
+      "title": "Sending payments",
+      "content": "Use the Send flow to enter recipient, amount, and network details, then review and sign."
+    },
+    {
+      "title": "Receiving payments",
+      "content": "Use the Receive screen to copy your address or share a QR code with the sender."
+    },
+    {
+      "title": "Session keys",
+      "content": "Create scoped, time-limited session keys for safer repeated operations and revoke keys when done."
+    }
+  ],
+  "security": [
+    {
+      "title": "Best practices",
+      "content": "Use unique credentials, keep devices updated, and verify all transaction details before signing."
+    },
+    {
+      "title": "Troubleshooting",
+      "content": "Check network selection, balances, and error messages first; then recreate issue with minimal steps."
+    }
+  ],
+  "faq": [
+    {
+      "question": "Can support recover my wallet?",
+      "answer": "No. Only your recovery phrase can restore wallet access."
+    },
+    {
+      "question": "Why is my payment pending?",
+      "answer": "Network congestion or confirmation delays can cause temporary pending status."
+    },
+    {
+      "question": "When should I revoke session keys?",
+      "answer": "Revoke keys as soon as a workflow is complete or any suspicious behavior appears."
+    }
+  ],
+  "tooltips": {
+    "send": "Double-check recipient address and network before confirming a payment.",
+    "receive": "Share your public address or QR code only; never share private keys.",
+    "sessionKeys": "Session keys should have least privilege and short expirations.",
+    "security": "Protect your recovery phrase offline and review permissions often."
+  }
+}

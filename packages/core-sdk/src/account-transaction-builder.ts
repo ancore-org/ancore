@@ -72,7 +72,6 @@ export class AccountTransactionBuilder {
   private readonly txBuilder: TransactionBuilder;
   private readonly server: rpc.Server;
   private readonly contract: Contract;
-  private readonly networkPassphrase: string;
   private readonly timeoutSeconds: number;
 
   /** Track whether at least one operation has been added. */
@@ -99,7 +98,6 @@ export class AccountTransactionBuilder {
 
     this.server = server;
     this.contract = new Contract(accountContractId);
-    this.networkPassphrase = networkPassphrase;
     this.timeoutSeconds = timeoutSeconds;
 
     // Delegate to Stellar SDK's TransactionBuilder

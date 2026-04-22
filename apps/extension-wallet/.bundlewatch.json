@@ -1,0 +1,12 @@
+{
+  "files": [
+    {
+      "maxSize": "200kB"
+    },
+    {
+      "path": "apps/extension-wallet/dist/assets/*.css",
+      "maxSize": "50kB"
+    }
+  ],
+  "bundlewatchServiceHost": "https://service.bundlewatch.io"
+}

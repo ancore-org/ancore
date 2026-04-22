@@ -1,11 +1,15 @@
 const js = require('@eslint/js');
 const tseslint = require('@typescript-eslint/eslint-plugin');
 const tsparser = require('@typescript-eslint/parser');
+const globals = require('globals');
+
+const parserOptions = { ecmaVersion: 2020, sourceType: 'module' };
 
 const nodeGlobals = {
   Buffer: 'readonly',
   console: 'readonly',
   process: 'readonly',
+  TextEncoder: 'readonly',
   setTimeout: 'readonly',
   clearTimeout: 'readonly',
   setInterval: 'readonly',
@@ -41,24 +45,33 @@ module.exports = [
         sourceType: 'module',
       },
       globals: {
-        ...nodeGlobals,
+        describe: 'readonly',
+        it: 'readonly',
+        expect: 'readonly',
+        beforeEach: 'readonly',
+        afterEach: 'readonly',
+        beforeAll: 'readonly',
+        afterAll: 'readonly',
+        jest: 'readonly',
+        Buffer: 'readonly',
+        console: 'readonly',
       },
     },
     plugins: {
       '@typescript-eslint': tseslint,
     },
+    plugins: { '@typescript-eslint': tseslint },
     rules: {
       ...tseslint.configs.recommended.rules,
-      '@typescript-eslint/no-unused-vars': ['warn', { argsIgnorePattern: '^_', varsIgnorePattern: '^_' }],
-      '@typescript-eslint/no-explicit-any': 'warn',
+      '@typescript-eslint/no-unused-vars': ['warn', { argsIgnorePattern: '^_' }],
     },
   },
   {
-    files: ['**/__tests__/**/*.ts', '**/*.test.ts', '**/*.spec.ts'],
+    files: ['**/__tests__/**/*.ts'],
     languageOptions: {
-      globals: {
-        ...jestGlobals,
-      },
+      parser: tsparser,
+      parserOptions,
+      globals: { ...globals.node, ...globals.jest },
     },
     rules: {
       '@typescript-eslint/no-explicit-any': 'off',
