@@ -1,35 +1,39 @@
 import '@testing-library/jest-dom';
 
-class MemoryStorage implements Storage {
-  private store = new Map<string, string>();
+function createMemoryStorage(): Storage {
+  const store = new Map<string, string>();
 
-  get length(): number {
-    return this.store.size;
-  }
-
-  clear(): void {
-    this.store.clear();
-  }
-
-  getItem(key: string): string | null {
-    return this.store.has(key) ? this.store.get(key)! : null;
-  }
-
-  key(index: number): string | null {
-    return Array.from(this.store.keys())[index] ?? null;
-  }
-
-  removeItem(key: string): void {
-    this.store.delete(key);
-  }
-
-  setItem(key: string, value: string): void {
-    this.store.set(key, value);
-  }
+  return {
+    get length() {
+      return store.size;
+    },
+    clear() {
+      store.clear();
+    },
+    getItem(key: string) {
+      return store.has(key) ? store.get(key)! : null;
+    },
+    key(index: number) {
+      return Array.from(store.keys())[index] ?? null;
+    },
+    removeItem(key: string) {
+      store.delete(key);
+    },
+    setItem(key: string, value: string) {
+      store.set(key, String(value));
+    },
+  };
 }
 
-Object.defineProperty(globalThis, 'localStorage', {
-  value: new MemoryStorage(),
-  configurable: true,
-  writable: true,
-});
+const hasUsableLocalStorage =
+  typeof globalThis.localStorage !== 'undefined' &&
+  typeof globalThis.localStorage.clear === 'function' &&
+  typeof globalThis.localStorage.getItem === 'function' &&
+  typeof globalThis.localStorage.setItem === 'function';
+
+if (!hasUsableLocalStorage) {
+  Object.defineProperty(globalThis, 'localStorage', {
+    value: createMemoryStorage(),
+    configurable: true,
+  });
+}

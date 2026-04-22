@@ -17,7 +17,11 @@
     "noUnusedLocals": true,
     "noUnusedParameters": true,
     "noFallthroughCasesInSwitch": true,
-    "isolatedModules": true
+    "isolatedModules": true,
+    "baseUrl": "./",
+    "paths": {
+      "@ancore/*": ["packages/*/src", "packages/*/dist"]
+    }
   },
   "exclude": ["node_modules", "dist", "build", ".turbo"]
 }

@@ -1,4 +1,3 @@
-// ...existing code...
 import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { vi } from 'vitest';
@@ -9,7 +8,7 @@ vi.mock('qrcode.react', () => ({
   ),
 }));
 
-import ReceiveScreen from '@/screens/ReceiveScreen';
+import { ReceiveScreen } from '@/screens/ReceiveScreen';
 
 const MAINNET_ACCOUNT = {
   publicKey: 'GABC1234567890DEFGHIJKLMNOPQRSTUVWXYZ',

@@ -3,8 +3,6 @@
  * Implements PBKDF2 key derivation and AES-GCM encryption/decryption
  */
 
-/* eslint-disable no-undef */
-
 const PBKDF2_ITERATIONS = 100000;
 const SALT_LENGTH = 16;
 const IV_LENGTH = 12;

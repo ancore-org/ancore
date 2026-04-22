@@ -1,3 +1,4 @@
+/* eslint-disable no-redeclare */
 /**
  * initialize — invoke AccountContract.initialize(owner) with typed error handling.
  *

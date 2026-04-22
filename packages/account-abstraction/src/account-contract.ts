@@ -3,9 +3,9 @@
  * Provides a TypeScript API for initialize, execute, session keys, and read methods.
  */
 
+import type { SessionKey } from '@ancore/types';
 import { Account, Contract, TransactionBuilder, xdr } from '@stellar/stellar-sdk';
-import { type ContractErrorContext, mapContractError } from './errors';
-import type { SessionKey } from './session-key';
+import { mapContractError } from './errors';
 import {
   addressToScVal,
   permissionsToScVal,
@@ -16,6 +16,12 @@ import {
   symbolToScVal,
   u64ToScVal,
 } from './xdr-utils';
+import {
+  executeContract,
+  simulateExecute,
+  type ExecuteOptions,
+  type ExecuteResult,
+} from './execute';
 
 /** Options for read calls (getOwner, getNonce, getSessionKey) when using a server */
 export interface AccountContractReadOptions {
@@ -34,12 +40,7 @@ export interface InvocationArgs {
   args: xdr.ScVal[];
 }
 
-export interface AccountContractWriteResult {
-  invocation: InvocationArgs;
-  operation: ReturnType<AccountContract['call']>;
-}
-
-interface SimulationErrorResponse {
+interface SimulateErrorShape {
   error?: string;
   message?: string;
   result?: {
@@ -95,20 +96,8 @@ export class AccountContract {
     publicKey: string | Uint8Array,
     permissions: number[],
     expiresAt: number
-  ): InvocationArgs;
-  addSessionKey(
-    publicKey: string | Uint8Array,
-    permissions: number[],
-    expiresAt: number,
-    options: AccountContractReadOptions
-  ): Promise<AccountContractWriteResult>;
-  addSessionKey(
-    publicKey: string | Uint8Array,
-    permissions: number[],
-    expiresAt: number,
-    options?: AccountContractReadOptions
-  ): InvocationArgs | Promise<AccountContractWriteResult> {
-    const invocation = {
+  ): InvocationArgs {
+    return {
       method: 'add_session_key',
       args: [
         publicKeyToBytes32ScVal(publicKey),
@@ -116,12 +105,6 @@ export class AccountContract {
         permissionsToScVal(permissions),
       ],
     };
-
-    if (!options) {
-      return invocation;
-    }
-
-    return this.prepareWriteInvocation(invocation, options);
   }
 
   /**
@@ -200,30 +183,37 @@ export class AccountContract {
     const result = await this.simulateRead(
       'get_session_key',
       [publicKeyToBytes32ScVal(publicKey)],
-      options,
-      {
-        sessionPublicKey: typeof publicKey === 'string' ? publicKey : undefined,
-      }
+      options
     );
     return scValToOptionalSessionKey(result);
   }
 
   /**
-   * Build and simulate a write invocation so contract errors are surfaced as typed errors.
+   * Execute a contract method with full transaction submission.
+   * Encodes arguments, submits transaction, and returns typed result.
    */
-  private async prepareWriteInvocation(
-    invocation: InvocationArgs,
-    options: AccountContractReadOptions
-  ): Promise<AccountContractWriteResult> {
-    const operation = this.buildInvokeOperation(invocation);
-    await this.simulateContractCall(invocation.method, invocation.args, options, {
-      requireResult: false,
-    });
+  async executeContract<T = unknown>(
+    to: string,
+    functionName: string,
+    args: unknown[],
+    expectedNonce: number,
+    options: ExecuteOptions
+  ): Promise<ExecuteResult<T>> {
+    return executeContract(this, to, functionName, args, expectedNonce, options);
+  }
 
-    return {
-      invocation,
-      operation,
-    };
+  /**
+   * Simulate a contract execution without submitting the transaction.
+   * Useful for testing and gas estimation.
+   */
+  async simulateExecute<T = unknown>(
+    to: string,
+    functionName: string,
+    args: unknown[],
+    expectedNonce: number,
+    options: Omit<ExecuteOptions, 'fee'>
+  ): Promise<T> {
+    return simulateExecute(this, to, functionName, args, expectedNonce, options);
   }
 
   /**
@@ -233,29 +223,8 @@ export class AccountContract {
   private async simulateRead(
     method: string,
     args: xdr.ScVal[],
-    options: AccountContractReadOptions,
-    context: ContractErrorContext = {}
+    options: AccountContractReadOptions
   ): Promise<xdr.ScVal> {
-    const result = await this.simulateContractCall(method, args, options, {
-      requireResult: true,
-      context,
-    });
-
-    return result as xdr.ScVal;
-  }
-
-  private async simulateContractCall(
-    method: string,
-    args: xdr.ScVal[],
-    options: AccountContractReadOptions,
-    {
-      requireResult,
-      context = {},
-    }: {
-      requireResult: boolean;
-      context?: ContractErrorContext;
-    }
-  ): Promise<xdr.ScVal | undefined> {
     const op = this.contract.call(method, ...args);
     const { server, sourceAccount } = options;
 
@@ -271,19 +240,19 @@ export class AccountContract {
 
     const raw = txBuilder.build();
 
-    const sim = (await server.simulateTransaction(raw)) as SimulationErrorResponse;
+    const sim = (await server.simulateTransaction(raw)) as SimulateErrorShape;
 
     if (sim && typeof sim === 'object' && ('error' in sim || 'message' in sim)) {
       const errMsg =
         (sim as { error?: string }).error ??
         (sim as { message?: string }).message ??
         'Simulation failed';
-      throw mapContractError(String(errMsg), sim, context);
+      throw mapContractError(String(errMsg), sim);
     }
 
     const result = sim.result?.retval;
-    if (requireResult && result === undefined) {
-      throw mapContractError('No return value from simulation', sim, context);
+    if (result === undefined) {
+      throw mapContractError('No return value from simulation', sim);
     }
     return result;
   }

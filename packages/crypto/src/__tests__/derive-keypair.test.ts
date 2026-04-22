@@ -36,11 +36,12 @@ describe('Key Derivation', () => {
 
     it('should derive different keypairs for different mnemonics with same index', () => {
       const mnemonic1 = generateMnemonic();
-      let mnemonic2 = generateMnemonic();
+      const mnemonic2 = generateMnemonic();
 
-      // Ensure we get different mnemonics (extremely unlikely to collide, but guard anyway)
+      // Ensure we get different mnemonics
       while (mnemonic1 === mnemonic2) {
-        mnemonic2 = generateMnemonic();
+        const newMnemonic = generateMnemonic();
+        if (newMnemonic !== mnemonic1) break;
       }
 
       const keypair1 = deriveKeypairFromMnemonic(mnemonic1, 0);

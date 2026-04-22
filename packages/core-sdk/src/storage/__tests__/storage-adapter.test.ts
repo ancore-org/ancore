@@ -7,50 +7,6 @@ import {
   createStorageAdapter,
 } from '../storage-adapter';
 
-interface LocalStorageLike {
-  readonly length: number;
-  clear(): void;
-  getItem(key: string): string | null;
-  key(index: number): string | null;
-  removeItem(key: string): void;
-  setItem(key: string, value: string): void;
-}
-
-function installLocalStorageMock(): void {
-  if ((globalThis as { localStorage?: LocalStorageLike }).localStorage) {
-    return;
-  }
-
-  const store = new Map<string, string>();
-  const localStorageMock: LocalStorageLike = {
-    get length() {
-      return store.size;
-    },
-    clear() {
-      store.clear();
-    },
-    getItem(key: string) {
-      return store.has(key) ? (store.get(key) ?? null) : null;
-    },
-    key(index: number) {
-      return Array.from(store.keys())[index] ?? null;
-    },
-    removeItem(key: string) {
-      store.delete(key);
-    },
-    setItem(key: string, value: string) {
-      store.set(key, String(value));
-    },
-  };
-
-  Object.defineProperty(globalThis, 'localStorage', {
-    configurable: true,
-    value: localStorageMock,
-  });
-}
-
-installLocalStorageMock();
-
 // ─── Mock chrome.storage ──────────────────────────────────────────────────────
 
 function makeChromeArea(store: Record<string, unknown> = {}) {
@@ -180,11 +136,38 @@ describe('BrowserStorageAdapter', () => {
 
 // ─── LocalStorageAdapter ──────────────────────────────────────────────────────
 
+function installMemoryLocalStorage(): void {
+  const data = new Map<string, string>();
+  (globalThis as unknown as { localStorage: Storage }).localStorage = {
+    get length() {
+      return data.size;
+    },
+    clear(): void {
+      data.clear();
+    },
+    getItem(key: string): string | null {
+      return data.has(key) ? data.get(key)! : null;
+    },
+    key(index: number): string | null {
+      return [...data.keys()][index] ?? null;
+    },
+    removeItem(key: string): void {
+      data.delete(key);
+    },
+    setItem(key: string, value: string): void {
+      data.set(key, value);
+    },
+  } as Storage;
+}
+
+// ─── LocalStorageAdapter ──────────────────────────────────────────────────────
+
 describe('LocalStorageAdapter', () => {
   let adapter: LocalStorageAdapter;
 
   beforeEach(() => {
-    localStorage.clear();
+    installMemoryLocalStorage();
+    globalThis.localStorage.clear();
     adapter = new LocalStorageAdapter();
   });
 

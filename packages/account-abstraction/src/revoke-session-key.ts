@@ -1,3 +1,4 @@
+/* eslint-disable no-redeclare */
 /**
  * revokeSessionKey — invoke AccountContract.revoke_session_key(publicKey).
  *

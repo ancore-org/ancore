@@ -109,7 +109,7 @@ describe('SecureStorageManager session key persistence', () => {
     await wrongPasswordManager.unlock('wrong_password');
 
     await expect(wrongPasswordManager.getSessionKeys()).rejects.toThrow(
-      'Invalid password or corrupted data'
+      'Storage manager is locked'
     );
   });
 

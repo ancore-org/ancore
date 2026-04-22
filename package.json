@@ -26,7 +26,9 @@
   },
   "devDependencies": {
     "@turbo/gen": "^2.3.0",
+    "@types/chrome": "^0.1.38",
     "@types/node": "^25.5.0",
+    "@types/webextension-polyfill": "^0.12.5",
     "husky": "^9.0.0",
     "lint-staged": "^15.0.0",
     "prettier": "^3.2.5",
@@ -60,7 +62,8 @@
     "overrides": {
       "js-yaml": ">=4.1.1",
       "tmp": ">=0.2.4",
-      "esbuild": "0.21.5"
+      "esbuild": "0.21.5",
+      "@stellar/stellar-sdk": "^13.3.0"
     }
   },
   "packageManager": "pnpm@9.0.0",

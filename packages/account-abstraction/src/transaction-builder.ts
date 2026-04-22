@@ -12,6 +12,10 @@ export interface ContractExecuteParams {
   args: unknown[];
 }
 
+type BuilderOp =
+  | { type: 'sessionKey'; op: SessionKeyOp; sessionKey: string }
+  | ({ type: 'contractExecute' } & ContractExecuteParams);
+
 export interface SimulationResult {
   fee: string;
   // ...other simulation fields
@@ -19,7 +23,7 @@ export interface SimulationResult {
 
 export class TransactionBuilder {
   private source: string;
-  private ops: unknown[] = [];
+  private ops: BuilderOp[] = [];
   private fee: string = '10000';
 
   constructor(source: string) {

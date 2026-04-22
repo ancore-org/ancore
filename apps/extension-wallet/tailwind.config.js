@@ -1,11 +1,9 @@
+import tailwindcssAnimate from 'tailwindcss-animate';
+
 /** @type {import('tailwindcss').Config} */
-export default {
+module.exports = {
   darkMode: ['class'],
-  content: [
-    './src/popup/index.html',
-    './src/**/*.{ts,tsx}',
-    '../../packages/ui-kit/src/**/*.{ts,tsx}',
-  ],
+  content: ['./index.html', './src/**/*.{ts,tsx}', '../../packages/ui-kit/src/**/*.{ts,tsx}'],
   theme: {
     extend: {
       colors: {

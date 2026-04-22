@@ -1,3 +1,5 @@
+import { registerHandler, installMessageDispatcher } from '@/messaging';
+
 type ChromeRuntimeManifest = {
   name: string;
   version: string;
@@ -7,7 +9,17 @@ type ChromeInstalledDetails = {
   reason: string;
 };
 
-type ChromeMessageSender = object;
+declare const chrome: {
+  runtime: {
+    getManifest(): ChromeRuntimeManifest;
+    onInstalled: {
+      addListener(callback: (details: ChromeInstalledDetails) => void): void;
+    };
+    onStartup: {
+      addListener(callback: () => void): void;
+    };
+  };
+};
 
 const logPrefix = '[ancore-extension/background]';
 
@@ -16,10 +28,6 @@ const manifest = (runtime?.getManifest?.() as ChromeRuntimeManifest | undefined)
   name: 'ancore-extension-wallet',
   version: '0.0.0',
 };
-
-interface RuntimeMessage {
-  type?: string;
-}
 
 console.info(`${logPrefix} booted`, {
   name: manifest.name,
@@ -34,20 +42,24 @@ runtime?.onStartup?.addListener(() => {
   console.info(`${logPrefix} startup`);
 });
 
-runtime?.onMessage?.addListener(
-  (message: unknown, _sender: ChromeMessageSender, sendResponse: (response: unknown) => void) => {
-    const runtimeMessage = message as RuntimeMessage;
+// ---------------------------------------------------------------------------
+// Message handlers
+// ---------------------------------------------------------------------------
 
-    if (runtimeMessage.type === 'wallet/ping') {
-      sendResponse({
-        ok: true,
-        version: manifest.version,
-        source: 'service-worker',
-      });
+registerHandler('GET_WALLET_STATE', async () => {
+  // TODO: read real state from storage
+  return { state: 'uninitialized' };
+});
 
-      return true;
-    }
+registerHandler('LOCK_WALLET', async () => {
+  // TODO: implement lock logic
+  return { success: true };
+});
 
-    return false;
-  }
-);
+registerHandler('UNLOCK_WALLET', async (_request) => {
+  // TODO: implement unlock + password verification
+  return { success: false };
+});
+
+// Activate the dispatcher — must be called after all handlers are registered.
+installMessageDispatcher();

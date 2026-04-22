@@ -3,7 +3,7 @@
  */
 
 import { initialize } from '../initialize';
-import { AccountContract } from '../account-contract';
+import { AccountContract, type AccountContractReadOptions } from '../account-contract';
 import { AlreadyInitializedError, ContractInvocationError } from '../errors';
 
 jest.mock('../account-contract', () => {
@@ -19,7 +19,13 @@ jest.mock('../account-contract', () => {
   };
 });
 
-const { __mocks } = jest.requireMock('../account-contract') as any;
+const { __mocks } = jest.requireMock('../account-contract') as {
+  __mocks: {
+    mockInitialize: jest.Mock;
+    mockBuildInvokeOperation: jest.Mock;
+    MockAccountContract: jest.Mock;
+  };
+};
 
 const CONTRACT_ID = 'CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAABSC4';
 const OWNER = 'GAAZI4TCR3TY5OJHCTJC2A4QSY6CJWJH5IAJTGKIN2ER7LBNVKOCCWN';
@@ -73,7 +79,7 @@ describe('initialize', () => {
       __mocks.mockInitialize.mockReturnValue(invocation);
       __mocks.mockBuildInvokeOperation.mockReturnValue(operation);
 
-      const options = {} as any;
+      const options = {} as AccountContractReadOptions;
       const result = await initialize(CONTRACT_ID, { owner: OWNER }, options);
 
       expect(result).toEqual({ invocation, operation });
@@ -84,9 +90,9 @@ describe('initialize', () => {
         throw new Error('Already initialized');
       });
 
-      await expect(initialize(CONTRACT_ID, { owner: OWNER }, {} as any)).rejects.toThrow(
-        AlreadyInitializedError
-      );
+      await expect(
+        initialize(CONTRACT_ID, { owner: OWNER }, {} as AccountContractReadOptions)
+      ).rejects.toThrow(AlreadyInitializedError);
     });
   });
 
@@ -96,7 +102,9 @@ describe('initialize', () => {
     });
 
     it('throws ContractInvocationError for missing params', () => {
-      expect(() => initialize(CONTRACT_ID, null as any)).toThrow(ContractInvocationError);
+      expect(() => initialize(CONTRACT_ID, null as unknown as { owner: string })).toThrow(
+        ContractInvocationError
+      );
     });
   });
 });

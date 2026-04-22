@@ -1,10 +1,10 @@
 import React from 'react';
 import ReactDOM from 'react-dom/client';
-import { RouterShell } from '../router';
+import { ExtensionRouter } from '../router';
 import '../index.css';
 
 ReactDOM.createRoot(document.getElementById('root')!).render(
   <React.StrictMode>
-    <RouterShell />
+    <ExtensionRouter />
   </React.StrictMode>
 );

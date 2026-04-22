@@ -60,6 +60,18 @@
                         "val": {
                           "address": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAFCT4"
                         }
+                      },
+                      {
+                        "key": {
+                          "vec": [
+                            {
+                              "symbol": "Version"
+                            }
+                          ]
+                        },
+                        "val": {
+                          "u32": 1
+                        }
                       }
                     ]
                   }
@@ -183,6 +195,13 @@
             "data": {
               "vec": [
                 {
+                  "vec": [
+                    {
+                      "symbol": "Owner"
+                    }
+                  ]
+                },
+                {
                   "address": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAHK3M"
                 },
                 {
@@ -191,9 +210,13 @@
                 {
                   "vec": []
                 },
+                "void",
                 {
                   "u64": 1
-                }
+                },
+                "void",
+                "void",
+                "void"
               ]
             }
           }
@@ -210,27 +233,16 @@
           "v0": {
             "topics": [
               {
-                "symbol": "log"
+                "symbol": "fn_return"
+              },
+              {
+                "symbol": "execute"
               }
             ],
             "data": {
-              "vec": [
-                {
-                  "string": "caught panic 'Invalid nonce' from contract function 'Symbol(execute)'"
-                },
-                {
-                  "address": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAHK3M"
-                },
-                {
-                  "symbol": "transfer"
-                },
-                {
-                  "vec": []
-                },
-                {
-                  "u64": 1
-                }
-              ]
+              "error": {
+                "contract": 4
+              }
             }
           }
         }
@@ -250,12 +262,12 @@
               },
               {
                 "error": {
-                  "wasm_vm": "invalid_action"
+                  "contract": 4
                 }
               }
             ],
             "data": {
-              "string": "caught error from function"
+              "string": "escalating Ok(ScErrorType::Contract) frame-exit to Err"
             }
           }
         }
@@ -275,7 +287,7 @@
               },
               {
                 "error": {
-                  "wasm_vm": "invalid_action"
+                  "contract": 4
                 }
               }
             ],
@@ -290,6 +302,13 @@
                 {
                   "vec": [
                     {
+                      "vec": [
+                        {
+                          "symbol": "Owner"
+                        }
+                      ]
+                    },
+                    {
                       "address": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAHK3M"
                     },
                     {
@@ -298,9 +317,13 @@
                     {
                       "vec": []
                     },
+                    "void",
                     {
                       "u64": 1
-                    }
+                    },
+                    "void",
+                    "void",
+                    "void"
                   ]
                 }
               ]
@@ -323,7 +346,7 @@
               },
               {
                 "error": {
-                  "wasm_vm": "invalid_action"
+                  "contract": 4
                 }
               }
             ],

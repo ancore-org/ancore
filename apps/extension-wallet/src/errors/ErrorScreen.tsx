@@ -7,7 +7,7 @@
 
 import { Button } from '@ancore/ui-kit';
 import { AlertTriangle, RotateCcw, RefreshCw, Info } from 'lucide-react';
-import { ReactNode } from 'react';
+import type { JSX, ReactNode } from 'react';
 import { getErrorMessage, ErrorCategory } from './error-messages';
 import { ErrorInfo, handleError } from './error-handler';
 
@@ -54,7 +54,7 @@ export function ErrorScreen({
   children,
   showDetails = false,
   className,
-}: ErrorScreenProps): JSX.Element {
+}: ErrorScreenProps): ReactElement {
   // Get user-friendly message from error info or fall back to defaults
   const userMessage = errorInfo
     ? getErrorMessage(errorInfo.category, errorInfo.code)
@@ -187,7 +187,7 @@ export function ErrorCard({
   onRetry,
   variant = 'error',
   className,
-}: ErrorCardProps): JSX.Element {
+}: ErrorCardProps): ReactElement {
   const variantStyles = {
     error: 'bg-red-50 dark:bg-red-900/20 border-red-200 dark:border-red-800',
     warning: 'bg-yellow-50 dark:bg-yellow-900/20 border-yellow-200 dark:border-yellow-800',
@@ -261,7 +261,7 @@ export function AsyncErrorHandler({
   onRetry,
   onReset,
   compact = false,
-}: AsyncErrorHandlerProps): JSX.Element {
+}: AsyncErrorHandlerProps): ReactElement {
   // Handle the error through our error handler
   const errorInfo = handleError(error, 'Async operation');
   const userMessage = getErrorMessage(errorInfo.category, errorInfo.code);

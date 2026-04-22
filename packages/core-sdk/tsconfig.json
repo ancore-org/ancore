@@ -1,27 +1,14 @@
 {
+  "extends": "../../tsconfig.base.json",
   "compilerOptions": {
-    "target": "ES2022",
-    "module": "ESNext",
-    "moduleResolution": "node",
-    "declaration": true,
-    "declarationMap": true,
-    "strict": true,
-    "skipLibCheck": true,
-    "esModuleInterop": true,
-    "baseUrl": ".",
-    "paths": {
-      "@ancore/types": ["../types/src/index.ts"],
-      "@ancore/types/*": ["../types/src/*"],
-      "@ancore/stellar": ["../stellar/src/index.ts"],
-      "@ancore/stellar/*": ["../stellar/src/*"],
-      "@ancore/account-abstraction": ["../account-abstraction/src/index.ts"],
-      "@ancore/account-abstraction/*": ["../account-abstraction/src/*"]
-    },
-    "types": ["node", "jest"],
-    "rootDir": "./src",
     "outDir": "./dist",
-    "composite": true
+    "rootDir": "./src"
   },
+  "references": [
+    { "path": "../types" },
+    { "path": "../account-abstraction" },
+    { "path": "../stellar" }
+  ],
   "include": ["src/**/*"],
   "exclude": ["node_modules", "dist", "**/*.test.ts"]
 }

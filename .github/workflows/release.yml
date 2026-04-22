@@ -64,11 +64,16 @@ jobs:
         working-directory: ./contracts
         run: cargo build --target wasm32-unknown-unknown --release
 
+      - name: Optimize contracts
+        working-directory: ./contracts
+        run: soroban contract optimize --wasm target/wasm32-unknown-unknown/release/*.wasm
+
       - name: Upload contract artifacts
         uses: actions/upload-artifact@v4
         with:
           name: contracts
-          path: contracts/target/
+          path: |
+            contracts/target/wasm32-unknown-unknown/release/*.wasm
 
   github-release:
     name: Create GitHub Release
@@ -96,6 +101,7 @@ jobs:
         with:
           body_path: CHANGELOG.md
           files: |
+            contracts-build/**/*.wasm
             contracts-build/**/*.json
           draft: false
           prerelease: ${{ contains(github.ref, 'alpha') || contains(github.ref, 'beta') || contains(github.ref, 'rc') }}

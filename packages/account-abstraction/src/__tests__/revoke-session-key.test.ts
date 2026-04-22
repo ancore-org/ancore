@@ -3,7 +3,7 @@
  */
 
 import { revokeSessionKey } from '../revoke-session-key';
-import { AccountContract } from '../account-contract';
+import { AccountContract, type AccountContractReadOptions } from '../account-contract';
 import { SessionKeyNotFoundError, UnauthorizedError, ContractInvocationError } from '../errors';
 
 jest.mock('../account-contract', () => {
@@ -19,7 +19,13 @@ jest.mock('../account-contract', () => {
   };
 });
 
-const { __mocks } = jest.requireMock('../account-contract') as any;
+const { __mocks } = jest.requireMock('../account-contract') as {
+  __mocks: {
+    mockRevokeSessionKey: jest.Mock;
+    mockBuildInvokeOperation: jest.Mock;
+    MockAccountContract: jest.Mock;
+  };
+};
 
 const CONTRACT_ID = 'CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAABSC4';
 const SESSION_KEY = 'GCM5WPR4DDR24FSAX5LIEM4J7AI3KOWJYANSXEPKYXCSZOTAYXE75AFN';
@@ -108,7 +114,11 @@ describe('revokeSessionKey', () => {
       __mocks.mockRevokeSessionKey.mockReturnValue(invocation);
       __mocks.mockBuildInvokeOperation.mockReturnValue(operation);
 
-      const result = await revokeSessionKey(CONTRACT_ID, { publicKey: SESSION_KEY }, {} as any);
+      const result = await revokeSessionKey(
+        CONTRACT_ID,
+        { publicKey: SESSION_KEY },
+        {} as AccountContractReadOptions
+      );
 
       expect(result).toEqual({ invocation, operation });
     });
@@ -119,7 +129,7 @@ describe('revokeSessionKey', () => {
       });
 
       await expect(
-        revokeSessionKey(CONTRACT_ID, { publicKey: SESSION_KEY }, {} as any)
+        revokeSessionKey(CONTRACT_ID, { publicKey: SESSION_KEY }, {} as AccountContractReadOptions)
       ).rejects.toThrow(SessionKeyNotFoundError);
     });
   });
@@ -132,7 +142,9 @@ describe('revokeSessionKey', () => {
     });
 
     it('throws ContractInvocationError for missing params', () => {
-      expect(() => revokeSessionKey(CONTRACT_ID, null as any)).toThrow(ContractInvocationError);
+      expect(() =>
+        revokeSessionKey(CONTRACT_ID, null as unknown as { publicKey: string | Uint8Array })
+      ).toThrow(ContractInvocationError);
     });
   });
 });

@@ -6,7 +6,7 @@
  */
 
 import { ErrorBoundary as ReactErrorBoundary, useErrorBoundary } from 'react-error-boundary';
-import type { ErrorInfo, ReactNode } from 'react';
+import type { ComponentType, ErrorInfo, JSX, ReactNode } from 'react';
 import { ErrorScreen } from './ErrorScreen';
 import { ErrorCategory, handleError } from './error-handler';
 
@@ -31,7 +31,7 @@ export interface ErrorBoundaryProps {
  * </ErrorBoundary>
  * ```
  */
-export function ErrorBoundary({ children, fallback, onError }: ErrorBoundaryProps): JSX.Element {
+export function ErrorBoundary({ children, fallback, onError }: ErrorBoundaryProps): ReactElement {
   // If there's a custom fallback component provided, use it
   if (fallback) {
     return (
@@ -88,7 +88,7 @@ function ErrorFallback({
   resetErrorBoundary,
   onError,
   customFallback,
-}: ErrorFallbackProps): JSX.Element {
+}: ErrorFallbackProps): ReactElement {
   // Convert unknown error to Error object
   const err =
     error && typeof error === 'object' && 'message' in error
@@ -166,9 +166,9 @@ export function useErrorHandler() {
  * ```
  */
 export function withErrorBoundary<P extends object>(
-  Component: React.ComponentType<P>,
+  Component: ComponentType<P>,
   errorBoundaryProps?: Partial<ErrorBoundaryProps>
-): React.ComponentType<P> {
+): ComponentType<P> {
   return function WrappedComponent(props: P): JSX.Element {
     return (
       <ErrorBoundary {...errorBoundaryProps}>
@@ -192,7 +192,7 @@ interface ErrorBoundaryResetProps {
  * A button component that resets the ErrorBoundary when clicked
  * Useful for triggering error recovery
  */
-export function ErrorBoundaryReset({ children, className }: ErrorBoundaryResetProps): JSX.Element {
+export function ErrorBoundaryReset({ children, className }: ErrorBoundaryResetProps): ReactElement {
   const { reset } = useErrorHandler();
 
   return (

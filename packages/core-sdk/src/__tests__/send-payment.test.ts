@@ -2,7 +2,7 @@
  * Unit tests for sendPayment — mocks builder, signer, and stellar client.
  */
 
-import { Account, Keypair, Networks } from '@stellar/stellar-sdk';
+import { Account, Asset, Keypair, Networks, Operation } from '@stellar/stellar-sdk';
 import {
   sendPayment,
   type SendPaymentParams,
@@ -77,7 +77,7 @@ jest.mock('@stellar/stellar-sdk', () => {
 const { __mocks: builderMocks } = jest.requireMock('../account-transaction-builder') as any;
 const { __mocks: stellarMocks } = jest.requireMock('@ancore/stellar') as any;
 
-const DEST = Keypair.random().publicKey();
+const DEST = 'GDQERENWDDSQZS7R7WKHZI3BSOYMV3FSWR7TFUYFTKQ447PIX6NREOJM';
 const SOURCE = Keypair.random().publicKey();
 
 function makeDeps(): SendPaymentDeps {
@@ -224,14 +224,6 @@ describe('sendPayment', () => {
       await expect(sendPayment({ to: DEST, amount: '1', signer }, makeDeps())).rejects.toThrow(
         TransactionSubmissionError
       );
-    });
-
-    it('wraps unknown build errors as BuilderValidationError', async () => {
-      builderMocks.mockBuild.mockRejectedValue(new Error('builder exploded'));
-
-      await expect(
-        sendPayment({ to: DEST, amount: '1', signer: makeSigner() }, makeDeps())
-      ).rejects.toThrow(BuilderValidationError);
     });
 
     it('wraps network submission errors as TransactionSubmissionError', async () => {

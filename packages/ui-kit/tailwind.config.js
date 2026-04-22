@@ -1,3 +1,4 @@
+/* global module, require */
 /** @type {import('tailwindcss').Config} */
 module.exports = {
   darkMode: ['class'],
