@@ -105,6 +105,14 @@ jobs:
         working-directory: ./contracts
         run: stellar contract build
 
+      - name: Check Rust formatting
+        working-directory: ./contracts
+        run: cargo fmt --check
+
+      - name: Run clippy
+        working-directory: ./contracts
+        run: cargo clippy -- -D warnings
+
       - name: Test contracts
         working-directory: ./contracts
         run: cargo test

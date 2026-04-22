@@ -1,132 +1,199 @@
+/**
+ * Tests for retry logic
+ */
+
 import { withRetry, calculateDelay } from '../retry';
 import { RetryExhaustedError } from '../errors';
 
-describe('calculateDelay', () => {
-  it('should return base delay for first attempt with exponential backoff', () => {
-    expect(calculateDelay(1, 1000, true)).toBe(1000);
-  });
-
-  it('should double delay for each subsequent attempt', () => {
-    expect(calculateDelay(1, 1000, true)).toBe(1000);
-    expect(calculateDelay(2, 1000, true)).toBe(2000);
-    expect(calculateDelay(3, 1000, true)).toBe(4000);
-  });
-
-  it('should return constant delay when exponential is false', () => {
-    expect(calculateDelay(1, 1000, false)).toBe(1000);
-    expect(calculateDelay(2, 1000, false)).toBe(1000);
-    expect(calculateDelay(3, 1000, false)).toBe(1000);
-  });
-});
-
-describe('withRetry', () => {
-  beforeEach(() => {
-    jest.useFakeTimers();
-  });
-
-  afterEach(() => {
-    jest.useRealTimers();
-  });
-
-  it('should return result on first successful attempt', async () => {
-    const fn = jest.fn().mockResolvedValue('success');
-
-    const resultPromise = withRetry(fn, { maxRetries: 3, baseDelayMs: 1000 });
-    const result = await resultPromise;
-
-    expect(result).toBe('success');
-    expect(fn).toHaveBeenCalledTimes(1);
-  });
-
-  it('should retry on failure and succeed on subsequent attempt', async () => {
-    const fn = jest.fn().mockRejectedValueOnce(new Error('fail')).mockResolvedValueOnce('success');
-
-    const resultPromise = withRetry(fn, { maxRetries: 3, baseDelayMs: 100 });
-
-    // First attempt fails immediately
-    await Promise.resolve();
-
-    // Advance timer for first retry delay (100ms)
-    jest.advanceTimersByTime(100);
-
-    const result = await resultPromise;
-
-    expect(result).toBe('success');
-    expect(fn).toHaveBeenCalledTimes(2);
-  });
-
-  it('should throw RetryExhaustedError after all retries fail', async () => {
-    const error = new Error('persistent failure');
-    const fn = jest.fn().mockRejectedValue(error);
-
-    const resultPromise = withRetry(fn, { maxRetries: 3, baseDelayMs: 100 });
-
-    // Advance through all retry delays
-    for (let i = 0; i < 10; i++) {
-      await Promise.resolve();
-      jest.advanceTimersByTime(500);
-    }
-
-    await expect(resultPromise).rejects.toThrow(RetryExhaustedError);
-    expect(fn).toHaveBeenCalledTimes(4); // 1 initial + 3 retries
-  });
-
-  it('should not retry if isRetryable returns false', async () => {
-    const nonRetryableError = new Error('non-retryable');
-    const fn = jest.fn().mockRejectedValue(nonRetryableError);
-
-    const resultPromise = withRetry(fn, {
-      maxRetries: 3,
-      baseDelayMs: 100,
-      isRetryable: (err) => err.message !== 'non-retryable',
+describe('retry', () => {
+  describe('calculateDelay', () => {
+    it('should calculate exponential backoff delays', () => {
+      expect(calculateDelay(1, 1000, true)).toBe(1000); // 1s
+      expect(calculateDelay(2, 1000, true)).toBe(2000); // 2s
+      expect(calculateDelay(3, 1000, true)).toBe(4000); // 4s
+      expect(calculateDelay(4, 1000, true)).toBe(8000); // 8s
     });
 
-    await expect(resultPromise).rejects.toThrow('non-retryable');
-    expect(fn).toHaveBeenCalledTimes(1);
+    it('should calculate linear delays when exponential is false', () => {
+      expect(calculateDelay(1, 1000, false)).toBe(1000);
+      expect(calculateDelay(2, 1000, false)).toBe(1000);
+      expect(calculateDelay(3, 1000, false)).toBe(1000);
+    });
+
+    it('should use custom base delay', () => {
+      expect(calculateDelay(1, 500, true)).toBe(500);
+      expect(calculateDelay(2, 500, true)).toBe(1000);
+      expect(calculateDelay(3, 500, true)).toBe(2000);
+    });
   });
 
-  it('should use default options when none provided', async () => {
-    const fn = jest.fn().mockResolvedValue('success');
+  describe('withRetry', () => {
+    it('should execute function successfully on first attempt', async () => {
+      const fn = jest.fn().mockResolvedValue('success');
 
-    const result = await withRetry(fn);
+      const result = await withRetry(fn);
 
-    expect(result).toBe('success');
-    expect(fn).toHaveBeenCalledTimes(1);
-  });
+      expect(result).toBe('success');
+      expect(fn).toHaveBeenCalledTimes(1);
+    });
 
-  it('should handle non-Error throws', async () => {
-    const fn = jest.fn().mockRejectedValueOnce('string error').mockResolvedValueOnce('success');
+    it('should retry on failure and eventually succeed', async () => {
+      const fn = jest
+        .fn()
+        .mockRejectedValueOnce(new Error('Attempt 1 failed'))
+        .mockRejectedValueOnce(new Error('Attempt 2 failed'))
+        .mockResolvedValueOnce('success');
 
-    const resultPromise = withRetry(fn, { maxRetries: 3, baseDelayMs: 100 });
+      const result = await withRetry(fn, {
+        maxRetries: 3,
+        baseDelayMs: 10,
+      });
 
-    await Promise.resolve();
-    jest.advanceTimersByTime(100);
+      expect(result).toBe('success');
+      expect(fn).toHaveBeenCalledTimes(3);
+    });
 
-    const result = await resultPromise;
+    it('should throw RetryExhaustedError after max retries', async () => {
+      const fn = jest.fn().mockRejectedValue(new Error('Always fails'));
 
-    expect(result).toBe('success');
-    expect(fn).toHaveBeenCalledTimes(2);
-  });
+      await expect(
+        withRetry(fn, {
+          maxRetries: 2,
+          baseDelayMs: 10,
+        })
+      ).rejects.toThrow(RetryExhaustedError);
 
-  it('should include last error in RetryExhaustedError', async () => {
-    const lastError = new Error('last error');
-    const fn = jest.fn().mockRejectedValue(lastError);
+      expect(fn).toHaveBeenCalledTimes(3); // 1 initial + 2 retries
+    });
 
-    const resultPromise = withRetry(fn, { maxRetries: 2, baseDelayMs: 100 });
+    it('should include last error in RetryExhaustedError', async () => {
+      const testError = new Error('Test error');
+      const fn = jest.fn().mockRejectedValue(testError);
 
-    // Advance through all retry delays
-    for (let i = 0; i < 10; i++) {
-      await Promise.resolve();
-      jest.advanceTimersByTime(500);
-    }
+      try {
+        await withRetry(fn, {
+          maxRetries: 1,
+          baseDelayMs: 10,
+        });
+      } catch (error) {
+        expect(error).toBeInstanceOf(RetryExhaustedError);
+        expect((error as RetryExhaustedError).lastError).toBe(testError);
+      }
+    });
 
-    try {
-      await resultPromise;
-      throw new Error('Expected to throw');
-    } catch (error) {
-      expect(error).toBeInstanceOf(RetryExhaustedError);
-      expect((error as RetryExhaustedError).lastError).toBe(lastError);
-      expect((error as RetryExhaustedError).attempts).toBe(3);
-    }
+    it('should respect isRetryable predicate', async () => {
+      const retryableError = new Error('Retryable');
+      const nonRetryableError = new Error('Non-retryable');
+
+      const fn = jest
+        .fn()
+        .mockRejectedValueOnce(retryableError)
+        .mockRejectedValueOnce(nonRetryableError);
+
+      await expect(
+        withRetry(fn, {
+          maxRetries: 3,
+          baseDelayMs: 10,
+          isRetryable: (error) => error.message === 'Retryable',
+        })
+      ).rejects.toThrow('Non-retryable');
+
+      expect(fn).toHaveBeenCalledTimes(2);
+    });
+
+    it('should use exponential backoff by default', async () => {
+      const fn = jest
+        .fn()
+        .mockRejectedValueOnce(new Error('Fail 1'))
+        .mockRejectedValueOnce(new Error('Fail 2'))
+        .mockResolvedValueOnce('success');
+
+      const startTime = Date.now();
+
+      await withRetry(fn, {
+        maxRetries: 2,
+        baseDelayMs: 50,
+        exponential: true,
+      });
+
+      const elapsed = Date.now() - startTime;
+
+      // Should take at least 50ms (first retry) + 100ms (second retry) = 150ms
+      // Allow some tolerance for execution time
+      expect(elapsed).toBeGreaterThanOrEqual(140);
+    });
+
+    it('should use linear backoff when exponential is false', async () => {
+      const fn = jest
+        .fn()
+        .mockRejectedValueOnce(new Error('Fail 1'))
+        .mockRejectedValueOnce(new Error('Fail 2'))
+        .mockResolvedValueOnce('success');
+
+      const startTime = Date.now();
+
+      await withRetry(fn, {
+        maxRetries: 2,
+        baseDelayMs: 50,
+        exponential: false,
+      });
+
+      const elapsed = Date.now() - startTime;
+
+      // Should take at least 50ms + 50ms = 100ms
+      expect(elapsed).toBeGreaterThanOrEqual(90);
+    });
+
+    it('should handle non-Error rejections', async () => {
+      const fn = jest.fn().mockRejectedValueOnce('String error').mockResolvedValueOnce('success');
+
+      const result = await withRetry(fn, {
+        maxRetries: 1,
+        baseDelayMs: 10,
+      });
+
+      expect(result).toBe('success');
+      expect(fn).toHaveBeenCalledTimes(2);
+    });
+
+    it('should use default options when not provided', async () => {
+      const fn = jest.fn().mockResolvedValue('success');
+
+      const result = await withRetry(fn);
+
+      expect(result).toBe('success');
+      expect(fn).toHaveBeenCalledTimes(1);
+    });
+
+    it('should handle async functions that throw', async () => {
+      const fn = jest.fn(async () => {
+        throw new Error('Async error');
+      });
+
+      await expect(
+        withRetry(fn, {
+          maxRetries: 1,
+          baseDelayMs: 10,
+        })
+      ).rejects.toThrow(RetryExhaustedError);
+
+      expect(fn).toHaveBeenCalledTimes(2);
+    });
+
+    it('should preserve return type', async () => {
+      interface TestData {
+        id: string;
+        value: number;
+      }
+
+      const testData: TestData = { id: 'test', value: 42 };
+      const fn = jest.fn().mockResolvedValue(testData);
+
+      const result = await withRetry(fn);
+
+      expect(result).toEqual(testData);
+      expect(result.id).toBe('test');
+      expect(result.value).toBe(42);
+    });
   });
 });

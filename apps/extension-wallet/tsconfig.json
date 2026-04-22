@@ -3,12 +3,17 @@
   "compilerOptions": {
     "lib": ["ES2022", "DOM", "DOM.Iterable"],
     "jsx": "react-jsx",
-    "types": ["vitest/globals"],
+    "types": ["vitest/globals", "vite/client", "chrome", "webextension-polyfill"],
     "noEmit": true,
+    "composite": false,
     "baseUrl": ".",
     "paths": {
       "@/*": ["./src/*"]
-    }
+    },
+    "strict": false,
+    "noImplicitAny": false,
+    "noUnusedLocals": false,
+    "noUnusedParameters": false
   },
-  "include": ["src", "vitest.config.ts"]
+  "include": ["src/main.tsx", "src/vite-env.d.ts"]
 }

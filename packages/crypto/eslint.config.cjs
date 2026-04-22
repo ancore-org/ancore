@@ -1,6 +1,7 @@
 const js = require('@eslint/js');
 const tseslint = require('@typescript-eslint/eslint-plugin');
 const tsparser = require('@typescript-eslint/parser');
+const globals = require('globals');
 
 const jestGlobals = {
   describe: 'readonly',
@@ -14,6 +15,13 @@ const jestGlobals = {
   jest: 'readonly',
 };
 
+const webcryptoGlobals = {
+  Crypto: 'readonly',
+  CryptoKey: 'readonly',
+  TextEncoder: 'readonly',
+  TextDecoder: 'readonly',
+};
+
 module.exports = [
   js.configs.recommended,
   {
@@ -25,12 +33,8 @@ module.exports = [
         sourceType: 'module',
       },
       globals: {
-        Buffer: 'readonly',
-        Crypto: 'readonly',
-        CryptoKey: 'readonly',
-        TextEncoder: 'readonly',
-        TextDecoder: 'readonly',
-        crypto: 'readonly',
+        ...globals.node,
+        ...webcryptoGlobals,
       },
     },
     plugins: {
@@ -47,6 +51,23 @@ module.exports = [
       globals: {
         ...jestGlobals,
       },
+    },
+  },
+  {
+    files: ['**/__tests__/**/*.ts'],
+    languageOptions: {
+      parser: tsparser,
+      parserOptions: {
+        ecmaVersion: 2020,
+        sourceType: 'module',
+      },
+      globals: {
+        ...globals.node,
+        ...globals.jest,
+      },
+    },
+    rules: {
+      '@typescript-eslint/no-explicit-any': 'off',
     },
   },
 ];

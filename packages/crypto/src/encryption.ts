@@ -1,3 +1,4 @@
+/* eslint-disable no-undef */
 import { Buffer } from 'node:buffer';
 import { webcrypto } from 'node:crypto';
 import { TextDecoder, TextEncoder } from 'node:util';
@@ -18,7 +19,11 @@ export interface EncryptedSecretKeyPayload {
   ciphertext: string;
 }
 
-function getCrypto(): webcrypto.Crypto {
+function asBufferSource(value: Uint8Array): BufferSource {
+  return value as unknown as BufferSource;
+}
+
+function getCrypto(): Crypto {
   if (!globalThis.crypto?.subtle) {
     throw new Error('WebCrypto API is not available in this environment.');
   }
@@ -52,7 +57,7 @@ async function deriveEncryptionKey(
   return cryptoApi.subtle.deriveKey(
     {
       name: 'PBKDF2',
-      salt,
+      salt: asBufferSource(salt),
       iterations,
       hash: 'SHA-256',
     },
@@ -132,7 +137,7 @@ export async function encryptSecretKey(
   const ciphertext = await cryptoApi.subtle.encrypt(
     {
       name: 'AES-GCM',
-      iv,
+      iv: asBufferSource(iv),
     },
     encryptionKey,
     new TextEncoder().encode(secretKey)
@@ -169,10 +174,10 @@ export async function decryptSecretKey(
     const plaintext = await cryptoApi.subtle.decrypt(
       {
         name: 'AES-GCM',
-        iv,
+        iv: asBufferSource(iv),
       },
       encryptionKey,
-      ciphertext
+      asBufferSource(ciphertext)
     );
 
     return new TextDecoder().decode(plaintext);

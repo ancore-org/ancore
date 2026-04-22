@@ -18,6 +18,7 @@ import {
   withErrorHandling,
   createRetryable,
   getErrorHandler,
+  type ErrorInfo,
 } from '../error-handler';
 import { getErrorMessage, ERROR_MESSAGES } from '../error-messages';
 
@@ -291,6 +292,7 @@ describe('Recovery functionality', () => {
 
       const retryableFn = createRetryable(validationErrorFn, 3, 10);
       const result = await retryableFn();
+      const errorInfo = result as ErrorInfo;
 
       expect(result).toHaveProperty('category');
       expect((result as { category: ErrorCategory }).category).toBe(ErrorCategory.VALIDATION);

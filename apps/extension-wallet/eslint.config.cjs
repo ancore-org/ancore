@@ -21,6 +21,7 @@ module.exports = [
       globals: {
         ...globals.browser,
         ...globals.node,
+        ...globals.vitest,
       },
     },
     plugins: {
@@ -51,6 +52,8 @@ module.exports = [
     files: ['**/__tests__/**/*.{ts,tsx}', '**/*.test.{ts,tsx}', '**/*.spec.{ts,tsx}'],
     languageOptions: {
       globals: {
+        ...globals.browser,
+        ...globals.node,
         ...globals.jest,
         ...globals.vitest,
         vi: 'readonly',
@@ -58,6 +61,12 @@ module.exports = [
     },
     rules: {
       '@typescript-eslint/no-explicit-any': 'off',
+    },
+  },
+  {
+    files: ['src/screens/Onboarding/**/*.tsx'],
+    rules: {
+      'react/no-unescaped-entities': 'off',
     },
   },
   {

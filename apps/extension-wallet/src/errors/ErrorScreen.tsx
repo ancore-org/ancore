@@ -7,7 +7,7 @@
 
 import { Button } from '@ancore/ui-kit';
 import { AlertTriangle, RotateCcw, RefreshCw, Info } from 'lucide-react';
-import type { ReactElement, ReactNode } from 'react';
+import type { JSX, ReactNode } from 'react';
 import { getErrorMessage, ErrorCategory } from './error-messages';
 import { ErrorInfo, handleError } from './error-handler';
 

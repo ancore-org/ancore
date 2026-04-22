@@ -2,7 +2,7 @@ import { webcrypto } from 'crypto';
 import type { EncryptedPayload, StorageAdapter } from '../types';
 
 if (!globalThis.crypto) {
-  // @ts-expect-error Node test environment does not expose writable crypto typing.
+  // @ts-expect-error - Polyfill for Node.js environment
   globalThis.crypto = webcrypto;
 }
 if (!globalThis.btoa) {
@@ -49,7 +49,8 @@ describe('SecureStorageManager', () => {
   });
 
   it('should store encrypted payloads (no plaintext secrets)', async () => {
-    await manager.unlock(password);
+    const unlockResult = await manager.unlock(password);
+    expect(unlockResult).toBe(true);
     await manager.saveAccount(accountData);
 
     const storedData = await storage.get<EncryptedPayload>('account');
@@ -66,7 +67,8 @@ describe('SecureStorageManager', () => {
   });
 
   it('should restore original data after unlock -> save -> lock -> unlock -> get', async () => {
-    await manager.unlock(password);
+    const unlockResult1 = await manager.unlock(password);
+    expect(unlockResult1).toBe(true);
     await manager.saveAccount(accountData);
     await manager.saveSessionKeys(sessionKeysData);
 
@@ -83,7 +85,8 @@ describe('SecureStorageManager', () => {
     await expect(newManager.saveAccount(accountData)).rejects.toThrow('Storage manager is locked');
 
     // Unlock with correct password
-    await newManager.unlock(password);
+    const unlockResult2 = await newManager.unlock(password);
+    expect(unlockResult2).toBe(true);
     expect(newManager.isUnlocked).toBe(true);
 
     const restoredAccount = await newManager.getAccount();
@@ -94,14 +97,20 @@ describe('SecureStorageManager', () => {
   });
 
   it('should fail gracefully with the wrong password', async () => {
-    await manager.unlock(password);
+    const unlockResult = await manager.unlock(password);
+    expect(unlockResult).toBe(true);
     await manager.saveAccount(accountData);
 
     manager.lock();
     const newManager = new SecureStorageManager(storage);
-    await newManager.unlock('wrong_password');
+    const wrongPasswordResult = await newManager.unlock('wrong_password');
 
-    await expect(newManager.getAccount()).rejects.toThrow('Invalid password or corrupted data');
+    // Wrong password should return false
+    expect(wrongPasswordResult).toBe(false);
+    // Manager should remain locked
+    expect(newManager.isUnlocked).toBe(false);
+    // Attempting to access data while locked should throw
+    await expect(newManager.getAccount()).rejects.toThrow('Storage manager is locked');
   });
 
   it('should return null for non-existent items', async () => {
@@ -115,8 +124,10 @@ describe('SecureStorageManager', () => {
   });
 
   it('should not throw on unlock if already unlocked', async () => {
-    await manager.unlock(password);
-    await manager.unlock(password); // Should return early
+    const unlockResult1 = await manager.unlock(password);
+    expect(unlockResult1).toBe(true);
+    const unlockResult2 = await manager.unlock(password); // Should return true immediately
+    expect(unlockResult2).toBe(true);
     expect(manager.isUnlocked).toBe(true);
   });
 });

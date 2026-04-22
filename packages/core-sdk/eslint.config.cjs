@@ -1,6 +1,7 @@
 const js = require('@eslint/js');
 const tseslint = require('@typescript-eslint/eslint-plugin');
 const tsparser = require('@typescript-eslint/parser');
+const globals = require('globals');
 
 const jestGlobals = {
   describe: 'readonly',
@@ -31,8 +32,10 @@ module.exports = [
         TextDecoder: 'readonly',
         CryptoKey: 'readonly',
         crypto: 'readonly',
-        console: 'readonly',
-        process: 'readonly',
+        // Browser extension globals
+        chrome: 'readonly',
+        browser: 'readonly',
+        localStorage: 'readonly',
       },
     },
     plugins: {
@@ -51,12 +54,32 @@ module.exports = [
         ...jestGlobals,
         process: 'readonly',
         require: 'readonly',
+        localStorage: 'readonly',
+        globalThis: 'readonly',
       },
     },
     rules: {
       '@typescript-eslint/no-explicit-any': 'off',
       '@typescript-eslint/no-require-imports': 'off',
       '@typescript-eslint/ban-ts-comment': 'off',
+    },
+  },
+  {
+    files: ['**/__tests__/**/*.ts'],
+    languageOptions: {
+      parser: tsparser,
+      parserOptions: {
+        ecmaVersion: 2020,
+        sourceType: 'module',
+      },
+      globals: {
+        ...globals.node,
+        ...globals.jest,
+      },
+    },
+    rules: {
+      '@typescript-eslint/no-explicit-any': 'off',
+      '@typescript-eslint/no-require-imports': 'off',
     },
   },
 ];
