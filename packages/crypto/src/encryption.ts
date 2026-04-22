@@ -1,5 +1,4 @@
 /* eslint-disable no-undef */
-
 import { Buffer } from 'node:buffer';
 
 const PBKDF2_ITERATIONS = 100000;

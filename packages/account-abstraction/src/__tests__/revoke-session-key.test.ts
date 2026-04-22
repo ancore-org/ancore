@@ -3,8 +3,7 @@
  */
 
 import { revokeSessionKey } from '../revoke-session-key';
-import { AccountContract } from '../account-contract';
-import type { AccountContractReadOptions } from '../account-contract';
+import { AccountContract, type AccountContractReadOptions } from '../account-contract';
 import { SessionKeyNotFoundError, UnauthorizedError, ContractInvocationError } from '../errors';
 
 jest.mock('../account-contract', () => {

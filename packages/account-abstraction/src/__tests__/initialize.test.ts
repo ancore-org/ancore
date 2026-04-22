@@ -3,8 +3,7 @@
  */
 
 import { initialize } from '../initialize';
-import { AccountContract } from '../account-contract';
-import type { AccountContractReadOptions } from '../account-contract';
+import { AccountContract, type AccountContractReadOptions } from '../account-contract';
 import { AlreadyInitializedError, ContractInvocationError } from '../errors';
 
 jest.mock('../account-contract', () => {

@@ -20,7 +20,7 @@ describe('Encryption Roundtrip', () => {
   it('should fail with malformed payload', async () => {
     const encrypted = await encryptSecretKey(secretKey, password);
     const malformed = { ...encrypted, version: 999 };
-    // @ts-expect-error validating malformed payload handling
+    // @ts-expect-error intentional bad payload for runtime validation
     await expect(decryptSecretKey(malformed, password)).rejects.toThrow(
       'Invalid password or corrupted encrypted payload.'
     );
@@ -29,7 +29,7 @@ describe('Encryption Roundtrip', () => {
   it('should fail with missing fields in payload', async () => {
     const encrypted = await encryptSecretKey(secretKey, password);
     const { salt: _salt, ...incomplete } = encrypted;
-    // @ts-expect-error validating incomplete payload handling
+    // @ts-expect-error intentional incomplete payload
     await expect(decryptSecretKey(incomplete, password)).rejects.toThrow(
       'Invalid password or corrupted encrypted payload.'
     );

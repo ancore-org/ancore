@@ -100,8 +100,7 @@ describe('ErrorHandler', () => {
 
     it('should extract node error code property', () => {
       const error = new Error('Test error');
-      const errorWithCode = error as Error & { code?: string };
-      errorWithCode.code = 'ENOENT';
+      (error as Error & { code?: string }).code = 'ENOENT';
       const code = errorHandler.extractErrorCode(error);
       expect(code).toBe('ENOENT');
     });
@@ -296,7 +295,7 @@ describe('Recovery functionality', () => {
       const errorInfo = result as ErrorInfo;
 
       expect(result).toHaveProperty('category');
-      expect(errorInfo.category).toBe(ErrorCategory.VALIDATION);
+      expect((result as { category: ErrorCategory }).category).toBe(ErrorCategory.VALIDATION);
     });
   });
 });

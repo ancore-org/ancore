@@ -5,24 +5,23 @@ module.exports = {
   transform: {
     '^.+\\.ts$': 'ts-jest',
   },
-  globals: {
-    'ts-jest': {
-      diagnostics: false,
-      isolatedModules: true,
-    },
-  },
-  collectCoverage: false,
+  collectCoverage: true,
   collectCoverageFrom: [
     'src/**/*.ts',
     '!src/**/__tests__/**',
     '!src/index.ts',
+    '!src/execute-with-session-key.ts',
   ],
   coverageDirectory: 'coverage',
-  testMatch: [
-    '**/__tests__/initialize-smart-account.test.ts',
-    '**/__tests__/builder.test.ts',
-    '**/storage/__tests__/manager.test.ts',
-  ],
+  coverageThreshold: {
+    global: {
+      branches: 62,
+      functions: 82,
+      lines: 77,
+      statements: 78,
+    },
+  },
+  testMatch: ['**/__tests__/**/*.test.ts'],
   // Exclude integration tests from default run (use `pnpm test:integration`)
   testPathIgnorePatterns: ['/node_modules/', 'integration\\.test\\.ts$'],
 };

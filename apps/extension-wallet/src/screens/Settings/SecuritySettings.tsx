@@ -70,8 +70,8 @@ function ChangePasswordView({ onDone }: { onDone: () => void }) {
           type="password"
           placeholder="Enter current password"
           value={form.current}
-          onChange={(e: React.ChangeEvent<HTMLInputElement>) =>
-            setForm((f) => ({ ...f, current: e.target.value }))
+          onChange={(event: React.ChangeEvent<HTMLInputElement>) =>
+            setForm((formState) => ({ ...formState, current: event.target.value }))
           }
         />
       </div>
@@ -84,8 +84,8 @@ function ChangePasswordView({ onDone }: { onDone: () => void }) {
             type={showNext ? 'text' : 'password'}
             placeholder="Min. 8 characters"
             value={form.next}
-            onChange={(e: React.ChangeEvent<HTMLInputElement>) =>
-              setForm((f) => ({ ...f, next: e.target.value }))
+            onChange={(event: React.ChangeEvent<HTMLInputElement>) =>
+              setForm((formState) => ({ ...formState, next: event.target.value }))
             }
             className="pr-10"
           />
@@ -106,8 +106,8 @@ function ChangePasswordView({ onDone }: { onDone: () => void }) {
           type="password"
           placeholder="Repeat new password"
           value={form.confirm}
-          onChange={(e: React.ChangeEvent<HTMLInputElement>) =>
-            setForm((f) => ({ ...f, confirm: e.target.value }))
+          onChange={(event: React.ChangeEvent<HTMLInputElement>) =>
+            setForm((formState) => ({ ...formState, confirm: event.target.value }))
           }
         />
       </div>
@@ -170,6 +170,7 @@ function ExportWarningView({
   onConfirm,
   onCancel,
 }: {
+  title: string;
   warningText: string;
   onConfirm: () => void;
   onCancel: () => void;
@@ -258,7 +259,7 @@ function ExportWarningView({
           type="password"
           placeholder="Enter password to continue"
           value={password}
-          onChange={(e: React.ChangeEvent<HTMLInputElement>) => setPassword(e.target.value)}
+          onChange={(event: React.ChangeEvent<HTMLInputElement>) => setPassword(event.target.value)}
         />
       </div>
       {error && <p className="text-xs text-destructive">{error}</p>}
@@ -311,6 +312,7 @@ export function SecuritySettings({
       )}
       {view === 'export-key' && (
         <ExportWarningView
+          title="Export Private Key"
           warningText="Your private key grants full control of your account. Anyone with it can steal your funds immediately."
           onConfirm={() => setView('menu')}
           onCancel={() => setView('menu')}
@@ -318,6 +320,7 @@ export function SecuritySettings({
       )}
       {view === 'export-mnemonic' && (
         <ExportWarningView
+          title="Export Recovery Phrase"
           warningText="Your recovery phrase can restore your entire wallet. Keep it offline, never share it with anyone."
           onConfirm={() => setView('menu')}
           onCancel={() => setView('menu')}

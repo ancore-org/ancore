@@ -2,7 +2,7 @@
  * Unit tests for sendPayment — mocks builder, signer, and stellar client.
  */
 
-import { Account, Asset, Networks, Operation } from '@stellar/stellar-sdk';
+import { Account, Asset, Keypair, Networks, Operation } from '@stellar/stellar-sdk';
 import {
   sendPayment,
   type SendPaymentParams,
@@ -78,7 +78,7 @@ const { __mocks: builderMocks } = jest.requireMock('../account-transaction-build
 const { __mocks: stellarMocks } = jest.requireMock('@ancore/stellar') as any;
 
 const DEST = 'GDQERENWDDSQZS7R7WKHZI3BSOYMV3FSWR7TFUYFTKQ447PIX6NREOJM';
-const SOURCE = 'GAAZI4TCR3TY5OJHCTJC2A4QSY6CJWJH5IAJTGKIN2ER7LBNVKOCCWN';
+const SOURCE = Keypair.random().publicKey();
 
 function makeDeps(): SendPaymentDeps {
   const sourceAccount = new Account(SOURCE, '100');

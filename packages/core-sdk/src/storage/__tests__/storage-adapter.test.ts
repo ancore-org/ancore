@@ -136,11 +136,38 @@ describe('BrowserStorageAdapter', () => {
 
 // ─── LocalStorageAdapter ──────────────────────────────────────────────────────
 
+function installMemoryLocalStorage(): void {
+  const data = new Map<string, string>();
+  (globalThis as unknown as { localStorage: Storage }).localStorage = {
+    get length() {
+      return data.size;
+    },
+    clear(): void {
+      data.clear();
+    },
+    getItem(key: string): string | null {
+      return data.has(key) ? data.get(key)! : null;
+    },
+    key(index: number): string | null {
+      return [...data.keys()][index] ?? null;
+    },
+    removeItem(key: string): void {
+      data.delete(key);
+    },
+    setItem(key: string, value: string): void {
+      data.set(key, value);
+    },
+  } as Storage;
+}
+
+// ─── LocalStorageAdapter ──────────────────────────────────────────────────────
+
 describe('LocalStorageAdapter', () => {
   let adapter: LocalStorageAdapter;
 
   beforeEach(() => {
-    localStorage.clear();
+    installMemoryLocalStorage();
+    globalThis.localStorage.clear();
     adapter = new LocalStorageAdapter();
   });
 

@@ -7,11 +7,6 @@ import helpContent from '../data/help-content.json';
 
 // Lazy-loaded screens
 const HomeScreen = lazy(() => import('../screens/HomeScreen'));
-const ReceiveScreen = lazy(() => import('../screens/ReceiveScreen'));
-const UnlockScreen = lazy(() => import('../screens/UnlockScreen'));
-const TransactionDetail = lazy(() => import('../screens/TransactionDetail'));
-const OnboardingFlow = lazy(() => import('../screens/Onboarding/OnboardingFlow'));
-const SendScreen = lazy(() => import('../screens/Send/SendScreen'));
 const SettingsScreen = lazy(() =>
   import('../screens/Settings/AboutScreen').then((m) => ({ default: m.AboutScreen }))
 );

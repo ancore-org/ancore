@@ -1,21 +1,35 @@
+import { AccountContract, type InvocationArgs } from '@ancore/account-abstraction';
+
+import { addSessionKey, type AddSessionKeyParams, type SessionKeyWriter } from './add-session-key';
+import { BuilderValidationError } from './errors';
 import {
-  initializeSmartAccount,
-  type InitializeSmartAccountOptions,
-  type InitializeSmartAccountResult,
-} from './initialize-smart-account';
+  revokeSessionKey,
+  type RevokeSessionKeyParams,
+  type SessionKeyRevoker,
+} from './revoke-session-key';
 
-export type AncoreClientOptions<
-  TOperation = unknown,
-  TTx = unknown,
-  TTxResult = unknown,
-> = InitializeSmartAccountOptions<TOperation, TTx, TTxResult>;
+export interface AncoreClientOptions {
+  accountContractId: string;
+}
 
-export class AncoreClient<TOperation = unknown, TTx = unknown, TTxResult = unknown> {
-  constructor(private readonly options: AncoreClientOptions<TOperation, TTx, TTxResult>) {}
+export class AncoreClient {
+  private readonly accountContract: SessionKeyWriter & SessionKeyRevoker;
 
-  async initializeSmartAccount(
-    contractId: string
-  ): Promise<InitializeSmartAccountResult<TTx, TTxResult>> {
-    return initializeSmartAccount(contractId, this.options);
+  constructor(options: AncoreClientOptions) {
+    if (!options.accountContractId) {
+      throw new BuilderValidationError(
+        'accountContractId is required. Provide the C... contract ID of your deployed Ancore account contract.'
+      );
+    }
+
+    this.accountContract = new AccountContract(options.accountContractId);
+  }
+
+  addSessionKey(params: AddSessionKeyParams): InvocationArgs {
+    return addSessionKey(this.accountContract, params);
+  }
+
+  revokeSessionKey(params: RevokeSessionKeyParams): InvocationArgs {
+    return revokeSessionKey(this.accountContract, params);
   }
 }

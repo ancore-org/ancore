@@ -1,6 +1,7 @@
 const js = require('@eslint/js');
 const tseslint = require('@typescript-eslint/eslint-plugin');
 const tsparser = require('@typescript-eslint/parser');
+const globals = require('globals');
 
 const jestGlobals = {
   describe: 'readonly',
@@ -32,6 +33,7 @@ module.exports = [
         sourceType: 'module',
       },
       globals: {
+        ...globals.node,
         ...webcryptoGlobals,
       },
     },
@@ -49,6 +51,23 @@ module.exports = [
       globals: {
         ...jestGlobals,
       },
+    },
+  },
+  {
+    files: ['**/__tests__/**/*.ts'],
+    languageOptions: {
+      parser: tsparser,
+      parserOptions: {
+        ecmaVersion: 2020,
+        sourceType: 'module',
+      },
+      globals: {
+        ...globals.node,
+        ...globals.jest,
+      },
+    },
+    rules: {
+      '@typescript-eslint/no-explicit-any': 'off',
     },
   },
 ];

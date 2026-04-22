@@ -114,6 +114,7 @@ const DAY_IN_LEDGERS: u32 = 17280; // 24 hours * 60 min * 60 sec / 5 sec per led
 const INSTANCE_BUMP_AMOUNT: u32 = 30 * DAY_IN_LEDGERS; // 30 days
 const INSTANCE_BUMP_THRESHOLD: u32 = 15 * DAY_IN_LEDGERS; // 15 days
 
+/// Permission bit for execute operations
 /// Permission bit for session-key execute authorization.
 /// Issue #188: Session keys must have this permission to invoke transactions.
 /// Without this bit set, execute() returns InsufficientPermission error.
@@ -164,7 +165,7 @@ impl AncoreAccount {
         env.storage().instance().get(&DataKey::Version).unwrap_or(0)
     }
 
-    /// Execute a transaction: validate nonce, perform cross-contract call, increment nonce.
+    /// Execute a transaction with nonce replay-protection and dual auth paths.
     ///
     /// # Security
     /// - Caller must be owner OR provide a valid session key signature
@@ -646,6 +647,7 @@ mod test {
         assert_eq!(event_pk, session_pk);
     }
 
+    /// Owner can execute; event is emitted with correct (to, function, nonce=0).
     #[test]
     fn test_execute_emits_event() {
         let env = Env::default();
@@ -701,6 +703,7 @@ mod test {
         client.initialize(&owner);
     }
 
+    /// Passing expected_nonce = 1 when current nonce is 0 must be rejected.
     #[test]
     #[should_panic(expected = "Error(Contract, #4)")]
     fn test_execute_rejects_invalid_nonce() {
@@ -715,7 +718,7 @@ mod test {
 
         let to = Address::generate(&env);
         let function = soroban_sdk::symbol_short!("transfer");
-        let args = Vec::new(&env);
+        let args: Vec<soroban_sdk::Val> = Vec::new(&env);
 
         // Current nonce is 0; passing expected_nonce = 1 must fail with InvalidNonce (#4)
         client.execute(
@@ -730,6 +733,7 @@ mod test {
         );
     }
 
+    /// Correct nonce is accepted and incremented to 1 afterward.
     #[test]
     fn test_execute_validates_nonce_then_increments() {
         let env = Env::default();
@@ -745,7 +749,7 @@ mod test {
 
         let callee_id = env.register_contract(None, AncoreAccount);
         let function = soroban_sdk::symbol_short!("get_nonce");
-        let args = Vec::new(&env);
+        let args: Vec<soroban_sdk::Val> = Vec::new(&env);
 
         let _result = client.execute(
             &CallerIdentity::Owner,
@@ -1078,6 +1082,75 @@ mod test {
             &Some(payload2),
         );
         let res_u64: u64 = soroban_sdk::FromVal::from_val(&env, &result2);
+        assert_eq!(res_u64, 0);
+    }
+
+    #[test]
+    fn test_execute_session_key_missing_signature_rejected() {
+        let env = Env::default();
+        let contract_id = env.register_contract(None, AncoreAccount);
+        let client = AncoreAccountClient::new(&env, &contract_id);
+
+        let owner = Address::generate(&env);
+        client.initialize(&owner);
+        env.mock_all_auths();
+
+        let mut csprng = OsRng;
+        let signing_key = SigningKey::generate(&mut csprng);
+        let session_pk = BytesN::from_array(&env, &signing_key.verifying_key().to_bytes());
+
+        let expires_at = env.ledger().timestamp() + 10000;
+        let mut permissions = Vec::new(&env);
+        permissions.push_back(PERMISSION_EXECUTE);
+        client.add_session_key(&session_pk, &expires_at, &permissions);
+
+        let callee_id = env.register_contract(None, AncoreAccount);
+        let function = soroban_sdk::symbol_short!("get_nonce");
+        let args = Vec::new(&env);
+
+        // Attempt to execute with session key but missing signature (signature=None)
+        let result = client.try_execute(
+            &CallerIdentity::SessionKey(session_pk.clone()),
+            &callee_id,
+            &function,
+            &args,
+            &0u64,
+            &Some(session_pk),
+            &None, // signature=None
+            &None, // signature_payload=None
+        );
+
+        // Should fail with unauthorized session-key missing signature
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_execute_owner_path_unaffected_by_session_signature_requirements() {
+        let env = Env::default();
+        let contract_id = env.register_contract(None, AncoreAccount);
+        let client = AncoreAccountClient::new(&env, &contract_id);
+
+        let owner = Address::generate(&env);
+        client.initialize(&owner);
+        env.mock_all_auths();
+
+        let callee_id = env.register_contract(None, AncoreAccount);
+        let function = soroban_sdk::symbol_short!("get_nonce");
+        let args = Vec::new(&env);
+
+        // Owner path should succeed even with None signature params
+        let result = client.execute(
+            &CallerIdentity::Owner,
+            &callee_id,
+            &function,
+            &args,
+            &0u64,
+            &None, // session_pub_key=None
+            &None, // signature=None
+            &None, // signature_payload=None
+        );
+
+        let res_u64: u64 = soroban_sdk::FromVal::from_val(&env, &result);
         assert_eq!(res_u64, 0);
     }
 }

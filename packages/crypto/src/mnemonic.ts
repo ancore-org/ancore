@@ -13,11 +13,25 @@ export function generateMnemonic(): string {
 }
 
 /**
- * Validates a BIP39 mnemonic phrase.
+ * Validates a given mnemonic phrase.
+ * Ensures the phrase is a valid BIP39 12-word mnemonic.
  *
- * @param {string} mnemonic - The mnemonic phrase to validate.
- * @returns {boolean} True if valid, false otherwise.
+ * @param mnemonic - The mnemonic phrase to validate
+ * @returns true if the mnemonic is a valid 12-word BIP39 mnemonic, false otherwise
  */
 export function validateMnemonic(mnemonic: string): boolean {
-  return bip39.validateMnemonic(mnemonic);
+  if (!mnemonic || typeof mnemonic !== 'string') {
+    return false;
+  }
+
+  // Ensure it's exactly 12 words
+  const words = mnemonic.trim().split(/\s+/);
+  if (words.length !== 12) {
+    return false;
+  }
+
+  const normalizedMnemonic = words.join(' ');
+
+  // Validate against BIP39 wordlist and checksum
+  return bip39.validateMnemonic(normalizedMnemonic);
 }

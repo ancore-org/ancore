@@ -8,7 +8,7 @@ vi.mock('qrcode.react', () => ({
   ),
 }));
 
-import ReceiveScreen from '@/screens/ReceiveScreen';
+import { ReceiveScreen } from '@/screens/ReceiveScreen';
 
 const MAINNET_ACCOUNT = {
   publicKey: 'GABC1234567890DEFGHIJKLMNOPQRSTUVWXYZ',
@@ -17,59 +17,58 @@ const MAINNET_ACCOUNT = {
 
 const TESTNET_ACCOUNT = {
   publicKey: 'GTEST9876543210ABCDEFGHIJKLMNOPQRSTUV',
-  name: 'Test Wallet',
 };
 
 // ─── Test suite ──────────────────────────────────────────────────────────────
 describe('ReceiveScreen', () => {
   describe('rendering', () => {
     it('renders the screen title', () => {
-      render(<ReceiveScreen account={MAINNET_ACCOUNT} network="mainnet" onBack={() => {}} />);
+      render(<ReceiveScreen account={MAINNET_ACCOUNT} />);
       expect(screen.getByRole('heading', { name: /receive/i })).toBeInTheDocument();
     });
 
     it('renders the QR code with the correct address value', () => {
-      render(<ReceiveScreen account={MAINNET_ACCOUNT} network="mainnet" onBack={() => {}} />);
+      render(<ReceiveScreen account={MAINNET_ACCOUNT} />);
       const qr = screen.getByTestId('qr-code-svg');
       expect(qr).toBeInTheDocument();
       expect(qr).toHaveAttribute('data-value', MAINNET_ACCOUNT.publicKey);
     });
 
     it('renders the QR code without a name', () => {
-      render(<ReceiveScreen account={TESTNET_ACCOUNT} network="testnet" onBack={() => {}} />);
+      render(<ReceiveScreen account={TESTNET_ACCOUNT} network="testnet" />);
       const qr = screen.getByTestId('qr-code-svg');
       expect(qr).toHaveAttribute('data-value', TESTNET_ACCOUNT.publicKey);
     });
 
     it('shows the optional account name', () => {
-      render(<ReceiveScreen account={MAINNET_ACCOUNT} network="mainnet" onBack={() => {}} />);
+      render(<ReceiveScreen account={MAINNET_ACCOUNT} />);
       expect(screen.getByText('Primary Wallet')).toBeInTheDocument();
     });
 
     it('does not render the account name when not provided', () => {
-      render(<ReceiveScreen account={TESTNET_ACCOUNT} network="testnet" onBack={() => {}} />);
+      render(<ReceiveScreen account={TESTNET_ACCOUNT} network="testnet" />);
       expect(screen.queryByText('Primary Wallet')).not.toBeInTheDocument();
     });
 
     it('renders the address display label', () => {
-      render(<ReceiveScreen account={MAINNET_ACCOUNT} network="mainnet" onBack={() => {}} />);
+      render(<ReceiveScreen account={MAINNET_ACCOUNT} />);
       expect(screen.getByText('Your address')).toBeInTheDocument();
     });
   });
 
   describe('network indicator', () => {
     it('shows "Mainnet" badge by default', () => {
-      render(<ReceiveScreen account={MAINNET_ACCOUNT} network="mainnet" onBack={() => {}} />);
+      render(<ReceiveScreen account={MAINNET_ACCOUNT} />);
       expect(screen.getByText('Mainnet')).toBeInTheDocument();
     });
 
     it('shows "Testnet" badge when network is testnet', () => {
-      render(<ReceiveScreen account={TESTNET_ACCOUNT} network="testnet" onBack={() => {}} />);
+      render(<ReceiveScreen account={TESTNET_ACCOUNT} network="testnet" />);
       expect(screen.getByText('Testnet')).toBeInTheDocument();
     });
 
     it('shows "Futurenet" badge when network is futurenet', () => {
-      render(<ReceiveScreen account={TESTNET_ACCOUNT} network="futurenet" onBack={() => {}} />);
+      render(<ReceiveScreen account={TESTNET_ACCOUNT} network="futurenet" />);
       expect(screen.getByText('Futurenet')).toBeInTheDocument();
     });
   });
@@ -78,7 +77,7 @@ describe('ReceiveScreen', () => {
     it('calls onBack when the back button is clicked', async () => {
       const user = userEvent.setup();
       const handleBack = vi.fn();
-      render(<ReceiveScreen account={MAINNET_ACCOUNT} network="mainnet" onBack={handleBack} />);
+      render(<ReceiveScreen account={MAINNET_ACCOUNT} onBack={handleBack} />);
 
       await user.click(screen.getByRole('button', { name: /go back/i }));
 
@@ -92,7 +91,7 @@ describe('ReceiveScreen', () => {
       const writeText = vi.spyOn(navigator.clipboard, 'writeText');
       writeText.mockResolvedValue(undefined);
 
-      render(<ReceiveScreen account={MAINNET_ACCOUNT} network="mainnet" onBack={() => {}} />);
+      render(<ReceiveScreen account={MAINNET_ACCOUNT} />);
 
       const copyBtn = screen.getByRole('button', { name: /copy address/i });
       await user.click(copyBtn);
@@ -104,7 +103,7 @@ describe('ReceiveScreen', () => {
       const user = userEvent.setup();
       vi.spyOn(navigator.clipboard, 'writeText').mockResolvedValue(undefined);
 
-      render(<ReceiveScreen account={MAINNET_ACCOUNT} network="mainnet" onBack={() => {}} />);
+      render(<ReceiveScreen account={MAINNET_ACCOUNT} />);
 
       await user.click(screen.getByRole('button', { name: /copy address/i }));
 
@@ -118,7 +117,7 @@ describe('ReceiveScreen', () => {
 
   describe('print', () => {
     it('renders a print button', () => {
-      render(<ReceiveScreen account={MAINNET_ACCOUNT} network="mainnet" onBack={() => {}} />);
+      render(<ReceiveScreen account={MAINNET_ACCOUNT} />);
       expect(screen.getByRole('button', { name: /print qr code/i })).toBeInTheDocument();
     });
 
@@ -126,7 +125,7 @@ describe('ReceiveScreen', () => {
       const user = userEvent.setup();
       const printSpy = vi.spyOn(window, 'print').mockImplementation(() => {});
 
-      render(<ReceiveScreen account={MAINNET_ACCOUNT} network="mainnet" onBack={() => {}} />);
+      render(<ReceiveScreen account={MAINNET_ACCOUNT} />);
       await user.click(screen.getByRole('button', { name: /print qr code/i }));
 
       expect(printSpy).toHaveBeenCalledTimes(1);
@@ -137,26 +136,18 @@ describe('ReceiveScreen', () => {
   describe('QR generation', () => {
     it('encodes exactly the publicKey in the QR code', () => {
       const publicKey = 'GD6SZQJNKL3ZYXPWLUVFXZNXUVXJTQPWMQHZMDMQHLS5VNLQBQNPFLM';
-      render(
-        <ReceiveScreen
-          account={{ publicKey, name: 'Unnamed Wallet' }}
-          network="mainnet"
-          onBack={() => {}}
-        />
-      );
+      render(<ReceiveScreen account={{ publicKey }} />);
       expect(screen.getByTestId('qr-code-svg')).toHaveAttribute('data-value', publicKey);
     });
 
     it('renders a different QR value when account changes', () => {
-      const { rerender } = render(
-        <ReceiveScreen account={MAINNET_ACCOUNT} network="mainnet" onBack={() => {}} />
-      );
+      const { rerender } = render(<ReceiveScreen account={MAINNET_ACCOUNT} />);
       expect(screen.getByTestId('qr-code-svg')).toHaveAttribute(
         'data-value',
         MAINNET_ACCOUNT.publicKey
       );
 
-      rerender(<ReceiveScreen account={TESTNET_ACCOUNT} network="testnet" onBack={() => {}} />);
+      rerender(<ReceiveScreen account={TESTNET_ACCOUNT} />);
       expect(screen.getByTestId('qr-code-svg')).toHaveAttribute(
         'data-value',
         TESTNET_ACCOUNT.publicKey
