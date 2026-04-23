@@ -45,8 +45,10 @@ pub enum ContractError {
     InsufficientPermission = 7,
     /// Invalid version provided for migration
     InvalidVersion = 8,
-    /// Session key expiry timestamp is invalid (e.g. zero)
-    InvalidExpiration = 9,
+    /// Signature is missing or invalid
+    InvalidSignature = 9,
+    /// Invalid WASM hash provided for upgrade
+    InvalidWasmHash = 10,
 }
 
 /// Event topic naming convention
@@ -207,8 +209,8 @@ impl AncoreAccount {
                 return Err(ContractError::InsufficientPermission);
             }
 
-            let sig = signature.ok_or(ContractError::Unauthorized)?;
-            let payload = signature_payload.ok_or(ContractError::Unauthorized)?;
+            let sig = signature.ok_or(ContractError::InvalidSignature)?;
+            let payload = signature_payload.ok_or(ContractError::InvalidSignature)?;
 
             // Verify signature using ed25519
             env.crypto().ed25519_verify(&session_pk, &payload, &sig);
@@ -292,9 +294,14 @@ impl AncoreAccount {
     ///
     /// # Security
     /// - Requires owner authorization
+    /// - `new_wasm_hash` must be non-zero; an all-zero hash is never a valid WASM hash
     pub fn upgrade(env: Env, new_wasm_hash: BytesN<32>) -> Result<(), ContractError> {
         let owner = Self::get_owner(env.clone())?;
         owner.require_auth();
+
+        if new_wasm_hash == BytesN::from_array(&env, &[0u8; 32]) {
+            return Err(ContractError::InvalidWasmHash);
+        }
 
         // Increment version number
         let current_version = Self::get_version(env.clone());
@@ -1126,7 +1133,131 @@ mod test {
             &None, // signature_payload=None
         );
 
-        // Should fail with unauthorized session-key missing signature
+        // Should fail with InvalidSignature because no signature was provided
+        assert!(matches!(result, Err(Ok(ContractError::InvalidSignature))));
+    }
+
+    #[test]
+    fn test_execute_session_key_missing_payload_returns_invalid_signature() {
+        let env = Env::default();
+        let contract_id = env.register_contract(None, AncoreAccount);
+        let client = AncoreAccountClient::new(&env, &contract_id);
+
+        let owner = Address::generate(&env);
+        client.initialize(&owner);
+        env.mock_all_auths();
+
+        let mut csprng = OsRng;
+        let signing_key = SigningKey::generate(&mut csprng);
+        let session_pk = BytesN::from_array(&env, &signing_key.verifying_key().to_bytes());
+
+        let expires_at = env.ledger().timestamp() + 10000;
+        let mut permissions = Vec::new(&env);
+        permissions.push_back(PERMISSION_EXECUTE);
+        client.add_session_key(&session_pk, &expires_at, &permissions);
+
+        let callee_id = env.register_contract(None, AncoreAccount);
+        let function = soroban_sdk::symbol_short!("get_nonce");
+        let args = Vec::new(&env);
+        let (sig, _payload) = sign_payload(&env, &signing_key, &callee_id, &function, &args, 0);
+
+        // Signature present but payload missing → InvalidSignature
+        let result = client.try_execute(
+            &CallerIdentity::SessionKey(session_pk.clone()),
+            &callee_id,
+            &function,
+            &args,
+            &0u64,
+            &Some(session_pk),
+            &Some(sig),
+            &None,
+        );
+
+        assert!(matches!(result, Err(Ok(ContractError::InvalidSignature))));
+    }
+
+    #[test]
+    fn test_upgrade_rejects_zero_wasm_hash() {
+        let env = Env::default();
+        let contract_id = env.register_contract(None, AncoreAccount);
+        let client = AncoreAccountClient::new(&env, &contract_id);
+
+        let owner = Address::generate(&env);
+        client.initialize(&owner);
+        env.mock_all_auths();
+
+        let zero_hash = BytesN::from_array(&env, &[0u8; 32]);
+        let result = client.try_upgrade(&zero_hash);
+
+        assert_eq!(result, Err(Ok(ContractError::InvalidWasmHash)));
+    }
+
+    #[test]
+    fn test_upgrade_rejects_zero_wasm_hash_error_code() {
+        let env = Env::default();
+        let contract_id = env.register_contract(None, AncoreAccount);
+        let client = AncoreAccountClient::new(&env, &contract_id);
+
+        let owner = Address::generate(&env);
+        client.initialize(&owner);
+        env.mock_all_auths();
+
+        let zero_hash = BytesN::from_array(&env, &[0u8; 32]);
+
+        // Verify the error discriminant matches the enum ordinal (#9)
+        let result = client.try_upgrade(&zero_hash);
+        assert!(result.is_err());
+        assert_eq!(result.unwrap_err(), Ok(ContractError::InvalidWasmHash));
+    }
+
+    #[test]
+    #[should_panic(expected = "Error(Contract, #10)")]
+    fn test_upgrade_zero_hash_panics_with_code_10() {
+        let env = Env::default();
+        let contract_id = env.register_contract(None, AncoreAccount);
+        let client = AncoreAccountClient::new(&env, &contract_id);
+
+        let owner = Address::generate(&env);
+        client.initialize(&owner);
+        env.mock_all_auths();
+
+        // Zero hash must panic with contract error #9 (InvalidWasmHash)
+        client.upgrade(&BytesN::from_array(&env, &[0u8; 32]));
+    }
+
+    #[test]
+    fn test_upgrade_version_not_incremented_on_invalid_hash() {
+        let env = Env::default();
+        let contract_id = env.register_contract(None, AncoreAccount);
+        let client = AncoreAccountClient::new(&env, &contract_id);
+
+        let owner = Address::generate(&env);
+        client.initialize(&owner);
+        env.mock_all_auths();
+
+        let initial_version = client.get_version();
+
+        let zero_hash = BytesN::from_array(&env, &[0u8; 32]);
+        let _ = client.try_upgrade(&zero_hash);
+
+        // Version must not have changed — guard fires before state mutation
+        assert_eq!(client.get_version(), initial_version);
+    }
+
+    #[test]
+    fn test_upgrade_owner_auth_required_even_for_invalid_hash() {
+        let env = Env::default();
+        let contract_id = env.register_contract(None, AncoreAccount);
+        let client = AncoreAccountClient::new(&env, &contract_id);
+
+        let owner = Address::generate(&env);
+        client.initialize(&owner);
+        // No mock_all_auths: owner auth NOT satisfied
+
+        let zero_hash = BytesN::from_array(&env, &[0u8; 32]);
+        // Should panic due to missing owner auth before reaching the hash guard
+        // (get_owner() + require_auth() fires first)
+        let result = client.try_upgrade(&zero_hash);
         assert!(result.is_err());
     }
 

@@ -1,0 +1,77 @@
+# Availability alerts — ancore mainnet
+# Assumes Prometheus + Alertmanager. Adapt metric names to actual instrumentation.
+# All alerts link to runbooks in docs/ops/runbooks/
+
+groups:
+  - name: ancore.availability
+    interval: 30s
+    rules:
+
+      - alert: ServiceDown
+        # Fires when any scraped target has been unreachable for 1 minute
+        expr: up{job=~"relayer|indexer|ai-agent"} == 0
+        for: 1m
+        labels:
+          severity: critical
+          escalation: pagerduty
+          team: platform
+        annotations:
+          summary: "Service {{ $labels.job }} is down"
+          description: >
+            {{ $labels.job }} on {{ $labels.instance }} has been unreachable
+            for more than 1 minute. Immediate investigation required.
+          runbook_url: "https://github.com/ancore-org/ancore/blob/main/docs/ops/runbooks/service-down.md"
+          dashboard_url: "http://grafana:3000/d/ancore-service-overview"
+
+      - alert: HighErrorRate
+        # 5xx rate > 0.1% — SLO breach imminent
+        expr: >
+          (
+            rate(http_requests_total{status=~"5.."}[5m])
+            /
+            rate(http_requests_total[5m])
+          ) > 0.001
+        for: 5m
+        labels:
+          severity: critical
+          escalation: pagerduty
+          team: platform
+        annotations:
+          summary: "High error rate on {{ $labels.job }}"
+          description: >
+            Error rate is {{ $value | humanizePercentage }} (SLO threshold: 0.1%)
+            on {{ $labels.job }}. SLO breach imminent.
+          runbook_url: "https://github.com/ancore-org/ancore/blob/main/docs/ops/runbooks/high-error-rate.md"
+
+      - alert: ErrorBudgetBurnRateHigh
+        # Burns 14.4× faster than allowed — exhausts monthly budget in 2 days
+        expr: >
+          (
+            rate(http_requests_total{status=~"5.."}[1h])
+            /
+            rate(http_requests_total[1h])
+          ) > (0.001 * 14.4)
+        for: 2m
+        labels:
+          severity: warning
+          escalation: slack
+          team: platform
+        annotations:
+          summary: "Error budget burning fast on {{ $labels.job }}"
+          description: >
+            At current burn rate, the 28-day error budget will be exhausted
+            within 2 days. Investigate immediately.
+          runbook_url: "https://github.com/ancore-org/ancore/blob/main/docs/ops/runbooks/error-budget.md"
+
+      - alert: ServiceHealthCheckFailing
+        # Health endpoint returning non-200 for > 2 minutes
+        expr: >
+          probe_success{job="blackbox", target=~".*/health"} == 0
+        for: 2m
+        labels:
+          severity: critical
+          escalation: pagerduty
+        annotations:
+          summary: "Health check failing for {{ $labels.target }}"
+          description: "Health endpoint {{ $labels.target }} has been failing for 2+ minutes."
+          runbook_url: "https://github.com/ancore-org/ancore/blob/main/docs/ops/runbooks/service-down.md"

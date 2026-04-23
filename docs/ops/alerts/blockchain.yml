@@ -1,0 +1,44 @@
+# Blockchain-specific alerts — ancore mainnet
+# Metric names assume stellar-core or horizon instrumentation.
+# Adapt to actual exporter metric names if different.
+
+groups:
+  - name: ancore.blockchain
+    rules:
+
+      - alert: StellarNodeBehind
+        expr: stellar_ledger_age_seconds > 30
+        for: 2m
+        labels:
+          severity: critical
+          escalation: pagerduty
+        annotations:
+          summary: "Stellar node not syncing"
+          description: >
+            Ledger is {{ $value }}s behind current network time (threshold: 30s).
+            Node may be partitioned or stalled.
+          runbook_url: "https://github.com/ancore-org/ancore/blob/main/docs/ops/runbooks/stellar-sync.md"
+
+      - alert: TransactionFailureRateHigh
+        expr: >
+          rate(stellar_transactions_failed_total[5m])
+          /
+          rate(stellar_transactions_total[5m]) > 0.05
+        for: 5m
+        labels:
+          severity: warning
+          escalation: slack
+        annotations:
+          summary: "High transaction failure rate"
+          description: "{{ $value | humanizePercentage }} of transactions failing (threshold: 5%)"
+          runbook_url: "https://github.com/ancore-org/ancore/blob/main/docs/ops/runbooks/tx-failures.md"
+
+      - alert: StellarNodeDown
+        expr: up{job="stellar-core"} == 0
+        for: 1m
+        labels:
+          severity: critical
+          escalation: pagerduty
+        annotations:
+          summary: "Stellar core node unreachable"
+          runbook_url: "https://github.com/ancore-org/ancore/blob/main/docs/ops/runbooks/stellar-sync.md"

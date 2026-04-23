@@ -1,0 +1,87 @@
+# Infrastructure alerts — ancore mainnet
+
+groups:
+  - name: ancore.infrastructure
+    rules:
+
+      - alert: HighCPUUsage
+        expr: >
+          100 - (avg by(instance)
+            (rate(node_cpu_seconds_total{mode="idle"}[5m])) * 100
+          ) > 85
+        for: 10m
+        labels:
+          severity: warning
+          escalation: slack
+        annotations:
+          summary: "High CPU on {{ $labels.instance }}"
+          description: "CPU usage {{ $value | humanize }}% sustained for 10m (threshold: 85%)"
+          runbook_url: "https://github.com/ancore-org/ancore/blob/main/docs/ops/runbooks/high-cpu.md"
+
+      - alert: CriticalCPUUsage
+        expr: >
+          100 - (avg by(instance)
+            (rate(node_cpu_seconds_total{mode="idle"}[5m])) * 100
+          ) > 95
+        for: 5m
+        labels:
+          severity: critical
+          escalation: pagerduty
+        annotations:
+          summary: "Critical CPU on {{ $labels.instance }}"
+          description: "CPU usage {{ $value | humanize }}% (threshold: 95%)"
+          runbook_url: "https://github.com/ancore-org/ancore/blob/main/docs/ops/runbooks/high-cpu.md"
+
+      - alert: HighMemoryUsage
+        expr: >
+          (1 - (node_memory_MemAvailable_bytes
+                / node_memory_MemTotal_bytes)) * 100 > 90
+        for: 5m
+        labels:
+          severity: critical
+          escalation: pagerduty
+        annotations:
+          summary: "High memory on {{ $labels.instance }}"
+          description: "Memory usage {{ $value | humanize }}% (threshold: 90%)"
+          runbook_url: "https://github.com/ancore-org/ancore/blob/main/docs/ops/runbooks/high-memory.md"
+
+      - alert: DiskSpaceLow
+        expr: >
+          (node_filesystem_avail_bytes{fstype!="tmpfs"}
+           / node_filesystem_size_bytes{fstype!="tmpfs"}) * 100 < 15
+        for: 5m
+        labels:
+          severity: warning
+          escalation: slack
+        annotations:
+          summary: "Disk space low on {{ $labels.instance }}"
+          description: >
+            {{ $value | humanize }}% disk remaining on {{ $labels.mountpoint }}.
+            Projected to fill in < 48 hours at current write rate.
+          runbook_url: "https://github.com/ancore-org/ancore/blob/main/docs/ops/runbooks/disk-space.md"
+
+      - alert: DiskSpaceCritical
+        expr: >
+          (node_filesystem_avail_bytes{fstype!="tmpfs"}
+           / node_filesystem_size_bytes{fstype!="tmpfs"}) * 100 < 5
+        for: 2m
+        labels:
+          severity: critical
+          escalation: pagerduty
+        annotations:
+          summary: "Critical disk space on {{ $labels.instance }}"
+          description: "Only {{ $value | humanize }}% disk remaining. Risk of data loss."
+          runbook_url: "https://github.com/ancore-org/ancore/blob/main/docs/ops/runbooks/disk-space.md"
+
+      - alert: ContainerOOMKilled
+        expr: kube_pod_container_status_last_terminated_reason{reason="OOMKilled"} == 1
+        for: 0m
+        labels:
+          severity: warning
+          escalation: slack
+        annotations:
+          summary: "Container OOMKilled: {{ $labels.container }}"
+          description: >
+            Container {{ $labels.container }} in pod {{ $labels.pod }}
+            was OOM killed. Memory limit may need adjustment.
+          runbook_url: "https://github.com/ancore-org/ancore/blob/main/docs/ops/runbooks/high-memory.md"
