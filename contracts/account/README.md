@@ -48,6 +48,19 @@ soroban contract build
 cargo test
 ```
 
+### Guardrail Coverage (Issue #260)
+
+The account contract test suite includes regression guardrails for storage growth and instance TTL bump policy:
+
+- `test_storage_key_growth_with_high_session_key_count` adds 96 session keys and validates each key is independently persisted/retrievable.
+- `test_instance_ttl_bump_threshold_policy_read_vs_write_paths` validates that read-only calls do not force TTL growth, while write paths restore instance TTL when near expiry.
+
+#### Expected Limits and Extreme-Input Behavior
+
+- High session-key counts are expected to grow persistent storage linearly by one key per session key.
+- Unknown session-key maintenance operations are rejected with `SessionKeyNotFound` (error `#5`).
+- Instance TTL bumping is expected only on mutating paths (`initialize`, `execute`, `upgrade`, `migrate`) and remains unchanged on read paths.
+
 ## Deployment
 
 ### Testnet

@@ -1153,4 +1153,96 @@ mod test {
         let res_u64: u64 = soroban_sdk::FromVal::from_val(&env, &result);
         assert_eq!(res_u64, 0);
     }
+
+    #[test]
+    fn test_storage_key_growth_with_high_session_key_count() {
+        let env = Env::default();
+        let contract_id = env.register_contract(None, AncoreAccount);
+        let client = AncoreAccountClient::new(&env, &contract_id);
+
+        let owner = Address::generate(&env);
+        client.initialize(&owner);
+        env.mock_all_auths();
+
+        let high_count: u8 = 96;
+        let expires_at = env.ledger().timestamp() + 86_400;
+        let mut permissions = Vec::new(&env);
+        permissions.push_back(PERMISSION_EXECUTE);
+
+        // Add a high number of session keys and assert each key is independently persisted.
+        for i in 0..high_count {
+            let mut bytes = [0u8; 32];
+            bytes[0] = i;
+            bytes[31] = 255u8.saturating_sub(i);
+            let session_pk = BytesN::from_array(&env, &bytes);
+            client.add_session_key(&session_pk, &expires_at, &permissions);
+        }
+
+        for i in 0..high_count {
+            let mut bytes = [0u8; 32];
+            bytes[0] = i;
+            bytes[31] = 255u8.saturating_sub(i);
+            let session_pk = BytesN::from_array(&env, &bytes);
+            assert!(client.has_session_key(&session_pk));
+            assert!(client.get_session_key(&session_pk).is_some());
+        }
+
+        // Validate rejection behavior on an unknown key after high-growth writes.
+        let unknown_pk = BytesN::from_array(&env, &[7u8; 32]);
+        assert_eq!(
+            client.try_refresh_session_key_ttl(&unknown_pk),
+            Err(Ok(ContractError::SessionKeyNotFound))
+        );
+    }
+
+    #[test]
+    fn test_instance_ttl_bump_threshold_policy_read_vs_write_paths() {
+        let env = Env::default();
+        let contract_id = env.register_contract(None, AncoreAccount);
+        let client = AncoreAccountClient::new(&env, &contract_id);
+
+        let owner = Address::generate(&env);
+        client.initialize(&owner);
+        env.mock_all_auths();
+
+        let before_read_ttl = env.storage().instance().get_ttl();
+        let _ = client.get_owner();
+        let after_read_ttl = env.storage().instance().get_ttl();
+        assert_eq!(
+            after_read_ttl, before_read_ttl,
+            "read paths should not force instance TTL extension"
+        );
+
+        // Move ledger near expiry so write-path extend_ttl threshold definitely applies.
+        env.ledger().set_sequence_number(
+            env.ledger()
+                .sequence()
+                .saturating_add(INSTANCE_BUMP_AMOUNT as u32),
+        );
+
+        let pre_write_ttl = env.storage().instance().get_ttl();
+        let callee_id = env.register_contract(None, AncoreAccount);
+        let function = soroban_sdk::symbol_short!("get_nonce");
+        let args = Vec::new(&env);
+        let _ = client.execute(
+            &CallerIdentity::Owner,
+            &callee_id,
+            &function,
+            &args,
+            &0u64,
+            &None,
+            &None,
+            &None,
+        );
+        let post_write_ttl = env.storage().instance().get_ttl();
+
+        assert!(
+            post_write_ttl >= INSTANCE_BUMP_THRESHOLD,
+            "write paths must restore TTL above threshold"
+        );
+        assert!(
+            post_write_ttl > pre_write_ttl,
+            "write paths should increase TTL when below threshold"
+        );
+    }
 }
