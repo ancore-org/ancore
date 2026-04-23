@@ -254,11 +254,17 @@ function UnlockScreen() {
   const location = useLocation();
   const { authState, unlockWallet, resetWallet } = useExtensionAuth();
   const [password, setPassword] = React.useState('');
+  const [error, setError] = React.useState<string | null>(null);
   const from = (location.state as { from?: string } | null)?.from ?? '/home';
 
-  function handleUnlock(event: React.FormEvent<HTMLFormElement>) {
+  async function handleUnlock(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    unlockWallet();
+    setError(null);
+    const didUnlock = await unlockWallet(password);
+    if (!didUnlock) {
+      setError('Invalid password. Please try again.');
+      return;
+    }
     navigate(from, { replace: true });
   }
 
@@ -283,6 +289,11 @@ function UnlockScreen() {
           <PrimaryButton disabled={!password.trim()} type="submit">
             Unlock
           </PrimaryButton>
+          {error ? (
+            <p className="rounded-lg border border-red-300 bg-red-50 px-3 py-2 text-sm text-red-700" role="alert">
+              {error}
+            </p>
+          ) : null}
         </form>
       </Card>
       <button

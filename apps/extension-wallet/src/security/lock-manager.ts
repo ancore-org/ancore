@@ -41,12 +41,14 @@ export class LockManager {
 
   /**
    * Unlock the wallet with the given password.
-   * Throws if the password is incorrect.
+   * Throws if the password is incorrect or unlock result is non-true.
    */
   async unlock(password: string): Promise<void> {
-    // Delegates password verification to SecureStorageManager.
-    // unlock() will throw 'Invalid password or corrupted data' on bad password.
-    await this.storageManager.unlock(password);
+    // Explicitly require a true result to avoid fail-open behavior.
+    const didUnlock = await this.storageManager.unlock(password);
+    if (didUnlock !== true) {
+      throw new Error('Invalid password or corrupted data');
+    }
 
     this.status = 'unlocked';
     this.detector.start();

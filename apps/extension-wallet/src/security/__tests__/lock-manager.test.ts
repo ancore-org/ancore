@@ -5,10 +5,11 @@ import { LockManager } from '../lock-manager';
 
 function makeMockStorageManager(shouldFailUnlock = false) {
   return {
-    unlock: vi.fn(async (password: string) => {
+    unlock: vi.fn(async (password: string): Promise<boolean> => {
       if (shouldFailUnlock || password !== 'correct') {
         throw new Error('Invalid password or corrupted data');
       }
+      return true;
     }),
     lock: vi.fn(),
     isUnlocked: false,
@@ -56,6 +57,26 @@ describe('LockManager', () => {
 
     await expect(manager.unlock('wrong')).rejects.toThrow('Invalid password');
     expect(manager.isLocked).toBe(true);
+    manager.destroy();
+  });
+
+  it('fails closed when storage unlock resolves false', async () => {
+    const storage = {
+      unlock: vi.fn(async () => false),
+      lock: vi.fn(),
+      isUnlocked: false,
+      touch: vi.fn(),
+    };
+    const onUnlock = vi.fn();
+    const manager = new LockManager({
+      autoLockMinutes: 5,
+      storageManager: storage as any,
+      onUnlock,
+    });
+
+    await expect(manager.unlock('correct')).rejects.toThrow('Invalid password or corrupted data');
+    expect(manager.isLocked).toBe(true);
+    expect(onUnlock).not.toHaveBeenCalled();
     manager.destroy();
   });
 

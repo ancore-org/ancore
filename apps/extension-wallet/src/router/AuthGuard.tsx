@@ -1,5 +1,6 @@
 import * as React from 'react';
 import { Navigate, Outlet, useLocation } from 'react-router-dom';
+import { SecureStorageManager, createStorageAdapter } from '@ancore/core-sdk';
 
 export const AUTH_STORAGE_KEY = 'ancore_extension_auth';
 
@@ -20,12 +21,20 @@ export const DEFAULT_AUTH_STATE: AuthState = {
 interface AuthContextValue {
   authState: AuthState;
   completeOnboarding: (walletName: string) => void;
-  unlockWallet: () => void;
+  unlockWallet: (password: string) => Promise<boolean>;
   lockWallet: () => void;
   resetWallet: () => void;
 }
 
 const AuthContext = React.createContext<AuthContextValue | null>(null);
+let storageManager: SecureStorageManager | null = null;
+
+function getStorageManager(): SecureStorageManager {
+  if (!storageManager) {
+    storageManager = new SecureStorageManager(createStorageAdapter());
+  }
+  return storageManager;
+}
 
 export function readAuthState(): AuthState {
   if (typeof window === 'undefined') {
@@ -53,6 +62,7 @@ function writeAuthState(authState: AuthState): void {
 
 export function ExtensionAuthProvider({ children }: { children: React.ReactNode }) {
   const [authState, setAuthState] = React.useState<AuthState>(readAuthState);
+  const storage = React.useMemo(() => getStorageManager(), []);
 
   React.useEffect(() => {
     writeAuthState(authState);
@@ -80,24 +90,44 @@ export function ExtensionAuthProvider({ children }: { children: React.ReactNode 
           accountAddress: DEFAULT_AUTH_STATE.accountAddress,
         });
       },
-      unlockWallet: () => {
-        setAuthState((current) => ({
-          ...current,
-          hasOnboarded: true,
-          isUnlocked: true,
-        }));
+      unlockWallet: async (password: string) => {
+        try {
+          const didUnlock = await storage.unlock(password);
+          if (!didUnlock) {
+            setAuthState((current) => ({
+              ...current,
+              isUnlocked: false,
+            }));
+            return false;
+          }
+
+          setAuthState((current) => ({
+            ...current,
+            hasOnboarded: true,
+            isUnlocked: true,
+          }));
+          return true;
+        } catch {
+          setAuthState((current) => ({
+            ...current,
+            isUnlocked: false,
+          }));
+          return false;
+        }
       },
       lockWallet: () => {
+        storage.lock();
         setAuthState((current) => ({
           ...current,
           isUnlocked: false,
         }));
       },
       resetWallet: () => {
+        storage.lock();
         setAuthState(DEFAULT_AUTH_STATE);
       },
     }),
-    [authState]
+    [authState, storage]
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

@@ -1,8 +1,30 @@
 import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { beforeEach, describe, expect, it } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { AUTH_STORAGE_KEY, DEFAULT_AUTH_STATE } from '../AuthGuard';
 import { ExtensionRouterTestHarness } from '..';
+
+const mockUnlock = vi.fn<(password: string) => Promise<boolean>>();
+const mockLock = vi.fn();
+
+vi.mock('@ancore/core-sdk', async () => {
+  const actual = await vi.importActual<object>('@ancore/core-sdk');
+  class MockSecureStorageManager {
+    unlock(password: string) {
+      return mockUnlock(password);
+    }
+
+    lock() {
+      mockLock();
+    }
+  }
+
+  return {
+    ...actual,
+    SecureStorageManager: MockSecureStorageManager,
+    createStorageAdapter: () => ({}),
+  };
+});
 
 function renderRouter(pathname: string, authState = DEFAULT_AUTH_STATE) {
   window.localStorage.setItem(AUTH_STORAGE_KEY, JSON.stringify(authState));
@@ -13,6 +35,9 @@ describe('extension router', () => {
   beforeEach(() => {
     window.localStorage.clear();
     document.title = 'Ancore Extension';
+    mockUnlock.mockReset();
+    mockLock.mockReset();
+    mockUnlock.mockResolvedValue(true);
   });
 
   it('redirects first-time users to welcome when they hit a protected route', () => {
@@ -89,5 +114,22 @@ describe('extension router', () => {
     await user.click(screen.getByRole('button', { name: /go back/i }));
 
     expect(await screen.findByRole('heading', { name: /settings/i })).toBeInTheDocument();
+  });
+
+  it('keeps users locked and shows an error when unlock credentials are invalid', async () => {
+    const user = userEvent.setup();
+    mockUnlock.mockResolvedValue(false);
+    renderRouter('/unlock', {
+      ...DEFAULT_AUTH_STATE,
+      hasOnboarded: true,
+      isUnlocked: false,
+    });
+
+    await user.type(screen.getByLabelText(/password/i), 'wrong-password');
+    await user.click(screen.getByRole('button', { name: /unlock/i }));
+
+    expect(await screen.findByRole('alert')).toHaveTextContent(/invalid password/i);
+    expect(screen.getByRole('heading', { name: /unlock wallet/i })).toBeInTheDocument();
+    expect(screen.queryByRole('heading', { name: /home/i })).not.toBeInTheDocument();
   });
 });
