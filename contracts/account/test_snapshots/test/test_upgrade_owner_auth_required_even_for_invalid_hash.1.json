@@ -192,11 +192,11 @@
                 "bytes": "0000000000000000000000000000000000000000000000000000000000000001"
               },
               {
-                "symbol": "refresh_session_key_ttl"
+                "symbol": "upgrade"
               }
             ],
             "data": {
-              "bytes": "0909090909090909090909090909090909090909090909090909090909090909"
+              "bytes": "0000000000000000000000000000000000000000000000000000000000000000"
             }
           }
         }
@@ -212,16 +212,23 @@
           "v0": {
             "topics": [
               {
-                "symbol": "fn_return"
+                "symbol": "error"
               },
               {
-                "symbol": "refresh_session_key_ttl"
+                "error": {
+                  "auth": "invalid_action"
+                }
               }
             ],
             "data": {
-              "error": {
-                "contract": 5
-              }
+              "vec": [
+                {
+                  "string": "Unauthorized function call for address"
+                },
+                {
+                  "address": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAFCT4"
+                }
+              ]
             }
           }
         }
@@ -241,12 +248,37 @@
               },
               {
                 "error": {
-                  "contract": 5
+                  "auth": "invalid_action"
                 }
               }
             ],
             "data": {
-              "string": "escalating Ok(ScErrorType::Contract) frame-exit to Err"
+              "string": "escalating error to panic"
+            }
+          }
+        }
+      },
+      "failed_call": true
+    },
+    {
+      "event": {
+        "ext": "v0",
+        "contract_id": "0000000000000000000000000000000000000000000000000000000000000001",
+        "type_": "diagnostic",
+        "body": {
+          "v0": {
+            "topics": [
+              {
+                "symbol": "error"
+              },
+              {
+                "error": {
+                  "auth": "invalid_action"
+                }
+              }
+            ],
+            "data": {
+              "string": "caught error from function"
             }
           }
         }
@@ -266,7 +298,7 @@
               },
               {
                 "error": {
-                  "contract": 5
+                  "auth": "invalid_action"
                 }
               }
             ],
@@ -276,12 +308,12 @@
                   "string": "contract try_call failed"
                 },
                 {
-                  "symbol": "refresh_session_key_ttl"
+                  "symbol": "upgrade"
                 },
                 {
                   "vec": [
                     {
-                      "bytes": "0909090909090909090909090909090909090909090909090909090909090909"
+                      "bytes": "0000000000000000000000000000000000000000000000000000000000000000"
                     }
                   ]
                 }

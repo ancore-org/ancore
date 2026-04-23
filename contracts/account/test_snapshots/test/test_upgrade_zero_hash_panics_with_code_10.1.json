@@ -192,11 +192,11 @@
                 "bytes": "0000000000000000000000000000000000000000000000000000000000000001"
               },
               {
-                "symbol": "refresh_session_key_ttl"
+                "symbol": "upgrade"
               }
             ],
             "data": {
-              "bytes": "0909090909090909090909090909090909090909090909090909090909090909"
+              "bytes": "0000000000000000000000000000000000000000000000000000000000000000"
             }
           }
         }
@@ -215,12 +215,12 @@
                 "symbol": "fn_return"
               },
               {
-                "symbol": "refresh_session_key_ttl"
+                "symbol": "upgrade"
               }
             ],
             "data": {
               "error": {
-                "contract": 5
+                "contract": 10
               }
             }
           }
@@ -241,7 +241,7 @@
               },
               {
                 "error": {
-                  "contract": 5
+                  "contract": 10
                 }
               }
             ],
@@ -266,26 +266,51 @@
               },
               {
                 "error": {
-                  "contract": 5
+                  "contract": 10
                 }
               }
             ],
             "data": {
               "vec": [
                 {
-                  "string": "contract try_call failed"
+                  "string": "contract call failed"
                 },
                 {
-                  "symbol": "refresh_session_key_ttl"
+                  "symbol": "upgrade"
                 },
                 {
                   "vec": [
                     {
-                      "bytes": "0909090909090909090909090909090909090909090909090909090909090909"
+                      "bytes": "0000000000000000000000000000000000000000000000000000000000000000"
                     }
                   ]
                 }
               ]
+            }
+          }
+        }
+      },
+      "failed_call": false
+    },
+    {
+      "event": {
+        "ext": "v0",
+        "contract_id": null,
+        "type_": "diagnostic",
+        "body": {
+          "v0": {
+            "topics": [
+              {
+                "symbol": "error"
+              },
+              {
+                "error": {
+                  "contract": 10
+                }
+              }
+            ],
+            "data": {
+              "string": "escalating error to panic"
             }
           }
         }

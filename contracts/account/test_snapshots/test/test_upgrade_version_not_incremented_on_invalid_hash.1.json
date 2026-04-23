@@ -5,6 +5,8 @@
   },
   "auth": [
     [],
+    [],
+    [],
     []
   ],
   "ledger": {
@@ -192,11 +194,58 @@
                 "bytes": "0000000000000000000000000000000000000000000000000000000000000001"
               },
               {
-                "symbol": "refresh_session_key_ttl"
+                "symbol": "get_version"
+              }
+            ],
+            "data": "void"
+          }
+        }
+      },
+      "failed_call": false
+    },
+    {
+      "event": {
+        "ext": "v0",
+        "contract_id": "0000000000000000000000000000000000000000000000000000000000000001",
+        "type_": "diagnostic",
+        "body": {
+          "v0": {
+            "topics": [
+              {
+                "symbol": "fn_return"
+              },
+              {
+                "symbol": "get_version"
               }
             ],
             "data": {
-              "bytes": "0909090909090909090909090909090909090909090909090909090909090909"
+              "u32": 1
+            }
+          }
+        }
+      },
+      "failed_call": false
+    },
+    {
+      "event": {
+        "ext": "v0",
+        "contract_id": null,
+        "type_": "diagnostic",
+        "body": {
+          "v0": {
+            "topics": [
+              {
+                "symbol": "fn_call"
+              },
+              {
+                "bytes": "0000000000000000000000000000000000000000000000000000000000000001"
+              },
+              {
+                "symbol": "upgrade"
+              }
+            ],
+            "data": {
+              "bytes": "0000000000000000000000000000000000000000000000000000000000000000"
             }
           }
         }
@@ -215,12 +264,12 @@
                 "symbol": "fn_return"
               },
               {
-                "symbol": "refresh_session_key_ttl"
+                "symbol": "upgrade"
               }
             ],
             "data": {
               "error": {
-                "contract": 5
+                "contract": 10
               }
             }
           }
@@ -241,7 +290,7 @@
               },
               {
                 "error": {
-                  "contract": 5
+                  "contract": 10
                 }
               }
             ],
@@ -266,7 +315,7 @@
               },
               {
                 "error": {
-                  "contract": 5
+                  "contract": 10
                 }
               }
             ],
@@ -276,16 +325,63 @@
                   "string": "contract try_call failed"
                 },
                 {
-                  "symbol": "refresh_session_key_ttl"
+                  "symbol": "upgrade"
                 },
                 {
                   "vec": [
                     {
-                      "bytes": "0909090909090909090909090909090909090909090909090909090909090909"
+                      "bytes": "0000000000000000000000000000000000000000000000000000000000000000"
                     }
                   ]
                 }
               ]
+            }
+          }
+        }
+      },
+      "failed_call": false
+    },
+    {
+      "event": {
+        "ext": "v0",
+        "contract_id": null,
+        "type_": "diagnostic",
+        "body": {
+          "v0": {
+            "topics": [
+              {
+                "symbol": "fn_call"
+              },
+              {
+                "bytes": "0000000000000000000000000000000000000000000000000000000000000001"
+              },
+              {
+                "symbol": "get_version"
+              }
+            ],
+            "data": "void"
+          }
+        }
+      },
+      "failed_call": false
+    },
+    {
+      "event": {
+        "ext": "v0",
+        "contract_id": "0000000000000000000000000000000000000000000000000000000000000001",
+        "type_": "diagnostic",
+        "body": {
+          "v0": {
+            "topics": [
+              {
+                "symbol": "fn_return"
+              },
+              {
+                "symbol": "get_version"
+              }
+            ],
+            "data": {
+              "u32": 1
             }
           }
         }

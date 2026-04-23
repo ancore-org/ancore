@@ -15,7 +15,7 @@
               "function_name": "add_session_key",
               "args": [
                 {
-                  "bytes": "330426ced3ddc875570960b03232708da7970b08aaf0ada72c27f9ac7a072cb9"
+                  "bytes": "d868cce1d86c18659050ecbb43f7e9a6d30451c5d2ce4b697a654f387179662c"
                 },
                 {
                   "u64": 10000
@@ -56,7 +56,7 @@
                   "symbol": "SessionKey"
                 },
                 {
-                  "bytes": "330426ced3ddc875570960b03232708da7970b08aaf0ada72c27f9ac7a072cb9"
+                  "bytes": "d868cce1d86c18659050ecbb43f7e9a6d30451c5d2ce4b697a654f387179662c"
                 }
               ]
             },
@@ -76,7 +76,7 @@
                       "symbol": "SessionKey"
                     },
                     {
-                      "bytes": "330426ced3ddc875570960b03232708da7970b08aaf0ada72c27f9ac7a072cb9"
+                      "bytes": "d868cce1d86c18659050ecbb43f7e9a6d30451c5d2ce4b697a654f387179662c"
                     }
                   ]
                 },
@@ -108,7 +108,7 @@
                         "symbol": "public_key"
                       },
                       "val": {
-                        "bytes": "330426ced3ddc875570960b03232708da7970b08aaf0ada72c27f9ac7a072cb9"
+                        "bytes": "d868cce1d86c18659050ecbb43f7e9a6d30451c5d2ce4b697a654f387179662c"
                       }
                     }
                   ]
@@ -366,7 +366,7 @@
             "data": {
               "vec": [
                 {
-                  "bytes": "330426ced3ddc875570960b03232708da7970b08aaf0ada72c27f9ac7a072cb9"
+                  "bytes": "d868cce1d86c18659050ecbb43f7e9a6d30451c5d2ce4b697a654f387179662c"
                 },
                 {
                   "u64": 10000
@@ -400,7 +400,7 @@
             "data": {
               "vec": [
                 {
-                  "bytes": "330426ced3ddc875570960b03232708da7970b08aaf0ada72c27f9ac7a072cb9"
+                  "bytes": "d868cce1d86c18659050ecbb43f7e9a6d30451c5d2ce4b697a654f387179662c"
                 },
                 {
                   "u64": 10000
@@ -459,7 +459,7 @@
                       "symbol": "SessionKey"
                     },
                     {
-                      "bytes": "330426ced3ddc875570960b03232708da7970b08aaf0ada72c27f9ac7a072cb9"
+                      "bytes": "d868cce1d86c18659050ecbb43f7e9a6d30451c5d2ce4b697a654f387179662c"
                     }
                   ]
                 },
@@ -476,7 +476,7 @@
                   "u64": 0
                 },
                 {
-                  "bytes": "330426ced3ddc875570960b03232708da7970b08aaf0ada72c27f9ac7a072cb9"
+                  "bytes": "d868cce1d86c18659050ecbb43f7e9a6d30451c5d2ce4b697a654f387179662c"
                 },
                 "void",
                 "void"
@@ -504,7 +504,7 @@
             ],
             "data": {
               "error": {
-                "contract": 3
+                "contract": 9
               }
             }
           }
@@ -525,7 +525,7 @@
               },
               {
                 "error": {
-                  "contract": 3
+                  "contract": 9
                 }
               }
             ],
@@ -550,7 +550,7 @@
               },
               {
                 "error": {
-                  "contract": 3
+                  "contract": 9
                 }
               }
             ],
@@ -570,7 +570,7 @@
                           "symbol": "SessionKey"
                         },
                         {
-                          "bytes": "330426ced3ddc875570960b03232708da7970b08aaf0ada72c27f9ac7a072cb9"
+                          "bytes": "d868cce1d86c18659050ecbb43f7e9a6d30451c5d2ce4b697a654f387179662c"
                         }
                       ]
                     },
@@ -587,7 +587,7 @@
                       "u64": 0
                     },
                     {
-                      "bytes": "330426ced3ddc875570960b03232708da7970b08aaf0ada72c27f9ac7a072cb9"
+                      "bytes": "d868cce1d86c18659050ecbb43f7e9a6d30451c5d2ce4b697a654f387179662c"
                     },
                     "void",
                     "void"
