@@ -1155,6 +1155,41 @@ mod test {
     }
 
     #[test]
+    fn test_upgrade_owner_path_succeeds_and_increments_version() {
+        let env = Env::default();
+        let contract_id = env.register_contract(None, AncoreAccount);
+        let client = AncoreAccountClient::new(&env, &contract_id);
+
+        let owner = Address::generate(&env);
+        client.initialize(&owner);
+        assert_eq!(client.get_version(), 1);
+
+        env.mock_all_auths();
+        let wasm_hash = BytesN::from_array(&env, &[42u8; 32]);
+        let _ = client.try_upgrade(&wasm_hash);
+
+        // Owner-authorized upgrade should increment version.
+        assert_eq!(client.get_version(), 2);
+    }
+
+    #[test]
+    fn test_upgrade_non_owner_is_rejected_and_version_unchanged() {
+        let env = Env::default();
+        let contract_id = env.register_contract(None, AncoreAccount);
+        let client = AncoreAccountClient::new(&env, &contract_id);
+
+        let owner = Address::generate(&env);
+        client.initialize(&owner);
+        assert_eq!(client.get_version(), 1);
+
+        // No owner auth is provided; require_auth() should reject this upgrade attempt.
+        let wasm_hash = BytesN::from_array(&env, &[7u8; 32]);
+        let result = client.try_upgrade(&wasm_hash);
+        assert!(result.is_err());
+        assert_eq!(client.get_version(), 1);
+    }
+
+    #[test]
     fn test_storage_key_growth_with_high_session_key_count() {
         let env = Env::default();
         let contract_id = env.register_contract(None, AncoreAccount);
