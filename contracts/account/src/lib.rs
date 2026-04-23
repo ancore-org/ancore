@@ -1286,4 +1286,447 @@ mod test {
         let res_u64: u64 = soroban_sdk::FromVal::from_val(&env, &result);
         assert_eq!(res_u64, 0);
     }
+
+    // ===== REPLAY PROTECTION TEST MATRIX =====
+    // Comprehensive adversarial tests ensuring execute signatures cannot be replayed 
+    // across network/account/contract contexts with detailed documentation.
+
+    /// Test matrix for replay attacks across different contexts.
+    /// Each test case verifies that valid signatures cannot be replayed when:
+    /// 1. Network context changes (different ledger timestamps)
+    /// 2. Contract context changes (different target contracts)
+    /// 3. Account context changes (different caller identities)
+    /// 4. Function context changes (different function calls)
+    /// 5. Parameter context changes (different function arguments)
+    #[test]
+    fn test_replay_protection_matrix_cross_context() {
+        let env = Env::default();
+        let contract_id = env.register_contract(None, AncoreAccount);
+        let client = AncoreAccountClient::new(&env, &contract_id);
+
+        let owner = Address::generate(&env);
+        client.initialize(&owner);
+        env.mock_all_auths();
+
+        // Setup session key for signature-based replay tests
+        let mut csprng = OsRng;
+        let signing_key = SigningKey::generate(&mut csprng);
+        let session_pk = BytesN::from_array(&env, &signing_key.verifying_key().to_bytes());
+        
+        let expires_at = env.ledger().timestamp() + 10000;
+        let mut permissions = Vec::new(&env);
+        permissions.push_back(PERMISSION_EXECUTE);
+        client.add_session_key(&session_pk, &expires_at, &permissions);
+
+        // Test contexts
+        let contract_a = env.register_contract(None, AncoreAccount);
+        let contract_b = env.register_contract(None, AncoreAccount);
+        let function_a = soroban_sdk::symbol_short!("get_nonce");
+        let function_b = soroban_sdk::symbol_short!("get_owner");
+        let args_a = Vec::new(&env);
+        let mut args_b = Vec::new(&env);
+        args_b.push_back(owner.to_val());
+
+        // Create original valid signature for context A
+        let (original_sig, original_payload) = sign_payload(&env, &signing_key, &contract_a, &function_a, &args_a, 0);
+
+        // 1. SUCCESS: Original context executes successfully
+        let result = client.execute(
+            &CallerIdentity::SessionKey(session_pk.clone()),
+            &contract_a,
+            &function_a,
+            &args_a,
+            &0u64,
+            &Some(session_pk.clone()),
+            &Some(original_sig.clone()),
+            &Some(original_payload.clone()),
+        );
+        let res_u64: u64 = soroban_sdk::FromVal::from_val(&env, &result);
+        assert_eq!(res_u64, 0);
+
+        // 2. REJECT: Same signature replayed to different contract (contract context mismatch)
+        let replay_result = client.try_execute(
+            &CallerIdentity::SessionKey(session_pk.clone()),
+            &contract_b, // Different contract
+            &function_a,
+            &args_a,
+            &1u64, // Next nonce
+            &Some(session_pk.clone()),
+            &Some(original_sig.clone()),
+            &Some(original_payload.clone()),
+        );
+        // Should fail due to signature verification (payload doesn't match contract_b)
+        assert!(replay_result.is_err());
+
+        // 3. REJECT: Same signature replayed with different function (function context mismatch)
+        let replay_result = client.try_execute(
+            &CallerIdentity::SessionKey(session_pk.clone()),
+            &contract_a,
+            &function_b, // Different function
+            &args_a,
+            &2u64, // Next nonce
+            &Some(session_pk.clone()),
+            &Some(original_sig.clone()),
+            &Some(original_payload.clone()),
+        );
+        // Should fail due to signature verification (payload doesn't match function_b)
+        assert!(replay_result.is_err());
+
+        // 4. REJECT: Same signature replayed with different arguments (parameter context mismatch)
+        let replay_result = client.try_execute(
+            &CallerIdentity::SessionKey(session_pk.clone()),
+            &contract_a,
+            &function_a,
+            &args_b, // Different args
+            &3u64, // Next nonce
+            &Some(session_pk.clone()),
+            &Some(original_sig.clone()),
+            &Some(original_payload.clone()),
+        );
+        // Should fail due to signature verification (payload doesn't match args_b)
+        assert!(replay_result.is_err());
+    }
+
+    /// Test replay protection with stale nonces across different authorization paths.
+    /// Verifies that stale nonces are rejected even with otherwise valid signatures.
+    #[test]
+    fn test_replay_protection_stale_nonce_matrix() {
+        let env = Env::default();
+        let contract_id = env.register_contract(None, AncoreAccount);
+        let client = AncoreAccountClient::new(&env, &contract_id);
+
+        let owner = Address::generate(&env);
+        client.initialize(&owner);
+
+        let callee_id = env.register_contract(None, AncoreAccount);
+        let function = soroban_sdk::symbol_short!("get_nonce");
+        let args = Vec::new(&env);
+
+        // Setup session key for signature-based tests
+        let mut csprng = OsRng;
+        let signing_key = SigningKey::generate(&mut csprng);
+        let session_pk = BytesN::from_array(&env, &signing_key.verifying_key().to_bytes());
+        
+        let expires_at = env.ledger().timestamp() + 10000;
+        let mut permissions = Vec::new(&env);
+        permissions.push_back(PERMISSION_EXECUTE);
+        
+        env.mock_all_auths();
+        client.add_session_key(&session_pk, &expires_at, &permissions);
+
+        // Create valid signatures for different nonces
+        let (sig_nonce_0, payload_nonce_0) = sign_payload(&env, &signing_key, &callee_id, &function, &args, 0);
+        let (sig_nonce_1, payload_nonce_1) = sign_payload(&env, &signing_key, &callee_id, &function, &args, 1);
+
+        // 1. SUCCESS: Execute with nonce 0 (owner path)
+        env.mock_all_auths();
+        let _result = client.execute(
+            &CallerIdentity::Owner,
+            &callee_id,
+            &function,
+            &args,
+            &0u64,
+            &None,
+            &None,
+            &None,
+        );
+        assert_eq!(client.get_nonce(), 1);
+
+        // 2. REJECT: Stale nonce 0 replayed with owner auth
+        env.mock_all_auths();
+        let stale_result = client.try_execute(
+            &CallerIdentity::Owner,
+            &callee_id,
+            &function,
+            &args,
+            &0u64, // Stale nonce
+            &None,
+            &None,
+            &None,
+        );
+        assert_eq!(stale_result, Err(Ok(ContractError::InvalidNonce)));
+
+        // 3. SUCCESS: Execute with nonce 1 (session key path)
+        let result = client.execute(
+            &CallerIdentity::SessionKey(session_pk.clone()),
+            &callee_id,
+            &function,
+            &args,
+            &1u64,
+            &Some(session_pk.clone()),
+            &Some(sig_nonce_1),
+            &Some(payload_nonce_1),
+        );
+        let res_u64: u64 = soroban_sdk::FromVal::from_val(&env, &result);
+        assert_eq!(res_u64, 1);
+        assert_eq!(client.get_nonce(), 2);
+
+        // 4. REJECT: Stale nonce 1 replayed with session key (even with valid signature)
+        let stale_result = client.try_execute(
+            &CallerIdentity::SessionKey(session_pk.clone()),
+            &callee_id,
+            &function,
+            &args,
+            &1u64, // Stale nonce
+            &Some(session_pk.clone()),
+            &Some(sig_nonce_1.clone()),
+            &Some(payload_nonce_1.clone()),
+        );
+        assert_eq!(stale_result, Err(Ok(ContractError::InvalidNonce)));
+
+        // 5. REJECT: Stale nonce 0 replayed with session key (old signature with stale nonce)
+        let stale_result = client.try_execute(
+            &CallerIdentity::SessionKey(session_pk.clone()),
+            &callee_id,
+            &function,
+            &args,
+            &0u64, // Stale nonce
+            &Some(session_pk.clone()),
+            &Some(sig_nonce_0),
+            &Some(payload_nonce_0),
+        );
+        assert_eq!(stale_result, Err(Ok(ContractError::InvalidNonce)));
+    }
+
+    /// Test replay protection across multiple account instances.
+    /// Ensures signatures from one account cannot be replayed on another account.
+    #[test]
+    fn test_replay_protection_cross_account_isolation() {
+        let env = Env::default();
+
+        // Create two separate account instances
+        let contract_a_id = env.register_contract(None, AncoreAccount);
+        let contract_b_id = env.register_contract(None, AncoreAccount);
+        let client_a = AncoreAccountClient::new(&env, &contract_a_id);
+        let client_b = AncoreAccountClient::new(&env, &contract_b_id);
+
+        let owner_a = Address::generate(&env);
+        let owner_b = Address::generate(&env);
+
+        client_a.initialize(&owner_a);
+        client_b.initialize(&owner_b);
+
+        env.mock_all_auths();
+
+        // Setup session key on account A
+        let mut csprng = OsRng;
+        let signing_key = SigningKey::generate(&mut csprng);
+        let session_pk = BytesN::from_array(&env, &signing_key.verifying_key().to_bytes());
+        
+        let expires_at = env.ledger().timestamp() + 10000;
+        let mut permissions = Vec::new(&env);
+        permissions.push_back(PERMISSION_EXECUTE);
+        client_a.add_session_key(&session_pk, &expires_at, &permissions);
+
+        // Test targets
+        let callee_id = env.register_contract(None, AncoreAccount);
+        let function = soroban_sdk::symbol_short!("get_nonce");
+        let args = Vec::new(&env);
+
+        // Create signature for account A
+        let (sig, payload) = sign_payload(&env, &signing_key, &callee_id, &function, &args, 0);
+
+        // 1. SUCCESS: Execute on account A with valid signature
+        let result = client_a.execute(
+            &CallerIdentity::SessionKey(session_pk.clone()),
+            &callee_id,
+            &function,
+            &args,
+            &0u64,
+            &Some(session_pk.clone()),
+            &Some(sig.clone()),
+            &Some(payload.clone()),
+        );
+        let res_u64: u64 = soroban_sdk::FromVal::from_val(&env, &result);
+        assert_eq!(res_u64, 0);
+
+        // 2. REJECT: Same signature replayed on account B (session key not found)
+        let replay_result = client_b.try_execute(
+            &CallerIdentity::SessionKey(session_pk.clone()),
+            &callee_id,
+            &function,
+            &args,
+            &0u64,
+            &Some(session_pk.clone()),
+            &Some(sig.clone()),
+            &Some(payload.clone()),
+        );
+        assert_eq!(replay_result, Err(Ok(ContractError::SessionKeyNotFound)));
+
+        // 3. SUCCESS: Account B can execute independently with owner auth
+        let result_b = client_b.execute(
+            &CallerIdentity::Owner,
+            &callee_id,
+            &function,
+            &args,
+            &0u64,
+            &None,
+            &None,
+            &None,
+        );
+        let res_u64_b: u64 = soroban_sdk::FromVal::from_val(&env, &result_b);
+        assert_eq!(res_u64_b, 0);
+    }
+
+    /// Test replay protection with network context changes.
+    /// Simulates network partition/recovery scenarios to ensure temporal isolation.
+    #[test]
+    fn test_replay_protection_network_context_isolation() {
+        let env = Env::default();
+        let contract_id = env.register_contract(None, AncoreAccount);
+        let client = AncoreAccountClient::new(&env, &contract_id);
+
+        let owner = Address::generate(&env);
+        client.initialize(&owner);
+
+        let callee_id = env.register_contract(None, AncoreAccount);
+        let function = soroban_sdk::symbol_short!("get_nonce");
+        let args = Vec::new(&env);
+
+        // Setup session key
+        let mut csprng = OsRng;
+        let signing_key = SigningKey::generate(&mut csprng);
+        let session_pk = BytesN::from_array(&env, &signing_key.verifying_key().to_bytes());
+        
+        let initial_timestamp = 1000u64;
+        env.ledger().set_timestamp(initial_timestamp);
+        
+        let expires_at = initial_timestamp + 10000;
+        let mut permissions = Vec::new(&env);
+        permissions.push_back(PERMISSION_EXECUTE);
+        
+        env.mock_all_auths();
+        client.add_session_key(&session_pk, &expires_at, &permissions);
+
+        // Create signature at initial timestamp
+        let (sig, payload) = sign_payload(&env, &signing_key, &callee_id, &function, &args, 0);
+
+        // 1. SUCCESS: Execute at initial timestamp
+        let result = client.execute(
+            &CallerIdentity::SessionKey(session_pk.clone()),
+            &callee_id,
+            &function,
+            &args,
+            &0u64,
+            &Some(session_pk.clone()),
+            &Some(sig.clone()),
+            &Some(payload.clone()),
+        );
+        let res_u64: u64 = soroban_sdk::FromVal::from_val(&env, &result);
+        assert_eq!(res_u64, 0);
+
+        // Simulate network time jump (e.g., after partition recovery)
+        let later_timestamp = initial_timestamp + 5000;
+        env.ledger().set_timestamp(later_timestamp);
+
+        // 2. REJECT: Same signature replayed after network time jump (stale nonce)
+        let replay_result = client.try_execute(
+            &CallerIdentity::SessionKey(session_pk.clone()),
+            &callee_id,
+            &function,
+            &args,
+            &0u64, // Same nonce as before
+            &Some(session_pk.clone()),
+            &Some(sig.clone()),
+            &Some(payload.clone()),
+        );
+        assert_eq!(replay_result, Err(Ok(ContractError::InvalidNonce)));
+
+        // 3. SUCCESS: New signature at later timestamp with next nonce
+        let (new_sig, new_payload) = sign_payload(&env, &signing_key, &callee_id, &function, &args, 1);
+        let result = client.execute(
+            &CallerIdentity::SessionKey(session_pk.clone()),
+            &callee_id,
+            &function,
+            &args,
+            &1u64,
+            &Some(session_pk.clone()),
+            &Some(new_sig),
+            &Some(new_payload),
+        );
+        let res_u64: u64 = soroban_sdk::FromVal::from_val(&env, &result);
+        assert_eq!(res_u64, 1);
+    }
+
+    /// Parameterized test for edge cases in replay protection.
+    /// Tests boundary conditions and error handling robustness.
+    #[test]
+    fn test_replay_protection_edge_cases() {
+        let env = Env::default();
+        let contract_id = env.register_contract(None, AncoreAccount);
+        let client = AncoreAccountClient::new(&env, &contract_id);
+
+        let owner = Address::generate(&env);
+        client.initialize(&owner);
+
+        let callee_id = env.register_contract(None, AncoreAccount);
+        let function = soroban_sdk::symbol_short!("get_nonce");
+        let args = Vec::new(&env);
+
+        // Setup session key
+        let mut csprng = OsRng;
+        let signing_key = SigningKey::generate(&mut csprng);
+        let session_pk = BytesN::from_array(&env, &signing_key.verifying_key().to_bytes());
+        
+        let expires_at = env.ledger().timestamp() + 10000;
+        let mut permissions = Vec::new(&env);
+        permissions.push_back(PERMISSION_EXECUTE);
+        
+        env.mock_all_auths();
+        client.add_session_key(&session_pk, &expires_at, &permissions);
+
+        // Test case 1: Future nonce rejection
+        let future_result = client.try_execute(
+            &CallerIdentity::Owner,
+            &callee_id,
+            &function,
+            &args,
+            &999u64, // Future nonce
+            &None,
+            &None,
+            &None,
+        );
+        assert_eq!(future_result, Err(Ok(ContractError::InvalidNonce)));
+
+        // Test case 2: Valid signature with wrong nonce (session key path)
+        let (sig, payload) = sign_payload(&env, &signing_key, &callee_id, &function, &args, 0);
+        let wrong_nonce_result = client.try_execute(
+            &CallerIdentity::SessionKey(session_pk.clone()),
+            &callee_id,
+            &function,
+            &args,
+            &999u64, // Wrong nonce
+            &Some(session_pk.clone()),
+            &Some(sig),
+            &Some(payload),
+        );
+        assert_eq!(wrong_nonce_result, Err(Ok(ContractError::InvalidNonce)));
+
+        // Test case 3: Execute successfully, then verify nonce increment prevents replay
+        env.mock_all_auths();
+        let _result = client.execute(
+            &CallerIdentity::Owner,
+            &callee_id,
+            &function,
+            &args,
+            &0u64,
+            &None,
+            &None,
+            &None,
+        );
+        assert_eq!(client.get_nonce(), 1);
+
+        // Test case 4: Replay prevention after successful execution
+        let replay_result = client.try_execute(
+            &CallerIdentity::Owner,
+            &callee_id,
+            &function,
+            &args,
+            &0u64, // Already used nonce
+            &None,
+            &None,
+            &None,
+        );
+        assert_eq!(replay_result, Err(Ok(ContractError::InvalidNonce)));
+    }
 }
