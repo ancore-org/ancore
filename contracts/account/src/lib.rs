@@ -174,6 +174,7 @@ impl AncoreAccount {
     /// # Security
     /// - Caller must be owner OR provide a valid session key signature
     /// - `expected_nonce` must match current nonce (replay protection)
+    /// - Session key signatures are bound to exact call parameters (to, function, args, nonce)
     /// - Nonce is incremented before invocation (checks-effects-interactions)
     pub fn execute(
         env: Env,
@@ -211,6 +212,13 @@ impl AncoreAccount {
 
             let sig = signature.ok_or(ContractError::InvalidSignature)?;
             let payload = signature_payload.ok_or(ContractError::InvalidSignature)?;
+
+            // CRITICAL: Bind signature to actual call parameters to prevent replay attacks
+            // The signature must be for the exact (to, function, args, nonce) tuple being executed
+            let expected_payload = Self::create_signature_payload(&env, &to, &function, &args, expected_nonce);
+            if payload != expected_payload {
+                return Err(ContractError::InvalidSignature);
+            }
 
             // Verify signature using ed25519
             env.crypto().ed25519_verify(&session_pk, &payload, &sig);
@@ -399,6 +407,24 @@ impl AncoreAccount {
             threshold,
             ledgers_to_live,
         );
+    }
+
+    /// Create canonical signature payload for replay protection.
+    /// This MUST match the exact format used by test helpers for signature verification.
+    /// Critical security: Binds signatures to specific (to, function, args, nonce) tuples.
+    fn create_signature_payload(
+        env: &Env,
+        to: &Address,
+        function: &soroban_sdk::Symbol,
+        args: &Vec<Val>,
+        nonce: u64,
+    ) -> soroban_sdk::Bytes {
+        let mut payload = soroban_sdk::Bytes::new(env);
+        payload.append(&to.clone().to_xdr(env));
+        payload.append(&function.clone().to_xdr(env));
+        payload.append(&args.clone().to_xdr(env));
+        payload.append(&nonce.to_xdr(env));
+        payload
     }
 }
 
@@ -1568,8 +1594,9 @@ mod test {
         assert_eq!(res_u64_b, 0);
     }
 
-    /// Test replay protection with network context changes.
-    /// Simulates network partition/recovery scenarios to ensure temporal isolation.
+    /// Test replay protection with network context changes and time-based expiration.
+    /// Simulates network partition/recovery scenarios to ensure temporal isolation
+    /// through session key expiration validation.
     #[test]
     fn test_replay_protection_network_context_isolation() {
         let env = Env::default();
@@ -1583,7 +1610,7 @@ mod test {
         let function = soroban_sdk::symbol_short!("get_nonce");
         let args = Vec::new(&env);
 
-        // Setup session key
+        // Setup session key with specific expiration
         let mut csprng = OsRng;
         let signing_key = SigningKey::generate(&mut csprng);
         let session_pk = BytesN::from_array(&env, &signing_key.verifying_key().to_bytes());
@@ -1591,7 +1618,7 @@ mod test {
         let initial_timestamp = 1000u64;
         env.ledger().set_timestamp(initial_timestamp);
         
-        let expires_at = initial_timestamp + 10000;
+        let expires_at = initial_timestamp + 10000; // Expires at timestamp 11000
         let mut permissions = Vec::new(&env);
         permissions.push_back(PERMISSION_EXECUTE);
         
@@ -1601,7 +1628,7 @@ mod test {
         // Create signature at initial timestamp
         let (sig, payload) = sign_payload(&env, &signing_key, &callee_id, &function, &args, 0);
 
-        // 1. SUCCESS: Execute at initial timestamp
+        // 1. SUCCESS: Execute before expiration
         let result = client.execute(
             &CallerIdentity::SessionKey(session_pk.clone()),
             &callee_id,
@@ -1615,26 +1642,27 @@ mod test {
         let res_u64: u64 = soroban_sdk::FromVal::from_val(&env, &result);
         assert_eq!(res_u64, 0);
 
-        // Simulate network time jump (e.g., after partition recovery)
-        let later_timestamp = initial_timestamp + 5000;
-        env.ledger().set_timestamp(later_timestamp);
+        // Simulate network time jump past session key expiration
+        let expired_timestamp = expires_at + 1; // Past expiration
+        env.ledger().set_timestamp(expired_timestamp);
 
-        // 2. REJECT: Same signature replayed after network time jump (stale nonce)
+        // 2. REJECT: Same signature replayed after session key expiration
         let replay_result = client.try_execute(
             &CallerIdentity::SessionKey(session_pk.clone()),
             &callee_id,
             &function,
             &args,
-            &0u64, // Same nonce as before
+            &1u64, // Next nonce
             &Some(session_pk.clone()),
             &Some(sig.clone()),
             &Some(payload.clone()),
         );
-        assert_eq!(replay_result, Err(Ok(ContractError::InvalidNonce)));
+        // Should fail due to session key expiration, not nonce mismatch
+        assert_eq!(replay_result, Err(Ok(ContractError::SessionKeyExpired)));
 
-        // 3. SUCCESS: New signature at later timestamp with next nonce
+        // 3. REJECT: Even new signature fails after expiration (temporal isolation enforced)
         let (new_sig, new_payload) = sign_payload(&env, &signing_key, &callee_id, &function, &args, 1);
-        let result = client.execute(
+        let expired_result = client.try_execute(
             &CallerIdentity::SessionKey(session_pk.clone()),
             &callee_id,
             &function,
@@ -1644,8 +1672,23 @@ mod test {
             &Some(new_sig),
             &Some(new_payload),
         );
-        let res_u64: u64 = soroban_sdk::FromVal::from_val(&env, &result);
-        assert_eq!(res_u64, 1);
+        // Should still fail due to session key expiration
+        assert_eq!(expired_result, Err(Ok(ContractError::SessionKeyExpired)));
+
+        // 4. SUCCESS: Owner path still works after session key expiration
+        env.mock_all_auths();
+        let owner_result = client.execute(
+            &CallerIdentity::Owner,
+            &callee_id,
+            &function,
+            &args,
+            &1u64,
+            &None,
+            &None,
+            &None,
+        );
+        let owner_res_u64: u64 = soroban_sdk::FromVal::from_val(&env, &owner_result);
+        assert_eq!(owner_res_u64, 1);
     }
 
     /// Parameterized test for edge cases in replay protection.
