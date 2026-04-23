@@ -1,0 +1,71 @@
+# Prometheus scrape configuration — ancore mainnet
+# Assumes Prometheus + Grafana stack.
+# Replace service names and ports with actual values from services/ directory.
+
+global:
+  scrape_interval:     15s
+  evaluation_interval: 15s
+  external_labels:
+    environment: mainnet
+    project:     ancore
+
+rule_files:
+  - /etc/prometheus/alerts/availability.yml
+  - /etc/prometheus/alerts/latency.yml
+  - /etc/prometheus/alerts/infrastructure.yml
+  - /etc/prometheus/alerts/blockchain.yml
+
+alerting:
+  alertmanagers:
+    - static_configs:
+        - targets: ['alertmanager:9093']
+
+scrape_configs:
+  - job_name: node-exporter
+    static_configs:
+      - targets: ['node-exporter:9100']
+
+  # Placeholder service configurations - update with actual ports when services are deployed
+  - job_name: relayer
+    metrics_path: /metrics
+    scrape_interval: 15s
+    static_configs:
+      - targets: ['relayer:8080']
+    relabel_configs:
+      - source_labels: [__address__]
+        target_label: instance
+        regex: '([^:]+)(?::\d+)?'
+        replacement: '$1'
+
+  - job_name: indexer
+    metrics_path: /metrics
+    scrape_interval: 15s
+    static_configs:
+      - targets: ['indexer:8081']
+    relabel_configs:
+      - source_labels: [__address__]
+        target_label: instance
+        regex: '([^:]+)(?::\d+)?'
+        replacement: '$1'
+
+  - job_name: ai-agent
+    metrics_path: /metrics
+    scrape_interval: 15s
+    static_configs:
+      - targets: ['ai-agent:8082']
+    relabel_configs:
+      - source_labels: [__address__]
+        target_label: instance
+        regex: '([^:]+)(?::\d+)?'
+        replacement: '$1'
+
+  - job_name: stellar-core
+    metrics_path: /metrics
+    scrape_interval: 15s
+    static_configs:
+      - targets: ['stellar-core:11626']
+    relabel_configs:
+      - source_labels: [__address__]
+        target_label: instance
+        regex: '([^:]+)(?::\d+)?'
+        replacement: '$1'

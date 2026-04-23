@@ -1,0 +1,54 @@
+# Latency alerts — ancore mainnet
+
+groups:
+  - name: ancore.latency
+    rules:
+
+      - alert: HighP95Latency
+        expr: >
+          histogram_quantile(0.95,
+            rate(http_request_duration_seconds_bucket[5m])
+          ) > 0.5
+        for: 5m
+        labels:
+          severity: warning
+          escalation: slack
+          team: platform
+        annotations:
+          summary: "P95 latency exceeds SLO on {{ $labels.job }}"
+          description: >
+            P95 latency is {{ $value | humanizeDuration }}
+            (SLO: 500ms) on {{ $labels.job }}.
+          runbook_url: "https://github.com/ancore-org/ancore/blob/main/docs/ops/runbooks/high-latency.md"
+
+      - alert: HighP99Latency
+        expr: >
+          histogram_quantile(0.99,
+            rate(http_request_duration_seconds_bucket[5m])
+          ) > 2.0
+        for: 5m
+        labels:
+          severity: critical
+          escalation: pagerduty
+          team: platform
+        annotations:
+          summary: "P99 latency breaching SLO on {{ $labels.job }}"
+          description: >
+            P99 latency is {{ $value | humanizeDuration }}
+            (SLO: 2000ms) on {{ $labels.job }}.
+          runbook_url: "https://github.com/ancore-org/ancore/blob/main/docs/ops/runbooks/high-latency.md"
+
+      - alert: LatencySpikeDetected
+        # Detects sudden 2× increase relative to the 1h baseline
+        expr: >
+          histogram_quantile(0.95, rate(http_request_duration_seconds_bucket[5m]))
+          >
+          2 * histogram_quantile(0.95, rate(http_request_duration_seconds_bucket[1h] offset 5m))
+        for: 3m
+        labels:
+          severity: warning
+          escalation: slack
+        annotations:
+          summary: "Latency spike on {{ $labels.job }}"
+          description: "P95 latency doubled relative to 1-hour baseline."
+          runbook_url: "https://github.com/ancore-org/ancore/blob/main/docs/ops/runbooks/high-latency.md"
