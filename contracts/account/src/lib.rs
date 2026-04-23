@@ -45,6 +45,8 @@ pub enum ContractError {
     InsufficientPermission = 7,
     /// Invalid version provided for migration
     InvalidVersion = 8,
+    /// Session key expiry timestamp is invalid (e.g. zero)
+    InvalidExpiration = 9,
 }
 
 /// Event topic naming convention
@@ -244,6 +246,10 @@ impl AncoreAccount {
         expires_at: u64,
         permissions: Vec<u32>,
     ) -> Result<(), ContractError> {
+        if expires_at == 0 {
+            return Err(ContractError::InvalidExpiration);
+        }
+
         let owner = Self::get_owner(env.clone())?;
         owner.require_auth();
 
@@ -1152,5 +1158,42 @@ mod test {
 
         let res_u64: u64 = soroban_sdk::FromVal::from_val(&env, &result);
         assert_eq!(res_u64, 0);
+    }
+
+    #[test]
+    fn test_add_session_key_zero_expiry_rejected() {
+        let env = Env::default();
+        let contract_id = env.register_contract(None, AncoreAccount);
+        let client = AncoreAccountClient::new(&env, &contract_id);
+
+        let owner = Address::generate(&env);
+        client.initialize(&owner);
+        env.mock_all_auths();
+
+        let session_pk = BytesN::from_array(&env, &[1u8; 32]);
+        let permissions = Vec::new(&env);
+
+        let result = client.try_add_session_key(&session_pk, &0u64, &permissions);
+
+        assert_eq!(result, Err(Ok(ContractError::InvalidExpiration)));
+    }
+
+    #[test]
+    fn test_add_session_key_nonzero_expiry_succeeds() {
+        let env = Env::default();
+        let contract_id = env.register_contract(None, AncoreAccount);
+        let client = AncoreAccountClient::new(&env, &contract_id);
+
+        let owner = Address::generate(&env);
+        client.initialize(&owner);
+        env.mock_all_auths();
+
+        let session_pk = BytesN::from_array(&env, &[2u8; 32]);
+        let permissions = Vec::new(&env);
+
+        // expires_at = 1 is the minimum valid value
+        let result = client.try_add_session_key(&session_pk, &1u64, &permissions);
+        assert!(result.is_ok());
+        assert!(client.has_session_key(&session_pk));
     }
 }
