@@ -5,6 +5,11 @@ import { renderHook, act } from '@testing-library/react';
 import { NotificationProvider } from '@ancore/ui-kit';
 
 import { useSettings } from '../../../hooks/useSettings';
+import {
+  DASHBOARD_SETTINGS_STORAGE_KEY,
+  DEFAULT_DASHBOARD_SETTINGS,
+  useDashboardSettingsStore,
+} from '../../../state/dashboard-settings';
 import { SettingsScreen } from '../SettingsScreen';
 import { NetworkSettings } from '../NetworkSettings';
 import { SecuritySettings } from '../SecuritySettings';
@@ -22,30 +27,48 @@ function renderSettingsScreen() {
 // ── useSettings ──────────────────────────────────────────────────────────────
 
 describe('useSettings', () => {
-  beforeEach(() => localStorage.clear());
+  beforeEach(() => {
+    localStorage.clear();
+    useDashboardSettingsStore.setState(DEFAULT_DASHBOARD_SETTINGS);
+  });
 
   it('returns default settings on first load', () => {
     const { result } = renderHook(() => useSettings());
     expect(result.current.settings.network).toBe('testnet');
     expect(result.current.settings.autoLockTimeout).toBe(5);
+    expect(result.current.settings.environment).toBe('production');
+    expect(result.current.settings.displayPreference).toBe('comfortable');
   });
 
   it('persists settings to localStorage', () => {
     const { result } = renderHook(() => useSettings());
-    act(() => result.current.updateSettings({ network: 'mainnet' }));
+    act(() => result.current.updateSettings({ network: 'mainnet', environment: 'staging' }));
     expect(result.current.settings.network).toBe('mainnet');
-    const stored = JSON.parse(localStorage.getItem('ancore_settings')!);
-    expect(stored.network).toBe('mainnet');
+    const stored = JSON.parse(localStorage.getItem(DASHBOARD_SETTINGS_STORAGE_KEY)!);
+    expect(stored.state.network).toBe('mainnet');
+    expect(stored.state.environment).toBe('staging');
   });
 
-  it('rehydrates settings from localStorage', () => {
+  it('rehydrates settings from localStorage', async () => {
     localStorage.setItem(
-      'ancore_settings',
-      JSON.stringify({ network: 'mainnet', autoLockTimeout: 15 })
+      DASHBOARD_SETTINGS_STORAGE_KEY,
+      JSON.stringify({
+        state: {
+          ...DEFAULT_DASHBOARD_SETTINGS,
+          network: 'mainnet',
+          autoLockTimeout: 15,
+          displayPreference: 'compact',
+        },
+        version: 0,
+      })
     );
+
+    await useDashboardSettingsStore.persist.rehydrate();
+
     const { result } = renderHook(() => useSettings());
     expect(result.current.settings.network).toBe('mainnet');
     expect(result.current.settings.autoLockTimeout).toBe(15);
+    expect(result.current.settings.displayPreference).toBe('compact');
   });
 
   it('merges partial updates', () => {
@@ -240,7 +263,10 @@ describe('AboutScreen', () => {
 // ── SettingsScreen (integration) ─────────────────────────────────────────────
 
 describe('SettingsScreen', () => {
-  beforeEach(() => localStorage.clear());
+  beforeEach(() => {
+    localStorage.clear();
+    useDashboardSettingsStore.setState(DEFAULT_DASHBOARD_SETTINGS);
+  });
 
   it('renders all top-level groups', () => {
     renderSettingsScreen();
@@ -274,11 +300,23 @@ describe('SettingsScreen', () => {
     expect(screen.getByText(/0\.1\.0/)).toBeInTheDocument();
   });
 
+  it('navigates to display and environment settings', async () => {
+    renderSettingsScreen();
+
+    await userEvent.click(screen.getByRole('button', { name: /density/i }));
+    expect(screen.getByText(/layout density/i)).toBeInTheDocument();
+
+    await userEvent.click(screen.getByRole('button', { name: /go back/i }));
+    await userEvent.click(screen.getByRole('button', { name: /environment/i }));
+    expect(screen.getByText(/runtime target/i)).toBeInTheDocument();
+  });
+
   it('shows current network in root view', () => {
-    localStorage.setItem(
-      'ancore_settings',
-      JSON.stringify({ network: 'mainnet', autoLockTimeout: 5 })
-    );
+    useDashboardSettingsStore.setState({
+      ...DEFAULT_DASHBOARD_SETTINGS,
+      network: 'mainnet',
+      autoLockTimeout: 5,
+    });
     renderSettingsScreen();
     expect(screen.getAllByText('Mainnet').length).toBeGreaterThanOrEqual(1);
   });
