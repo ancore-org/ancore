@@ -1897,4 +1897,94 @@ mod test {
         client.refresh_session_key_ttl(&session_pk);
         client.revoke_session_key(&session_pk);
     }
+
+    // ─────────────────────────────────────────────────────────────────────────
+    // Issue #211 — Non-owner migrate rejection tests
+    // ─────────────────────────────────────────────────────────────────────────
+
+    #[test]
+    fn test_migrate_unauthorized_caller_rejected() {
+        let env = Env::default();
+        let contract_id = env.register_contract(None, AncoreAccount);
+        let client = AncoreAccountClient::new(&env, &contract_id);
+
+        let owner = Address::generate(&env);
+        client.initialize(&owner);
+
+        // Do NOT mock auth — non-owner caller should be rejected
+        let result = client.try_migrate(&2u32);
+        assert!(
+            result.is_err(),
+            "migrate without owner auth must be rejected"
+        );
+    }
+
+    #[test]
+    fn test_migrate_owner_success() {
+        let env = Env::default();
+        let contract_id = env.register_contract(None, AncoreAccount);
+        let client = AncoreAccountClient::new(&env, &contract_id);
+
+        let owner = Address::generate(&env);
+        client.initialize(&owner);
+        env.mock_all_auths();
+
+        let initial_version = client.get_version();
+        assert_eq!(initial_version, 1u32);
+
+        // Successful migration should increment version
+        client.migrate(&2u32);
+        assert_eq!(client.get_version(), 2u32);
+
+        // Verify migration event was emitted
+        let events_list = env.events().all();
+        assert!(events_list.len() >= 2); // initialized + migrated
+        let (_contract, topics, data) = events_list.get_unchecked(1).clone();
+        
+        let topic_symbol: soroban_sdk::Symbol =
+            soroban_sdk::FromVal::from_val(&env, &topics.get_unchecked(0));
+        assert_eq!(topic_symbol, events::migrated(&env));
+
+        let data_tuple: (u32, u32) = soroban_sdk::FromVal::from_val(&env, &data);
+        assert_eq!(data_tuple.0, 1u32); // old_version
+        assert_eq!(data_tuple.1, 2u32); // new_version
+    }
+
+    #[test]
+    #[should_panic(expected = "Error(Contract, #8)")]
+    fn test_migrate_invalid_version_rejected() {
+        let env = Env::default();
+        let contract_id = env.register_contract(None, AncoreAccount);
+        let client = AncoreAccountClient::new(&env, &contract_id);
+
+        let owner = Address::generate(&env);
+        client.initialize(&owner);
+        env.mock_all_auths();
+
+        // Attempt to migrate to same version should fail with InvalidVersion (#8)
+        client.migrate(&1u32);
+    }
+
+    #[test]
+    fn test_migrate_version_must_be_strictly_increasing() {
+        let env = Env::default();
+        let contract_id = env.register_contract(None, AncoreAccount);
+        let client = AncoreAccountClient::new(&env, &contract_id);
+
+        let owner = Address::generate(&env);
+        client.initialize(&owner);
+        env.mock_all_auths();
+
+        let initial_version = client.get_version();
+
+        // Try to migrate to lower version
+        let result = client.try_migrate(&0u32);
+        assert_eq!(result, Err(Ok(ContractError::InvalidVersion)));
+        assert_eq!(client.get_version(), initial_version);
+
+        // Try to migrate to same version  
+        let result = client.try_migrate(&initial_version);
+        assert_eq!(result, Err(Ok(ContractError::InvalidVersion)));
+        assert_eq!(client.get_version(), initial_version);
+    }
 }
