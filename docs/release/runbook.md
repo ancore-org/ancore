@@ -12,6 +12,27 @@ Step-by-step guide for cutting an Ancore release and operating the release gate.
 
 ---
 
+## 0. MVP Gate (first production release only)
+
+Before cutting the first production release, the MVP gate must pass in addition
+to the standard release checklist.
+
+1. Open `docs/release/mvp-gate-checklist.md` and work through every section.
+2. Collect all required evidence artifacts (see §8 of the checklist) and store
+   them in the release artifact store.
+3. Schedule the **gate review meeting** with all sign-off stakeholders (§10).
+4. Record the go/no-go decision in §11 of the checklist.
+5. Commit the completed checklist before proceeding to step 1 below:
+   ```bash
+   git add docs/release/mvp-gate-checklist.md
+   git commit -m "chore(release): MVP gate sign-off for vX.Y.Z"
+   git push origin main
+   ```
+
+> For subsequent releases, skip this step and use only `docs/release/checklist.md`.
+
+---
+
 ## 1. Pre-release preparation
 
 1. Ensure all feature branches targeting this release are merged to `main`.
