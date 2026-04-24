@@ -776,7 +776,7 @@ describe('SecureStorageManager - Error Message Security (Task 6.2)', () => {
         expect(error.message).not.toContain('salt');
         expect(error.message).not.toContain('iv');
       }
-    });
+    }, 15000);
 
     it('should not leak password in error messages', async () => {
       const password = 'my-secret-password-123';

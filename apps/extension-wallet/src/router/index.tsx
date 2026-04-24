@@ -24,6 +24,7 @@ import { NotificationProvider } from '@ancore/ui-kit';
 import { AuthGuard, ExtensionAuthProvider, PublicOnlyGuard, useExtensionAuth } from './AuthGuard';
 import { NavBar } from '../components/Navigation/NavBar';
 import { SettingsScreen } from '../screens/Settings/SettingsScreen';
+import { useDashboardSettingsStore } from '../state/dashboard-settings';
 
 const APP_TITLE = 'Ancore Extension';
 
@@ -54,8 +55,13 @@ function TitleSync() {
 }
 
 function PopupFrame({ children }: { children: React.ReactNode }) {
+  const displayPreference = useDashboardSettingsStore((state) => state.displayPreference);
+
   return (
-    <div className="mx-auto min-h-screen w-[360px] bg-background text-foreground shadow-xl">
+    <div
+      className={`mx-auto min-h-screen w-[360px] bg-background text-foreground shadow-xl ${displayPreference === 'compact' ? 'text-[13px]' : ''}`.trim()}
+      data-display-preference={displayPreference}
+    >
       {children}
     </div>
   );
@@ -298,6 +304,8 @@ function UnlockScreen() {
 
 function HomeScreen() {
   const { authState, lockWallet } = useExtensionAuth();
+  const network = useDashboardSettingsStore((state) => state.network);
+  const environment = useDashboardSettingsStore((state) => state.environment);
 
   return (
     <PageScaffold
@@ -315,7 +323,10 @@ function HomeScreen() {
         </button>
       }
     >
-      <Card title={authState.walletName} description="Demo session wallet">
+      <Card
+        title={authState.walletName}
+        description={`Demo session wallet • ${network} • ${environment}`}
+      >
         <div className="rounded-xl bg-accent px-4 py-3 text-sm text-muted-foreground">
           <p className="font-medium text-foreground">Available balance</p>
           <p className="mt-1 text-2xl font-bold text-foreground">1,245.80 XLM</p>
@@ -360,13 +371,18 @@ function SendScreen() {
 }
 
 function ReceiveScreen() {
+  const network = useDashboardSettingsStore((state) => state.network);
+
   return (
     <PageScaffold
       eyebrow="Payments"
       title="Receive"
       description="Expose the wallet address and handoff to copy or QR actions."
     >
-      <Card title="Receive funds" description="Share this demo address with another wallet.">
+      <Card
+        title="Receive funds"
+        description={`Share this demo address with another wallet on ${network}.`}
+      >
         <div className="rounded-xl border border-dashed border-border bg-background px-4 py-4 text-sm text-muted-foreground">
           GCFX...WALLET
         </div>

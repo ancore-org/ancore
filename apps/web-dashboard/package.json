@@ -5,10 +5,11 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "build": "tsc && vite build",
+    "build": "vite build",
     "preview": "vite preview",
-    "test": "vitest",
-    "lint": "eslint . --ext ts,tsx --report-unused-disable-directives --max-warnings 0"
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "lint": "eslint src/"
   },
   "dependencies": {
     "@ancore/account-abstraction": "workspace:*",

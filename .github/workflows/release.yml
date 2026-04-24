@@ -4,14 +4,75 @@ on:
   push:
     tags:
       - 'v*.*.*'
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: 'Run in dry-run mode (no publish, no GitHub release)'
+        required: false
+        default: 'false'
+        type: choice
+        options: ['true', 'false']
+      rollback_tag:
+        description: 'Tag to roll back to (leave blank for normal run)'
+        required: false
+        default: ''
 
 permissions:
   contents: write
   packages: write
 
+env:
+  DRY_RUN: ${{ github.event.inputs.dry_run || 'false' }}
+
 jobs:
+  # ── Dry-run gate ─────────────────────────────────────────────────────────
+  dry-run:
+    name: Dry-Run Gate
+    runs-on: ubuntu-latest
+    outputs:
+      report: ${{ steps.report.outputs.json }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Rust
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Add wasm32 target
+        run: rustup target add wasm32-unknown-unknown
+
+      - name: Install Stellar CLI
+        run: |
+          mkdir -p ~/.local/bin
+          curl -L https://github.com/stellar/stellar-cli/releases/download/v22.0.1/stellar-cli-22.0.1-x86_64-unknown-linux-gnu.tar.gz \
+            | tar xz -C ~/.local/bin
+          echo "$HOME/.local/bin" >> $GITHUB_PATH
+          stellar version
+
+      - name: Run dry-run script
+        id: dry_run_script
+        working-directory: ./contracts
+        run: |
+          chmod +x scripts/dry-run.sh
+          bash scripts/dry-run.sh --wasm "" --output dry-run-report.json
+          echo "exit_code=$?" >> "$GITHUB_OUTPUT"
+
+      - name: Upload dry-run report
+        id: report
+        uses: actions/upload-artifact@v4
+        with:
+          name: dry-run-report
+          path: contracts/dry-run-report.json
+
+      - name: Fail if dry-run failed
+        if: steps.dry_run_script.outputs.exit_code != '0'
+        run: |
+          echo "Dry-run gate failed. Blocking release."
+          exit 1
+
+  # ── Build Node packages ──────────────────────────────────────────────────
   build:
     name: Build Release
+    needs: dry-run
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -40,13 +101,25 @@ jobs:
         run: pnpm test
 
       - name: Publish to npm
-        if: startsWith(github.ref, 'refs/tags/')
+        if: |
+          startsWith(github.ref, 'refs/tags/') &&
+          env.DRY_RUN == 'false'
         run: pnpm publish -r --no-git-checks
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
 
+      - name: Dry-run npm publish (no-op)
+        if: env.DRY_RUN == 'true'
+        run: |
+          echo "[DRY RUN] Would publish packages to npm"
+          pnpm publish -r --no-git-checks --dry-run || true
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+
+  # ── Build & optimize contracts ───────────────────────────────────────────
   contracts:
     name: Build Contracts
+    needs: dry-run
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -57,8 +130,13 @@ jobs:
       - name: Add wasm32 target
         run: rustup target add wasm32-unknown-unknown
 
-      - name: Install Soroban CLI
-        run: cargo install --locked soroban-cli
+      - name: Install Stellar CLI
+        run: |
+          mkdir -p ~/.local/bin
+          curl -L https://github.com/stellar/stellar-cli/releases/download/v22.0.1/stellar-cli-22.0.1-x86_64-unknown-linux-gnu.tar.gz \
+            | tar xz -C ~/.local/bin
+          echo "$HOME/.local/bin" >> $GITHUB_PATH
+          stellar version
 
       - name: Build contracts
         working-directory: ./contracts
@@ -66,19 +144,24 @@ jobs:
 
       - name: Optimize contracts
         working-directory: ./contracts
-        run: soroban contract optimize --wasm target/wasm32-unknown-unknown/release/*.wasm
+        run: |
+          stellar contract optimize \
+            --wasm account/target/wasm32-unknown-unknown/release/ancore_account.wasm \
+            --output account/target/wasm32-unknown-unknown/release/ancore_account.optimized.wasm
 
       - name: Upload contract artifacts
         uses: actions/upload-artifact@v4
         with:
           name: contracts
           path: |
-            contracts/target/wasm32-unknown-unknown/release/*.wasm
+            contracts/account/target/wasm32-unknown-unknown/release/*.wasm
 
+  # ── Create GitHub release ────────────────────────────────────────────────
   github-release:
     name: Create GitHub Release
     needs: [build, contracts]
     runs-on: ubuntu-latest
+    if: env.DRY_RUN == 'false'
     steps:
       - uses: actions/checkout@v4
         with:
@@ -90,11 +173,22 @@ jobs:
           name: contracts
           path: contracts-build
 
+      - name: Download dry-run report
+        uses: actions/download-artifact@v4
+        with:
+          name: dry-run-report
+          path: .
+
       - name: Generate changelog
         id: changelog
         run: |
           echo "## Changes" > CHANGELOG.md
           git log $(git describe --tags --abbrev=0 HEAD^)..HEAD --pretty=format:"* %s" >> CHANGELOG.md
+          echo "" >> CHANGELOG.md
+          echo "## Dry-Run Report" >> CHANGELOG.md
+          echo '```json' >> CHANGELOG.md
+          cat dry-run-report.json >> CHANGELOG.md
+          echo '```' >> CHANGELOG.md
 
       - name: Create Release
         uses: softprops/action-gh-release@v2
@@ -102,8 +196,64 @@ jobs:
           body_path: CHANGELOG.md
           files: |
             contracts-build/**/*.wasm
-            contracts-build/**/*.json
+            dry-run-report.json
           draft: false
           prerelease: ${{ contains(github.ref, 'alpha') || contains(github.ref, 'beta') || contains(github.ref, 'rc') }}
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  # ── Rollback rehearsal ───────────────────────────────────────────────────
+  rollback:
+    name: Rollback Rehearsal
+    runs-on: ubuntu-latest
+    if: github.event.inputs.rollback_tag != ''
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Validate rollback tag exists
+        id: validate
+        run: |
+          TAG="${{ github.event.inputs.rollback_tag }}"
+          if git rev-parse "refs/tags/$TAG" >/dev/null 2>&1; then
+            echo "tag_sha=$(git rev-list -n1 refs/tags/$TAG)" >> "$GITHUB_OUTPUT"
+            echo "Rollback target $TAG is valid ($(git rev-list -n1 refs/tags/$TAG))"
+          else
+            echo "ERROR: Tag $TAG does not exist"
+            exit 1
+          fi
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v2
+        with:
+          version: 9
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'pnpm'
+
+      - name: Checkout rollback target
+        run: git checkout ${{ steps.validate.outputs.tag_sha }}
+
+      - name: Install dependencies at rollback target
+        run: pnpm install --frozen-lockfile
+
+      - name: Build at rollback target
+        run: pnpm build
+
+      - name: Run tests at rollback target
+        run: pnpm test
+
+      - name: Rollback rehearsal summary
+        run: |
+          echo "## Rollback Rehearsal Summary" >> "$GITHUB_STEP_SUMMARY"
+          echo "| Field | Value |" >> "$GITHUB_STEP_SUMMARY"
+          echo "|-------|-------|" >> "$GITHUB_STEP_SUMMARY"
+          echo "| Target tag | \`${{ github.event.inputs.rollback_tag }}\` |" >> "$GITHUB_STEP_SUMMARY"
+          echo "| Tag SHA | \`${{ steps.validate.outputs.tag_sha }}\` |" >> "$GITHUB_STEP_SUMMARY"
+          echo "| Build | ✓ passed |" >> "$GITHUB_STEP_SUMMARY"
+          echo "| Tests | ✓ passed |" >> "$GITHUB_STEP_SUMMARY"
+          echo "| Rehearsal status | PASS — rollback to this tag is viable |" >> "$GITHUB_STEP_SUMMARY"

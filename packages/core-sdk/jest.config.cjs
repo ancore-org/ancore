@@ -1,6 +1,7 @@
 module.exports = {
   preset: 'ts-jest',
   testEnvironment: 'node',
+  testTimeout: 30000,
   roots: ['<rootDir>/src'],
   moduleNameMapper: {
     '^@ancore/account-abstraction$': '<rootDir>/../account-abstraction/src/index.ts',

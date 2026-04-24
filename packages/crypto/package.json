@@ -8,7 +8,7 @@
   "scripts": {
     "build": "tsup src/index.ts --format cjs,esm --dts",
     "dev": "tsup src/index.ts --format cjs,esm --dts --watch",
-    "test": "jest --coverage",
+    "test": "jest --coverage --runInBand",
     "lint": "eslint src/",
     "clean": "rm -rf dist"
   },

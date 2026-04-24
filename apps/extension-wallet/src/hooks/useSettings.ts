@@ -1,41 +1,38 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useCallback } from 'react';
 import type { Network } from '@ancore/types';
+import {
+  useDashboardSettingsStore,
+  type DashboardEnvironment,
+  type DisplayPreference,
+} from '../state/dashboard-settings';
 
 export interface Settings {
   network: Network;
-  autoLockTimeout: number; // minutes; 0 = never
-}
-
-const SETTINGS_STORAGE_KEY = 'ancore_settings';
-
-const DEFAULT_SETTINGS: Settings = {
-  network: 'testnet',
-  autoLockTimeout: 5,
-};
-
-function readStorage(): Settings {
-  try {
-    const raw = localStorage.getItem(SETTINGS_STORAGE_KEY);
-    return raw ? { ...DEFAULT_SETTINGS, ...JSON.parse(raw) } : DEFAULT_SETTINGS;
-  } catch {
-    return DEFAULT_SETTINGS;
-  }
-}
-
-function writeStorage(settings: Settings): void {
-  localStorage.setItem(SETTINGS_STORAGE_KEY, JSON.stringify(settings));
+  environment: DashboardEnvironment;
+  displayPreference: DisplayPreference;
+  autoLockTimeout: number;
 }
 
 export function useSettings() {
-  const [settings, setSettingsState] = useState<Settings>(readStorage);
+  const network = useDashboardSettingsStore((state) => state.network);
+  const environment = useDashboardSettingsStore((state) => state.environment);
+  const displayPreference = useDashboardSettingsStore((state) => state.displayPreference);
+  const autoLockTimeout = useDashboardSettingsStore((state) => state.autoLockTimeout);
+  const setAll = useDashboardSettingsStore((state) => state.setAll);
 
-  useEffect(() => {
-    writeStorage(settings);
-  }, [settings]);
+  const settings: Settings = {
+    network,
+    environment,
+    displayPreference,
+    autoLockTimeout,
+  };
 
-  const updateSettings = useCallback((patch: Partial<Settings>) => {
-    setSettingsState((prev) => ({ ...prev, ...patch }));
-  }, []);
+  const updateSettings = useCallback(
+    (patch: Partial<Settings>) => {
+      setAll(patch);
+    },
+    [setAll]
+  );
 
   return { settings, updateSettings };
 }

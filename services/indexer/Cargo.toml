@@ -31,6 +31,9 @@ base64 = "0.22"
 thiserror = "1"
 anyhow = "1"
 
+# Async trait support
+async-trait = "0.1"
+
 # Tracing
 tracing = "0.1"
 tracing-subscriber = { version = "0.3", features = ["env-filter"] }

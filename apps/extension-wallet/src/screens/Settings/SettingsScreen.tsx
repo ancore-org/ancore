@@ -1,21 +1,35 @@
 import * as React from 'react';
-import { Globe, Lock, Timer, Key, FileText, Info, Bell } from 'lucide-react';
+import { Globe, Lock, Timer, Key, FileText, Info, Bell, Monitor, Server } from 'lucide-react';
 import { SettingsGroup, SettingItem } from '../../components/SettingsGroup';
 import { NetworkSettings } from './NetworkSettings';
 import { SecuritySettings } from './SecuritySettings';
 import { AboutScreen } from './AboutScreen';
+import { EnvironmentSettings } from './EnvironmentSettings';
+import { DisplaySettings } from './DisplaySettings';
 import { useSettings } from '../../hooks/useSettings';
 import { useToast } from '@ancore/ui-kit';
 import type { Network } from '@ancore/types';
+import { useSettingsStore } from '../../stores/settings';
 
-type SettingsView = 'root' | 'network' | 'security' | 'about';
+type SettingsView = 'root' | 'network' | 'security' | 'environment' | 'display' | 'about';
 
 export function SettingsScreen() {
   const { settings, updateSettings } = useSettings();
+  const runtimeTheme = useSettingsStore((state) => state.theme);
+  const setRuntimeTheme = useSettingsStore((state) => state.setTheme);
+  const setRuntimeNetwork = useSettingsStore((state) => state.setNetwork);
+  const setRuntimeAutoLockMinutes = useSettingsStore((state) => state.setAutoLockMinutes);
+  const requirePasswordForSensitiveActions = useSettingsStore(
+    (state) => state.requirePasswordForSensitiveActions
+  );
+  const setRequirePasswordForSensitiveActions = useSettingsStore(
+    (state) => state.setRequirePasswordForSensitiveActions
+  );
   const [view, setView] = React.useState<SettingsView>('root');
 
   function handleNetworkChange(network: Network) {
     updateSettings({ network });
+    setRuntimeNetwork(network);
   }
 
   if (view === 'network') {
@@ -32,7 +46,34 @@ export function SettingsScreen() {
     return (
       <SecuritySettings
         autoLockTimeout={settings.autoLockTimeout}
-        onAutoLockChange={(autoLockTimeout) => updateSettings({ autoLockTimeout })}
+        onAutoLockChange={(autoLockTimeout) => {
+          updateSettings({ autoLockTimeout });
+          setRuntimeAutoLockMinutes(autoLockTimeout);
+        }}
+        requirePasswordForSensitiveActions={requirePasswordForSensitiveActions}
+        onRequirePasswordForSensitiveActionsChange={setRequirePasswordForSensitiveActions}
+        onBack={() => setView('root')}
+      />
+    );
+  }
+
+  if (view === 'environment') {
+    return (
+      <EnvironmentSettings
+        value={settings.environment}
+        onChange={(environment) => updateSettings({ environment })}
+        onBack={() => setView('root')}
+      />
+    );
+  }
+
+  if (view === 'display') {
+    return (
+      <DisplaySettings
+        value={settings.displayPreference}
+        onChange={(displayPreference) => updateSettings({ displayPreference })}
+        theme={runtimeTheme}
+        onThemeChange={setRuntimeTheme}
         onBack={() => setView('root')}
       />
     );
@@ -45,6 +86,9 @@ export function SettingsScreen() {
   const networkLabel = settings.network.charAt(0).toUpperCase() + settings.network.slice(1);
 
   const timeoutLabel = settings.autoLockTimeout === 0 ? 'Never' : `${settings.autoLockTimeout} min`;
+  const environmentLabel = settings.environment === 'production' ? 'Production' : 'Staging';
+  const displayLabel = settings.displayPreference === 'comfortable' ? 'Comfortable' : 'Compact';
+  const themeLabel = runtimeTheme.charAt(0).toUpperCase() + runtimeTheme.slice(1);
 
   return (
     <div className="flex flex-col min-h-screen bg-background">
@@ -79,6 +123,23 @@ export function SettingsScreen() {
             icon={<Globe className="h-4 w-4" />}
             value={networkLabel}
             onClick={() => setView('network')}
+          />
+          <SettingItem
+            label="Environment"
+            description={`Using ${environmentLabel.toLowerCase()} endpoints`}
+            icon={<Server className="h-4 w-4" />}
+            value={environmentLabel}
+            onClick={() => setView('environment')}
+          />
+        </SettingsGroup>
+
+        <SettingsGroup title="Display">
+          <SettingItem
+            label="Density"
+            description="Control spacing across dashboard pages"
+            icon={<Monitor className="h-4 w-4" />}
+            value={`${displayLabel} • ${themeLabel}`}
+            onClick={() => setView('display')}
           />
         </SettingsGroup>
 
