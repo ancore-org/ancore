@@ -272,8 +272,6 @@ importers:
         specifier: ^1.0.0
         version: 1.6.1(@types/node@25.5.0)(jsdom@23.2.0)
 
-  apps/mobile-wallet:
-
   packages/account-abstraction:
     dependencies:
       '@ancore/crypto':
