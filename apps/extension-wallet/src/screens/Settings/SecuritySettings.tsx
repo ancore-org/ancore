@@ -8,6 +8,8 @@ type SecurityView = 'menu' | 'change-password' | 'auto-lock' | 'export-key' | 'e
 interface SecuritySettingsProps {
   autoLockTimeout: number;
   onAutoLockChange: (minutes: number) => void;
+  requirePasswordForSensitiveActions: boolean;
+  onRequirePasswordForSensitiveActionsChange: (value: boolean) => void;
   onBack: () => void;
 }
 
@@ -167,11 +169,13 @@ function AutoLockView({
 
 function ExportWarningView({
   warningText,
+  requirePassword,
   onConfirm,
   onCancel,
 }: {
   title: string;
   warningText: string;
+  requirePassword: boolean;
   onConfirm: () => void;
   onCancel: () => void;
 }) {
@@ -184,7 +188,7 @@ function ExportWarningView({
 
   function handleReveal(e: React.FormEvent) {
     e.preventDefault();
-    if (!password) {
+    if (requirePassword && !password) {
       setError('Enter your password.');
       return;
     }
@@ -253,13 +257,18 @@ function ExportWarningView({
       </div>
       <div className="space-y-1">
         <label className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
-          Confirm Password
+          {requirePassword ? 'Confirm Password' : 'Password Check (Disabled)'}
         </label>
         <Input
           type="password"
-          placeholder="Enter password to continue"
+          placeholder={
+            requirePassword
+              ? 'Enter password to continue'
+              : 'Sensitive export password check disabled'
+          }
           value={password}
           onChange={(event: React.ChangeEvent<HTMLInputElement>) => setPassword(event.target.value)}
+          disabled={!requirePassword}
         />
       </div>
       {error && <p className="text-xs text-destructive">{error}</p>}
@@ -280,6 +289,8 @@ function ExportWarningView({
 export function SecuritySettings({
   autoLockTimeout,
   onAutoLockChange,
+  requirePasswordForSensitiveActions,
+  onRequirePasswordForSensitiveActionsChange,
   onBack,
 }: SecuritySettingsProps) {
   const [view, setView] = React.useState<SecurityView>('menu');
@@ -301,7 +312,14 @@ export function SecuritySettings({
     <div className="flex flex-col min-h-screen bg-background">
       <ScreenHeader title={titles[view]} onBack={handleBack} />
 
-      {view === 'menu' && <SecurityMenu autoLockTimeout={autoLockTimeout} onNavigate={setView} />}
+      {view === 'menu' && (
+        <SecurityMenu
+          autoLockTimeout={autoLockTimeout}
+          onNavigate={setView}
+          requirePasswordForSensitiveActions={requirePasswordForSensitiveActions}
+          onRequirePasswordForSensitiveActionsChange={onRequirePasswordForSensitiveActionsChange}
+        />
+      )}
       {view === 'change-password' && <ChangePasswordView onDone={() => setView('menu')} />}
       {view === 'auto-lock' && (
         <AutoLockView
@@ -314,6 +332,7 @@ export function SecuritySettings({
         <ExportWarningView
           title="Export Private Key"
           warningText="Your private key grants full control of your account. Anyone with it can steal your funds immediately."
+          requirePassword={requirePasswordForSensitiveActions}
           onConfirm={() => setView('menu')}
           onCancel={() => setView('menu')}
         />
@@ -322,6 +341,7 @@ export function SecuritySettings({
         <ExportWarningView
           title="Export Recovery Phrase"
           warningText="Your recovery phrase can restore your entire wallet. Keep it offline, never share it with anyone."
+          requirePassword={requirePasswordForSensitiveActions}
           onConfirm={() => setView('menu')}
           onCancel={() => setView('menu')}
         />
@@ -333,9 +353,13 @@ export function SecuritySettings({
 function SecurityMenu({
   autoLockTimeout,
   onNavigate,
+  requirePasswordForSensitiveActions,
+  onRequirePasswordForSensitiveActionsChange,
 }: {
   autoLockTimeout: number;
   onNavigate: (v: SecurityView) => void;
+  requirePasswordForSensitiveActions: boolean;
+  onRequirePasswordForSensitiveActionsChange: (value: boolean) => void;
 }) {
   const timeoutLabel = TIMEOUT_OPTIONS.find((o) => o.value === autoLockTimeout)?.label ?? 'Custom';
 
@@ -352,6 +376,14 @@ function SecurityMenu({
           description="Lock after inactivity"
           value={timeoutLabel}
           onClick={() => onNavigate('auto-lock')}
+        />
+        <MenuItem
+          label="Require password for exports"
+          description="Gate key/mnemonic reveal behind password"
+          value={requirePasswordForSensitiveActions ? 'Enabled' : 'Disabled'}
+          onClick={() =>
+            onRequirePasswordForSensitiveActionsChange(!requirePasswordForSensitiveActions)
+          }
         />
       </div>
       <p className="px-1 text-[11px] font-semibold uppercase tracking-widest text-muted-foreground">

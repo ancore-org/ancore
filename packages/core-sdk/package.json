@@ -15,7 +15,7 @@
   "scripts": {
     "build": "tsup src/index.ts --format cjs,esm --tsconfig ./tsconfig.json",
     "dev": "tsup src/index.ts --format cjs,esm --dts --watch",
-    "test": "jest --coverage",
+    "test": "jest --coverage --runInBand",
     "test:integration": "jest --testPathPattern=integration --no-coverage",
     "lint": "eslint src/",
     "clean": "rm -rf dist"
@@ -38,7 +38,7 @@
     "@ancore/types": "workspace:*",
     "@ancore/account-abstraction": "workspace:*",
     "@ancore/stellar": "workspace:*",
-    "@stellar/stellar-sdk": "^13.0.0"
+    "@stellar/stellar-sdk": "^13.3.0"
   },
   "devDependencies": {
     "@eslint/js": "^9.0.0",

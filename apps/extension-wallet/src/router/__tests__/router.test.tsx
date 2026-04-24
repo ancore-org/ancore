@@ -90,4 +90,32 @@ describe('extension router', () => {
 
     expect(await screen.findByRole('heading', { name: /settings/i })).toBeInTheDocument();
   });
+
+  it('applies network and display settings across pages without reload', async () => {
+    const user = userEvent.setup();
+    renderRouter('/settings', {
+      ...DEFAULT_AUTH_STATE,
+      hasOnboarded: true,
+      isUnlocked: true,
+    });
+
+    await user.click(screen.getByRole('button', { name: /environment/i }));
+    await user.click(screen.getByRole('button', { name: /staging/i }));
+    await user.click(screen.getByRole('button', { name: /go back/i }));
+
+    await user.click(screen.getByRole('button', { name: /network/i }));
+    await user.click(screen.getByRole('button', { name: /^testnet/i }));
+
+    await user.click(screen.getByRole('link', { name: /home/i }));
+    expect(await screen.findByText(/testnet • staging/i)).toBeInTheDocument();
+
+    await user.click(screen.getByRole('link', { name: /settings/i }));
+    await user.click(screen.getByRole('button', { name: /density/i }));
+    await user.click(screen.getByRole('button', { name: /compact/i }));
+    await user.click(screen.getByRole('button', { name: /go back/i }));
+
+    await user.click(screen.getByRole('link', { name: /receive/i }));
+    expect(await screen.findByText(/on testnet/i)).toBeInTheDocument();
+    expect(document.querySelector('[data-display-preference="compact"]')).toBeTruthy();
+  });
 });

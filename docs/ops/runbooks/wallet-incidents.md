@@ -6,7 +6,7 @@ Fires when wallet services (extension, mobile, web) experience critical errors, 
 ## Severity & Escalation
 - **Level:** critical (service unavailable) / warning (degraded performance)
 - **Escalation:** PagerDuty (critical) / Slack #ancore-alerts (warning)
-- **Escalation path:** On-call engineer → Wallet lead (Service Lead, L2 at 15 min) → Platform Lead (L3 at 30 min) → CTO (L4 at 60 min) → CEO (L5 at 2 hours)
+- **Escalation path:** On-call engineer → Wallet lead → CTO (> 30 min unresolved)
 
 ## Triage Flow
 

@@ -1,0 +1,167 @@
+name: Rollback Drill
+
+on:
+  # Scheduled: every two weeks on Monday at 09:00 UTC
+  schedule:
+    - cron: '0 9 * * 1/14'
+  # Manual trigger for ad-hoc drills or pre-release verification
+  workflow_dispatch:
+    inputs:
+      release_tag:
+        description: 'Release tag to drill rollback FROM (e.g. v1.2.0)'
+        required: true
+        type: string
+      previous_tag:
+        description: 'Release tag to roll back TO (e.g. v1.1.0)'
+        required: true
+        type: string
+      env:
+        description: 'Target environment'
+        required: false
+        default: 'rc'
+        type: choice
+        options: [rc, staging]
+      dry_run:
+        description: 'Dry run (no destructive commands)'
+        required: false
+        default: 'true'
+        type: choice
+        options: ['true', 'false']
+
+permissions:
+  contents: read
+
+jobs:
+  # ── Resolve tags when triggered by schedule ────────────────────────────────
+  resolve-tags:
+    name: Resolve Release Tags
+    runs-on: ubuntu-latest
+    outputs:
+      release_tag:  ${{ steps.tags.outputs.release_tag }}
+      previous_tag: ${{ steps.tags.outputs.previous_tag }}
+      dry_run:      ${{ steps.tags.outputs.dry_run }}
+      env:          ${{ steps.tags.outputs.env }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Resolve tags
+        id: tags
+        run: |
+          if [[ "${{ github.event_name }}" == "workflow_dispatch" ]]; then
+            echo "release_tag=${{ github.event.inputs.release_tag }}"   >> "$GITHUB_OUTPUT"
+            echo "previous_tag=${{ github.event.inputs.previous_tag }}" >> "$GITHUB_OUTPUT"
+            echo "dry_run=${{ github.event.inputs.dry_run }}"           >> "$GITHUB_OUTPUT"
+            echo "env=${{ github.event.inputs.env }}"                   >> "$GITHUB_OUTPUT"
+          else
+            # Scheduled: use the two most recent semver tags
+            TAGS=$(git tag --sort=-version:refname | grep -E '^v[0-9]+\.[0-9]+\.[0-9]+$' | head -2)
+            RELEASE_TAG=$(echo "$TAGS" | head -1)
+            PREVIOUS_TAG=$(echo "$TAGS" | tail -1)
+
+            if [[ -z "$RELEASE_TAG" || -z "$PREVIOUS_TAG" || "$RELEASE_TAG" == "$PREVIOUS_TAG" ]]; then
+              echo "Not enough semver tags for a scheduled drill — skipping"
+              echo "release_tag=skip"  >> "$GITHUB_OUTPUT"
+              echo "previous_tag=skip" >> "$GITHUB_OUTPUT"
+            else
+              echo "release_tag=${RELEASE_TAG}"   >> "$GITHUB_OUTPUT"
+              echo "previous_tag=${PREVIOUS_TAG}" >> "$GITHUB_OUTPUT"
+            fi
+            echo "dry_run=true" >> "$GITHUB_OUTPUT"
+            echo "env=rc"       >> "$GITHUB_OUTPUT"
+          fi
+
+  # ── Run the drill ──────────────────────────────────────────────────────────
+  drill:
+    name: Run Rollback Drill
+    needs: resolve-tags
+    if: needs.resolve-tags.outputs.release_tag != 'skip'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Make scripts executable
+        run: chmod +x scripts/release/rollback-drill.sh scripts/release/verify-artifacts.sh
+
+      - name: Run rollback drill
+        run: |
+          DRY_FLAG=""
+          [[ "${{ needs.resolve-tags.outputs.dry_run }}" == "true" ]] && DRY_FLAG="--dry-run"
+
+          ./scripts/release/rollback-drill.sh \
+            --env       "${{ needs.resolve-tags.outputs.env }}" \
+            --release   "${{ needs.resolve-tags.outputs.release_tag }}" \
+            --previous  "${{ needs.resolve-tags.outputs.previous_tag }}" \
+            --artifacts ./rollback-artifacts \
+            $DRY_FLAG
+        env:
+          STELLAR_NETWORK: ${{ vars.STELLAR_NETWORK || 'testnet' }}
+          # DEPLOYER_SECRET and DATABASE_URL intentionally omitted in dry-run CI
+          # Set them as repository secrets for live drills
+
+      - name: Verify artifacts
+        if: always()
+        run: |
+          ./scripts/release/verify-artifacts.sh \
+            --artifacts ./rollback-artifacts
+
+      - name: Upload drill artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: rollback-drill-${{ needs.resolve-tags.outputs.release_tag }}-${{ github.run_id }}
+          path: rollback-artifacts/
+          retention-days: 90
+
+      - name: Write step summary
+        if: always()
+        run: |
+          LATEST=$(find rollback-artifacts -name summary.json | sort | tail -1)
+          if [[ -f "$LATEST" ]]; then
+            python3 - <<'PYEOF'
+          import json, os
+
+          path = os.popen("find rollback-artifacts -name summary.json | sort | tail -1").read().strip()
+          d = json.load(open(path))
+
+          icon = lambda s: "✅" if s == "pass" else "❌"
+
+          lines = [
+              "# Rollback Drill Report",
+              "",
+              f"| Field | Value |",
+              f"|-------|-------|",
+              f"| Drill ID | `{d['drill_id']}` |",
+              f"| Environment | `{d['env']}` |",
+              f"| Rolled back from | `{d['release_tag']}` |",
+              f"| Rolled back to | `{d['previous_tag']}` |",
+              f"| Dry run | `{d['dry_run']}` |",
+              f"| Start | {d['rollback_start']} |",
+              f"| End | {d['rollback_end']} |",
+              "",
+              "## Check Results",
+              "",
+              "| Check | Status |",
+              "|-------|--------|",
+          ]
+
+          for c in d.get("checks", []):
+              lines.append(f"| {c['check']} | {icon(c['status'])} `{c['status']}` |")
+
+          lines += [
+              "",
+              f"## Overall: {icon(d['overall'])} `{d['overall'].upper()}`",
+              "",
+              f"Passed: {d['checks_passed']}  Failed: {d['checks_failed']}",
+          ]
+
+          report = "\n".join(lines)
+          print(report)
+
+          with open(os.environ.get("GITHUB_STEP_SUMMARY", "/dev/null"), "a") as f:
+              f.write(report)
+          PYEOF
+          fi

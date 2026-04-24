@@ -9,7 +9,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { SecureStorageManager } from '@ancore/core-sdk';
 import { createStorageAdapter } from '@ancore/core-sdk';
 import { LockManager } from '../security/lock-manager';
-import { getSettingsState } from '../stores/settings';
+import { getSettingsState, useSettingsStore } from '../stores/settings';
 import { setSessionState } from '../stores/session';
 
 // Singleton storage manager shared across hook instances
@@ -50,8 +50,14 @@ export function useLockManager(): UseLockManagerResult {
     });
 
     managerRef.current = manager;
+    const unsubscribe = useSettingsStore.subscribe((state, previousState) => {
+      if (state.autoLockMinutes !== previousState.autoLockMinutes) {
+        manager.setAutoLockMinutes(state.autoLockMinutes);
+      }
+    });
 
     return () => {
+      unsubscribe();
       manager.destroy();
       managerRef.current = null;
     };

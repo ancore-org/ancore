@@ -1,0 +1,383 @@
+name: Release Gate
+
+on:
+  push:
+    tags:
+      - 'v*.*.*'
+  workflow_dispatch:
+    inputs:
+      override_reason:
+        description: 'Manual override reason (required when bypassing a failed gate)'
+        required: false
+        type: string
+
+permissions:
+  contents: write
+  checks: write
+
+concurrency:
+  group: release-gate-${{ github.ref }}
+  cancel-in-progress: false   # never cancel an in-flight release gate
+
+# ─────────────────────────────────────────────────────────────────────────────
+# GATE 1 — TypeScript build & tests
+# ─────────────────────────────────────────────────────────────────────────────
+jobs:
+  gate-ts-build:
+    name: '[Gate 1] TS Build & Tests'
+    runs-on: ubuntu-latest
+    outputs:
+      status: ${{ steps.result.outputs.status }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v2
+        with:
+          version: 9
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'pnpm'
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Build all packages
+        run: pnpm build
+
+      - name: Run all tests
+        run: pnpm test
+
+      - name: Check formatting
+        run: pnpm format:check
+
+      - id: result
+        if: always()
+        run: echo "status=${{ job.status }}" >> "$GITHUB_OUTPUT"
+
+# ─────────────────────────────────────────────────────────────────────────────
+# GATE 2 — Rust contracts build, lint & tests
+# ─────────────────────────────────────────────────────────────────────────────
+  gate-contracts:
+    name: '[Gate 2] Contracts Build & Tests'
+    runs-on: ubuntu-latest
+    outputs:
+      status: ${{ steps.result.outputs.status }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt,clippy
+          targets: wasm32-unknown-unknown
+
+      - name: Cache Cargo
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/bin
+            ~/.cargo/registry/index
+            ~/.cargo/registry/cache
+            ~/.cargo/git/db
+            contracts/target
+          key: ${{ runner.os }}-cargo-${{ hashFiles('contracts/Cargo.lock') }}
+
+      - name: Install Stellar CLI
+        run: |
+          mkdir -p ~/.local/bin
+          curl -L https://github.com/stellar/stellar-cli/releases/download/v22.0.1/stellar-cli-22.0.1-x86_64-unknown-linux-gnu.tar.gz \
+            | tar xz -C ~/.local/bin
+          echo "$HOME/.local/bin" >> $GITHUB_PATH
+
+      - name: Build contracts
+        working-directory: ./contracts
+        run: stellar contract build
+
+      - name: Clippy (deny warnings)
+        working-directory: ./contracts
+        run: cargo clippy -- -D warnings
+
+      - name: Rust formatting
+        working-directory: ./contracts
+        run: cargo fmt --check
+
+      - name: Contract unit tests
+        working-directory: ./contracts
+        run: cargo test
+
+      - id: result
+        if: always()
+        run: echo "status=${{ job.status }}" >> "$GITHUB_OUTPUT"
+
+# ─────────────────────────────────────────────────────────────────────────────
+# GATE 3 — Security audit (npm + cargo)
+# ─────────────────────────────────────────────────────────────────────────────
+  gate-security:
+    name: '[Gate 3] Security Audit'
+    runs-on: ubuntu-latest
+    outputs:
+      status: ${{ steps.result.outputs.status }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v2
+        with:
+          version: 9
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'pnpm'
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: npm audit (high+)
+        run: pnpm audit --audit-level=high
+
+      - uses: dtolnay/rust-toolchain@stable
+
+      - name: Install cargo-audit
+        run: cargo install --locked cargo-audit
+
+      - name: Cargo audit
+        working-directory: ./contracts
+        run: cargo audit
+
+      - id: result
+        if: always()
+        run: echo "status=${{ job.status }}" >> "$GITHUB_OUTPUT"
+
+# ─────────────────────────────────────────────────────────────────────────────
+# GATE 4 — Observability config validation
+# ─────────────────────────────────────────────────────────────────────────────
+  gate-observability:
+    name: '[Gate 4] Observability Configs'
+    runs-on: ubuntu-latest
+    outputs:
+      status: ${{ steps.result.outputs.status }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install promtool
+        run: |
+          PROM_VER=2.48.0
+          wget -q "https://github.com/prometheus/prometheus/releases/download/v${PROM_VER}/prometheus-${PROM_VER}.linux-amd64.tar.gz"
+          tar xzf "prometheus-${PROM_VER}.linux-amd64.tar.gz"
+          sudo mv "prometheus-${PROM_VER}.linux-amd64/promtool" /usr/local/bin/
+
+      - name: Validate alert rules
+        run: |
+          for f in docs/ops/alerts/*.yml; do
+            echo "Checking $f"
+            promtool check rules "$f"
+          done
+
+      - name: Validate Prometheus config
+        run: |
+          if [ -f services/prometheus.yml ]; then
+            promtool check config services/prometheus.yml
+          fi
+
+      - name: Validate SLO document exists
+        run: test -f docs/ops/slo-definitions.md
+
+      - name: Validate release runbook exists
+        run: test -f docs/release/runbook.md
+
+      - id: result
+        if: always()
+        run: echo "status=${{ job.status }}" >> "$GITHUB_OUTPUT"
+
+# ─────────────────────────────────────────────────────────────────────────────
+# GATE 5 — Release doc completeness
+# ─────────────────────────────────────────────────────────────────────────────
+  gate-release-docs:
+    name: '[Gate 5] Release Docs'
+    runs-on: ubuntu-latest
+    outputs:
+      status: ${{ steps.result.outputs.status }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Verify required release documents
+        run: |
+          python3 - <<'PYEOF'
+          import os, sys
+
+          required = [
+              "docs/release/runbook.md",
+              "docs/release/checklist.md",
+              "SECURITY.md",
+              "CONTRIBUTING.md",
+          ]
+
+          missing = [p for p in required if not os.path.exists(p)]
+
+          if missing:
+              print("Missing required release documents:")
+              for p in missing:
+                  print(f"  ✗ {p}")
+              sys.exit(1)
+
+          print("✓ All required release documents present")
+          PYEOF
+
+      - name: Verify checklist has no unchecked blocking items
+        run: |
+          python3 - <<'PYEOF'
+          import re, sys
+
+          path = "docs/release/checklist.md"
+          content = open(path).read()
+
+          # Lines of the form: - [ ] ... BLOCKING
+          blocking_unchecked = re.findall(
+              r'^\s*-\s+\[ \].*\bBLOCKING\b.*$', content, re.M
+          )
+
+          if blocking_unchecked:
+              print(f"✗ {len(blocking_unchecked)} unchecked BLOCKING item(s) in {path}:")
+              for line in blocking_unchecked:
+                  print(f"  {line.strip()}")
+              sys.exit(1)
+
+          print("✓ No unchecked BLOCKING items in release checklist")
+          PYEOF
+
+      - id: result
+        if: always()
+        run: echo "status=${{ job.status }}" >> "$GITHUB_OUTPUT"
+
+# ─────────────────────────────────────────────────────────────────────────────
+# SUMMARY — Collect all gate results and publish artifact
+# ─────────────────────────────────────────────────────────────────────────────
+  gate-summary:
+    name: Release Gate Summary
+    needs:
+      - gate-ts-build
+      - gate-contracts
+      - gate-security
+      - gate-observability
+      - gate-release-docs
+    runs-on: ubuntu-latest
+    if: always()
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Build gate summary
+        id: summary
+        env:
+          GATE1: ${{ needs.gate-ts-build.outputs.status }}
+          GATE2: ${{ needs.gate-contracts.outputs.status }}
+          GATE3: ${{ needs.gate-security.outputs.status }}
+          GATE4: ${{ needs.gate-observability.outputs.status }}
+          GATE5: ${{ needs.gate-release-docs.outputs.status }}
+          REF:   ${{ github.ref_name }}
+          SHA:   ${{ github.sha }}
+          ACTOR: ${{ github.actor }}
+          OVERRIDE: ${{ github.event.inputs.override_reason }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: |
+          python3 - <<'PYEOF'
+          import os, json
+          from datetime import datetime, timezone
+
+          def icon(s):
+              return "✅" if s == "success" else ("⚠️" if s == "skipped" else "❌")
+
+          gates = {
+              "TS Build & Tests":       os.environ["GATE1"],
+              "Contracts Build & Tests": os.environ["GATE2"],
+              "Security Audit":          os.environ["GATE3"],
+              "Observability Configs":   os.environ["GATE4"],
+              "Release Docs":            os.environ["GATE5"],
+          }
+
+          all_pass = all(v == "success" for v in gates.values())
+          override = os.environ.get("OVERRIDE", "").strip()
+          timestamp = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+
+          lines = [
+              f"# Release Gate Report",
+              f"",
+              f"| Field | Value |",
+              f"|-------|-------|",
+              f"| Ref | `{os.environ['REF']}` |",
+              f"| Commit | `{os.environ['SHA'][:12]}` |",
+              f"| Triggered by | `{os.environ['ACTOR']}` |",
+              f"| Timestamp | {timestamp} |",
+              f"| Run | [{os.environ['RUN_URL']}]({os.environ['RUN_URL']}) |",
+              f"",
+              f"## Gate Results",
+              f"",
+              f"| Gate | Status |",
+              f"|------|--------|",
+          ]
+
+          for name, status in gates.items():
+              lines.append(f"| {name} | {icon(status)} `{status}` |")
+
+          lines += [
+              f"",
+              f"## Verdict",
+              f"",
+          ]
+
+          if all_pass:
+              lines.append("### ✅ ALL GATES PASSED — release is approved to proceed.")
+          elif override:
+              lines += [
+                  "### ⚠️ ONE OR MORE GATES FAILED — manual override applied.",
+                  f"",
+                  f"**Override reason:** {override}",
+                  f"",
+                  f"> Manual overrides require sign-off from `@ancore/core-team`.",
+                  f"> See `docs/release/runbook.md` § Override Policy.",
+              ]
+          else:
+              lines += [
+                  "### ❌ ONE OR MORE GATES FAILED — release is BLOCKED.",
+                  f"",
+                  f"Resolve all failing gates before tagging a release.",
+                  f"If an emergency override is required, re-run this workflow",
+                  f"via `workflow_dispatch` and supply an `override_reason`.",
+              ]
+
+          report = "\n".join(lines)
+          print(report)
+
+          os.makedirs("release-gate-report", exist_ok=True)
+          with open("release-gate-report/summary.md", "w") as f:
+              f.write(report)
+
+          # Machine-readable JSON for downstream consumers
+          result = {
+              "ref": os.environ["REF"],
+              "sha": os.environ["SHA"],
+              "timestamp": timestamp,
+              "gates": gates,
+              "all_pass": all_pass,
+              "override_applied": bool(override),
+              "override_reason": override or None,
+          }
+          with open("release-gate-report/result.json", "w") as f:
+              json.dump(result, f, indent=2)
+
+          # Write to GitHub step summary
+          with open(os.environ.get("GITHUB_STEP_SUMMARY", "/dev/null"), "a") as f:
+              f.write(report)
+
+          # Fail the job if gates failed and no override
+          if not all_pass and not override:
+              raise SystemExit(1)
+          PYEOF
+
+      - name: Upload gate report artifact
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: release-gate-report-${{ github.ref_name }}
+          path: release-gate-report/
+          retention-days: 90
