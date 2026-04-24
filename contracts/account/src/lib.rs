@@ -149,32 +149,13 @@ impl AccountContract {
         // Execute the function call
         let result = env.invoke_contract(&to, &function, args);
 
-            // CRITICAL: Bind signature to actual call parameters to prevent replay attacks
-            // The signature must be for the exact (to, function, args, nonce) tuple being executed
-            let expected_payload = Self::create_signature_payload(&env, &to, &function, &args, expected_nonce);
-            if payload != expected_payload {
-                return Err(ContractError::InvalidSignature);
-            }
+        // Emit event
+        env.events().publish(
+            (symbol_short!("executed"),),
+            (to, function, expected_nonce),
+        );
 
-            // Verify signature using ed25519
-            env.crypto().ed25519_verify(&session_pk, &payload, &sig);
-        } else {
-            // Fallback: require owner direct authorization
-            let owner = Self::get_owner(env.clone())?;
-            owner.require_auth();
-        }
-
-        // Compute the expected payload on-chain (no redundant signature_payload parameter)
-        let expected_payload = Self::create_signature_payload(env, to, function, args, expected_nonce);
-
-        // Verify the signature using the computed payload instead of caller-provided
-        let is_valid = env.crypto().ed25519_verify(session_pk, &expected_payload, sig);
-
-        if !is_valid {
-            return Err(ContractError::InvalidSignature);
-        }
-
-        Ok(true)
+        Ok(result.into_bool())
     }
 
     fn create_signature_payload(
