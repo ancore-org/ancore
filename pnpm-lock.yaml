@@ -272,6 +272,39 @@ importers:
         specifier: ^1.0.0
         version: 1.6.1(@types/node@25.5.0)(jsdom@23.2.0)
 
+  apps/mobile-wallet:
+    devDependencies:
+      '@eslint/js':
+        specifier: ^9.0.0
+        version: 9.39.4
+      '@types/jest':
+        specifier: ^29.5.0
+        version: 29.5.14
+      '@types/node':
+        specifier: ^25.5.0
+        version: 25.5.0
+      '@typescript-eslint/eslint-plugin':
+        specifier: ^8.0.0
+        version: 8.57.2(@typescript-eslint/parser@8.57.2(eslint@9.39.4(jiti@1.21.7))(typescript@5.9.3))(eslint@9.39.4(jiti@1.21.7))(typescript@5.9.3)
+      '@typescript-eslint/parser':
+        specifier: ^8.0.0
+        version: 8.57.2(eslint@9.39.4(jiti@1.21.7))(typescript@5.9.3)
+      eslint:
+        specifier: ^9.0.0
+        version: 9.39.4(jiti@1.21.7)
+      jest:
+        specifier: ^30.2.0
+        version: 30.3.0(@types/node@25.5.0)(esbuild-register@3.6.0(esbuild@0.21.5))
+      ts-jest:
+        specifier: ^29.4.0
+        version: 29.4.6(@babel/core@7.29.0)(@jest/transform@30.3.0)(@jest/types@30.3.0)(babel-jest@30.3.0(@babel/core@7.29.0))(esbuild@0.21.5)(jest-util@30.3.0)(jest@30.3.0(@types/node@25.5.0)(esbuild-register@3.6.0(esbuild@0.21.5)))(typescript@5.9.3)
+      tsup:
+        specifier: ^8.0.0
+        version: 8.5.1(jiti@1.21.7)(postcss@8.5.8)(typescript@5.9.3)(yaml@2.8.3)
+      typescript:
+        specifier: ^5.6.0
+        version: 5.9.3
+
   packages/account-abstraction:
     dependencies:
       '@ancore/crypto':
