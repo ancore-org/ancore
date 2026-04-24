@@ -73,18 +73,43 @@ export class AccountContract {
   }
 
   /**
-   * Build invocation for execute(to, function, args, expected_nonce).
+   * Build invocation for execute(to, function, args, expected_nonce, session_pub_key?, signature?).
    * Caller must pass the current nonce (e.g. from getNonce()) for replay protection.
+   * For session key execution, provide session_pub_key and signature parameters.
+   * The signature payload is computed on-chain, so no signature_payload parameter is needed.
    */
-  execute(to: string, fn: string, args: xdr.ScVal[], expectedNonce: number): InvocationArgs {
+  execute(
+    to: string, 
+    fn: string, 
+    args: xdr.ScVal[], 
+    expectedNonce: number,
+    sessionPubKey?: string | Uint8Array,
+    signature?: string | Uint8Array
+  ): InvocationArgs {
+    const executeArgs = [
+      addressToScVal(to),
+      symbolToScVal(fn),
+      xdr.ScVal.scvVec(args),
+      u64ToScVal(expectedNonce),
+    ];
+
+    // Add optional session key parameters
+    if (sessionPubKey !== undefined) {
+      executeArgs.push(publicKeyToBytes32ScVal(sessionPubKey));
+    } else {
+      executeArgs.push(xdr.ScVal.scvVoid());
+    }
+
+    if (signature !== undefined) {
+      executeArgs.push(xdr.ScVal.scvBytes(signature instanceof Uint8Array ? signature : 
+        Buffer.from(signature, 'base64')));
+    } else {
+      executeArgs.push(xdr.ScVal.scvVoid());
+    }
+
     return {
       method: 'execute',
-      args: [
-        addressToScVal(to),
-        symbolToScVal(fn),
-        xdr.ScVal.scvVec(args),
-        u64ToScVal(expectedNonce),
-      ],
+      args: executeArgs,
     };
   }
 

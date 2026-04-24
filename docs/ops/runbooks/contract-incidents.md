@@ -6,7 +6,8 @@ Fires when smart contracts experience critical failures, upgrade issues, or secu
 ## Severity & Escalation
 - **Level:** critical (contract failure, security breach) / warning (upgrade issues, degraded performance)
 - **Escalation:** PagerDuty (critical) / Slack #ancore-alerts (warning)
-- **Escalation path:** On-call engineer → Contract lead → CTO (> 15 min unresolved for critical)
+- **Escalation path:** On-call engineer (L1) → Contract lead → Service Lead (L2, 15 min) → Platform Lead (L3, 30 min) → CTO (L4, 60 min)
+- **Note:** For security incidents, follow Security Escalation path: Security On-Call → Security Lead (5 min) → CTO/CEO (15 min)
 
 ## Triage Flow
 
@@ -196,7 +197,10 @@ stellar contract readall [CONTRACT_ID]
 - Test remediation procedures on testnet
 
 ## Success Criteria
-- **Resolution Time:** < 15 minutes for critical security incidents
+- **Resolution Time:** Resolved within 1 hour (see success criteria below)
+- **Vulnerability Response:** < 10 minutes (95% of incidents)
+- **Emergency Patch Deployment:** < 30 minutes (90% of incidents)
+- **Security Assessment:** < 2 hours (85% of incidents)
 - **Service Restoration:** Contract functionality fully restored
 - **User Impact:** No fund loss for security incidents
 - **Documentation:** Complete incident report filed

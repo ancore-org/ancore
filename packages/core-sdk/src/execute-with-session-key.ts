@@ -79,7 +79,11 @@ export class AncoreClient {
         request.target,
         request.function,
         Array.from(request.args),
-        request.expectedNonce
+        request.expectedNonce,
+        request.signer.publicKey,
+        // Note: The signature will be added by the execution layer
+        // since it needs to sign the auth entry XDR
+        undefined
       );
 
       return await this.executionLayer.executeWithSessionKey<TResult, TArgs>({

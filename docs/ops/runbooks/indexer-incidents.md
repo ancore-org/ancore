@@ -6,7 +6,7 @@ Fires when the indexer service experiences sync failures, data inconsistencies, 
 ## Severity & Escalation
 - **Level:** critical (sync stopped, data unavailable) / warning (sync lag, degraded performance)
 - **Escalation:** PagerDuty (critical) / Slack #ancore-alerts (warning)
-- **Escalation path:** On-call engineer → Indexer lead → CTO (> 30 min unresolved)
+- **Escalation path:** On-call engineer → Indexer lead → Platform Lead (30+ min) → CTO (60+ min)
 
 ## Triage Flow
 
@@ -137,9 +137,12 @@ kubectl exec -it deploy/indexer -- curl http://localhost:3000/debug/pprof/heap
   ```bash
   kubectl exec -it deploy/postgres -- psql -c "VACUUM ANALYZE;"
   ```
-- **Rebuild indexes** if fragmented:
+- **Rebuild indexes (last resort, approval required):**
+  - Prefer targeted index reindexing first during incidents.
+  - Use full database reindex only in controlled windows after escalation approval.
   ```bash
-  kubectl exec -it deploy/postgres -- psql -c "REINDEX DATABASE ancore;"
+  # Example: inspect and reindex a specific index/table first
+  kubectl exec -it deploy/postgres -- psql -c "REINDEX INDEX CONCURRENTLY <index_name>;"
   ```
 
 ### Sync Management

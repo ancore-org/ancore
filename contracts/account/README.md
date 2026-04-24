@@ -80,10 +80,13 @@ fn execute(
     to: Address,
     function: Symbol,
     args: Vec<Val>,
-) -> bool
+    expected_nonce: u64,
+    session_pub_key: Option<BytesN<32>>,
+    signature: Option<BytesN<64>>,
+) -> Result<bool, ContractError>
 ```
 
-Execute a transaction on behalf of the account.
+Execute a transaction on behalf of the account. For owner execution, omit the session key parameters. For session key execution, provide the session public key and signature. The signature payload is computed on-chain to prevent redundant payload parameters.
 
 ### Session Keys
 
@@ -118,6 +121,7 @@ The contract uses structured error codes to provide clear feedback for failure c
 | 6          | `SessionKeyExpired`      | Session key has expired                |
 | 7          | `InsufficientPermission` | Insufficient permissions               |
 | 8          | `InvalidVersion`         | Invalid version provided for migration |
+| 9          | `InvalidSignature`       | Invalid signature provided            |
 
 ### Error Handling Examples
 

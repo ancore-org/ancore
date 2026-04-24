@@ -6,7 +6,7 @@ Fires when the relayer service experiences transaction failures, high latency, o
 ## Severity & Escalation
 - **Level:** critical (transaction processing stopped) / warning (high failure rates)
 - **Escalation:** PagerDuty (critical) / Slack #ancore-alerts (warning)
-- **Escalation path:** On-call engineer → Relayer lead → CTO (> 30 min unresolved)
+- **Escalation path:** On-call engineer → Relayer lead → Platform Lead (30 min) → CTO (60 min)
 
 ## Triage Flow
 
