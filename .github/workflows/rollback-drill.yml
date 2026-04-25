@@ -42,7 +42,7 @@ jobs:
       dry_run:      ${{ steps.tags.outputs.dry_run }}
       env:          ${{ steps.tags.outputs.env }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
         with:
           fetch-depth: 0
 
@@ -79,7 +79,7 @@ jobs:
     if: needs.resolve-tags.outputs.release_tag != 'skip'
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
         with:
           fetch-depth: 0
 
@@ -110,7 +110,7 @@ jobs:
 
       - name: Upload drill artifacts
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: rollback-drill-${{ needs.resolve-tags.outputs.release_tag }}-${{ github.run_id }}
           path: rollback-artifacts/
