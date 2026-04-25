@@ -353,6 +353,9 @@ importers:
       '@ancore/account-abstraction':
         specifier: workspace:*
         version: link:../account-abstraction
+      '@ancore/crypto':
+        specifier: workspace:*
+        version: link:../crypto
       '@ancore/stellar':
         specifier: workspace:*
         version: link:../stellar
