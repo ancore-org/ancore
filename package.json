@@ -22,6 +22,7 @@
     "clean": "turbo run clean && rm -rf node_modules",
     "contracts:build": "cd contracts && cargo build --target wasm32-unknown-unknown --release",
     "contracts:test": "cd contracts && cargo test",
+    "audit:security": "node tools/security-audit.js",
     "prepare": "husky"
   },
   "devDependencies": {
