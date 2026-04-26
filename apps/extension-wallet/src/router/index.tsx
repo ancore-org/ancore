@@ -21,7 +21,13 @@ import {
   Wallet,
 } from 'lucide-react';
 import { NotificationProvider } from '@ancore/ui-kit';
-import { AuthGuard, ExtensionAuthProvider, PublicOnlyGuard, useExtensionAuth } from './AuthGuard';
+import {
+  AuthGuard,
+  ExtensionAuthProvider,
+  PublicOnlyGuard,
+  UnlockVerifier,
+  useExtensionAuth,
+} from './AuthGuard';
 import { NavBar } from '../components/Navigation/NavBar';
 import { SettingsScreen } from '../screens/Settings/SettingsScreen';
 import { useDashboardSettingsStore } from '../state/dashboard-settings';
@@ -258,14 +264,23 @@ function CreateAccountScreen() {
 function UnlockScreen() {
   const navigate = useNavigate();
   const location = useLocation();
-  const { authState, unlockWallet, resetWallet } = useExtensionAuth();
+  const { authState, unlockError, unlockWallet, resetWallet } = useExtensionAuth();
   const [password, setPassword] = React.useState('');
+  const [isSubmitting, setIsSubmitting] = React.useState(false);
   const from = (location.state as { from?: string } | null)?.from ?? '/home';
 
-  function handleUnlock(event: React.FormEvent<HTMLFormElement>) {
+  async function handleUnlock(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    unlockWallet();
-    navigate(from, { replace: true });
+    setIsSubmitting(true);
+
+    try {
+      const didUnlock = await unlockWallet(password);
+      if (didUnlock) {
+        navigate(from, { replace: true });
+      }
+    } finally {
+      setIsSubmitting(false);
+    }
   }
 
   return (
@@ -286,8 +301,16 @@ function UnlockScreen() {
               value={password}
             />
           </label>
-          <PrimaryButton disabled={!password.trim()} type="submit">
-            Unlock
+          {unlockError ? (
+            <p
+              className="rounded-xl border border-red-500/20 bg-red-500/10 px-3 py-2 text-sm text-red-600"
+              role="alert"
+            >
+              {unlockError}
+            </p>
+          ) : null}
+          <PrimaryButton disabled={isSubmitting || !password.trim()} type="submit">
+            {isSubmitting ? 'Unlocking…' : 'Unlock'}
           </PrimaryButton>
         </form>
       </Card>
@@ -550,11 +573,17 @@ export function ExtensionRouter() {
   );
 }
 
-export function ExtensionRouterTestHarness({ initialEntries }: { initialEntries: string[] }) {
+export function ExtensionRouterTestHarness({
+  initialEntries,
+  unlockVerifier,
+}: {
+  initialEntries: string[];
+  unlockVerifier?: UnlockVerifier;
+}) {
   return (
     <MemoryRouter initialEntries={initialEntries}>
       <NotificationProvider>
-        <ExtensionAuthProvider>
+        <ExtensionAuthProvider unlockVerifier={unlockVerifier}>
           <ExtensionRouterContent />
         </ExtensionAuthProvider>
       </NotificationProvider>
