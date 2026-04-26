@@ -476,9 +476,9 @@ mod test {
     use ed25519_dalek::{Signer, SigningKey};
     use rand::rngs::OsRng;
     use soroban_sdk::{
-        testutils::{Address as _, Events, Ledger},
+        testutils::{Address as _, Events, Ledger, MockAuth, MockAuthInvoke},
         xdr::ToXdr,
-        Address, Bytes, Env,
+        Address, Bytes, Env, IntoVal,
     };
 
     fn sign_payload(
@@ -1744,16 +1744,23 @@ mod test {
         let client = AncoreAccountClient::new(&env, &contract_id);
 
         let owner = Address::generate(&env);
+        let non_owner = Address::generate(&env);
         client.initialize(&owner);
 
-        // Do NOT mock auth — non-owner caller should be rejected before wasm call
         let dummy_hash = BytesN::from_array(&env, &[0u8; 32]);
-        // Calling upgrade without owner auth must panic (auth required)
+
+        env.mock_auths(&[MockAuth {
+            address: &non_owner,
+            invoke: &MockAuthInvoke {
+                contract: &contract_id,
+                fn_name: "upgrade",
+                args: (dummy_hash.clone(),).into_val(&env),
+                sub_invokes: &[],
+            },
+        }]);
+
         let result = client.try_upgrade(&dummy_hash);
-        assert!(
-            result.is_err(),
-            "upgrade without owner auth must be rejected"
-        );
+        assert!(result.is_err(), "non-owner upgrade must be rejected");
     }
 
     #[test]
