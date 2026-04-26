@@ -144,6 +144,8 @@ impl AncoreAccount {
             return Err(ContractError::AlreadyInitialized);
         }
 
+        owner.require_auth();
+
         env.storage().instance().set(&DataKey::Owner, &owner);
         env.storage().instance().set(&DataKey::Nonce, &0u64);
         env.storage().instance().set(&DataKey::Version, &1u32);
@@ -1982,9 +1984,25 @@ mod test {
         assert_eq!(result, Err(Ok(ContractError::InvalidVersion)));
         assert_eq!(client.get_version(), initial_version);
 
-        // Try to migrate to same version  
+        // Try to migrate to same version
         let result = client.try_migrate(&initial_version);
         assert_eq!(result, Err(Ok(ContractError::InvalidVersion)));
         assert_eq!(client.get_version(), initial_version);
+    }
+
+    // ─────────────────────────────────────────────────────────────────────────
+    // Issue #206 — initialize requires owner auth
+    // ─────────────────────────────────────────────────────────────────────────
+
+    #[test]
+    fn test_initialize_without_owner_auth_fails() {
+        let env = Env::default();
+        let contract_id = env.register_contract(None, AncoreAccount);
+        let client = AncoreAccountClient::new(&env, &contract_id);
+
+        let owner = Address::generate(&env);
+        // No mock_all_auths: owner has not authorised the call
+        let result = client.try_initialize(&owner);
+        assert!(result.is_err(), "initialize must fail when owner has not authorized");
     }
 }
