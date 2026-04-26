@@ -64,3 +64,26 @@ Configure timeout via `useSettingsStore().setAutoLockMinutes(n)` (0 = never lock
 
 - `storage` — persist wallet state
 - `activeTab` — interact with active tab for dApp connections
+
+## E2E Smoke Suite
+
+Release candidates use a deterministic Playwright smoke suite that validates:
+
+- onboarding (`/welcome` -> `/home`)
+- lock/unlock (`/unlock` -> `/home`)
+- send/receive navigation (`/send`, `/receive`)
+- session key access controls (`/session-keys`)
+
+Run locally:
+
+```bash
+pnpm --filter @ancore/extension-wallet test:e2e:smoke
+```
+
+Debug locally (headed, single worker, traces on):
+
+```bash
+pnpm --filter @ancore/extension-wallet test:e2e:smoke:debug
+```
+
+See `docs/testing/extension-e2e-smoke.md` for troubleshooting and CI behavior.

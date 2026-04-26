@@ -8,8 +8,10 @@
     "lib": ["ES2022", "DOM"],
     "moduleResolution": "node",
     "types": ["node", "jest"],
-    "composite": false
+    "composite": true,
+    "tsBuildInfoFile": "./dist/.tsbuildinfo"
   },
+  "references": [{ "path": "../types" }],
   "include": ["src/**/*.ts"],
   "exclude": ["node_modules", "dist", "src/__tests__"]
 }

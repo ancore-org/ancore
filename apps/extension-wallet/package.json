@@ -10,6 +10,8 @@
     "test:watch": "vitest",
     "lint": "eslint src/",
     "test:e2e": "playwright test --config=tests/playwright.config.ts",
+    "test:e2e:smoke": "playwright test --config=tests/playwright.config.ts --grep @smoke",
+    "test:e2e:smoke:debug": "playwright test --config=tests/playwright.config.ts --grep @smoke --headed --workers=1 --project=chromium --trace=on",
     "analyze": "node scripts/analyze-bundle.js"
   },
   "dependencies": {

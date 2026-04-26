@@ -251,6 +251,39 @@ jobs:
         run: echo "status=${{ job.status }}" >> "$GITHUB_OUTPUT"
 
 # ─────────────────────────────────────────────────────────────────────────────
+# GATE 6 — Extension E2E smoke suite
+# ─────────────────────────────────────────────────────────────────────────────
+  gate-extension-e2e-smoke:
+    name: '[Gate 6] Extension E2E Smoke'
+    runs-on: ubuntu-latest
+    outputs:
+      status: ${{ steps.result.outputs.status }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v2
+        with:
+          version: 9
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'pnpm'
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Install Playwright browser dependencies
+        run: pnpm --filter @ancore/extension-wallet exec playwright install --with-deps chromium
+
+      - name: Run extension smoke suite
+        run: pnpm --filter @ancore/extension-wallet test:e2e:smoke
+
+      - id: result
+        if: always()
+        run: echo "status=${{ job.status }}" >> "$GITHUB_OUTPUT"
+
+# ─────────────────────────────────────────────────────────────────────────────
 # SUMMARY — Collect all gate results and publish artifact
 # ─────────────────────────────────────────────────────────────────────────────
   gate-summary:
@@ -261,6 +294,7 @@ jobs:
       - gate-security
       - gate-observability
       - gate-release-docs
+      - gate-extension-e2e-smoke
     runs-on: ubuntu-latest
     if: always()
     steps:
@@ -274,6 +308,7 @@ jobs:
           GATE3: ${{ needs.gate-security.outputs.status }}
           GATE4: ${{ needs.gate-observability.outputs.status }}
           GATE5: ${{ needs.gate-release-docs.outputs.status }}
+          GATE6: ${{ needs.gate-extension-e2e-smoke.outputs.status }}
           REF:   ${{ github.ref_name }}
           SHA:   ${{ github.sha }}
           ACTOR: ${{ github.actor }}
@@ -293,6 +328,7 @@ jobs:
               "Security Audit":          os.environ["GATE3"],
               "Observability Configs":   os.environ["GATE4"],
               "Release Docs":            os.environ["GATE5"],
+              "Extension E2E Smoke":     os.environ["GATE6"],
           }
 
           all_pass = all(v == "success" for v in gates.values())

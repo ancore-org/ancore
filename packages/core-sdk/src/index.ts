@@ -5,6 +5,17 @@
 
 export const SDK_VERSION = '0.1.0';
 
+export {
+  createWallet,
+  importWallet,
+  restoreWallet,
+  deriveContractId,
+  type CreateWalletOptions,
+  type ImportWalletOptions,
+  type RestoreWalletOptions,
+  type WalletMaterial,
+} from './wallet';
+
 // Client
 export { AncoreClient, type AncoreClientOptions } from './ancore-client';
 

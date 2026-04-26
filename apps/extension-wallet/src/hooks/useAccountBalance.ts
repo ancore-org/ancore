@@ -13,7 +13,7 @@ interface UseAccountBalanceReturn {
  * via @ancore/core-sdk and @ancore/stellar packages
  */
 export function useAccountBalance(): UseAccountBalanceReturn {
-  const [balance, setBalance] = useState<number>(100.5); // Default balance for demo
+  const [balance, setBalance] = useState<number>(0);
   const [isLoading, setIsLoading] = useState<boolean>(false);
   const [error, setError] = useState<Error | null>(null);
 

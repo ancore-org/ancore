@@ -40,6 +40,11 @@ export interface InvocationArgs {
   args: xdr.ScVal[];
 }
 
+export interface AccountContractWriteResult {
+  invocation: InvocationArgs;
+  operation: ReturnType<AccountContract['buildInvokeOperation']>;
+}
+
 interface SimulateErrorShape {
   error?: string;
   message?: string;

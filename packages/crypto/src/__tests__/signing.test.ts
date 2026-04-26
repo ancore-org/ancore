@@ -133,4 +133,27 @@ describe('signTransaction', () => {
     expect(isValid).toBe(true);
     expect(feeBumpTx.signatures.length).toBe(1);
   });
+
+  it('returns false when verifying with a malformed public key', async () => {
+    const kp = Keypair.random();
+    const tx = new TransactionBuilder(mockAccount(kp.publicKey(), '1'), {
+      fee: '100',
+      networkPassphrase,
+    })
+      .addOperation(Operation.bumpSequence({ bumpTo: '2' }))
+      .setTimeout(0)
+      .build();
+
+    const signature = await signTransaction(tx, kp);
+
+    await expect(verifySignature(tx.hash(), signature, 'not-a-public-key')).resolves.toBe(false);
+  });
+
+  it('returns false when verifying a malformed signature string', async () => {
+    const kp = Keypair.random();
+
+    await expect(verifySignature('message', '%%%not-base64%%%', kp.publicKey())).resolves.toBe(
+      false
+    );
+  });
 });

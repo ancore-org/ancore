@@ -28,12 +28,13 @@ const AUTH_PRESETS = {
 export interface ExtensionFixtures {
   seedWallet: (state: WalletState) => Promise<void>;
   clearWallet: () => Promise<void>;
+  freezeTime: (isoDate: string) => Promise<void>;
 }
 
 export const test = base.extend<ExtensionFixtures>({
   seedWallet: async ({ page }, use) => {
     await use(async (state: WalletState) => {
-      await page.goto('/');
+      await page.goto('/', { waitUntil: 'domcontentloaded' });
       await page.evaluate(
         ([key, value]) => {
           localStorage.setItem(key, JSON.stringify(value));
@@ -48,11 +49,23 @@ export const test = base.extend<ExtensionFixtures>({
       await page.evaluate((key) => localStorage.removeItem(key), AUTH_KEY);
     });
   },
+
+  freezeTime: async ({ page }, use) => {
+    await use(async (isoDate: string) => {
+      const fixedTime = new Date(isoDate).getTime();
+      await page.addInitScript((mockedNow) => {
+        const realNow = Date.now.bind(Date);
+        Date.now = () => mockedNow;
+        (window as Window & { __restoreDateNow?: () => void }).__restoreDateNow = () => {
+          Date.now = realNow;
+        };
+      }, fixedTime);
+    });
+  },
 });
 
 export { expect } from '@playwright/test';
 
 export async function navigateTo(page: Page, path: string): Promise<void> {
-  await page.goto(path);
-  await page.waitForLoadState('networkidle');
+  await page.goto(path, { waitUntil: 'domcontentloaded' });
 }

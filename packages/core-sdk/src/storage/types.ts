@@ -8,7 +8,7 @@ export interface EncryptedPayload {
 }
 
 export interface StorageAdapter {
-  get(key: string): Promise<unknown>;
+  get<T = unknown>(key: string): Promise<T | null>;
   set(key: string, value: unknown): Promise<void>;
   remove(key: string): Promise<void>;
 }

@@ -22,13 +22,10 @@ export interface SimulationResult {
 }
 
 export class TransactionBuilder {
-  private source: string;
   private ops: BuilderOp[] = [];
   private fee: string = '10000';
 
-  constructor(source: string) {
-    this.source = source;
-  }
+  constructor(_source: string) {}
 
   addSessionKey(sessionKey: string) {
     this.ops.push({ type: 'sessionKey', op: 'add', sessionKey });

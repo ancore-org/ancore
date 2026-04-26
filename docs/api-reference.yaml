@@ -1,0 +1,740 @@
+##
+# Ancore Interface Specification
+# Issue #287 — OpenAPI-style contract/client interface documentation
+#
+# This file is the canonical reference for all contract entrypoints and SDK
+# wrapper methods. Teams MUST keep this in sync when changing signatures.
+#
+# Version history:
+#   0.1.0 — initial spec (2026-04-24)
+##
+
+spec_version: "0.1.0"
+updated: "2026-04-24"
+
+# ---------------------------------------------------------------------------
+# Shared type definitions
+# ---------------------------------------------------------------------------
+types:
+  Address:
+    description: Stellar account or contract address (G… or C… format)
+    type: string
+    pattern: "^[GC][A-Z0-9]{55}$"
+
+  PublicKey:
+    description: Ed25519 public key — Stellar G… address
+    type: string
+    pattern: "^G[A-Z0-9]{55}$"
+
+  BytesN32:
+    description: 32-byte value encoded as hex or base64 (contract layer)
+    type: string
+
+  U64:
+    description: Unsigned 64-bit integer (unix timestamp in seconds or nonce)
+    type: integer
+    minimum: 0
+    maximum: 18446744073709551615
+
+  SessionPermission:
+    description: |
+      Permission bit granted to a session key. Maps to Vec<u32> in the contract.
+      Values are additive — pass multiple to grant multiple permissions.
+    type: integer
+    enum:
+      - value: 0
+        name: SEND_PAYMENT
+        description: Authorize payment operations
+      - value: 1
+        name: MANAGE_DATA
+        description: Authorize manage-data operations
+      - value: 2
+        name: INVOKE_CONTRACT
+        description: Authorize arbitrary contract invocations
+    note: >
+      PERMISSION_EXECUTE (contract constant = 1) must be present in the
+      permissions array for execute() to succeed via the session-key path.
+      PERMISSION_EXECUTE is a separate internal constant from SessionPermission —
+      it is NOT the same as SessionPermission.MANAGE_DATA (also value 1).
+      Always include it explicitly when creating session keys that need to call execute().
+
+  SessionKey:
+    description: A delegated signing key with scoped permissions and expiry
+    fields:
+      publicKey:
+        type: PublicKey
+        required: true
+      permissions:
+        type: array
+        items: SessionPermission
+        required: true
+      expiresAt:
+        type: U64
+        description: >
+          Expiry timestamp. The @ancore/types interface uses unix milliseconds (ms).
+          The contract stores and compares in unix seconds — the SDK's extend_session_key_ttl
+          helper auto-detects ms vs seconds (values > 100_000_000_000 are treated as ms).
+          Pass unix seconds to the contract directly; pass unix ms to the TypeScript SDK types.
+        required: true
+      label:
+        type: string
+        description: Optional human-readable label (off-chain only, not stored on-chain)
+        required: false
+
+  TransactionResult:
+    description: Result of a submitted Stellar transaction
+    fields:
+      status:
+        type: string
+        enum: [success, failure, pending]
+        required: true
+      hash:
+        type: string
+        description: Transaction hash (present on success)
+        required: false
+      ledger:
+        type: integer
+        description: Ledger sequence number (present on success)
+        required: false
+      error:
+        type: string
+        description: Error message (present on failure)
+        required: false
+      timestamp:
+        type: integer
+        description: Unix timestamp (ms) when the result was recorded
+        required: true
+
+  InvocationArgs:
+    description: |
+      Encoded contract invocation — method name + XDR ScVal arguments.
+      Returned by SDK builder methods; pass to your transaction builder.
+    fields:
+      method:
+        type: string
+        required: true
+      args:
+        type: array
+        items: xdr.ScVal
+        required: true
+
+# ---------------------------------------------------------------------------
+# Contract entrypoints  (contracts/account/src/lib.rs)
+# ---------------------------------------------------------------------------
+contract_methods:
+
+  initialize:
+    description: |
+      Initialize the account contract with an owner address.
+      Must be called exactly once after deployment.
+    auth: none
+    parameters:
+      - name: owner
+        type: Address
+        required: true
+        description: Stellar address that will own this account
+    returns:
+      success: "void"
+    errors:
+      - code: 1
+        name: AlreadyInitialized
+        condition: Contract storage already contains an owner key
+    state_changes:
+      - Writes Owner → owner address to instance storage
+      - Writes Nonce → 0 to instance storage
+      - Writes Version → 1 to instance storage
+      - Extends instance TTL (30-day bump)
+    events:
+      - topic: initialized
+        data: "(owner: Address)"
+
+  get_owner:
+    description: Return the owner address stored in the contract.
+    auth: none
+    parameters: []
+    returns:
+      success: Address
+    errors:
+      - code: 2
+        name: NotInitialized
+        condition: Contract has not been initialized
+
+  get_nonce:
+    description: Return the current replay-protection nonce.
+    auth: none
+    parameters: []
+    returns:
+      success: U64
+    errors: []
+    note: Returns 0 if nonce key is absent (pre-initialization safe read).
+
+  get_version:
+    description: Return the current contract version number.
+    auth: none
+    parameters: []
+    returns:
+      success: "u32"
+    errors: []
+
+  execute:
+    description: |
+      Execute a cross-contract call with replay protection.
+      Supports two auth paths: owner direct auth or session-key signature.
+    auth: owner OR valid session key with PERMISSION_EXECUTE
+    parameters:
+      - name: _caller
+        type: CallerIdentity
+        required: true
+        description: "Enum: Owner | SessionKey(BytesN<32>)"
+      - name: to
+        type: Address
+        required: true
+        description: Target contract address
+      - name: function
+        type: Symbol
+        required: true
+        description: Function name to invoke on the target contract
+      - name: args
+        type: "Vec<Val>"
+        required: true
+        description: Arguments to pass to the target function
+      - name: expected_nonce
+        type: U64
+        required: true
+        description: Must equal the current nonce; prevents replay attacks
+      - name: session_pub_key
+        type: "Option<BytesN<32>>"
+        required: false
+        description: Session key public key (session-key path only)
+      - name: signature
+        type: "Option<BytesN<64>>"
+        required: false
+        description: Ed25519 signature over signature_payload (session-key path only)
+      - name: signature_payload
+        type: "Option<Bytes>"
+        required: false
+        description: |
+          Canonical payload that was signed. Must equal the contract-computed
+          payload: XDR(to) ++ XDR(function) ++ XDR(args) ++ XDR(nonce).
+    returns:
+      success: Val
+      description: Return value from the invoked contract function
+    errors:
+      - code: 2
+        name: NotInitialized
+        condition: Contract has not been initialized
+      - code: 3
+        name: Unauthorized
+        condition: Owner path — require_auth() failed
+      - code: 4
+        name: InvalidNonce
+        condition: expected_nonce does not match current nonce
+      - code: 5
+        name: SessionKeyNotFound
+        condition: session_pub_key provided but no matching key in storage
+      - code: 6
+        name: SessionKeyExpired
+        condition: "ledger.timestamp() >= session_key.expires_at"
+      - code: 7
+        name: InsufficientPermission
+        condition: Session key does not have PERMISSION_EXECUTE (bit 1) set
+      - code: 9
+        name: InvalidSignature
+        condition: signature or signature_payload missing, or payload mismatch
+    state_changes:
+      - Increments Nonce by 1 (before invocation — checks-effects-interactions)
+      - Extends instance TTL (30-day bump)
+    events:
+      - topic: executed
+        data: "(to: Address, function: Symbol, nonce: u64)"
+    security_notes:
+      - Nonce is incremented before the cross-contract call to prevent reentrancy nonce manipulation
+      - Signature payload binds to exact (to, function, args, nonce) — no partial replay possible
+
+  add_session_key:
+    description: |
+      Register a new session key with scoped permissions and an expiry timestamp.
+      Only the account owner may call this.
+    auth: owner (require_auth) — called AFTER the expires_at == 0 guard
+    parameters:
+      - name: public_key
+        type: "BytesN<32>"
+        required: true
+        description: Ed25519 public key of the session key
+      - name: expires_at
+        type: U64
+        required: true
+        description: Unix timestamp (seconds) when the key expires; must be > 0
+      - name: permissions
+        type: "Vec<u32>"
+        required: true
+        description: Permission bits granted to this key (see SessionPermission)
+    returns:
+      success: "void"
+    errors:
+      - code: 11
+        name: InvalidExpiration
+        condition: expires_at == 0 (checked first, before auth)
+      - code: 2
+        name: NotInitialized
+        condition: Contract has not been initialized (checked during get_owner)
+      - code: 3
+        name: Unauthorized
+        condition: Caller is not the owner
+    state_changes:
+      - Writes SessionKey(public_key) → SessionKey struct to persistent storage
+      - Extends session key TTL proportional to expires_at
+      - Extends instance TTL (30-day bump)
+    events:
+      - topic: session_key_added
+        data: "(public_key: BytesN<32>, expires_at: u64)"
+
+  revoke_session_key:
+    description: |
+      Remove a session key from storage. Immediately invalidates it.
+      Only the account owner may call this.
+    auth: owner (require_auth)
+    parameters:
+      - name: public_key
+        type: "BytesN<32>"
+        required: true
+        description: Ed25519 public key of the session key to revoke
+    returns:
+      success: "void"
+    errors:
+      - code: 2
+        name: NotInitialized
+        condition: Contract has not been initialized
+      - code: 3
+        name: Unauthorized
+        condition: Caller is not the owner
+    state_changes:
+      - Removes SessionKey(public_key) from persistent storage
+      - Extends instance TTL (30-day bump)
+    events:
+      - topic: session_key_revoked
+        data: "(public_key: BytesN<32>)"
+
+  get_session_key:
+    description: Return the SessionKey struct for a given public key, or None.
+    auth: none
+    parameters:
+      - name: public_key
+        type: "BytesN<32>"
+        required: true
+    returns:
+      success: "Option<SessionKey>"
+    errors: []
+
+  has_session_key:
+    description: Return true if a session key exists in storage (regardless of expiry).
+    auth: none
+    parameters:
+      - name: public_key
+        type: "BytesN<32>"
+        required: true
+    returns:
+      success: bool
+    errors: []
+
+  is_session_key_active:
+    description: Return true if a session key exists AND has not expired.
+    auth: none
+    parameters:
+      - name: public_key
+        type: "BytesN<32>"
+        required: true
+    returns:
+      success: bool
+    errors: []
+
+  refresh_session_key_ttl:
+    description: |
+      Extend the Soroban storage TTL of an existing session key so it is not
+      evicted before its logical expiry. Does not change expires_at.
+    auth: none
+    parameters:
+      - name: public_key
+        type: "BytesN<32>"
+        required: true
+    returns:
+      success: "void"
+    errors:
+      - code: 5
+        name: SessionKeyNotFound
+        condition: No session key found for the given public key
+    state_changes:
+      - Extends persistent storage TTL for SessionKey(public_key)
+      - Extends instance TTL (30-day bump)
+    events:
+      - topic: session_key_ttl_refreshed
+        data: "(public_key: BytesN<32>, expires_at: u64)"
+
+  upgrade:
+    description: |
+      Replace the contract WASM with a new hash. Increments the version counter.
+      Only the account owner may call this.
+    auth: owner (require_auth)
+    parameters:
+      - name: new_wasm_hash
+        type: "BytesN<32>"
+        required: true
+        description: Hash of the new WASM blob; must not be all-zero
+    returns:
+      success: "void"
+    errors:
+      - code: 2
+        name: NotInitialized
+        condition: Contract has not been initialized
+      - code: 3
+        name: Unauthorized
+        condition: Caller is not the owner
+      - code: 10
+        name: InvalidWasmHash
+        condition: new_wasm_hash is all-zero bytes
+    state_changes:
+      - Increments Version by 1
+      - Calls env.deployer().update_current_contract_wasm(new_wasm_hash)
+      - Extends instance TTL (30-day bump)
+    events:
+      - topic: upgraded
+        data: "(new_wasm_hash: BytesN<32>)"
+
+  migrate:
+    description: |
+      Update the stored version number for a migration. Version must be
+      strictly increasing. Only the account owner may call this.
+    auth: owner (require_auth)
+    parameters:
+      - name: new_version
+        type: "u32"
+        required: true
+        description: New version number; must be > current version
+    returns:
+      success: "void"
+    errors:
+      - code: 2
+        name: NotInitialized
+        condition: Contract has not been initialized
+      - code: 3
+        name: Unauthorized
+        condition: Caller is not the owner
+      - code: 8
+        name: InvalidVersion
+        condition: new_version <= current_version
+    state_changes:
+      - Writes Version → new_version to instance storage
+      - Extends instance TTL (30-day bump)
+    events:
+      - topic: migrated
+        data: "(old_version: u32, new_version: u32)"
+
+# ---------------------------------------------------------------------------
+# SDK wrapper methods  (packages/core-sdk / packages/account-abstraction)
+# ---------------------------------------------------------------------------
+sdk_methods:
+
+  AncoreClient.addSessionKey:
+    package: "@ancore/core-sdk"
+    description: |
+      Build the InvocationArgs for an add_session_key contract call.
+      Returns encoded args — caller is responsible for building and submitting
+      the transaction.
+      Delegates to the standalone addSessionKey() function from add-session-key.ts.
+    signature: "addSessionKey(params: AddSessionKeyParams): InvocationArgs"
+    parameters:
+      - name: params.publicKey
+        type: string
+        required: true
+        description: Ed25519 public key (G… Stellar address)
+        validation: non-empty string
+      - name: params.permissions
+        type: "SessionPermission[]"
+        required: true
+        description: Array of permission enum values
+        validation: must be an array
+      - name: params.expiresAt
+        type: number
+        required: true
+        description: >
+          Expiry timestamp in unix seconds (passed directly to the contract).
+          Note: @ancore/types SessionKey.expiresAt is unix ms — convert before
+          passing to addSessionKey if reading from a stored SessionKey.
+        validation: finite number
+    returns:
+      success: InvocationArgs
+    errors:
+      - name: BuilderValidationError
+        code: BUILDER_VALIDATION
+        condition: Any required parameter is missing or invalid
+      - name: SessionKeyManagementError
+        code: SESSION_KEY_MANAGEMENT_FAILED
+        condition: AccountContract layer throws an unexpected error
+    async: false
+
+  AncoreClient.revokeSessionKey:
+    package: "@ancore/core-sdk"
+    description: |
+      Build the InvocationArgs for a revoke_session_key contract call.
+      Delegates to the standalone revokeSessionKey() function from revoke-session-key.ts.
+    signature: "revokeSessionKey(params: RevokeSessionKeyParams): InvocationArgs"
+    parameters:
+      - name: params.publicKey
+        type: string
+        required: true
+        description: Ed25519 public key of the key to revoke
+        validation: non-empty string
+    returns:
+      success: InvocationArgs
+    errors:
+      - name: BuilderValidationError
+        code: BUILDER_VALIDATION
+        condition: publicKey is missing or empty
+      - name: SessionKeyManagementError
+        code: SESSION_KEY_REVOKE_FAILED
+        condition: AccountContract layer throws an unexpected error
+    async: false
+
+  executeWithSessionKey:
+    package: "@ancore/core-sdk"
+    exported_from: "execute-with-session-key.ts"
+    description: |
+      Standalone exported function — NOT a method on AncoreClient.
+      Execute a cross-contract call authenticated by a session key.
+      Validates inputs, builds the execute invocation via an AccountContract instance,
+      delegates to the provided executionLayer for signing and submission, and returns
+      the result.
+      The AncoreClient class in ancore-client.ts does NOT expose this method —
+      use it directly from the module export.
+    signature: >
+      executeWithSessionKey<TResult, TArgs>(
+        params: ExecuteWithSessionKeyParams<TArgs>
+      ): Promise<ExecuteWithSessionKeyResult<TResult>>
+    note: >
+      This function is used via an AncoreClient instance that is constructed with
+      { accountContract, executionLayer } — a different shape from the AncoreClient
+      exported by ancore-client.ts. See execute-with-session-key.ts for the full
+      AncoreClient class that wraps this function.
+    parameters:
+      - name: params.target
+        type: string
+        required: true
+        description: Target contract address (G… or C…)
+        validation: valid Stellar Address
+      - name: params.function
+        type: string
+        required: true
+        description: Function name to invoke on the target contract
+        validation: non-empty string
+      - name: params.args
+        type: "xdr.ScVal[]"
+        required: true
+        description: XDR-encoded arguments for the target function
+        validation: must be an array
+      - name: params.expectedNonce
+        type: number
+        required: true
+        description: Current contract nonce (fetch via AccountContract.getNonce)
+        validation: non-negative integer
+      - name: params.signer.publicKey
+        type: string
+        required: true
+        description: Session key public key (G… address)
+        validation: valid Ed25519 public key (StrKey.isValidEd25519PublicKey)
+      - name: params.signer.signAuthEntryXdr
+        type: "(authEntryXdr: string) => Promise<string> | string"
+        required: true
+        description: Callback that signs an auth entry XDR and returns signed XDR
+        validation: must be a function
+    returns:
+      success: "ExecuteWithSessionKeyResult<TResult>"
+      fields:
+        result: "TResult — decoded return value from the contract"
+        transactionHash: "string | undefined — hash of the submitted transaction"
+    errors:
+      - name: SessionKeyExecutionValidationError
+        code: SESSION_KEY_EXECUTION_VALIDATION
+        condition: Any input parameter fails validation
+      - name: SessionKeyExecutionError
+        code: SESSION_KEY_EXECUTION_UNAUTHORIZED
+        condition: Contract returns Unauthorized (session key not authorized)
+      - name: SessionKeyExecutionError
+        code: SESSION_KEY_EXECUTION_INVALID_NONCE
+        condition: Contract returns InvalidNonce
+      - name: SessionKeyExecutionError
+        code: SESSION_KEY_EXECUTION_NOT_INITIALIZED
+        condition: Contract returns NotInitialized
+      - name: SessionKeyExecutionError
+        code: SESSION_KEY_EXECUTION_CONTRACT
+        condition: Any other AccountContractError
+      - name: SessionKeyExecutionError
+        code: SESSION_KEY_EXECUTION_FAILED
+        condition: Unknown or unexpected error
+    async: true
+
+  sendPayment:
+    package: "@ancore/core-sdk"
+    description: |
+      Build, sign, and submit a Stellar payment transaction.
+      Internally uses AccountTransactionBuilder (simulate + assemble) then
+      submits via StellarClient.
+    signature: >
+      sendPayment(
+        params: SendPaymentParams,
+        deps: SendPaymentDeps
+      ): Promise<TransactionResult>
+    parameters:
+      - name: params.to
+        type: string
+        required: true
+        description: Destination Stellar address (G…)
+        validation: non-empty string
+      - name: params.amount
+        type: string
+        required: true
+        description: Amount as a decimal string (e.g. "10.5000000")
+        validation: positive numeric string
+      - name: params.asset
+        type: "{ code: string; issuer: string } | 'native'"
+        required: false
+        default: "'native'"
+        description: Asset to send; omit or pass 'native' for XLM
+      - name: params.signer
+        type: PaymentSigner
+        required: true
+        description: "Implements sign(xdr: string): Promise<string> | string"
+        validation: must have a sign function
+      - name: deps.sourceAccount
+        type: "Account"
+        required: true
+        description: Loaded Stellar Account object (provides sequence number)
+      - name: deps.builderOptions
+        type: AccountTransactionBuilderOptions
+        required: true
+        description: Network passphrase, RPC server, fee, etc.
+      - name: deps.stellarClient
+        type: StellarClient
+        required: true
+        description: "@ancore/stellar StellarClient for network submission"
+    returns:
+      success: TransactionResult
+    errors:
+      - name: BuilderValidationError
+        code: BUILDER_VALIDATION
+        condition: Invalid params (missing to, non-positive amount, missing signer)
+      - name: SimulationFailedError
+        code: SIMULATION_FAILED
+        condition: Soroban simulation returns an error
+      - name: SimulationExpiredError
+        code: SIMULATION_EXPIRED
+        condition: Simulation result requires ledger restoration
+      - name: TransactionSubmissionError
+        code: SUBMISSION_FAILED
+        condition: Signing fails or network submission fails
+    async: true
+
+  AccountContract.getOwner:
+    package: "@ancore/account-abstraction"
+    description: Simulate get_owner and return the decoded owner address.
+    signature: "getOwner(options: AccountContractReadOptions): Promise<string>"
+    parameters:
+      - name: options.server
+        type: SorobanRpcServer
+        required: true
+      - name: options.sourceAccount
+        type: string
+        required: true
+      - name: options.networkPassphrase
+        type: string
+        required: false
+    returns:
+      success: string
+    errors:
+      - name: AccountContractError
+        condition: Simulation fails or contract not initialized
+    async: true
+
+  AccountContract.getNonce:
+    package: "@ancore/account-abstraction"
+    description: Simulate get_nonce and return the current nonce as a number.
+    signature: "getNonce(options: AccountContractReadOptions): Promise<number>"
+    parameters:
+      - name: options.server
+        type: SorobanRpcServer
+        required: true
+      - name: options.sourceAccount
+        type: string
+        required: true
+      - name: options.networkPassphrase
+        type: string
+        required: false
+    returns:
+      success: number
+    errors:
+      - name: AccountContractError
+        condition: Simulation fails or contract not initialized
+    async: true
+
+  AccountContract.getSessionKey:
+    package: "@ancore/account-abstraction"
+    description: Simulate get_session_key and return the decoded SessionKey or null.
+    signature: >
+      getSessionKey(
+        publicKey: string | Uint8Array,
+        options: AccountContractReadOptions
+      ): Promise<SessionKey | null>
+    parameters:
+      - name: publicKey
+        type: "string | Uint8Array"
+        required: true
+      - name: options
+        type: AccountContractReadOptions
+        required: true
+    returns:
+      success: "SessionKey | null"
+    errors:
+      - name: AccountContractError
+        condition: Simulation fails
+    async: true
+
+# ---------------------------------------------------------------------------
+# Contract error code reference
+# ---------------------------------------------------------------------------
+error_codes:
+  1:  { name: AlreadyInitialized,    sdk_class: AlreadyInitializedError }
+  2:  { name: NotInitialized,        sdk_class: NotInitializedError }
+  3:  { name: Unauthorized,          sdk_class: UnauthorizedError }
+  4:  { name: InvalidNonce,          sdk_class: InvalidNonceError }
+  5:  { name: SessionKeyNotFound,    sdk_class: SessionKeyNotFoundError }
+  6:  { name: SessionKeyExpired,     sdk_class: SessionKeyExpiredError }
+  7:  { name: InsufficientPermission, sdk_class: InsufficientPermissionError }
+  8:  { name: InvalidVersion,        sdk_class: ContractInvocationError }
+  9:  { name: InvalidSignature,      sdk_class: ContractInvocationError }
+  10: { name: InvalidWasmHash,       sdk_class: ContractInvocationError }
+  11: { name: InvalidExpiration,     sdk_class: ContractInvocationError }
+
+# ---------------------------------------------------------------------------
+# Contract events reference
+# ---------------------------------------------------------------------------
+events:
+  initialized:
+    data: "(owner: Address)"
+    emitted_by: [initialize]
+  executed:
+    data: "(to: Address, function: Symbol, nonce: u64)"
+    emitted_by: [execute]
+  session_key_added:
+    data: "(public_key: BytesN<32>, expires_at: u64)"
+    emitted_by: [add_session_key]
+  session_key_revoked:
+    data: "(public_key: BytesN<32>)"
+    emitted_by: [revoke_session_key]
+  session_key_ttl_refreshed:
+    data: "(public_key: BytesN<32>, expires_at: u64)"
+    emitted_by: [refresh_session_key_ttl]
+  upgraded:
+    data: "(new_wasm_hash: BytesN<32>)"
+    emitted_by: [upgrade]
+  migrated:
+    data: "(old_version: u32, new_version: u32)"
+    emitted_by: [migrate]

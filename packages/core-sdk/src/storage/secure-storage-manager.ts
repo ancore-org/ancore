@@ -1,6 +1,10 @@
 import { AccountData, EncryptedPayload, SessionKeysData, StorageAdapter } from './types';
-import { getSessionKeys as loadSessionKeys } from './get-session-keys';
-import { saveSessionKeys as persistSessionKeys } from './save-session-keys';
+
+function toArrayBufferView(value: Uint8Array): Uint8Array<ArrayBuffer> {
+  const normalized = new Uint8Array(new ArrayBuffer(value.byteLength));
+  normalized.set(value);
+  return normalized;
+}
 
 interface VerificationContent {
   marker: 'KIRO_VERIFICATION_V1';
@@ -163,7 +167,7 @@ export class SecureStorageManager {
     const keyMaterial = await globalThis.crypto.subtle.deriveBits(
       {
         name: 'PBKDF2',
-        salt: masterSalt as BufferSource,
+        salt: toArrayBufferView(masterSalt),
         iterations: 100000,
         hash: 'SHA-256',
       },
@@ -217,7 +221,7 @@ export class SecureStorageManager {
     return globalThis.crypto.subtle.deriveKey(
       {
         name: 'PBKDF2',
-        salt: salt as BufferSource,
+        salt: toArrayBufferView(salt),
         iterations: 100000,
         hash: 'SHA-256',
       },

@@ -90,8 +90,20 @@ export function SendScreen({ balance, service, pollIntervalMs }: SendScreenProps
           }
         />
 
-        <Button type="button" className="w-full" onClick={() => void send.goToReview(form)}>
-          Review
+        {send.errors.simulation && (
+          <div className="p-3 rounded-xl bg-red-500/10 border border-red-500/20 text-xs text-red-500 mb-4 animate-in fade-in slide-in-from-top-1">
+            <strong>Simulation Failed:</strong> {send.errors.simulation}
+          </div>
+        )}
+
+        <Button
+          type="button"
+          className="w-full"
+          onClick={() => void send.goToReview(form)}
+          loading={send.submitting}
+          disabled={send.submitting}
+        >
+          {send.submitting ? 'Simulating...' : 'Review'}
         </Button>
       </CardContent>
     </Card>

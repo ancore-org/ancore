@@ -37,6 +37,7 @@
   "dependencies": {
     "@ancore/types": "workspace:*",
     "@ancore/account-abstraction": "workspace:*",
+    "@ancore/crypto": "workspace:*",
     "@ancore/stellar": "workspace:*",
     "@stellar/stellar-sdk": "^13.3.0"
   },

@@ -38,6 +38,7 @@ export interface ValidationErrors {
   to?: string;
   amount?: string;
   password?: string;
+  simulation?: string;
 }
 
 const DEFAULT_BALANCE = 250;
@@ -128,13 +129,25 @@ export function useSendTransaction(options: UseSendTransactionOptions = {}) {
         return false;
       }
 
-      const estimatedFee = await service.estimateFee(values);
-      const total = (Number(values.amount) + Number(estimatedFee.totalFee)).toFixed(7);
+      setSubmitting(true);
+      setErrors((current) => ({ ...current, simulation: undefined }));
 
-      setFee(estimatedFee);
-      setTx({ ...values, fee: estimatedFee, total });
-      setStep('review');
-      return true;
+      try {
+        const estimatedFee = await service.estimateFee(values);
+        const total = (Number(values.amount) + Number(estimatedFee.totalFee)).toFixed(7);
+
+        setFee(estimatedFee);
+        setTx({ ...values, fee: estimatedFee, total });
+        setStep('review');
+        return true;
+      } catch (error) {
+        console.error('Simulation failed:', error);
+        const msg = error instanceof Error ? error.message : 'Simulation failed';
+        setErrors((current) => ({ ...current, simulation: msg }));
+        return false;
+      } finally {
+        setSubmitting(false);
+      }
     },
     [service, validateForm]
   );

@@ -1,11 +1,14 @@
 {
   "extends": "../../tsconfig.base.json",
   "compilerOptions": {
+    "rootDir": "./src",
     "outDir": "./dist",
     "moduleResolution": "node",
-    "composite": false,
+    "composite": true,
+    "tsBuildInfoFile": "./dist/.tsbuildinfo",
     "types": ["node", "jest"]
   },
+  "references": [{ "path": "../types" }],
   "include": ["src/**/*"],
   "exclude": ["node_modules", "dist", "**/*.test.ts"]
 }
