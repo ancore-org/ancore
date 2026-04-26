@@ -1,5 +1,6 @@
 #!/bin/bash
-# Setup local Soroban sandbox and fund deployer account
+# Setup local Stellar sandbox and fund deployer account
+# Requires: stellar CLI v22.0.1+
 
 set -e
 
@@ -11,14 +12,14 @@ if [ -z "$DEPLOYER_SECRET" ]; then
   exit 1
 fi
 
-# Start Soroban sandbox (if not running)
-if ! pgrep -f "soroban serve" > /dev/null; then
-  echo "Starting Soroban sandbox..."
-  soroban serve --network $NETWORK &
+# Start Stellar sandbox (if not running)
+if ! pgrep -f "stellar serve" > /dev/null; then
+  echo "Starting Stellar sandbox..."
+  stellar serve --network $NETWORK &
   sleep 2
 fi
 
 # Fund deployer account
-soroban auth fund-account --network $NETWORK --source $DEPLOYER_SECRET || true
+stellar keys fund --network $NETWORK --source $DEPLOYER_SECRET || true
 
-echo "Local Soroban sandbox setup complete."
+echo "Local Stellar sandbox setup complete."
