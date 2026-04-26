@@ -1,39 +1,5 @@
-import '@testing-library/jest-dom';
-
-function createMemoryStorage(): Storage {
-  const store = new Map<string, string>();
-
-  return {
-    get length() {
-      return store.size;
-    },
-    clear() {
-      store.clear();
-    },
-    getItem(key: string) {
-      return store.has(key) ? store.get(key)! : null;
-    },
-    key(index: number) {
-      return Array.from(store.keys())[index] ?? null;
-    },
-    removeItem(key: string) {
-      store.delete(key);
-    },
-    setItem(key: string, value: string) {
-      store.set(key, String(value));
-    },
-  };
-}
-
-const hasUsableLocalStorage =
-  typeof globalThis.localStorage !== 'undefined' &&
-  typeof globalThis.localStorage.clear === 'function' &&
-  typeof globalThis.localStorage.getItem === 'function' &&
-  typeof globalThis.localStorage.setItem === 'function';
-
-if (!hasUsableLocalStorage) {
-  Object.defineProperty(globalThis, 'localStorage', {
-    value: createMemoryStorage(),
-    configurable: true,
-  });
-}
+/**
+ * Extension wallet test setup.
+ * Delegates to the shared Vitest setup (jest-dom, cleanup, localStorage shim).
+ */
+export * from '../../../../packages/vitest.setup';

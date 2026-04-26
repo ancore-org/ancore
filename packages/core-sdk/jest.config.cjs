@@ -1,8 +1,13 @@
+/** @type {import('ts-jest').JestConfigWithTsJest} */
 module.exports = {
   preset: 'ts-jest',
   testEnvironment: 'node',
   testTimeout: 30000,
   roots: ['<rootDir>/src'],
+  transform: {
+    '^.+\\.ts$': ['ts-jest', { tsconfig: '<rootDir>/tsconfig.test.json' }],
+  },
+  setupFilesAfterFramework: ['<rootDir>/../../packages/jest.setup.ts'],
   moduleNameMapper: {
     '^@ancore/account-abstraction$': '<rootDir>/../account-abstraction/src/index.ts',
     '^@ancore/account-abstraction/(.*)$': '<rootDir>/../account-abstraction/src/$1',
@@ -10,9 +15,6 @@ module.exports = {
     '^@ancore/stellar/(.*)$': '<rootDir>/../stellar/src/$1',
     '^@ancore/types$': '<rootDir>/../types/src/index.ts',
     '^@ancore/types/(.*)$': '<rootDir>/../types/src/$1',
-  },
-  transform: {
-    '^.+\\.ts$': ['ts-jest', { tsconfig: '<rootDir>/tsconfig.test.json' }],
   },
   collectCoverage: true,
   collectCoverageFrom: [
@@ -31,6 +33,5 @@ module.exports = {
     },
   },
   testMatch: ['**/__tests__/**/*.test.ts'],
-  // Exclude integration tests from default run (use `pnpm test:integration`)
   testPathIgnorePatterns: ['/node_modules/', 'integration\\.test\\.ts$'],
 };
