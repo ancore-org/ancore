@@ -89,6 +89,14 @@ jobs:
       - name: Run extension smoke suite
         run: pnpm --filter @ancore/extension-wallet test:e2e:smoke
 
+      - name: Upload extension E2E failure artifacts
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: extension-e2e-failure-artifacts
+          path: apps/extension-wallet/test-results/
+          retention-days: 7
+
   contracts:
     name: Build & Test Contracts
     runs-on: ubuntu-latest
@@ -96,7 +104,7 @@ jobs:
       - uses: actions/checkout@v4
 
       - name: Setup Rust
-        uses: dtolnay/rust-toolchain@stable
+        uses: dtolnay/rust-toolchain@1.81.0
 
       - name: Ensure Cargo cache directories exist
         run: |
@@ -142,6 +150,14 @@ jobs:
       - name: Test contracts
         working-directory: ./contracts
         run: cargo test
+
+      - name: Upload contract build logs on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: contract-failure-logs
+          path: contracts/target/wasm32-unknown-unknown/release/*.wasm
+          retention-days: 7
 
   security:
     name: Security Audit
