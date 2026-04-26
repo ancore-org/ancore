@@ -51,6 +51,8 @@ pub enum ContractError {
     InvalidWasmHash = 10,
     /// Invalid expiration time provided
     InvalidExpiration = 11,
+    /// Caller identity does not match provided auth parameters
+    InvalidCallerIdentity = 12,
 }
 
 /// Event topic naming convention
@@ -188,7 +190,7 @@ impl AncoreAccount {
     /// - Nonce is incremented before invocation (checks-effects-interactions)
     pub fn execute(
         env: Env,
-        _caller: CallerIdentity,
+        caller: CallerIdentity,
         to: Address,
         function: soroban_sdk::Symbol,
         args: Vec<Val>,
@@ -203,39 +205,47 @@ impl AncoreAccount {
             return Err(ContractError::InvalidNonce);
         }
 
-        // Validate session key or enforce owner auth
-        if let Some(session_pk) = session_pub_key {
-            let session = Self::get_session_key(env.clone(), session_pk.clone())
-                .ok_or(ContractError::SessionKeyNotFound)?;
-
-            // Check session key has not expired
-            if env.ledger().timestamp() >= session.expires_at {
-                return Err(ContractError::SessionKeyExpired);
+        match caller {
+            // Owner auth takes precedence and ignores any extraneous session params.
+            CallerIdentity::Owner => {
+                let owner = Self::get_owner(env.clone())?;
+                owner.require_auth();
             }
+            CallerIdentity::SessionKey(expected_session_pk) => {
+                let session_pk = session_pub_key.ok_or(ContractError::InvalidCallerIdentity)?;
+                if session_pk != expected_session_pk {
+                    return Err(ContractError::InvalidCallerIdentity);
+                }
 
-            // Issue #188: Enforce explicit execute permission for session-key path
-            // Session keys must have PERMISSION_EXECUTE bit set to authorize transactions.
-            // This prevents unauthorized transaction invocation via scoped session keys.
-            if !session.permissions.contains(PERMISSION_EXECUTE) {
-                return Err(ContractError::InsufficientPermission);
+                let session = Self::get_session_key(env.clone(), session_pk.clone())
+                    .ok_or(ContractError::SessionKeyNotFound)?;
+
+                // Check session key has not expired
+                if env.ledger().timestamp() >= session.expires_at {
+                    return Err(ContractError::SessionKeyExpired);
+                }
+
+                // Issue #188: Enforce explicit execute permission for session-key path
+                // Session keys must have PERMISSION_EXECUTE bit set to authorize transactions.
+                // This prevents unauthorized transaction invocation via scoped session keys.
+                if !session.permissions.contains(PERMISSION_EXECUTE) {
+                    return Err(ContractError::InsufficientPermission);
+                }
+
+                let sig = signature.ok_or(ContractError::InvalidSignature)?;
+                let payload = signature_payload.ok_or(ContractError::InvalidSignature)?;
+
+                // CRITICAL: Bind signature to actual call parameters to prevent replay attacks
+                // The signature must be for the exact (to, function, args, nonce) tuple being executed
+                let expected_payload =
+                    Self::canonical_execute_signing_payload(&env, &to, &function, &args, expected_nonce);
+                if payload != expected_payload {
+                    return Err(ContractError::InvalidSignature);
+                }
+
+                // Verify signature using ed25519
+                env.crypto().ed25519_verify(&session_pk, &payload, &sig);
             }
-
-            let sig = signature.ok_or(ContractError::InvalidSignature)?;
-            let payload = signature_payload.ok_or(ContractError::InvalidSignature)?;
-
-            // CRITICAL: Bind signature to actual call parameters to prevent replay attacks
-            // The signature must be for the exact (to, function, args, nonce) tuple being executed
-            let expected_payload = Self::create_signature_payload(&env, &to, &function, &args, expected_nonce);
-            if payload != expected_payload {
-                return Err(ContractError::InvalidSignature);
-            }
-
-            // Verify signature using ed25519
-            env.crypto().ed25519_verify(&session_pk, &payload, &sig);
-        } else {
-            // Fallback: require owner direct authorization
-            let owner = Self::get_owner(env.clone())?;
-            owner.require_auth();
         }
 
         // Increment nonce before invocation (checks-effects-interactions)
@@ -456,7 +466,7 @@ impl AncoreAccount {
     /// Create canonical signature payload for replay protection.
     /// This MUST match the exact format used by test helpers for signature verification.
     /// Critical security: Binds signatures to specific (to, function, args, nonce) tuples.
-    fn create_signature_payload(
+    fn canonical_execute_signing_payload(
         env: &Env,
         to: &Address,
         function: &soroban_sdk::Symbol,
@@ -491,11 +501,8 @@ mod test {
         args: &Vec<Val>,
         nonce: u64,
     ) -> (BytesN<64>, Bytes) {
-        let mut payload = Bytes::new(env);
-        payload.append(&to.clone().to_xdr(env));
-        payload.append(&function.clone().to_xdr(env));
-        payload.append(&args.clone().to_xdr(env));
-        payload.append(&nonce.to_xdr(env));
+        let payload =
+            AncoreAccount::canonical_execute_signing_payload(env, to, function, args, nonce);
 
         let mut payload_bytes = [0u8; 1024];
         let len = payload.len() as usize;
