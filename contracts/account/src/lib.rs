@@ -21,10 +21,10 @@
 //! - `session_key_added`: Emitted when a session key is added with public_key and expires_at
 //! - `session_key_revoked`: Emitted when a session key is revoked with public_key
 
+use soroban_sdk::xdr::ToXdr;
 use soroban_sdk::{
     contract, contracterror, contractimpl, contracttype, Address, BytesN, Env, Val, Vec,
 };
-use soroban_sdk::xdr::ToXdr;
 
 #[cfg(not(target_family = "wasm"))]
 use ed25519_dalek::{Signature as DalekSignature, VerifyingKey};
@@ -57,6 +57,12 @@ pub enum ContractError {
     InvalidExpiration = 11,
     /// Caller identity does not match provided auth parameters
     InvalidCallerIdentity = 12,
+    /// Signature payload does not match the canonical execute() signing payload
+    SignaturePayloadMismatch = 13,
+    /// Session key registration already exists
+    SessionKeyAlreadyExists = 14,
+    /// Session key expiration is already in the past
+    SessionKeyExpirationInPast = 15,
 }
 
 /// Event topic naming convention
@@ -150,8 +156,8 @@ fn verify_ed25519_signature(
 ) -> Result<(), ContractError> {
     #[cfg(not(target_family = "wasm"))]
     {
-        let verifying_key =
-            VerifyingKey::from_bytes(&public_key.to_array()).map_err(|_| ContractError::InvalidSignature)?;
+        let verifying_key = VerifyingKey::from_bytes(&public_key.to_array())
+            .map_err(|_| ContractError::InvalidSignature)?;
         let dalek_sig = DalekSignature::from_bytes(&signature.to_array());
 
         // Avoid dynamic allocation by copying into a bounded stack buffer.
@@ -238,8 +244,11 @@ impl AncoreAccount {
         }
 
         match caller {
-            // Owner auth takes precedence and ignores any extraneous session params.
+            // Owner auth path: reject any session-key auth parameters.
             CallerIdentity::Owner => {
+                if session_pub_key.is_some() || signature.is_some() || signature_payload.is_some() {
+                    return Err(ContractError::InvalidCallerIdentity);
+                }
                 let owner = Self::get_owner(env.clone())?;
                 owner.require_auth();
             }
@@ -269,10 +278,15 @@ impl AncoreAccount {
 
                 // CRITICAL: Bind signature to actual call parameters to prevent replay attacks
                 // The signature must be for the exact (to, function, args, nonce) tuple being executed
-                let expected_payload =
-                    Self::canonical_execute_signing_payload(&env, &to, &function, &args, expected_nonce);
+                let expected_payload = Self::canonical_execute_signing_payload(
+                    &env,
+                    &to,
+                    &function,
+                    &args,
+                    expected_nonce,
+                );
                 if payload != expected_payload {
-                    return Err(ContractError::InvalidSignature);
+                    return Err(ContractError::SignaturePayloadMismatch);
                 }
 
                 verify_ed25519_signature(&env, &session_pk, &payload, &sig)?;
@@ -313,6 +327,24 @@ impl AncoreAccount {
 
         let owner = Self::get_owner(env.clone())?;
         owner.require_auth();
+
+        if env
+            .storage()
+            .persistent()
+            .has(&DataKey::SessionKey(public_key.clone()))
+        {
+            return Err(ContractError::SessionKeyAlreadyExists);
+        }
+
+        let current_timestamp = env.ledger().timestamp();
+        let expires_at_secs = if expires_at > 100_000_000_000 {
+            expires_at / 1000
+        } else {
+            expires_at
+        };
+        if expires_at_secs <= current_timestamp {
+            return Err(ContractError::SessionKeyExpirationInPast);
+        }
 
         let session_key = SessionKey {
             public_key: public_key.clone(),
@@ -1897,7 +1929,7 @@ mod test {
         let events_list = env.events().all();
         assert!(events_list.len() >= 2); // initialized + migrated
         let (_contract, topics, data) = events_list.get_unchecked(1).clone();
-        
+
         let topic_symbol: soroban_sdk::Symbol =
             soroban_sdk::FromVal::from_val(&env, &topics.get_unchecked(0));
         assert_eq!(topic_symbol, events::migrated(&env));
@@ -1958,6 +1990,9 @@ mod test {
         let owner = Address::generate(&env);
         // No mock_all_auths: owner has not authorised the call
         let result = client.try_initialize(&owner);
-        assert!(result.is_err(), "initialize must fail when owner has not authorized");
+        assert!(
+            result.is_err(),
+            "initialize must fail when owner has not authorized"
+        );
     }
 }
