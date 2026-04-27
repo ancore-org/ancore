@@ -15,21 +15,9 @@ export const AccountOverviewGrid: React.FC<AccountOverviewGridProps> = ({ public
 
   return (
     <div className="grid gap-4 md:grid-cols-3">
-      <BalanceWidget 
-        balance={data?.balance} 
-        isLoading={isLoading} 
-        error={error} 
-      />
-      <NonceWidget 
-        nonce={data?.nonce} 
-        isLoading={isLoading} 
-        error={error} 
-      />
-      <AccountStatusWidget 
-        status={data?.status} 
-        isLoading={isLoading} 
-        error={error} 
-      />
+      <BalanceWidget balance={data?.balance} isLoading={isLoading} error={error} />
+      <NonceWidget nonce={data?.nonce} isLoading={isLoading} error={error} />
+      <AccountStatusWidget status={data?.status} isLoading={isLoading} error={error} />
     </div>
   );
 };

@@ -48,8 +48,8 @@ export const SessionKeysScreen: React.FC = () => {
       <section className="mb-4">
         <h2 className="text-lg font-semibold">What are session keys?</h2>
         <p className="text-sm text-gray-500 mt-1">
-          Session keys let apps act on your behalf with limited permissions and a fixed expiry —
-          no main key exposure.
+          Session keys let apps act on your behalf with limited permissions and a fixed expiry — no
+          main key exposure.
         </p>
       </section>
 
@@ -87,9 +87,7 @@ export const SessionKeysScreen: React.FC = () => {
                     </p>
                     <p className="text-xs text-gray-500 mt-1">
                       Permissions:{' '}
-                      {key.permissions
-                        .map((p) => PERMISSION_LABELS[p] ?? String(p))
-                        .join(', ')}
+                      {key.permissions.map((p) => PERMISSION_LABELS[p] ?? String(p)).join(', ')}
                     </p>
                     <p className="text-xs text-gray-500">
                       Expires: {new Date(key.expiresAt).toLocaleString()}

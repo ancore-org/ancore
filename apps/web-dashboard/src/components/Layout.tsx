@@ -3,7 +3,7 @@ import { NavLink, Outlet } from 'react-router-dom';
 import { cn } from '@ancore/ui-kit';
 
 const NAV_LINKS = [
-  { to: '/',             label: 'Dashboard', end: true },
+  { to: '/', label: 'Dashboard', end: true },
   { to: '/transactions', label: 'Transactions' },
 ];
 
@@ -18,8 +18,10 @@ export const Layout: React.FC = () => (
             to={to}
             end={end}
             className={({ isActive }) =>
-              cn('text-sm transition-colors hover:text-foreground',
-                isActive ? 'text-foreground font-medium' : 'text-muted-foreground')
+              cn(
+                'text-sm transition-colors hover:text-foreground',
+                isActive ? 'text-foreground font-medium' : 'text-muted-foreground'
+              )
             }
           >
             {label}

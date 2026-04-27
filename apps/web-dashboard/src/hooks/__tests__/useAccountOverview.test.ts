@@ -7,7 +7,7 @@ describe('useAccountOverview', () => {
     const { result } = renderHook(() => useAccountOverview('GB...'));
 
     expect(result.current.isLoading).toBe(true);
-    
+
     await waitFor(() => expect(result.current.isLoading).toBe(false), { timeout: 2000 });
 
     expect(result.current.data).toEqual({

@@ -46,11 +46,7 @@ export const MetricWidget: React.FC<MetricWidgetProps> = ({
             <div className="text-2xl font-bold" data-testid="metric-value">
               {value ?? '—'}
             </div>
-            {description && (
-              <p className="text-xs text-muted-foreground mt-1">
-                {description}
-              </p>
-            )}
+            {description && <p className="text-xs text-muted-foreground mt-1">{description}</p>}
           </>
         )}
       </CardContent>

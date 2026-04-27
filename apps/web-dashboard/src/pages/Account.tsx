@@ -9,7 +9,7 @@ export const Account: React.FC = () => {
   const { account, transactions, loading, error } = useAccountData(address);
 
   if (loading) return <p className="text-muted-foreground">Loading…</p>;
-  if (error)   return <p className="text-destructive">Error: {error.message}</p>;
+  if (error) return <p className="text-destructive">Error: {error.message}</p>;
   if (!account) return <p className="text-muted-foreground">Account not found.</p>;
 
   return (

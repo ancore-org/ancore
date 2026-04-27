@@ -1,9 +1,10 @@
 import React from 'react';
-import { BrowserRouter, Routes, Route } from 'react-router-dom';
+import { BrowserRouter, Route, Routes } from 'react-router-dom';
+
 import { Layout } from './components/Layout';
-import { Dashboard } from './pages/Dashboard';
-import { Account } from './pages/Account';
 import { TransactionList } from './components/TransactionList';
+import { Account } from './pages/Account';
+import { Dashboard } from './pages/Dashboard';
 
 const App: React.FC = () => (
   <BrowserRouter>

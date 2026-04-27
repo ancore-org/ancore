@@ -12,7 +12,9 @@ vi.mock('@ancore/ui-kit', () => ({
   CardContent: ({ children }: any) => <div>{children}</div>,
   Badge: ({ children }: any) => <span>{children}</span>,
   Button: ({ children, onClick, disabled }: any) => (
-    <button onClick={onClick} disabled={disabled}>{children}</button>
+    <button onClick={onClick} disabled={disabled}>
+      {children}
+    </button>
   ),
 }));
 

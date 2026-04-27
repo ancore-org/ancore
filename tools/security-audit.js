@@ -142,7 +142,11 @@ async function runAudit() {
 
   // Phase 2: Run security checks
   log('\n=== Phase 2: Security Validation ===');
-  runCheck('dependency audit', 'pnpm audit --audit-level=high', 'NPM dependency vulnerability scan');
+  runCheck(
+    'dependency audit',
+    'pnpm audit --audit-level=high',
+    'NPM dependency vulnerability scan'
+  );
   runCheck('cargo audit', 'cargo audit', 'Rust dependency vulnerability scan');
 
   // Phase 3: Run tests

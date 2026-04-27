@@ -1,11 +1,11 @@
-import AsyncStorage from "@react-native-async-storage/async-storage";
-import { StateStorage, createJSONStorage, persist } from "zustand/middleware";
-import { useStore } from "./store";
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import { StateStorage, createJSONStorage, persist } from 'zustand/middleware';
+import { useStore } from './store';
 
 const storage: StateStorage = createJSONStorage(() => AsyncStorage);
 
 export const usePersistedStore = persist(useStore, {
-  name: "wallet-store",
+  name: 'wallet-store',
   storage,
   version: 1,
 
@@ -13,7 +13,7 @@ export const usePersistedStore = persist(useStore, {
     if (version === 0) {
       return {
         ...persistedState,
-        network: "testnet",
+        network: 'testnet',
       };
     }
     return persistedState;

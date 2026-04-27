@@ -26,7 +26,7 @@ describe('Account Overview Widgets', () => {
   describe('BalanceWidget', () => {
     it('renders balance correctly', () => {
       render(<BalanceWidget balance={100.5} />);
-      expect(screen.getByText('100.5 XLM')).toBeInTheDocument();
+      expect(screen.getByText('100.50 XLM')).toBeInTheDocument();
       expect(screen.getByText('Total Balance')).toBeInTheDocument();
     });
 

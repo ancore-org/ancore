@@ -13,12 +13,13 @@ export const BalanceWidget: React.FC<WidgetProps & { balance?: number }> = ({
   isLoading,
   error,
 }) => {
-  const formattedBalance = balance !== undefined 
-    ? new Intl.NumberFormat('en-US', {
-        minimumFractionDigits: 2,
-        maximumFractionDigits: 4,
-      }).format(balance) + ' XLM'
-    : undefined;
+  const formattedBalance =
+    balance !== undefined
+      ? new Intl.NumberFormat('en-US', {
+          minimumFractionDigits: 2,
+          maximumFractionDigits: 4,
+        }).format(balance) + ' XLM'
+      : undefined;
 
   return (
     <MetricWidget
@@ -65,9 +66,7 @@ export const AccountStatusWidget: React.FC<WidgetProps & { status?: AccountStatu
     }
   };
 
-  const formattedStatus = status 
-    ? status.charAt(0).toUpperCase() + status.slice(1)
-    : undefined;
+  const formattedStatus = status ? status.charAt(0).toUpperCase() + status.slice(1) : undefined;
 
   return (
     <MetricWidget

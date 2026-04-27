@@ -16,8 +16,7 @@ export const useSessionKeyStore = create<SessionKeyState>()(
     (set) => ({
       keys: [],
 
-      addKey: (key) =>
-        set((state) => ({ keys: [...state.keys, key] })),
+      addKey: (key) => set((state) => ({ keys: [...state.keys, key] })),
 
       removeKey: (publicKey) =>
         set((state) => ({ keys: state.keys.filter((k) => k.publicKey !== publicKey) })),
@@ -32,6 +31,6 @@ export const useSessionKeyStore = create<SessionKeyState>()(
     {
       name: 'ancore-session-keys',
       storage: createJSONStorage(() => extensionStorage),
-    },
-  ),
+    }
+  )
 );

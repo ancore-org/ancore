@@ -19,13 +19,18 @@ export const DEFAULT_AUTH_STATE: AuthState = {
 
 interface AuthContextValue {
   authState: AuthState;
+  unlockError: string | null;
   completeOnboarding: (walletName: string) => void;
-  unlockWallet: () => void;
+  unlockWallet: (password: string) => Promise<boolean>;
   lockWallet: () => void;
   resetWallet: () => void;
 }
 
 const AuthContext = React.createContext<AuthContextValue | null>(null);
+
+export type UnlockVerifier = (password: string) => boolean | Promise<boolean>;
+
+const DEFAULT_UNLOCK_ERROR = 'Incorrect password. Please try again.';
 
 export function readAuthState(): AuthState {
   if (typeof window === 'undefined') {
@@ -51,8 +56,15 @@ function writeAuthState(authState: AuthState): void {
   window.localStorage.setItem(AUTH_STORAGE_KEY, JSON.stringify(authState));
 }
 
-export function ExtensionAuthProvider({ children }: { children: React.ReactNode }) {
+export function ExtensionAuthProvider({
+  children,
+  unlockVerifier,
+}: {
+  children: React.ReactNode;
+  unlockVerifier?: UnlockVerifier;
+}) {
   const [authState, setAuthState] = React.useState<AuthState>(readAuthState);
+  const [unlockError, setUnlockError] = React.useState<string | null>(null);
 
   React.useEffect(() => {
     writeAuthState(authState);
@@ -72,7 +84,9 @@ export function ExtensionAuthProvider({ children }: { children: React.ReactNode 
   const value = React.useMemo<AuthContextValue>(
     () => ({
       authState,
+      unlockError,
       completeOnboarding: (walletName: string) => {
+        setUnlockError(null);
         setAuthState({
           hasOnboarded: true,
           isUnlocked: true,
@@ -80,24 +94,48 @@ export function ExtensionAuthProvider({ children }: { children: React.ReactNode 
           accountAddress: DEFAULT_AUTH_STATE.accountAddress,
         });
       },
-      unlockWallet: () => {
-        setAuthState((current) => ({
-          ...current,
-          hasOnboarded: true,
-          isUnlocked: true,
-        }));
+      unlockWallet: async (password: string) => {
+        try {
+          const isValid = await (unlockVerifier?.(password) ?? Boolean(password.trim()));
+
+          if (!isValid) {
+            setUnlockError(DEFAULT_UNLOCK_ERROR);
+            setAuthState((current) => ({
+              ...current,
+              isUnlocked: false,
+            }));
+            return false;
+          }
+
+          setUnlockError(null);
+          setAuthState((current) => ({
+            ...current,
+            hasOnboarded: true,
+            isUnlocked: true,
+          }));
+          return true;
+        } catch {
+          setUnlockError(DEFAULT_UNLOCK_ERROR);
+          setAuthState((current) => ({
+            ...current,
+            isUnlocked: false,
+          }));
+          return false;
+        }
       },
       lockWallet: () => {
+        setUnlockError(null);
         setAuthState((current) => ({
           ...current,
           isUnlocked: false,
         }));
       },
       resetWallet: () => {
+        setUnlockError(null);
         setAuthState(DEFAULT_AUTH_STATE);
       },
     }),
-    [authState]
+    [authState, unlockError, unlockVerifier]
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

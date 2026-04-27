@@ -10,7 +10,7 @@ export const Dashboard: React.FC = () => {
   const { account, transactions, loading, error } = useAccountData(DEFAULT_ADDRESS);
 
   if (loading) return <p className="text-muted-foreground">Loading…</p>;
-  if (error)   return <p className="text-destructive">Error: {error.message}</p>;
+  if (error) return <p className="text-destructive">Error: {error.message}</p>;
   if (!account) return null;
 
   return (

@@ -1,5 +1,3 @@
-import React from 'react';
-
 import { type Transaction } from '../screens/history/types';
 
 type Props = {

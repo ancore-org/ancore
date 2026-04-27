@@ -1,0 +1,15 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="440" height="280" viewBox="0 0 440 280">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#0b1020"/>
+      <stop offset="100%" stop-color="#1c2f6b"/>
+    </linearGradient>
+  </defs>
+  <rect width="440" height="280" fill="url(#bg)"/>
+  <circle cx="360" cy="60" r="80" fill="#36d6c5" opacity="0.16"/>
+  <circle cx="70" cy="250" r="110" fill="#5aa8ff" opacity="0.12"/>
+  <text x="36" y="84" font-family="Inter, Segoe UI, Arial" font-size="26" font-weight="700" fill="#ffffff">Ancore Wallet</text>
+  <text x="36" y="120" font-family="Inter, Segoe UI, Arial" font-size="15" fill="#c9d7ff">Account abstraction for Stellar</text>
+  <rect x="36" y="150" rx="10" ry="10" width="170" height="40" fill="#36d6c5"/>
+  <text x="52" y="176" font-family="Inter, Segoe UI, Arial" font-size="14" font-weight="700" fill="#0b1020">Session Keys Built-In</text>
+</svg>

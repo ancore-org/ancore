@@ -26,7 +26,7 @@ describe('AccountSummary', () => {
     expect(screen.getByText('GABC...XYZ')).toBeInTheDocument();
     expect(screen.getByText('500.50 XLM')).toBeInTheDocument();
     expect(screen.getByText('active')).toBeInTheDocument();
-    expect(screen.getByText('1/1/2026')).toBeInTheDocument();
+    expect(screen.getByText(MOCK_ACCOUNT.lastActivity.toLocaleDateString())).toBeInTheDocument();
   });
 
   it('renders inactive status', () => {

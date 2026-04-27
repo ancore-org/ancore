@@ -67,7 +67,10 @@ export function setupFocusTrap(
  * @param message - Message to announce
  * @param priority - ARIA live region priority (polite or assertive)
  */
-export function announceToScreenReader(message: string, priority: 'polite' | 'assertive' = 'polite'): void {
+export function announceToScreenReader(
+  message: string,
+  priority: 'polite' | 'assertive' = 'polite'
+): void {
   const announcement = document.createElement('div');
   announcement.setAttribute('aria-live', priority);
   announcement.setAttribute('aria-atomic', 'true');
@@ -87,7 +90,8 @@ export function createSkipLink(): HTMLElement {
   const link = document.createElement('a');
   link.href = '#main-content';
   link.textContent = 'Skip to main content';
-  link.className = 'sr-only focus:not-sr-only focus:absolute focus:top-2 focus:left-2 focus:z-50 focus:p-2 focus:bg-cyan-400 focus:text-slate-950 focus:rounded';
+  link.className =
+    'sr-only focus:not-sr-only focus:absolute focus:top-2 focus:left-2 focus:z-50 focus:p-2 focus:bg-cyan-400 focus:text-slate-950 focus:rounded';
   return link;
 }
 
@@ -127,7 +131,10 @@ export function getFocusableElements(container: HTMLElement): HTMLElement[] {
  * Verifies that interactive elements are reachable via keyboard
  * @param container - Container to check
  */
-export function checkKeyboardAccessibility(container: HTMLElement): { passed: boolean; issues: string[] } {
+export function checkKeyboardAccessibility(container: HTMLElement): {
+  passed: boolean;
+  issues: string[];
+} {
   const issues: string[] = [];
   const focusableElements = getFocusableElements(container);
 
@@ -156,7 +163,8 @@ export const a11yAttrs = {
   /**
    * Focus visible styling class
    */
-  focusRing: 'focus:outline-none focus:ring-2 focus:ring-cyan-400 focus:ring-offset-2 focus:ring-offset-slate-950',
+  focusRing:
+    'focus:outline-none focus:ring-2 focus:ring-cyan-400 focus:ring-offset-2 focus:ring-offset-slate-950',
 
   /**
    * Screen reader only text (visually hidden)

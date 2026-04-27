@@ -7,10 +7,7 @@ interface TransactionListProps {
   pageSize?: number;
 }
 
-export const TransactionList: React.FC<TransactionListProps> = ({
-  transactions,
-  pageSize = 5,
-}) => {
+export const TransactionList: React.FC<TransactionListProps> = ({ transactions, pageSize = 5 }) => {
   const [page, setPage] = useState(0);
   const total = Math.ceil(transactions.length / pageSize);
   const visible = transactions.slice(page * pageSize, (page + 1) * pageSize);
@@ -25,18 +22,20 @@ export const TransactionList: React.FC<TransactionListProps> = ({
           <p className="text-sm text-muted-foreground">No transactions found.</p>
         ) : (
           visible.map((tx) => (
-            <div key={tx.id} className="flex items-center justify-between py-2 border-b last:border-0">
+            <div
+              key={tx.id}
+              className="flex items-center justify-between py-2 border-b last:border-0"
+            >
               <div className="flex items-center gap-3">
-                <Badge variant={tx.type === 'receive' ? 'default' : 'secondary'}>
-                  {tx.type}
-                </Badge>
+                <Badge variant={tx.type === 'receive' ? 'default' : 'secondary'}>{tx.type}</Badge>
                 <span className="text-sm text-muted-foreground">
                   {tx.timestamp.toLocaleDateString()}
                 </span>
               </div>
               <div className="flex items-center gap-3">
                 <span className="font-medium">
-                  {tx.type === 'send' ? '-' : '+'}{tx.amount} XLM
+                  {tx.type === 'send' ? '-' : '+'}
+                  {tx.amount} XLM
                 </span>
                 <Badge variant={tx.status === 'confirmed' ? 'default' : 'secondary'}>
                   {tx.status}
@@ -47,11 +46,23 @@ export const TransactionList: React.FC<TransactionListProps> = ({
         )}
         {total > 1 && (
           <div className="flex justify-between items-center pt-2">
-            <Button variant="outline" size="sm" onClick={() => setPage((p) => p - 1)} disabled={page === 0}>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setPage((p) => p - 1)}
+              disabled={page === 0}
+            >
               Previous
             </Button>
-            <span className="text-sm text-muted-foreground">{page + 1} / {total}</span>
-            <Button variant="outline" size="sm" onClick={() => setPage((p) => p + 1)} disabled={page >= total - 1}>
+            <span className="text-sm text-muted-foreground">
+              {page + 1} / {total}
+            </span>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setPage((p) => p + 1)}
+              disabled={page >= total - 1}
+            >
               Next
             </Button>
           </div>

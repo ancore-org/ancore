@@ -1,4 +1,4 @@
-import { SessionState, SessionActions } from "../types/session";
+import { SessionState, SessionActions } from '../types/session';
 
 export const createSessionSlice = (set: any): SessionState & SessionActions => ({
   isAuthenticated: false,
