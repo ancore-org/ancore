@@ -32,10 +32,10 @@ jobs:
     outputs:
       report: ${{ steps.report.outputs.json }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
 
       - name: Setup Rust
-        uses: dtolnay/rust-toolchain@1.81.0
+        uses: dtolnay/rust-toolchain@1.100.0
 
       - name: Add wasm32 target
         run: rustup target add wasm32-unknown-unknown
@@ -58,7 +58,7 @@ jobs:
 
       - name: Upload dry-run report
         id: report
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: dry-run-report
           path: contracts/dry-run-report.json
@@ -75,17 +75,17 @@ jobs:
     needs: dry-run
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
         with:
           fetch-depth: 0
 
       - name: Setup pnpm
-        uses: pnpm/action-setup@v2
+        uses: pnpm/action-setup@v6
         with:
           version: 9
 
       - name: Setup Node.js
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v6
         with:
           node-version: '20'
           cache: 'pnpm'
@@ -122,10 +122,10 @@ jobs:
     needs: dry-run
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
 
       - name: Setup Rust
-        uses: dtolnay/rust-toolchain@1.81.0
+        uses: dtolnay/rust-toolchain@1.100.0
 
       - name: Add wasm32 target
         run: rustup target add wasm32-unknown-unknown
@@ -150,7 +150,7 @@ jobs:
             --output account/target/wasm32-unknown-unknown/release/ancore_account.optimized.wasm
 
       - name: Upload contract artifacts
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: contracts
           path: |
@@ -163,18 +163,18 @@ jobs:
     runs-on: ubuntu-latest
     if: env.DRY_RUN == 'false'
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
         with:
           fetch-depth: 0
 
       - name: Download contract artifacts
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v8
         with:
           name: contracts
           path: contracts-build
 
       - name: Download dry-run report
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v8
         with:
           name: dry-run-report
           path: .
@@ -191,7 +191,7 @@ jobs:
           echo '```' >> CHANGELOG.md
 
       - name: Create Release
-        uses: softprops/action-gh-release@v2
+        uses: softprops/action-gh-release@v3
         with:
           body_path: CHANGELOG.md
           files: |
@@ -208,7 +208,7 @@ jobs:
     runs-on: ubuntu-latest
     if: github.event.inputs.rollback_tag != ''
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
         with:
           fetch-depth: 0
 
@@ -225,12 +225,12 @@ jobs:
           fi
 
       - name: Setup pnpm
-        uses: pnpm/action-setup@v2
+        uses: pnpm/action-setup@v6
         with:
           version: 9
 
       - name: Setup Node.js
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v6
         with:
           node-version: '20'
           cache: 'pnpm'

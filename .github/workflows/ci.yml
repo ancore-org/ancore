@@ -15,15 +15,15 @@ jobs:
     name: Lint
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
 
       - name: Setup pnpm
-        uses: pnpm/action-setup@v2
+        uses: pnpm/action-setup@v6
         with:
           version: 9
 
       - name: Setup Node.js
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v6
         with:
           node-version: '20'
           cache: 'pnpm'
@@ -41,15 +41,15 @@ jobs:
     name: Test
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
 
       - name: Setup pnpm
-        uses: pnpm/action-setup@v2
+        uses: pnpm/action-setup@v6
         with:
           version: 9
 
       - name: Setup Node.js
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v6
         with:
           node-version: '20'
           cache: 'pnpm'
@@ -69,7 +69,7 @@ jobs:
 
       - name: Upload coverage reports
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: coverage-reports
           path: packages/*/coverage/
@@ -81,15 +81,15 @@ jobs:
     needs: test
     if: always()
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
 
       - name: Setup pnpm
-        uses: pnpm/action-setup@v2
+        uses: pnpm/action-setup@v6
         with:
           version: 9
 
       - name: Setup Node.js
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v6
         with:
           node-version: '20'
           cache: 'pnpm'
@@ -133,15 +133,15 @@ jobs:
       matrix:
         browser: [chromium, firefox]
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
 
       - name: Setup pnpm
-        uses: pnpm/action-setup@v2
+        uses: pnpm/action-setup@v6
         with:
           version: 9
 
       - name: Setup Node.js
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v6
         with:
           node-version: '20'
           cache: 'pnpm'
@@ -157,7 +157,7 @@ jobs:
 
       - name: Upload extension E2E failure artifacts
         if: failure()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: extension-e2e-failure-artifacts-${{ matrix.browser }}
           path: apps/extension-wallet/test-results/
@@ -167,10 +167,10 @@ jobs:
     name: Build & Test Contracts
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
 
       - name: Setup Rust
-        uses: dtolnay/rust-toolchain@1.81.0
+        uses: dtolnay/rust-toolchain@1.100.0
 
       - name: Ensure Cargo cache directories exist
         run: |
@@ -181,7 +181,7 @@ jobs:
           mkdir -p ${{ github.workspace }}/contracts/target
 
       - name: Cache Cargo
-        uses: actions/cache@v3
+        uses: actions/cache@v5
         with:
           path: |
             ~/.cargo/bin
@@ -219,7 +219,7 @@ jobs:
 
       - name: Upload contract build logs on failure
         if: failure()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: contract-failure-logs
           path: contracts/target/wasm32-unknown-unknown/release/*.wasm
@@ -229,15 +229,15 @@ jobs:
     name: Security Audit
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
 
       - name: Setup pnpm
-        uses: pnpm/action-setup@v2
+        uses: pnpm/action-setup@v6
         with:
           version: 9
 
       - name: Setup Node.js
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v6
         with:
           node-version: '20'
           cache: 'pnpm'
