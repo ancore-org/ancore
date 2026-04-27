@@ -15,8 +15,6 @@
 # Smart Contracts - Critical security boundary
 /contracts/ @ancore/contract-team @ancore/security-team
 /contracts/account/ @ancore/contract-team @ancore/security-team
-/contracts/validation-modules/ @ancore/contract-team @ancore/security-team
-/contracts/upgrade/ @ancore/contract-team @ancore/security-team
 
 # Cryptographic operations - Must be reviewed by security team
 /packages/crypto/ @ancore/security-team @ancore/core-team
@@ -40,7 +38,6 @@
 # Services - Backend infrastructure
 /services/relayer/ @ancore/infrastructure-team
 /services/indexer/ @ancore/infrastructure-team
-/services/ai-agent/ @ancore/infrastructure-team @ancore/sdk-team
 
 # ============================================================================
 # LOW RISK - Standard review process
