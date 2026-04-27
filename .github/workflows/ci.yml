@@ -63,6 +63,68 @@ jobs:
       - name: Run tests
         run: pnpm test
 
+      - name: Check coverage gates
+        run: node scripts/coverage-gate.js
+        continue-on-error: false
+
+      - name: Upload coverage reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage-reports
+          path: packages/*/coverage/
+          retention-days: 30
+
+  coverage-report:
+    name: Coverage Report
+    runs-on: ubuntu-latest
+    needs: test
+    if: always()
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v2
+        with:
+          version: 9
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'pnpm'
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Build packages
+        run: pnpm build
+
+      - name: Run tests with coverage
+        run: pnpm test
+        continue-on-error: true
+
+      - name: Generate coverage summary
+        run: |
+          echo "## 📊 Coverage Report" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          
+          for package in core-sdk account-abstraction crypto stellar; do
+            if [ -f "packages/$package/coverage/coverage-summary.json" ]; then
+              echo "### $package" >> $GITHUB_STEP_SUMMARY
+              echo '```' >> $GITHUB_STEP_SUMMARY
+              node -e "
+                const data = require('./packages/$package/coverage/coverage-summary.json');
+                const total = data.total;
+                console.log('Branch:    ' + total.branches.pct + '%');
+                console.log('Functions: ' + total.functions.pct + '%');
+                console.log('Lines:     ' + total.lines.pct + '%');
+                console.log('Statements: ' + total.statements.pct + '%');
+              " >> $GITHUB_STEP_SUMMARY
+              echo '```' >> $GITHUB_STEP_SUMMARY
+            fi
+          done
+
   extension-e2e-smoke:
     name: Extension E2E Smoke
     runs-on: ubuntu-latest
