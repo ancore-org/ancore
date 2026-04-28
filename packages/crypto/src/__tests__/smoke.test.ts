@@ -8,6 +8,7 @@ const EXPECTED_EXPORTS = [
   'generateMnemonic',
   'validateMnemonic',
   'deriveKeypairFromMnemonic',
+  'keyFingerprint',
 ] as const;
 
 describe('@ancore/crypto smoke test', () => {

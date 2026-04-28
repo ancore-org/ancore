@@ -10,3 +10,4 @@ export { encryptSecretKey, decryptSecretKey } from './encryption';
 export type { EncryptedSecretKeyPayload } from './encryption';
 export { generateMnemonic, validateMnemonic } from './mnemonic';
 export { deriveKeypairFromMnemonic } from './key-derivation';
+export { keyFingerprint } from './fingerprint';
