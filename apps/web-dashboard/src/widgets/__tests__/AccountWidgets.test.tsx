@@ -10,7 +10,6 @@ vi.mock('lucide-react', () => ({
   ShieldCheck: () => <div data-testid="shield-check-icon" />,
   ShieldAlert: () => <div data-testid="shield-alert-icon" />,
   Shield: () => <div data-testid="shield-icon" />,
-  Loader2: () => <div data-testid="loader-icon" />,
   AlertCircle: () => <div data-testid="alert-icon" />,
 }));
 
@@ -20,6 +19,7 @@ vi.mock('@ancore/ui-kit', () => ({
   CardHeader: ({ children, className }: any) => <div className={className}>{children}</div>,
   CardTitle: ({ children, className }: any) => <div className={className}>{children}</div>,
   CardContent: ({ children, className }: any) => <div className={className}>{children}</div>,
+  Skeleton: ({ className }: any) => <div className={className} aria-hidden="true" />,
 }));
 
 describe('Account Overview Widgets', () => {

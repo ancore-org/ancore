@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { amountSchema, isStellarAddress } from '@ancore/ui-kit';
+import { mapRpcStatus, isTerminalStatus } from '@/utils/transaction-status';
 
 export type SendStep = 'form' | 'review' | 'confirm' | 'status';
 export type TxStatus = 'idle' | 'pending' | 'confirmed' | 'failed';
@@ -182,10 +183,11 @@ export function useSendTransaction(options: UseSendTransactionOptions = {}) {
         setStep('status');
 
         pollRef.current = setInterval(async () => {
-          const next = await service.fetchTransactionStatus(submission.txId);
-          setStatus(next);
+          const raw = await service.fetchTransactionStatus(submission.txId);
+          const appStatus = mapRpcStatus(raw);
+          setStatus(raw); // keep TxStatus in local state for hook consumers
 
-          if (next === 'confirmed' || next === 'failed') {
+          if (isTerminalStatus(appStatus)) {
             if (pollRef.current) {
               clearInterval(pollRef.current);
             }

@@ -1,6 +1,6 @@
 import React from 'react';
-import { Card, CardContent, CardHeader, CardTitle } from '@ancore/ui-kit';
-import { Loader2, AlertCircle } from 'lucide-react';
+import { Card, CardContent, CardHeader, CardTitle, Skeleton } from '@ancore/ui-kit';
+import { AlertCircle } from 'lucide-react';
 
 export interface MetricWidgetProps {
   title: string;
@@ -33,8 +33,9 @@ export const MetricWidget: React.FC<MetricWidgetProps> = ({
       </CardHeader>
       <CardContent>
         {isLoading ? (
-          <div className="flex h-8 items-center" data-testid="metric-loading">
-            <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
+          <div data-testid="metric-loading">
+            <Skeleton className="h-8 w-24 mb-1" />
+            <Skeleton className="h-3 w-32" />
           </div>
         ) : error ? (
           <div className="flex items-center space-x-2 text-destructive" data-testid="metric-error">

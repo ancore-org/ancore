@@ -30,7 +30,7 @@ Support email: support@ancore.org
 ### Icon
 
 - [x] 128x128 store icon source (`store/icon-128.svg`)
-- [ ] Export to PNG (`icon-128.png`) before upload
+- [x] PNG icons present in `public/icons/` (16, 32, 48, 128 px) referenced by `manifest.json`
 
 ## 3) Policy Documents
 
@@ -41,7 +41,7 @@ Support email: support@ancore.org
 ## 4) Compliance Review
 
 - [x] Data collection/disclosure described in privacy policy
-- [x] Permissions are minimal and justified (`storage`, `activeTab`)
+- [x] Permissions are minimal and justified (`storage`)
 - [x] No prohibited claims (financial guarantees, misleading statements)
 - [x] Support contact provided
 - [x] Security language avoids false guarantees

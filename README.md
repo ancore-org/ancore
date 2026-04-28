@@ -34,14 +34,14 @@ ancore/
 │
 ├── contracts/                # Soroban smart contracts
 │   ├── account/              # Core account contract
-│   ├── validation-modules/   # Pluggable validation logic
-│   ├── invoice/              # Invoice system
-│   └── upgrade/              # Upgrade mechanisms
+│   ├── validation-modules/   # Planned pluggable validation module scaffolds
+│   ├── invoice/              # Planned invoice contract scaffolds
+│   └── upgrade/              # Planned upgrade contract scaffolds
 │
 ├── services/                 # Optional infrastructure
 │   ├── relayer/              # Transaction relay service
 │   ├── indexer/              # Blockchain indexer
-│   └── ai-agent/             # AI-powered financial agent
+│   └── ai-agent/             # Planned AI orchestration service scaffold
 │
 └── docs/                     # Documentation
     ├── architecture/         # System architecture
@@ -116,6 +116,7 @@ pnpm contracts:test
 ## Contributing
 
 We welcome contributions! Please see our [Contributing Guide](CONTRIBUTING.md) for details.
+Please also review our [Code of Conduct](CODE_OF_CONDUCT.md) before engaging in community discussions.
 
 **Quick guidelines:**
 
@@ -173,14 +174,34 @@ For a deep dive into Ancore's architecture, see:
 
 ## Roadmap
 
+### In progress (active)
+
 - [x] Core account abstraction contracts
-- [x] Session key implementation
-- [ ] Browser extension wallet (v1)
-- [ ] Mobile wallet
+- [x] Session key primitives (contract + SDK foundation)
+- [x] Browser extension wallet foundation
+- [x] Web dashboard foundation
+- [ ] Production-ready relayer security path
+- [ ] Production-ready account contract hardening and audit
+- [ ] MVP release gate completion
+
+### Planned (post-MVP)
+
+- [ ] Mobile wallet productionization
 - [ ] Social recovery
 - [ ] Invoice system
 - [ ] AI agent integration
 - [ ] Mainnet launch
+
+### Planned module scaffolds (intentionally preserved)
+
+- `contracts/validation-modules/` - reserved for modular auth/policy contracts
+- `contracts/invoice/` - reserved for invoice/request-to-pay contracts
+- `contracts/upgrade/` - reserved for upgrade governance contracts
+- `services/ai-agent/` - reserved for AI workflow orchestration
+
+These directories are intentionally kept as scaffolds to preserve architecture direction and contributor workflow without implying production completeness.
+
+For execution waves (2-3 features at a time), see `docs/product/FINANCIAL_OS_ROADMAP.md`.
 
 ## Community
 

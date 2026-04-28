@@ -1,3 +1,4 @@
+use base64::Engine as _;
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use sqlx::{PgPool, Row};
@@ -127,8 +128,9 @@ pub async fn get_account_activity(
 
     // Build query dynamically using QueryBuilder
     let mut query = sqlx::query_builder::QueryBuilder::new(
-        "SELECT id, account_id, activity_type, amount, asset, counterparty, tx_hash, ledger_seq, created_at, metadata FROM account_activity WHERE account_id = $1",
+        "SELECT id, account_id, activity_type, amount, asset, counterparty, tx_hash, ledger_seq, created_at, metadata FROM account_activity WHERE account_id = ",
     );
+    query.push_bind(account_id);
 
     // Push account_id parameter
     let mut param_count = 1;
@@ -201,46 +203,8 @@ pub async fn get_account_activity(
     query.push(" ORDER BY created_at DESC, id DESC LIMIT ");
     query.push(effective_limit + 1); // Fetch one extra to detect next page
 
-    // Build and execute query
-    let mut sql_query = query.build();
-    sql_query.bind(account_id);
-
-    // Re-bind all the filter parameters
-    if let Some(ref decoded) = decoded_after {
-        sql_query.bind(decoded.t.clone());
-        sql_query.bind(Uuid::parse_str(&decoded.i).map_err(|_| {
-            ApiError::InvalidCursor("Invalid UUID in cursor".to_string())
-        })?);
-    } else if let Some(ref decoded) = decoded_before {
-        sql_query.bind(decoded.t.clone());
-        sql_query.bind(Uuid::parse_str(&decoded.i).map_err(|_| {
-            ApiError::InvalidCursor("Invalid UUID in cursor".to_string())
-        })?);
-    }
-
-    if let Some(ref activity_type) = filter.activity_type {
-        sql_query.bind(activity_type);
-    }
-    if let Some(ref asset) = filter.asset {
-        sql_query.bind(asset);
-    }
-    if let Some(ref counterparty) = filter.counterparty {
-        sql_query.bind(counterparty);
-    }
-    if let Some(ledger_min) = filter.ledger_min {
-        sql_query.bind(ledger_min);
-    }
-    if let Some(ledger_max) = filter.ledger_max {
-        sql_query.bind(ledger_max);
-    }
-    if let Some(from_date) = filter.from_date {
-        sql_query.bind(from_date);
-    }
-    if let Some(to_date) = filter.to_date {
-        sql_query.bind(to_date);
-    }
-
-    let rows = sql_query.fetch_all(db).await?;
+    // Build and execute query — parameters are already bound via push_bind above.
+    let rows = query.build().fetch_all(db).await?;
 
     // Determine if there's a next page
     let has_next_page = rows.len() > effective_limit as usize;

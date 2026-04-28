@@ -1,3 +1,4 @@
+pub mod backfill;
 pub mod checkpoint;
 pub mod sink;
 pub mod source;

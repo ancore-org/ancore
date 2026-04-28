@@ -63,7 +63,6 @@ Configure timeout via `useSettingsStore().setAutoLockMinutes(n)` (0 = never lock
 ## Permissions
 
 - `storage` — persist wallet state
-- `activeTab` — interact with active tab for dApp connections
 
 ## E2E Smoke Suite
 

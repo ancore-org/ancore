@@ -126,10 +126,10 @@ describe('BrowserStorageAdapter', () => {
     expect(await adapter.get('k')).toBeNull();
   });
 
-  it('maps thrown error to StorageError', async () => {
-    area.get.mockRejectedValueOnce(new Error('permission denied'));
+  it('maps serialization error to StorageError', async () => {
+    area.get.mockRejectedValueOnce(new Error('JSON parse error in browser'));
     await expect(adapter.get('x')).rejects.toMatchObject({
-      code: StorageErrorCode.PERMISSION_DENIED,
+      code: StorageErrorCode.SERIALIZATION,
     });
   });
 });

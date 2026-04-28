@@ -29,6 +29,9 @@ export { Separator } from './components/ui/separator';
 export { Dialog } from './components/ui/dialog';
 export { Tooltip } from './components/ui/tooltip';
 
+export { Skeleton } from './components/ui/skeleton';
+export type { SkeletonProps } from './components/ui/skeleton';
+
 // Custom wallet components
 export { AmountInput } from './components/amount-input';
 export type { AmountInputProps } from './components/amount-input';

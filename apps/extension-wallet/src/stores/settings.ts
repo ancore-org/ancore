@@ -11,16 +11,27 @@ import { extensionStorage } from './_storage';
 export type NetworkMode = 'mainnet' | 'testnet' | 'futurenet';
 export type ThemePreference = 'light' | 'dark' | 'system';
 
+export type NotificationCategory = 'sent' | 'received' | 'failed' | 'security';
+
+export interface NotificationPreferences {
+  sent: boolean;
+  received: boolean;
+  failed: boolean;
+  security: boolean;
+}
+
 export interface SettingsState {
   network: NetworkMode;
   theme: ThemePreference;
   autoLockMinutes: number;
   requirePasswordForSensitiveActions: boolean;
+  notificationPreferences: NotificationPreferences;
 
   setNetwork: (network: NetworkMode) => void;
   setTheme: (theme: ThemePreference) => void;
   setAutoLockMinutes: (minutes: number) => void;
   setRequirePasswordForSensitiveActions: (value: boolean) => void;
+  setNotificationPreference: (category: NotificationCategory, enabled: boolean) => void;
   reset: () => void;
 }
 
@@ -35,9 +46,15 @@ export const DEFAULTS = {
   theme: 'dark' as ThemePreference,
   autoLockMinutes: 15,
   requirePasswordForSensitiveActions: true,
+  notificationPreferences: {
+    sent: true,
+    received: true,
+    failed: true,
+    security: true,
+  } as NotificationPreferences,
 };
 
-const STORE_VERSION = 2;
+const STORE_VERSION = 3;
 
 function applyTheme(theme: ThemePreference): void {
   if (typeof document === 'undefined') return;
@@ -58,6 +75,13 @@ export const useSettingsStore = create<SettingsState>()(
       setAutoLockMinutes: (autoLockMinutes) => set({ autoLockMinutes }),
       setRequirePasswordForSensitiveActions: (requirePasswordForSensitiveActions) =>
         set({ requirePasswordForSensitiveActions }),
+      setNotificationPreference: (category, enabled) =>
+        set((state) => ({
+          notificationPreferences: {
+            ...state.notificationPreferences,
+            [category]: enabled,
+          },
+        })),
       reset: () => set(DEFAULTS),
     }),
     {

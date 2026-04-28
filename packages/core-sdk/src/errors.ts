@@ -154,3 +154,18 @@ export class SessionKeyExecutionError extends AncoreSdkError {
     Object.setPrototypeOf(this, new.target.prototype);
   }
 }
+
+// ---------------------------------------------------------------------------
+// Payment Request errors
+// ---------------------------------------------------------------------------
+
+/**
+ * Thrown when a payment request payload is invalid or malformed.
+ */
+export class PaymentRequestValidationError extends AncoreSdkError {
+  constructor(message: string) {
+    super('PAYMENT_REQUEST_VALIDATION', message);
+    this.name = 'PaymentRequestValidationError';
+    Object.setPrototypeOf(this, new.target.prototype);
+  }
+}

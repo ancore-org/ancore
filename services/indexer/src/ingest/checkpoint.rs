@@ -4,7 +4,7 @@
 //! the ingestion worker can resume from the correct position after a restart.
 
 use anyhow::Context;
-use sqlx::PgPool;
+use sqlx::{PgPool, Row};
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -22,37 +22,31 @@ pub struct Checkpoint {
 /// Load the current checkpoint for `stream`, returning `None` if no checkpoint
 /// exists yet (i.e. first run).
 pub async fn load(db: &PgPool, stream: &str) -> anyhow::Result<Option<Checkpoint>> {
-    let row = sqlx::query!(
-        r#"
-        SELECT last_ledger_seq
-        FROM ingest_checkpoints
-        WHERE stream = $1
-        "#,
-        stream
+    let row = sqlx::query(
+        "SELECT last_ledger_seq FROM ingest_checkpoints WHERE stream = $1",
     )
+    .bind(stream)
     .fetch_optional(db)
     .await
     .context("load checkpoint")?;
 
     Ok(row.map(|r| Checkpoint {
         stream: stream.to_owned(),
-        last_ledger_seq: r.last_ledger_seq as u32,
+        last_ledger_seq: r.try_get::<i64, _>("last_ledger_seq").unwrap_or(0) as u32,
     }))
 }
 
 /// Persist (upsert) a checkpoint.
 pub async fn save(db: &PgPool, checkpoint: &Checkpoint) -> anyhow::Result<()> {
-    sqlx::query!(
-        r#"
-        INSERT INTO ingest_checkpoints (stream, last_ledger_seq, updated_at)
-        VALUES ($1, $2, NOW())
-        ON CONFLICT (stream)
-        DO UPDATE SET last_ledger_seq = EXCLUDED.last_ledger_seq,
-                      updated_at      = EXCLUDED.updated_at
-        "#,
-        checkpoint.stream,
-        checkpoint.last_ledger_seq as i64,
+    sqlx::query(
+        "INSERT INTO ingest_checkpoints (stream, last_ledger_seq, updated_at) \
+         VALUES ($1, $2, NOW()) \
+         ON CONFLICT (stream) \
+         DO UPDATE SET last_ledger_seq = EXCLUDED.last_ledger_seq, \
+                       updated_at      = EXCLUDED.updated_at",
     )
+    .bind(&checkpoint.stream)
+    .bind(checkpoint.last_ledger_seq as i64)
     .execute(db)
     .await
     .context("save checkpoint")?;

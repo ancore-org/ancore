@@ -1,4 +1,4 @@
-import { render, screen } from '@testing-library/react';
+import { render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { beforeEach, describe, expect, it } from 'vitest';
 import type { UnlockVerifier } from '../AuthGuard';
@@ -143,15 +143,16 @@ describe('extension router', () => {
     await user.click(screen.getByRole('button', { name: /network/i }));
     await user.click(screen.getByRole('button', { name: /^testnet/i }));
 
-    await user.click(screen.getByRole('link', { name: /home/i }));
+    const navBar = screen.getByTestId('nav-bar');
+    await user.click(within(navBar).getByRole('link', { name: /home/i }));
     expect(await screen.findByText(/testnet • staging/i)).toBeInTheDocument();
 
-    await user.click(screen.getByRole('link', { name: /settings/i }));
+    await user.click(within(navBar).getByRole('link', { name: /settings/i }));
     await user.click(screen.getByRole('button', { name: /density/i }));
     await user.click(screen.getByRole('button', { name: /compact/i }));
     await user.click(screen.getByRole('button', { name: /go back/i }));
 
-    await user.click(screen.getByRole('link', { name: /receive/i }));
+    await user.click(within(navBar).getByRole('link', { name: /receive/i }));
     expect(await screen.findByText(/on testnet/i)).toBeInTheDocument();
     expect(document.querySelector('[data-display-preference="compact"]')).toBeTruthy();
   });

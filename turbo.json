@@ -21,6 +21,10 @@
     },
     "clean": {
       "cache": false
+    },
+    "e2e": {
+      "dependsOn": ["build"],
+      "cache": false
     }
   }
 }

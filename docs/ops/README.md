@@ -25,6 +25,10 @@ All configs are code-reviewed and validated by CI before merge.
 - **[Indexer Incidents](./runbooks/indexer-incidents.md)** - Data sync and database performance issues
 - **[Contract Incidents](./runbooks/contract-incidents.md)** - Smart contract failures and security incidents
 
+### Security Operations Runbooks
+- **[Key Rotation](./runbooks/key-rotation.md)** - Comprehensive key rotation procedures for relayer/secrets and API credentials
+- **[Key Rotation Quick Reference](./runbooks/key-rotation-quick-reference.md)** - Quick reference card for common rotation operations
+
 ### Core Infrastructure Runbooks
 - **[Service Down](./runbooks/service-down.md)** - Complete service unavailability
 - **[High CPU/Memory](./runbooks/high-cpu.md)** - Resource utilization issues

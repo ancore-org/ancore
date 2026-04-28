@@ -47,17 +47,19 @@ describe('AccountContract', () => {
   });
 
   describe('execute', () => {
-    it('returns method and to, function, args, expectedNonce', () => {
+    it('returns method and execute payload with optional auth placeholders', () => {
       const to = 'CDLZFC3SYJYDZT7K67VZ75HPJVIEUVNIXF47ZG2FB2RMQQVU2HHGCYSC';
       const fn = 'transfer';
       const args: xdr.ScVal[] = [new Address(OWNER_ADDRESS).toScVal(), xdr.ScVal.scvU32(100)];
       const inv = contract.execute(to, fn, args, 0);
       expect(inv.method).toBe('execute');
-      expect(inv.args).toHaveLength(4);
+      expect(inv.args).toHaveLength(6);
       expect(scValToAddress(inv.args[0])).toBe(to);
       expect(inv.args[1]).toBeDefined();
       expect(inv.args[2].vec()).toHaveLength(2);
       expect(scValToU64(inv.args[3])).toBe(0);
+      expect(inv.args[4].switch().name).toBe('scvVoid');
+      expect(inv.args[5].switch().name).toBe('scvVoid');
     });
   });
 

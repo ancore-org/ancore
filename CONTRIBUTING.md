@@ -48,8 +48,16 @@ We are committed to providing a welcoming and inclusive environment. Please:
    pnpm install
    ```
 5. Build the project:
+
    ```bash
    pnpm build
+   ```
+
+6. Run the baseline verification suite:
+   ```bash
+   pnpm lint
+   pnpm typecheck
+   pnpm test
    ```
 
 ## Development Workflow
@@ -305,6 +313,21 @@ Describe any security implications
 ```
 
 ## Community Contributions
+
+### How to Pick an Issue
+
+Use labels to pick work matching your experience:
+
+- `good first issue`: small, self-contained tasks with low risk
+- `help wanted`: medium-scope tasks where maintainers are available for guidance
+- `docs`: documentation-only tasks
+- `refactor`: code quality and maintainability improvements
+
+Before starting:
+
+1. Comment on the issue that you want to work on it.
+2. Confirm scope and acceptance criteria with a maintainer.
+3. Link your PR to the issue (`Closes #<id>`).
 
 ### Good First Issues
 

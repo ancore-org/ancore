@@ -1,5 +1,6 @@
 import request from 'supertest';
 import { createApp } from '../../src/server';
+import { IdempotencyStore } from '../../src/store/idempotency';
 import type { AuthServiceContract, SignatureServiceContract } from '../../src/types';
 
 const VALID_KEY = 'a'.repeat(64);
@@ -13,14 +14,14 @@ const validBody = {
   nonce: 1,
 };
 
-function makeApp(sigValid = true) {
+function makeApp(sigValid = true, idempotencyStore?: IdempotencyStore) {
   const authService: AuthServiceContract = {
     verifyToken: jest.fn().mockResolvedValue({ callerId: 'test-caller' }),
   };
   const signatureService: SignatureServiceContract = {
     verify: jest.fn().mockReturnValue(sigValid),
   };
-  return createApp(authService, signatureService);
+  return createApp(authService, signatureService, idempotencyStore);
 }
 
 describe('POST /relay/execute', () => {
@@ -98,11 +99,94 @@ describe('POST /relay/validate', () => {
 });
 
 describe('GET /relay/status', () => {
-  it('200 with status ok (no auth required)', async () => {
+  it('200 with status ok and dependency details (no auth required)', async () => {
     const res = await request(makeApp()).get('/relay/status');
     expect(res.status).toBe(200);
     expect(res.body.status).toBe('ok');
     expect(typeof res.body.uptime).toBe('number');
     expect(res.body.timestamp).toMatch(/^\d{4}-\d{2}-\d{2}T/);
+    expect(res.body.dependencies).toBeDefined();
+    expect(res.body.dependencies.queue.status).toBe('ok');
+    expect(res.body.dependencies.rpc.status).toBe('ok');
+    expect(res.body.dependencies.storage.status).toBe('ok');
+  });
+});
+
+describe('POST /relay/execute — idempotency-key header', () => {
+  it('returns the same response on replay within TTL', async () => {
+    const store = new IdempotencyStore();
+    const app = makeApp(true, store);
+
+    const first = await request(app)
+      .post('/relay/execute')
+      .set('Authorization', 'Bearer token')
+      .set('idempotency-key', 'test-key-1')
+      .send(validBody);
+
+    expect(first.status).toBe(200);
+    expect(first.body.success).toBe(true);
+
+    const replay = await request(app)
+      .post('/relay/execute')
+      .set('Authorization', 'Bearer token')
+      .set('idempotency-key', 'test-key-1')
+      .send(validBody);
+
+    expect(replay.status).toBe(first.status);
+    expect(replay.body.transactionId).toBe(first.body.transactionId);
+  });
+
+  it('treats distinct keys as independent requests', async () => {
+    const store = new IdempotencyStore();
+    const app = makeApp(true, store);
+
+    const r1 = await request(app)
+      .post('/relay/execute')
+      .set('Authorization', 'Bearer token')
+      .set('idempotency-key', 'key-a')
+      .send(validBody);
+
+    const r2 = await request(app)
+      .post('/relay/execute')
+      .set('Authorization', 'Bearer token')
+      .set('idempotency-key', 'key-b')
+      .send(validBody);
+
+    expect(r1.status).toBe(200);
+    expect(r2.status).toBe(200);
+    // Both succeed; transaction IDs are random so just verify both are present
+    expect(r1.body.transactionId).toBeDefined();
+    expect(r2.body.transactionId).toBeDefined();
+  });
+
+  it('caches error responses too (422 replay)', async () => {
+    const store = new IdempotencyStore();
+    const app = makeApp(false, store);
+
+    const first = await request(app)
+      .post('/relay/execute')
+      .set('Authorization', 'Bearer token')
+      .set('idempotency-key', 'err-key')
+      .send(validBody);
+
+    expect(first.status).toBe(422);
+
+    const replay = await request(app)
+      .post('/relay/execute')
+      .set('Authorization', 'Bearer token')
+      .set('idempotency-key', 'err-key')
+      .send(validBody);
+
+    expect(replay.status).toBe(422);
+    expect(replay.body.error.code).toBe(first.body.error.code);
+  });
+
+  it('falls through without caching when header is absent', async () => {
+    const store = new IdempotencyStore();
+    const app = makeApp(true, store);
+
+    await request(app).post('/relay/execute').set('Authorization', 'Bearer token').send(validBody);
+
+    expect(store.size()).toBe(0);
   });
 });

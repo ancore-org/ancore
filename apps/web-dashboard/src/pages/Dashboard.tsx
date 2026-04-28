@@ -3,13 +3,14 @@ import { AccountSummary } from '../components/AccountSummary';
 import { TransactionList } from '../components/TransactionList';
 import { AccountOverviewGrid } from '../widgets/AccountOverviewGrid';
 import { useAccountData } from '../hooks/useAccountData';
+import { DashboardPageSkeleton } from '../components/LoadingSkeletons';
 
 const DEFAULT_ADDRESS = 'GABC...XYZ';
 
 export const Dashboard: React.FC = () => {
   const { account, transactions, loading, error } = useAccountData(DEFAULT_ADDRESS);
 
-  if (loading) return <p className="text-muted-foreground">Loading…</p>;
+  if (loading) return <DashboardPageSkeleton />;
   if (error) return <p className="text-destructive">Error: {error.message}</p>;
   if (!account) return null;
 
