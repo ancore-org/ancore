@@ -15,6 +15,9 @@ const EXPECTED_EXPORTS = [
   'decryptSecretKey',
   'generateMnemonic',
   'validateMnemonic',
+  'assertEnglishMnemonic',
+  'UnsupportedMnemonicLanguageError',
+  'SUPPORTED_MNEMONIC_LANGUAGE',
   'deriveKeypairFromMnemonic',
   'randomBytes',
 ] as const;
