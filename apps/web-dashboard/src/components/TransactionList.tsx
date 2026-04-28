@@ -1,17 +1,30 @@
 import React, { useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle, Badge, Button } from '@ancore/ui-kit';
-import { Download } from 'lucide-react';
+import { Download, Clock, AlertCircle } from 'lucide-react';
 import type { Transaction } from '../types/dashboard';
 
 interface TransactionListProps {
   transactions: Transaction[];
   pageSize?: number;
+  optimisticTransaction?: Transaction | null;
+  isProcessing?: boolean;
 }
 
-export const TransactionList: React.FC<TransactionListProps> = ({ transactions, pageSize = 5 }) => {
+export const TransactionList: React.FC<TransactionListProps> = ({
+  transactions,
+  pageSize = 5,
+  optimisticTransaction = null,
+  isProcessing = false,
+}) => {
   const [page, setPage] = useState(0);
-  const total = Math.ceil(transactions.length / pageSize);
-  const visible = transactions.slice(page * pageSize, (page + 1) * pageSize);
+
+  // Combine optimistic and confirmed transactions
+  const allTransactions = optimisticTransaction
+    ? [optimisticTransaction, ...transactions]
+    : transactions;
+
+  const total = Math.ceil(allTransactions.length / pageSize);
+  const visible = allTransactions.slice(page * pageSize, (page + 1) * pageSize);
 
   const handleExportCSV = () => {
     if (transactions.length === 0) return;
@@ -40,6 +53,20 @@ export const TransactionList: React.FC<TransactionListProps> = ({ transactions, 
     window.URL.revokeObjectURL(url);
   };
 
+  const getStatusBadgeVariant = (status: 'confirmed' | 'pending', isOptimistic: boolean) => {
+    if (isOptimistic && status === 'pending') {
+      return 'secondary';
+    }
+    return status === 'confirmed' ? 'default' : 'secondary';
+  };
+
+  const getStatusDisplay = (status: 'confirmed' | 'pending', isOptimistic: boolean) => {
+    if (isOptimistic && status === 'pending') {
+      return 'pending (optimistic)';
+    }
+    return status;
+  };
+
   return (
     <Card>
       <CardHeader className="flex flex-row items-center justify-between">
@@ -58,28 +85,38 @@ export const TransactionList: React.FC<TransactionListProps> = ({ transactions, 
         {visible.length === 0 ? (
           <p className="text-sm text-muted-foreground">No transactions found.</p>
         ) : (
-          visible.map((tx) => (
-            <div
-              key={tx.id}
-              className="flex items-center justify-between py-2 border-b last:border-0"
-            >
-              <div className="flex items-center gap-3">
-                <Badge variant={tx.type === 'receive' ? 'default' : 'secondary'}>{tx.type}</Badge>
-                <span className="text-sm text-muted-foreground">
-                  {tx.timestamp.toLocaleDateString()}
-                </span>
+          visible.map((tx, index) => {
+            const isOptimistic = tx.id === optimisticTransaction?.id;
+            const rowClassName = isOptimistic ? 'bg-amber-50 border-l-2 border-amber-500 pl-2' : '';
+
+            return (
+              <div
+                key={`${tx.id}-${index}`}
+                className={`flex items-center justify-between py-2 border-b last:border-0 ${rowClassName}`}
+              >
+                <div className="flex items-center gap-3">
+                  <div className="flex items-center gap-2">
+                    <Badge variant={tx.type === 'receive' ? 'default' : 'secondary'}>
+                      {tx.type}
+                    </Badge>
+                    {isOptimistic && <Clock className="w-4 h-4 text-amber-600" />}
+                  </div>
+                  <span className="text-sm text-muted-foreground">
+                    {tx.timestamp.toLocaleDateString()}
+                  </span>
+                </div>
+                <div className="flex items-center gap-3">
+                  <span className="font-medium">
+                    {tx.type === 'send' ? '-' : '+'}
+                    {tx.amount} XLM
+                  </span>
+                  <Badge variant={getStatusBadgeVariant(tx.status, isOptimistic)}>
+                    {getStatusDisplay(tx.status, isOptimistic)}
+                  </Badge>
+                </div>
               </div>
-              <div className="flex items-center gap-3">
-                <span className="font-medium">
-                  {tx.type === 'send' ? '-' : '+'}
-                  {tx.amount} XLM
-                </span>
-                <Badge variant={tx.status === 'confirmed' ? 'default' : 'secondary'}>
-                  {tx.status}
-                </Badge>
-              </div>
-            </div>
-          ))
+            );
+          })
         )}
         {total > 1 && (
           <div className="flex justify-between items-center pt-2">
