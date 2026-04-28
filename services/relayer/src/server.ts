@@ -1,4 +1,4 @@
-import express, { Express } from 'express';
+import express, { Express, Request } from 'express';
 import rateLimit from 'express-rate-limit';
 import { z } from 'zod';
 import { RelayService } from './services/relayService';
@@ -58,7 +58,7 @@ export function createApp(
     windowMs: 15 * 60 * 1000, // 15 minutes
     max: process.env.RELAY_RATE_LIMIT_MAX ? parseInt(process.env.RELAY_RATE_LIMIT_MAX) : 50, // limit each IP to 50 requests per windowMs
     message: 'Too many relay requests from this IP, please try again later.',
-    keyGenerator: (req) => {
+    keyGenerator: (req: Request) => {
       // If authenticated, use callerId, else use IP
       const callerId = (req as any).callerId;
       return callerId || req.ip;
