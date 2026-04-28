@@ -59,6 +59,16 @@ export {
   TransactionSubmissionError,
 } from './errors';
 
+// Retry policy presets
+export {
+  LOW_LATENCY,
+  RELIABLE,
+  AGGRESSIVE,
+  RETRY_PRESETS,
+  type RetryPresetName,
+  getRetryPreset,
+} from './retry-presets';
+
 export {
   mapExecuteWithSessionKeyError,
   type ExecuteWithSessionKeyParams,
