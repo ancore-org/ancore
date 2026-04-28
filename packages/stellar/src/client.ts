@@ -78,7 +78,7 @@ interface AssetMetadataCacheEntry {
   expiresAt: number;
 }
 
-type HorizonOperationRecord = { paging_token?: string } & Record<string, unknown>;
+type HorizonOperationRecord = { paging_token?: string };
 
 /**
  * StellarClient provides methods for interacting with the Stellar network
@@ -225,7 +225,7 @@ export class StellarClient {
           .order(order);
 
         const page = cursor ? await builder.cursor(cursor).call() : await builder.call();
-        const records = page.records as HorizonOperationRecord[];
+        const records = page.records as unknown as HorizonOperationRecord[];
         const nextCursor = this.getNextCursor(records);
 
         return { records, nextCursor };
