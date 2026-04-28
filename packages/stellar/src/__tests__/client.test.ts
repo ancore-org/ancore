@@ -241,4 +241,67 @@ describe('StellarClient', () => {
       expect(typeof client.isHealthy).toBe('function');
     });
   });
+
+  describe('account activity pagination helpers', () => {
+    it('should fetch account activity page and return next cursor', async () => {
+      const client = new StellarClient({ network: 'testnet' });
+      const records = [
+        { id: '1', paging_token: 'pt-1' },
+        { id: '2', paging_token: 'pt-2' },
+      ] as unknown as Horizon.HorizonApi.OperationResponse[];
+
+      const call = jest.fn().mockResolvedValue({ records });
+      const cursor = jest.fn().mockReturnValue({ call });
+      const order = jest.fn().mockReturnValue({ call, cursor });
+      const limit = jest.fn().mockReturnValue({ call, order, cursor });
+      const forAccount = jest.fn().mockReturnValue({ call, limit, order, cursor });
+      const operations = jest.fn().mockReturnValue({ forAccount });
+
+      (client as unknown as { horizonServer: { operations: () => unknown } }).horizonServer = {
+        operations,
+      };
+
+      const page = await client.getAccountActivityPage('GABC123', {
+        cursor: 'start',
+        limit: 2,
+        order: 'desc',
+      });
+
+      expect(page.records).toHaveLength(2);
+      expect(page.nextCursor).toBe('pt-2');
+      expect(forAccount).toHaveBeenCalledWith('GABC123');
+      expect(limit).toHaveBeenCalledWith(2);
+      expect(order).toHaveBeenCalledWith('desc');
+      expect(cursor).toHaveBeenCalledWith('start');
+    });
+
+    it('should iterate through pages until completion', async () => {
+      const client = new StellarClient({ network: 'testnet' });
+      const getAccountActivityPage = jest
+        .spyOn(client, 'getAccountActivityPage')
+        .mockResolvedValueOnce({
+          records: [{ id: '1', paging_token: 'pt-1' }] as unknown as Horizon.HorizonApi.OperationResponse[],
+          nextCursor: 'pt-1',
+        })
+        .mockResolvedValueOnce({
+          records: [{ id: '2', paging_token: 'pt-2' }] as unknown as Horizon.HorizonApi.OperationResponse[],
+          nextCursor: null,
+        });
+
+      const seen: string[] = [];
+      for await (const op of client.iterateAccountActivity('GABC123', { limit: 1 })) {
+        seen.push((op as unknown as { id: string }).id);
+      }
+
+      expect(seen).toEqual(['1', '2']);
+      expect(getAccountActivityPage).toHaveBeenNthCalledWith(1, 'GABC123', {
+        limit: 1,
+        cursor: null,
+      });
+      expect(getAccountActivityPage).toHaveBeenNthCalledWith(2, 'GABC123', {
+        limit: 1,
+        cursor: 'pt-1',
+      });
+    });
+  });
 });
