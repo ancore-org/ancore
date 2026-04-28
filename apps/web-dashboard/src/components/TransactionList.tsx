@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle, Badge, Button } from '@ancore/ui-kit';
 import { Download, Clock, AlertCircle } from 'lucide-react';
 import type { Transaction } from '../types/dashboard';
+import { useTableDensity } from '../contexts/TableDensityContext';
 
 interface TransactionListProps {
   transactions: Transaction[];
@@ -16,6 +17,7 @@ export const TransactionList: React.FC<TransactionListProps> = ({
   optimisticTransaction = null,
   isProcessing = false,
 }) => {
+  const { density } = useTableDensity();
   const [page, setPage] = useState(0);
 
   // Combine optimistic and confirmed transactions
@@ -67,6 +69,8 @@ export const TransactionList: React.FC<TransactionListProps> = ({
     return status;
   };
 
+  const densityPadding = density === 'compact' ? 'py-1' : 'py-2';
+
   return (
     <Card>
       <CardHeader className="flex flex-row items-center justify-between">
@@ -81,7 +85,7 @@ export const TransactionList: React.FC<TransactionListProps> = ({
           Export CSV
         </Button>
       </CardHeader>
-      <CardContent className="space-y-2">
+      <CardContent className={density === 'compact' ? 'space-y-1' : 'space-y-2'}>
         {visible.length === 0 ? (
           <p className="text-sm text-muted-foreground">No transactions found.</p>
         ) : (
@@ -92,7 +96,7 @@ export const TransactionList: React.FC<TransactionListProps> = ({
             return (
               <div
                 key={`${tx.id}-${index}`}
-                className={`flex items-center justify-between py-2 border-b last:border-0 ${rowClassName}`}
+                className={`flex items-center justify-between ${densityPadding} border-b last:border-0 ${rowClassName}`}
               >
                 <div className="flex items-center gap-3">
                   <div className="flex items-center gap-2">

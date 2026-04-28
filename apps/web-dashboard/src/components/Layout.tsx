@@ -1,11 +1,28 @@
 import React from 'react';
 import { NavLink, Outlet } from 'react-router-dom';
 import { cn } from '@ancore/ui-kit';
+import { useTableDensity } from '../contexts/TableDensityContext';
+import { Settings, Rows } from 'lucide-react';
 
 const NAV_LINKS = [
   { to: '/', label: 'Dashboard', end: true },
   { to: '/transactions', label: 'Transactions' },
 ];
+
+const DensityToggle: React.FC = () => {
+  const { density, toggleDensity } = useTableDensity();
+
+  return (
+    <button
+      onClick={toggleDensity}
+      className="flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground transition-colors px-2 py-1 rounded-md hover:bg-accent"
+      title={`Switch to ${density === 'comfortable' ? 'compact' : 'comfortable'} density`}
+    >
+      <Rows className="w-4 h-4" />
+      <span className="capitalize">{density}</span>
+    </button>
+  );
+};
 
 export const Layout: React.FC = () => (
   <div className="min-h-screen bg-background text-foreground">
@@ -28,6 +45,10 @@ export const Layout: React.FC = () => (
           </NavLink>
         ))}
       </nav>
+      <div className="ml-auto flex items-center gap-2">
+        <DensityToggle />
+        <Settings className="w-4 h-4 text-muted-foreground" />
+      </div>
     </header>
     <main className="container mx-auto px-6 py-8">
       <Outlet />
