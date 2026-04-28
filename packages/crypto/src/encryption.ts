@@ -1,7 +1,7 @@
 /* eslint-disable no-undef */
-import { Buffer } from 'node:buffer';
 import { webcrypto } from 'node:crypto';
 import { TextDecoder, TextEncoder } from 'node:util';
+import { toBase64, fromBase64 } from './signature-format';
 
 const PBKDF2_ITERATIONS = 100000;
 const MAX_PBKDF2_ITERATIONS = 600000;
@@ -29,15 +29,6 @@ function getCrypto(): Crypto {
   }
 
   return globalThis.crypto;
-}
-
-function toBase64(bytes: ArrayBuffer | Uint8Array): string {
-  const view = bytes instanceof Uint8Array ? bytes : new Uint8Array(bytes);
-  return Buffer.from(view).toString('base64');
-}
-
-function fromBase64(value: string): Uint8Array {
-  return Uint8Array.from(Buffer.from(value, 'base64'));
 }
 
 async function deriveEncryptionKey(
@@ -148,7 +139,7 @@ export async function encryptSecretKey(
     iterations: PBKDF2_ITERATIONS,
     salt: toBase64(salt),
     iv: toBase64(iv),
-    ciphertext: toBase64(ciphertext),
+    ciphertext: toBase64(new Uint8Array(ciphertext)),
   };
 }
 

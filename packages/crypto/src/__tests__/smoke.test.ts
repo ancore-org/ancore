@@ -2,12 +2,20 @@ import * as CryptoAPI from '../index';
 
 const EXPECTED_EXPORTS = [
   'CRYPTO_VERSION',
+  'toHex',
+  'fromHex',
+  'toBase64',
+  'fromBase64',
+  'encodeSignature',
+  'decodeSignature',
   'validatePasswordStrength',
   'encryptSecretKey',
   'decryptSecretKey',
   'generateMnemonic',
   'validateMnemonic',
   'deriveKeypairFromMnemonic',
+  'signTransaction',
+  'verifySignature',
 ] as const;
 
 describe('@ancore/crypto smoke test', () => {
