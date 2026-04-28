@@ -12,10 +12,7 @@ import { readdirSync } from 'fs';
 import { resolve, dirname } from 'path';
 import { fileURLToPath } from 'url';
 
-const MIGRATIONS_DIR = resolve(
-  dirname(fileURLToPath(import.meta.url)),
-  '../migrations',
-);
+const MIGRATIONS_DIR = resolve(dirname(fileURLToPath(import.meta.url)), '../migrations');
 
 const VALID = /^\d{3}_[a-z][a-z0-9_]*\.sql$/;
 
@@ -34,9 +31,7 @@ for (const file of files) {
 
   const seq = file.slice(0, 3);
   if (seen.has(seq)) {
-    errors.push(
-      `  ✗ Duplicate sequence ${seq}: "${seen.get(seq)}" and "${file}"`,
-    );
+    errors.push(`  ✗ Duplicate sequence ${seq}: "${seen.get(seq)}" and "${file}"`);
   } else {
     seen.set(seq, file);
   }
@@ -47,4 +42,6 @@ if (errors.length) {
   process.exit(1);
 }
 
-console.log(`Migration lint passed (${files.length} file${files.length !== 1 ? 's' : ''} checked).`);
+console.log(
+  `Migration lint passed (${files.length} file${files.length !== 1 ? 's' : ''} checked).`
+);
