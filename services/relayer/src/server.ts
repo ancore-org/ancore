@@ -1,4 +1,5 @@
 import express, { Express } from 'express';
+import rateLimit from 'express-rate-limit';
 import { z } from 'zod';
 import { RelayService } from './services/relayService';
 import { createAuthMiddleware } from './middleware/auth';
@@ -51,6 +52,25 @@ export function createApp(
   const app = express();
   app.use(express.json());
 
+  // Rate limiting for relay operations
+  const relayLimiter = rateLimit({
+    windowMs: 15 * 60 * 1000, // 15 minutes
+    max: process.env.RELAY_RATE_LIMIT_MAX ? parseInt(process.env.RELAY_RATE_LIMIT_MAX) : 50, // limit each IP to 50 requests per windowMs
+    message: 'Too many relay requests from this IP, please try again later.',
+    keyGenerator: (req) => {
+      // If authenticated, use callerId, else use IP
+      const callerId = (req as any).callerId;
+      return callerId || req.ip;
+    },
+  });
+
+  // Rate limiting for status
+  const statusLimiter = rateLimit({
+    windowMs: 15 * 60 * 1000, // 15 minutes
+    max: process.env.STATUS_RATE_LIMIT_MAX ? parseInt(process.env.STATUS_RATE_LIMIT_MAX) : 200, // higher limit for status
+    message: 'Too many status requests from this IP, please try again later.',
+  });
+
   const relayService = new RelayService(signatureService);
   const auth = createAuthMiddleware(authService);
   const validate = validateBody(relayRequestSchema);
@@ -59,9 +79,9 @@ export function createApp(
   const executeHandler = createExecuteRelayHandler(relayService);
   const validateHandler = createValidateRelayHandler(relayService);
 
-  app.post('/relay/execute', auth, validate, idempotency, executeHandler);
-  app.post('/relay/validate', auth, validate, validateHandler);
-  app.get('/relay/status', (_req, res) => res.json(relayService.health()));
+  app.post('/relay/execute', auth, relayLimiter, validate, idempotency, executeHandler);
+  app.post('/relay/validate', auth, relayLimiter, validate, validateHandler);
+  app.get('/relay/status', statusLimiter, (_req, res) => res.json(relayService.health()));
 
   return app;
 }

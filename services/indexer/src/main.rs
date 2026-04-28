@@ -4,6 +4,7 @@ use axum::{
 };
 use sqlx::postgres::PgPoolOptions;
 use std::net::SocketAddr;
+use tower_governor::{governor::GovernorConfigBuilder, GovernorLayer};
 use tower_http::cors::CorsLayer;
 use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
 
@@ -27,6 +28,22 @@ async fn main() -> anyhow::Result<()> {
 
     // Load environment variables
     dotenvy::dotenv().ok();
+
+    // Configure rate limiting
+    let per_second = std::env::var("RATE_LIMIT_PER_SECOND")
+        .unwrap_or_else(|_| "10".to_string())
+        .parse::<u64>()
+        .unwrap_or(10);
+    let burst_size = std::env::var("RATE_LIMIT_BURST_SIZE")
+        .unwrap_or_else(|_| "20".to_string())
+        .parse::<u32>()
+        .unwrap_or(20);
+    let governor_conf = GovernorConfigBuilder::default()
+        .per_second(per_second)
+        .burst_size(burst_size)
+        .key_extractor(tower_governor::governor::DefaultKeyExtractorFactory)
+        .finish()
+        .unwrap();
 
     // Get database URL from environment
     let database_url = std::env::var("DATABASE_URL")
@@ -56,6 +73,7 @@ async fn main() -> anyhow::Result<()> {
             get(account_activity::list_types_handler),
         )
         .route("/health", get(health::health_handler))
+        .layer(GovernorLayer::new(&governor_conf))
         .layer(CorsLayer::permissive())
         .with_state(pool);
 
