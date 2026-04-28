@@ -35,18 +35,36 @@ const NETWORK_CONFIG: Record<
 };
 
 const FRIENDBOT_URL = 'https://friendbot.stellar.org';
+const DEFAULT_ASSET_METADATA_CACHE_TTL_MS = 5 * 60 * 1000;
 
-export interface Balance {
+export interface AssetMetadata {
   asset: string;
-  balance: string;
   assetType: string;
   assetCode?: string;
   assetIssuer?: string;
 }
 
+export interface Balance extends AssetMetadata {
+  balance: string;
+}
+
+export interface AssetMetadataCacheMetrics {
+  hits: number;
+  misses: number;
+  expirations: number;
+  size: number;
+}
+
 export interface StellarClientConfig extends NetworkConfig {
   /** Custom retry options for network requests */
   retryOptions?: RetryOptions;
+  /** Time in milliseconds to cache resolved asset metadata. Set to 0 to disable caching. */
+  assetMetadataCacheTtlMs?: number;
+}
+
+interface AssetMetadataCacheEntry {
+  metadata: AssetMetadata;
+  expiresAt: number;
 }
 
 /**
@@ -65,6 +83,13 @@ export class StellarClient {
   private readonly networkPassphrase: string;
   private readonly network: Network;
   private readonly retryOptions: RetryOptions;
+  private readonly assetMetadataCacheTtlMs: number;
+  private readonly assetMetadataCache = new Map<string, AssetMetadataCacheEntry>();
+  private assetMetadataCacheMetrics = {
+    hits: 0,
+    misses: 0,
+    expirations: 0,
+  };
 
   constructor(config: StellarClientConfig) {
     this.network = config.network;
@@ -81,6 +106,8 @@ export class StellarClient {
       baseDelayMs: 1000,
       exponential: true,
     };
+    this.assetMetadataCacheTtlMs =
+      config.assetMetadataCacheTtlMs ?? DEFAULT_ASSET_METADATA_CACHE_TTL_MS;
   }
 
   /**
@@ -95,6 +122,16 @@ export class StellarClient {
    */
   getNetwork(): Network {
     return this.network;
+  }
+
+  /**
+   * Get asset metadata cache metrics.
+   */
+  getAssetMetadataCacheMetrics(): AssetMetadataCacheMetrics {
+    return {
+      ...this.assetMetadataCacheMetrics,
+      size: this.assetMetadataCache.size,
+    };
   }
 
   /**
@@ -151,24 +188,64 @@ export class StellarClient {
   async getBalances(publicKey: string): Promise<Balance[]> {
     const account = await this.getAccount(publicKey);
 
-    return account.balances.map((balance) => {
-      if (balance.asset_type === 'native') {
-        return {
-          asset: 'XLM',
-          balance: balance.balance,
-          assetType: 'native',
-        };
+    return account.balances.map((balance) => ({
+      ...this.resolveAssetMetadata(balance),
+      balance: balance.balance,
+    }));
+  }
+
+  private resolveAssetMetadata(balance: Horizon.HorizonApi.BalanceLine): AssetMetadata {
+    const cacheKey = this.getAssetMetadataCacheKey(balance);
+    const cached = this.assetMetadataCache.get(cacheKey);
+    const now = Date.now();
+
+    if (cached) {
+      if (cached.expiresAt > now) {
+        this.assetMetadataCacheMetrics.hits += 1;
+        return cached.metadata;
       }
 
-      const creditBalance = balance as Horizon.HorizonApi.BalanceLineAsset;
+      this.assetMetadataCache.delete(cacheKey);
+      this.assetMetadataCacheMetrics.expirations += 1;
+    }
+
+    this.assetMetadataCacheMetrics.misses += 1;
+
+    const metadata = this.createAssetMetadata(balance);
+    if (this.assetMetadataCacheTtlMs > 0) {
+      this.assetMetadataCache.set(cacheKey, {
+        metadata,
+        expiresAt: now + this.assetMetadataCacheTtlMs,
+      });
+    }
+
+    return metadata;
+  }
+
+  private getAssetMetadataCacheKey(balance: Horizon.HorizonApi.BalanceLine): string {
+    if (balance.asset_type === 'native') {
+      return 'native:XLM';
+    }
+
+    const creditBalance = balance as Horizon.HorizonApi.BalanceLineAsset;
+    return `${creditBalance.asset_type}:${creditBalance.asset_code}:${creditBalance.asset_issuer}`;
+  }
+
+  private createAssetMetadata(balance: Horizon.HorizonApi.BalanceLine): AssetMetadata {
+    if (balance.asset_type === 'native') {
       return {
-        asset: `${creditBalance.asset_code}:${creditBalance.asset_issuer}`,
-        balance: creditBalance.balance,
-        assetType: creditBalance.asset_type,
-        assetCode: creditBalance.asset_code,
-        assetIssuer: creditBalance.asset_issuer,
+        asset: 'XLM',
+        assetType: 'native',
       };
-    });
+    }
+
+    const creditBalance = balance as Horizon.HorizonApi.BalanceLineAsset;
+    return {
+      asset: `${creditBalance.asset_code}:${creditBalance.asset_issuer}`,
+      assetType: creditBalance.asset_type,
+      assetCode: creditBalance.asset_code,
+      assetIssuer: creditBalance.asset_issuer,
+    };
   }
 
   /**

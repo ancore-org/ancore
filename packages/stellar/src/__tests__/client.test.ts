@@ -52,6 +52,11 @@ const mockAccountResponse: Horizon.AccountResponse = {
 };
 
 describe('StellarClient', () => {
+  afterEach(() => {
+    jest.useRealTimers();
+    jest.restoreAllMocks();
+  });
+
   describe('constructor', () => {
     it('should create a client with testnet network', () => {
       const client = new StellarClient({ network: 'testnet' });
@@ -97,6 +102,24 @@ describe('StellarClient', () => {
       });
 
       expect(client.getNetwork()).toBe('testnet');
+    });
+
+    it('should allow custom asset metadata cache TTL', async () => {
+      const client = new StellarClient({
+        network: 'testnet',
+        assetMetadataCacheTtlMs: 1000,
+      });
+
+      jest.spyOn(client, 'getAccount').mockResolvedValue(mockAccountResponse);
+
+      await client.getBalances('GABC123');
+
+      expect(client.getAssetMetadataCacheMetrics()).toEqual({
+        hits: 0,
+        misses: 2,
+        expirations: 0,
+        size: 2,
+      });
     });
   });
 
@@ -150,6 +173,63 @@ describe('StellarClient', () => {
       jest.spyOn(client, 'getAccount').mockRejectedValue(new AccountNotFoundError('GABC123'));
 
       await expect(client.getBalances('GABC123')).rejects.toThrow(AccountNotFoundError);
+    });
+
+    it('should report asset metadata cache misses on first resolution', async () => {
+      const client = new StellarClient({ network: 'testnet' });
+
+      jest.spyOn(client, 'getAccount').mockResolvedValue(mockAccountResponse);
+
+      await client.getBalances('GABC123');
+
+      expect(client.getAssetMetadataCacheMetrics()).toEqual({
+        hits: 0,
+        misses: 2,
+        expirations: 0,
+        size: 2,
+      });
+    });
+
+    it('should report asset metadata cache hits before TTL expiry', async () => {
+      const client = new StellarClient({
+        network: 'testnet',
+        assetMetadataCacheTtlMs: 1000,
+      });
+
+      jest.spyOn(client, 'getAccount').mockResolvedValue(mockAccountResponse);
+
+      await client.getBalances('GABC123');
+      await client.getBalances('GABC123');
+
+      expect(client.getAssetMetadataCacheMetrics()).toEqual({
+        hits: 2,
+        misses: 2,
+        expirations: 0,
+        size: 2,
+      });
+    });
+
+    it('should invalidate asset metadata cache entries after TTL expiry', async () => {
+      jest.useFakeTimers();
+      jest.setSystemTime(new Date('2024-01-01T00:00:00Z'));
+
+      const client = new StellarClient({
+        network: 'testnet',
+        assetMetadataCacheTtlMs: 1000,
+      });
+
+      jest.spyOn(client, 'getAccount').mockResolvedValue(mockAccountResponse);
+
+      await client.getBalances('GABC123');
+      jest.advanceTimersByTime(1001);
+      await client.getBalances('GABC123');
+
+      expect(client.getAssetMetadataCacheMetrics()).toEqual({
+        hits: 0,
+        misses: 4,
+        expirations: 2,
+        size: 2,
+      });
     });
   });
 
