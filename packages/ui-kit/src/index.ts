@@ -70,6 +70,8 @@ export {
   parseAmount,
   formatAmount,
   getPasswordStrength,
+  getDecimalPlaces,
+  validateAmountPrecision,
   STELLAR_ADDRESS_REGEX,
 } from './components/Form/validation';
 export type { PasswordStrength } from './components/Form/validation';
