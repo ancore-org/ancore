@@ -7,10 +7,7 @@ interface AccountOverviewGridProps {
   publicKey: string;
 }
 
-/**
- * A grid layout containing all account overview widgets.
- * Connects to the useAccountOverview hook for data fetching.
- */
+
 export const AccountOverviewGrid: React.FC<AccountOverviewGridProps> = ({ publicKey }) => {
   const { data, isLoading, error } = useAccountOverview(publicKey);
 
