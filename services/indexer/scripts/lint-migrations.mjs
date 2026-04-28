@@ -28,7 +28,7 @@ const seen = new Map(); // sequence → filename
 
 for (const file of files) {
   if (!VALID.test(file)) {
-    errors.push(`  ✗ Invalid name: "${file}"  (expected NNN_snake_case.sql)`);
+    errors.push(`  ✗ Invalid name: "${file}"  (expected NNN_snake_case_description.sql)`);
     continue;
   }
 
