@@ -39,6 +39,31 @@ Fires when the indexer service experiences sync failures, data inconsistencies, 
 
 ## Common Incident Types
 
+### Stale Cursor Detection
+**Symptoms:** Cursor not updating, ingestion appears frozen, staleness metric exceeds threshold
+**Diagnosis:**
+```bash
+# Check cursor staleness metrics
+kubectl exec -it deploy/indexer -- curl http://localhost:3000/metrics
+
+# Check specific stream cursor status
+kubectl exec -it deploy/postgres -- psql -c "SELECT stream, last_ledger_seq, updated_at, NOW() - updated_at AS staleness FROM ingest_checkpoints;"
+
+# Check ingestion worker logs for errors
+kubectl logs -n ancore deploy/indexer --tail=100 | grep -i "checkpoint\|cursor\|ingest"
+```
+**Alert Thresholds:**
+- **Warning:** Cursor staleness > 5 minutes (300 seconds)
+- **Critical:** Cursor staleness > 15 minutes (900 seconds)
+- **Rationale:** At 5s per ledger, 5 minutes = ~60 ledgers behind, indicating processing issues
+
+**Remediation:**
+- Check if ingestion worker is running
+- Verify database connectivity and write permissions
+- Check for blocking queries or locks on ingest_checkpoints table
+- Restart indexer service if worker is stuck
+- Review worker logs for processing errors
+
 ### Indexer Sync Stalled
 **Symptoms:** Sync progress stopped, increasing ledger gap
 **Diagnosis:**
@@ -158,7 +183,59 @@ kubectl exec -it deploy/indexer -- curl http://localhost:3000/debug/pprof/heap
 - Add database performance monitoring
 - Implement circuit breakers for Stellar node failures
 - Regularly test disaster recovery procedures
-- Monitor key metrics: sync lag, query performance, error rates
+- Monitor key metrics: cursor staleness, sync lag, query performance, error rates
+
+## Monitoring & Alerting Setup
+
+### Cursor Staleness Alerts
+Configure alerts based on the `/metrics` endpoint:
+
+**Prometheus Alert Rules:**
+```yaml
+groups:
+  - name: indexer_cursor_staleness
+    interval: 30s
+    rules:
+      - alert: IndexerCursorStaleWarning
+        expr: indexer_cursor_staleness_seconds > 300
+        for: 2m
+        labels:
+          severity: warning
+          component: indexer
+        annotations:
+          summary: "Indexer cursor is stale ({{ $labels.stream }})"
+          description: "Cursor for stream {{ $labels.stream }} has not updated in {{ $value }}s (threshold: 300s)"
+          runbook: "https://docs.ancore.io/ops/runbooks/indexer-incidents#stale-cursor-detection"
+
+      - alert: IndexerCursorStaleCritical
+        expr: indexer_cursor_staleness_seconds > 900
+        for: 5m
+        labels:
+          severity: critical
+          component: indexer
+        annotations:
+          summary: "Indexer cursor critically stale ({{ $labels.stream }})"
+          description: "Cursor for stream {{ $labels.stream }} has not updated in {{ $value }}s (threshold: 900s)"
+          runbook: "https://docs.ancore.io/ops/runbooks/indexer-incidents#stale-cursor-detection"
+```
+
+**Grafana Dashboard Queries:**
+```promql
+# Cursor staleness by stream
+indexer_cursor_staleness_seconds{stream="main"}
+
+# Number of stale cursors
+count(indexer_cursor_staleness_seconds > 300)
+
+# Max staleness across all streams
+max(indexer_cursor_staleness_seconds)
+```
+
+**Health Check Integration:**
+```bash
+# Automated health check script
+curl -f http://indexer:3000/metrics | jq -e '.status == "ok"' || exit 1
+```
 
 ## Communication Protocol
 
@@ -189,6 +266,7 @@ kubectl exec -it deploy/indexer -- curl http://localhost:3000/debug/pprof/heap
 - **Prevention:** At least one preventive measure implemented
 
 ## Key Metrics to Monitor
+- Cursor staleness (target: < 5 minutes, alert: > 5 minutes warning, > 15 minutes critical)
 - Sync lag (target: < 5 minutes)
 - Query response time (target: < 100ms)
 - Database connection pool usage (target: < 80%)
