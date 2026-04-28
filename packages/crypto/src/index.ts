@@ -23,3 +23,4 @@ export type { EncryptedSecretKeyPayload } from './encryption';
 export { generateMnemonic, validateMnemonic } from './mnemonic';
 export { deriveKeypairFromMnemonic } from './key-derivation';
 export { randomBytes } from './random';
+export { toBase58, fromBase58 } from './encoding';

@@ -17,6 +17,8 @@ const EXPECTED_EXPORTS = [
   'validateMnemonic',
   'deriveKeypairFromMnemonic',
   'randomBytes',
+  'toBase58',
+  'fromBase58',
 ] as const;
 
 describe('@ancore/crypto smoke test', () => {
