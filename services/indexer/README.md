@@ -119,6 +119,22 @@ TEST_DATABASE_URL=postgresql://user:password@localhost:5432/ancore_test
 psql $DATABASE_URL -f migrations/001_create_account_activity_table.sql
 ```
 
+### Linting Migrations
+
+The lint script validates that every file in `migrations/` follows the naming convention and that no two files share the same sequence number.
+
+**Convention:** `NNN_snake_case_description.sql` — three zero-padded digits, lowercase body, `.sql` extension.
+
+```bash
+# From the repo root
+pnpm indexer:lint-migrations
+
+# Or directly
+node services/indexer/scripts/lint-migrations.mjs
+```
+
+The script also runs automatically in CI as part of the `lint` job.
+
 ### Development
 
 ```bash
