@@ -211,7 +211,7 @@ export class StellarClient {
   async getAccountActivityPage(
     publicKey: string,
     request: AccountActivityPageRequest = {}
-  ): Promise<AccountActivityPage<Horizon.HorizonApi.OperationResponse>> {
+  ): Promise<AccountActivityPage<Horizon.HorizonApi.OperationResponseType>> {
     const { cursor = null, limit = 20, order = 'desc' } = request;
 
     return withRetry(async () => {
@@ -223,7 +223,7 @@ export class StellarClient {
           .order(order);
 
         const page = cursor ? await builder.cursor(cursor).call() : await builder.call();
-        const records = page.records as Horizon.HorizonApi.OperationResponse[];
+        const records = page.records as Horizon.HorizonApi.OperationResponseType[];
         const nextCursor = this.getNextCursor(records);
 
         return { records, nextCursor };
@@ -241,7 +241,7 @@ export class StellarClient {
   async *iterateAccountActivity(
     publicKey: string,
     request: AccountActivityPageRequest = {}
-  ): AsyncGenerator<Horizon.HorizonApi.OperationResponse, void, unknown> {
+  ): AsyncGenerator<Horizon.HorizonApi.OperationResponseType, void, unknown> {
     let cursor = request.cursor ?? null;
 
     while (true) {
