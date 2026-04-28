@@ -3,7 +3,11 @@
  *
  * Tracks user activity events and fires a callback after a configurable
  * period of inactivity. Cleans up all listeners on destroy().
+ *
+ * Accepts an optional Clock for deterministic testing.
  */
+
+import { type Clock, systemClock } from '@/utils/clock';
 
 const ACTIVITY_EVENTS: (keyof WindowEventMap)[] = [
   'mousemove',
@@ -19,10 +23,12 @@ export class InactivityDetector {
   private readonly onInactive: () => void;
   private timeoutMs: number;
   private active = false;
+  private readonly clock: Clock;
 
-  constructor(onInactive: () => void, timeoutMs: number) {
+  constructor(onInactive: () => void, timeoutMs: number, clock: Clock = systemClock) {
     this.onInactive = onInactive;
     this.timeoutMs = timeoutMs;
+    this.clock = clock;
     this.handleActivity = this.handleActivity.bind(this);
   }
 
@@ -60,14 +66,14 @@ export class InactivityDetector {
   private resetTimer(): void {
     this.clearTimer();
     if (this.timeoutMs <= 0) return; // 0 = never lock
-    this.timer = setTimeout(() => {
+    this.timer = this.clock.setTimeout(() => {
       this.onInactive();
     }, this.timeoutMs);
   }
 
   private clearTimer(): void {
     if (this.timer !== null) {
-      clearTimeout(this.timer);
+      this.clock.clearTimeout(this.timer);
       this.timer = null;
     }
   }
