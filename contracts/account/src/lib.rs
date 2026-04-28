@@ -138,6 +138,7 @@ pub enum DataKey {
 const DAY_IN_LEDGERS: u32 = 17280; // 24 hours * 60 min * 60 sec / 5 sec per ledger
 const INSTANCE_BUMP_AMOUNT: u32 = 30 * DAY_IN_LEDGERS; // 30 days
 const INSTANCE_BUMP_THRESHOLD: u32 = 15 * DAY_IN_LEDGERS; // 15 days
+const MIN_MILLISECONDS_TIMESTAMP: u64 = 100_000_000_000;
 
 /// Permission bit for execute operations
 /// Permission bit for session-key execute authorization.
@@ -336,19 +337,15 @@ impl AncoreAccount {
             return Err(ContractError::SessionKeyAlreadyExists);
         }
 
+        let expires_at_secs = Self::normalize_expiry_timestamp(expires_at)?;
         let current_timestamp = env.ledger().timestamp();
-        let expires_at_secs = if expires_at > 100_000_000_000 {
-            expires_at / 1000
-        } else {
-            expires_at
-        };
         if expires_at_secs <= current_timestamp {
             return Err(ContractError::SessionKeyExpirationInPast);
         }
 
         let session_key = SessionKey {
             public_key: public_key.clone(),
-            expires_at,
+            expires_at: expires_at_secs,
             permissions,
         };
 
@@ -356,7 +353,7 @@ impl AncoreAccount {
             .persistent()
             .set(&DataKey::SessionKey(public_key.clone()), &session_key);
 
-        Self::extend_session_key_ttl(&env, &public_key, expires_at);
+        Self::extend_session_key_ttl(&env, &public_key, expires_at_secs);
 
         // Issue #212: Consistently bump instance TTL in write paths
         env.storage()
@@ -365,7 +362,7 @@ impl AncoreAccount {
 
         // Emit session_key_added event
         env.events()
-            .publish((events::session_key_added(&env),), (public_key, expires_at));
+            .publish((events::session_key_added(&env),), (public_key, expires_at_secs));
 
         Ok(())
     }
@@ -479,10 +476,19 @@ impl AncoreAccount {
 
     /// Refresh the TTL of a session key
     pub fn refresh_session_key_ttl(env: Env, public_key: BytesN<32>) -> Result<(), ContractError> {
-        let session_key = Self::get_session_key(env.clone(), public_key.clone())
+        let mut session_key = Self::get_session_key(env.clone(), public_key.clone())
             .ok_or(ContractError::SessionKeyNotFound)?;
 
-        Self::extend_session_key_ttl(&env, &public_key, session_key.expires_at);
+        // Normalize once at refresh entry point to remove legacy ambiguity.
+        let normalized_expiry = Self::normalize_expiry_timestamp(session_key.expires_at)?;
+        if normalized_expiry != session_key.expires_at {
+            session_key.expires_at = normalized_expiry;
+            env.storage()
+                .persistent()
+                .set(&DataKey::SessionKey(public_key.clone()), &session_key);
+        }
+
+        Self::extend_session_key_ttl(&env, &public_key, normalized_expiry);
 
         // Issue #212: Consistently bump instance TTL in write paths
         env.storage()
@@ -492,7 +498,7 @@ impl AncoreAccount {
         // Issue #195: Emit event on session key TTL refresh
         env.events().publish(
             (events::session_key_ttl_refreshed(&env),),
-            (public_key, session_key.expires_at),
+            (public_key, normalized_expiry),
         );
 
         Ok(())
@@ -510,13 +516,8 @@ impl AncoreAccount {
     /// Helper to cleanly extend session key TTL
     fn extend_session_key_ttl(env: &Env, public_key: &BytesN<32>, expires_at: u64) {
         let current_timestamp = env.ledger().timestamp();
-
-        // Auto-detect if expires_at is using ms vs s. ms timestamps are > 100_000_000_000
-        let expires_at_secs = if expires_at > 100_000_000_000 {
-            expires_at / 1000
-        } else {
-            expires_at
-        };
+        // expires_at is always normalized to seconds before this helper is called.
+        let expires_at_secs = expires_at;
 
         let ledgers_to_live = if expires_at_secs > current_timestamp {
             // Using 4 seconds-per-ledger + 1 day buffer to guarantee it outlives expiry
@@ -532,6 +533,23 @@ impl AncoreAccount {
             threshold,
             ledgers_to_live,
         );
+    }
+
+    /// Normalize supported expiry input units into unix seconds.
+    ///
+    /// Accepted contract:
+    /// - Seconds: unix timestamp in seconds
+    /// - Milliseconds: unix timestamp in milliseconds (>= MIN_MILLISECONDS_TIMESTAMP)
+    fn normalize_expiry_timestamp(expires_at: u64) -> Result<u64, ContractError> {
+        if expires_at == 0 {
+            return Err(ContractError::InvalidExpiration);
+        }
+
+        if expires_at >= MIN_MILLISECONDS_TIMESTAMP {
+            return Ok(expires_at / 1000);
+        }
+
+        Ok(expires_at)
     }
 
     /// Create canonical signature payload for replay protection.
@@ -1474,6 +1492,43 @@ mod test {
         let result = client.try_add_session_key(&session_pk, &1u64, &permissions);
         assert!(result.is_ok());
         assert!(client.has_session_key(&session_pk));
+    }
+
+    #[test]
+    fn test_add_session_key_normalizes_seconds_input() {
+        let env = Env::default();
+        let contract_id = env.register_contract(None, AncoreAccount);
+        let client = AncoreAccountClient::new(&env, &contract_id);
+
+        let owner = Address::generate(&env);
+        init(&env, &client, &owner);
+        env.mock_all_auths();
+
+        let session_pk = BytesN::from_array(&env, &[14u8; 32]);
+        let expires_at_seconds = env.ledger().timestamp() + 600;
+        client.add_session_key(&session_pk, &expires_at_seconds, &Vec::new(&env));
+
+        let stored = client.get_session_key(&session_pk).unwrap();
+        assert_eq!(stored.expires_at, expires_at_seconds);
+    }
+
+    #[test]
+    fn test_add_session_key_normalizes_milliseconds_input() {
+        let env = Env::default();
+        let contract_id = env.register_contract(None, AncoreAccount);
+        let client = AncoreAccountClient::new(&env, &contract_id);
+
+        let owner = Address::generate(&env);
+        init(&env, &client, &owner);
+        env.mock_all_auths();
+
+        let session_pk = BytesN::from_array(&env, &[15u8; 32]);
+        let expires_at_seconds = env.ledger().timestamp() + 900;
+        let expires_at_millis = expires_at_seconds * 1000;
+        client.add_session_key(&session_pk, &expires_at_millis, &Vec::new(&env));
+
+        let stored = client.get_session_key(&session_pk).unwrap();
+        assert_eq!(stored.expires_at, expires_at_seconds);
     }
 
     // ─────────────────────────────────────────────────────────────────────────
