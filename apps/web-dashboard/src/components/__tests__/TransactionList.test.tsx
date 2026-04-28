@@ -1,5 +1,5 @@
 import React from 'react';
-import { render, screen } from '@testing-library/react';
+import { render, screen, fireEvent } from '@testing-library/react';
 import { TransactionList } from '../TransactionList';
 import type { Transaction } from '../../types/dashboard';
 
@@ -194,5 +194,209 @@ describe('TransactionList', () => {
 
     // Optimistic should still be visible
     expect(screen.getByText(/pending \(optimistic\)/)).toBeInTheDocument();
+  });
+
+  it('renders sortable headers when transactions exist', () => {
+    render(<TransactionList transactions={mockTransactions} />);
+    
+    expect(screen.getByText('Date')).toBeInTheDocument();
+    expect(screen.getByText('Amount')).toBeInTheDocument();
+    expect(screen.getByText('Status')).toBeInTheDocument();
+  });
+
+  it('does not render sortable headers when no transactions', () => {
+    render(<TransactionList transactions={[]} />);
+    
+    expect(screen.queryByText('Date')).not.toBeInTheDocument();
+    expect(screen.queryByText('Amount')).not.toBeInTheDocument();
+    expect(screen.queryByText('Status')).not.toBeInTheDocument();
+  });
+
+  it('sorts transactions by date in descending order by default', () => {
+    const dateSortedTransactions: Transaction[] = [
+      {
+        id: 'tx-1',
+        type: 'send',
+        amount: 100,
+        timestamp: new Date('2024-01-01'),
+        status: 'confirmed',
+        counterparty: 'GRECIPIENT1',
+      },
+      {
+        id: 'tx-2',
+        type: 'receive',
+        amount: 50,
+        timestamp: new Date('2024-01-03'),
+        status: 'confirmed',
+        counterparty: 'GSENDER1',
+      },
+      {
+        id: 'tx-3',
+        type: 'send',
+        amount: 75,
+        timestamp: new Date('2024-01-02'),
+        status: 'confirmed',
+        counterparty: 'GRECIPIENT2',
+      },
+    ];
+
+    const { container } = render(
+      <TransactionList transactions={dateSortedTransactions} pageSize={10} />
+    );
+
+    const rows = container.querySelectorAll('[class*="border-b"]');
+    const firstRowDate = rows[0].textContent;
+    const lastRowDate = rows[rows.length - 1].textContent;
+
+    // Most recent date should appear first (descending order)
+    expect(firstRowDate).toContain('1/3/2024');
+    expect(lastRowDate).toContain('1/1/2024');
+  });
+
+  it('sorts transactions by amount in ascending order', () => {
+    const amountSortedTransactions: Transaction[] = [
+      {
+        id: 'tx-1',
+        type: 'send',
+        amount: 100,
+        timestamp: new Date('2024-01-01'),
+        status: 'confirmed',
+        counterparty: 'GRECIPIENT1',
+      },
+      {
+        id: 'tx-2',
+        type: 'receive',
+        amount: 50,
+        timestamp: new Date('2024-01-02'),
+        status: 'confirmed',
+        counterparty: 'GSENDER1',
+      },
+      {
+        id: 'tx-3',
+        type: 'send',
+        amount: 75,
+        timestamp: new Date('2024-01-03'),
+        status: 'confirmed',
+        counterparty: 'GRECIPIENT2',
+      },
+    ];
+
+    const { container } = render(
+      <TransactionList transactions={amountSortedTransactions} pageSize={10} />
+    );
+
+    // Click Amount header to sort ascending
+    fireEvent.click(screen.getByText('Amount'));
+    fireEvent.click(screen.getByText('Amount'));
+
+    const rows = container.querySelectorAll('[class*="border-b"]');
+    const firstRowAmount = rows[0].textContent;
+    const lastRowAmount = rows[rows.length - 1].textContent;
+
+    // Smallest amount should appear first (ascending order)
+    expect(firstRowAmount).toContain('50 XLM');
+    expect(lastRowAmount).toContain('100 XLM');
+  });
+
+  it('sorts transactions by status alphabetically', () => {
+    const statusSortedTransactions: Transaction[] = [
+      {
+        id: 'tx-1',
+        type: 'send',
+        amount: 100,
+        timestamp: new Date('2024-01-01'),
+        status: 'confirmed',
+        counterparty: 'GRECIPIENT1',
+      },
+      {
+        id: 'tx-2',
+        type: 'receive',
+        amount: 50,
+        timestamp: new Date('2024-01-02'),
+        status: 'pending',
+        counterparty: 'GSENDER1',
+      },
+      {
+        id: 'tx-3',
+        type: 'send',
+        amount: 75,
+        timestamp: new Date('2024-01-03'),
+        status: 'confirmed',
+        counterparty: 'GRECIPIENT2',
+      },
+    ];
+
+    const { container } = render(
+      <TransactionList transactions={statusSortedTransactions} pageSize={10} />
+    );
+
+    // Click Status header to sort
+    fireEvent.click(screen.getByText('Status'));
+
+    const rows = container.querySelectorAll('[class*="border-b"]');
+    const firstRowStatus = rows[0].textContent;
+    const lastRowStatus = rows[rows.length - 1].textContent;
+
+    // 'confirmed' should appear before 'pending' alphabetically in ascending order
+    expect(firstRowStatus).toContain('confirmed');
+    expect(lastRowStatus).toContain('pending');
+  });
+
+  it('toggles sort direction when clicking same header', () => {
+    const { container } = render(
+      <TransactionList transactions={mockTransactions} pageSize={10} />
+    );
+
+    // Click Date header twice to toggle from desc to asc
+    fireEvent.click(screen.getByText('Date'));
+    fireEvent.click(screen.getByText('Date'));
+
+    const rows = container.querySelectorAll('[class*="border-b"]');
+    const firstRowDate = rows[0].textContent;
+    const lastRowDate = rows[rows.length - 1].textContent;
+
+    // Oldest date should appear first (ascending order after toggle)
+    expect(firstRowDate).toContain('1/1/2024');
+    expect(lastRowDate).toContain('1/2/2024');
+  });
+
+  it('preserves sort state during pagination', () => {
+    const manyTransactions = Array.from({ length: 10 }, (_, i) => ({
+      id: `tx-${i}`,
+      type: 'send' as const,
+      amount: 10 * (i + 1),
+      timestamp: new Date(`2024-01-${String(i + 1).padStart(2, '0')}`),
+      status: 'confirmed' as const,
+      counterparty: `GRECIPIENT${i}`,
+    }));
+
+    const { container } = render(
+      <TransactionList transactions={manyTransactions} pageSize={5} />
+    );
+
+    // Sort by amount ascending
+    fireEvent.click(screen.getByText('Amount'));
+    fireEvent.click(screen.getByText('Amount'));
+
+    // Navigate to next page
+    fireEvent.click(screen.getByText('Next'));
+
+    const rows = container.querySelectorAll('[class*="border-b"]');
+    const firstRowAmount = rows[0].textContent;
+
+    // First transaction on second page should have amount 60 (sorted ascending)
+    expect(firstRowAmount).toContain('60 XLM');
+  });
+
+  it('shows sort indicator for active sort field', () => {
+    const { container } = render(<TransactionList transactions={mockTransactions} />);
+    
+    // Date should be the default sort field with indicator
+    const dateButton = screen.getByText('Date').closest('button');
+    expect(dateButton).toBeInTheDocument();
+    
+    // Check for chevron icon (sort indicator)
+    const svg = container.querySelector('svg');
+    expect(svg).toBeInTheDocument();
   });
 });
