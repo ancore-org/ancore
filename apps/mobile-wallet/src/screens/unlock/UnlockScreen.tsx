@@ -1,4 +1,4 @@
-import { useEffect } from 'react';
+import { useEffect, useRef } from 'react';
 import { BiometricLockoutManager } from '../../security/biometric-lockout-manager';
 import { useBiometricUnlock } from '../../security/hooks/useBiometricUnlock';
 import { AttemptsIndicator } from '../../components/AttemptsIndicator';
@@ -20,6 +20,7 @@ export const UnlockScreen = ({
   passwordService,
   onUnlocked,
 }: Props) => {
+  const hasAutoTriggered = useRef(false);
   const {
     state,
     attemptBiometric,
@@ -35,11 +36,17 @@ export const UnlockScreen = ({
 
   // Auto-trigger biometric prompt on mount
   useEffect(() => {
-    if (!state.isLoading && state.phase === 'idle' && state.isBiometricAvailable) {
+    if (
+      !hasAutoTriggered.current &&
+    !state.isLoading &&
+    state.phase === 'idle' &&
+    state.isBiometricAvailable
+  ) {
+    hasAutoTriggered.current = true;
       attemptBiometric();
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [state.isLoading]);
+  }, [state.isLoading, state.phase, state.isBiometricAvailable, attemptBiometric]);
 
   if (state.isLoading) {
     return <p aria-live="polite">Loading…</p>;

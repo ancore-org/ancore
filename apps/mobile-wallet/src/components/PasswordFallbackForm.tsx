@@ -51,7 +51,7 @@ export const PasswordFallbackForm = ({ onSubmit, isLoading, error }: Props) => {
         </p>
       )}
 
-      <button type="submit" disabled={isLoading || password.length === 0}>
+      <button type="submit" disabled={isLoading || password.trim().length === 0}>
         {isLoading ? 'Unlocking…' : 'Unlock'}
       </button>
     </form>

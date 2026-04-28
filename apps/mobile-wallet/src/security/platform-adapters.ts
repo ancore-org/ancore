@@ -4,6 +4,20 @@ import type { BiometricFailureReason } from './biometric-lockout.types';
 import type { SecureStoreAdapter } from '../storage/types';
 
 
+function decodeBase64Url(input: string): ArrayBuffer {
+  const normalized = input.replace(/-/g, '+').replace(/_/g, '/');
+  const padded = normalized + '='.repeat((4 - (normalized.length % 4)) % 4);
+  const binary = atob(padded);
+  const buffer = new ArrayBuffer(binary.length);
+  const view = new Uint8Array(buffer);
+
+  for (let i = 0; i < binary.length; i += 1) {
+    view[i] = binary.charCodeAt(i);
+  }
+
+  return buffer;
+}
+
 export class WebAuthnBiometricService implements IBiometricAuthService {
   private rpId: string;
   private credentialId: string | null;
@@ -39,7 +53,7 @@ export class WebAuthnBiometricService implements IBiometricAuthService {
           rpId: this.rpId,
           allowCredentials: [
             {
-              id: Uint8Array.from(atob(this.credentialId), (c) => c.charCodeAt(0)),
+              id: decodeBase64Url(this.credentialId),
               type: 'public-key',
               transports: ['internal'],
             },
@@ -73,8 +87,7 @@ function mapWebAuthnError(err: unknown): BiometricFailureReason {
   return 'UNKNOWN';
 }
 
-
-// Replace verifyFn with your actual wallet password verification logic.
+// Password auth adapter 
 export class WalletPasswordAuthService implements IPasswordAuthService {
   private verifyPassword: (pw: string) => Promise<boolean>;
 

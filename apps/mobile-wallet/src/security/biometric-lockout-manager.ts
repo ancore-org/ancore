@@ -28,6 +28,14 @@ export class BiometricLockoutManager {
     if (raw) {
       try {
         const persisted: BiometricLockoutState = JSON.parse(raw);
+        // Basic shape validation
+      if (
+        typeof persisted.failedAttempts !== 'number' ||
+        typeof persisted.permanentlyLocked !== 'boolean' ||
+        (persisted.lockedUntil !== null && typeof persisted.lockedUntil !== 'number')
+      ) {
+         throw new Error('Invalid state shape');
+       }
         this.state = persisted;
         // Auto-clear expired time-based lockout on load
         if (this.isTimedLockoutExpired()) {
