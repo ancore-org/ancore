@@ -18,6 +18,10 @@ vi.mock('@ancore/ui-kit', () => ({
   ),
 }));
 
+vi.mock('lucide-react', () => ({
+  Download: () => <svg data-testid="download-icon" />,
+}));
+
 const makeTx = (id: string, type: 'send' | 'receive' = 'send'): Transaction => ({
   id,
   type,
@@ -28,6 +32,15 @@ const makeTx = (id: string, type: 'send' | 'receive' = 'send'): Transaction => (
 });
 
 describe('TransactionList', () => {
+  beforeEach(() => {
+    window.URL.createObjectURL = vi.fn(() => 'blob:test-url');
+    window.URL.revokeObjectURL = vi.fn();
+  });
+
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
   it('renders empty state', () => {
     render(<TransactionList transactions={[]} />);
     expect(screen.getByText('No transactions found.')).toBeInTheDocument();
@@ -55,5 +68,21 @@ describe('TransactionList', () => {
     expect(screen.getByText('Previous')).toBeDisabled();
     await userEvent.click(screen.getByText('Next'));
     expect(screen.getByText('Next')).toBeDisabled();
+  });
+
+  it('exports CSV correctly', async () => {
+    const txs = [makeTx('tx1', 'receive'), makeTx('tx2', 'send')];
+    render(<TransactionList transactions={txs} />);
+
+    const exportBtn = screen.getByText('Export CSV');
+    expect(exportBtn).toBeInTheDocument();
+
+    const appendSpy = vi.spyOn(document.body, 'appendChild');
+
+    await userEvent.click(exportBtn);
+
+    expect(window.URL.createObjectURL).toHaveBeenCalled();
+    expect(appendSpy).toHaveBeenCalled();
+    expect(window.URL.revokeObjectURL).toHaveBeenCalled();
   });
 });
