@@ -40,7 +40,11 @@ export class UnsupportedMnemonicLanguageError extends Error {
  *   English BIP39 wordlist
  */
 export function assertEnglishMnemonic(mnemonic: string): void {
-  const englishWordlist: string[] = bip39.wordlists['english'];
+  // bip39 exports `wordlists` at runtime but the stub @types/bip39 does not
+  // declare it; cast through `unknown` to satisfy the DTS compiler while
+  // retaining full type safety at the call site.
+  const allWordlists = (bip39 as unknown as { wordlists: Record<string, string[]> }).wordlists;
+  const englishWordlist: string[] = allWordlists['english'];
   const englishSet = new Set(englishWordlist);
 
   const words = mnemonic.trim().split(/\s+/);
