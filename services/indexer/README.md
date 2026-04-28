@@ -110,6 +110,7 @@ CREATE TABLE account_activity (
 ```bash
 DATABASE_URL=postgresql://user:password@localhost:5432/ancore
 TEST_DATABASE_URL=postgresql://user:password@localhost:5432/ancore_test
+DB_QUERY_TIMEOUT_SEC=30 # Optional, defaults to 30
 ```
 
 ### Running Migrations

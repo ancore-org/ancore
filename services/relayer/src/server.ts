@@ -8,6 +8,7 @@ import { validateBody } from './validation/middleware';
 import { createExecuteRelayHandler } from './handlers/executeRelay';
 import { createValidateRelayHandler } from './handlers/validateRelay';
 import { IdempotencyStore } from './store/idempotency';
+import { JobQueue } from './queue/JobQueue';
 import type { AuthServiceContract, SignatureServiceContract } from './types';
 
 // ── Request schema ────────────────────────────────────────────────────────────
@@ -71,7 +72,8 @@ export function createApp(
     message: 'Too many status requests from this IP, please try again later.',
   });
 
-  const relayService = new RelayService(signatureService);
+  const jobQueue = new JobQueue();
+  const relayService = new RelayService(signatureService, jobQueue, idempotencyStore);
   const auth = createAuthMiddleware(authService);
   const validate = validateBody(relayRequestSchema);
   const idempotency = createIdempotencyMiddleware(idempotencyStore);
