@@ -1,12 +1,22 @@
 import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { beforeEach, describe, expect, it } from 'vitest';
+import type { UnlockVerifier } from '../AuthGuard';
 import { AUTH_STORAGE_KEY, DEFAULT_AUTH_STATE } from '../AuthGuard';
 import { ExtensionRouterTestHarness } from '..';
 
-function renderRouter(pathname: string, authState = DEFAULT_AUTH_STATE) {
+function renderRouter(
+  pathname: string,
+  authState = DEFAULT_AUTH_STATE,
+  options?: { unlockVerifier?: UnlockVerifier }
+) {
   window.localStorage.setItem(AUTH_STORAGE_KEY, JSON.stringify(authState));
-  return render(<ExtensionRouterTestHarness initialEntries={[pathname]} />);
+  return render(
+    <ExtensionRouterTestHarness
+      initialEntries={[pathname]}
+      unlockVerifier={options?.unlockVerifier}
+    />
+  );
 }
 
 describe('extension router', () => {
@@ -31,6 +41,33 @@ describe('extension router', () => {
 
     expect(screen.getByRole('heading', { name: /unlock wallet/i })).toBeInTheDocument();
     expect(document.title).toBe('Unlock Wallet | Ancore Extension');
+  });
+
+  it('keeps locked users on unlock when password verification fails', async () => {
+    const user = userEvent.setup();
+    renderRouter(
+      '/send',
+      {
+        ...DEFAULT_AUTH_STATE,
+        hasOnboarded: true,
+        walletName: 'Locked Wallet',
+      },
+      {
+        unlockVerifier: async () => false,
+      }
+    );
+
+    await user.type(screen.getByLabelText(/password/i), 'wrong-password');
+    await user.click(screen.getByRole('button', { name: /unlock/i }));
+
+    expect(await screen.findByRole('alert')).toHaveTextContent(/incorrect password/i);
+    expect(screen.getByRole('heading', { name: /unlock wallet/i })).toBeInTheDocument();
+    expect(screen.queryByRole('heading', { name: /home/i })).not.toBeInTheDocument();
+    expect(document.title).toBe('Unlock Wallet | Ancore Extension');
+    expect(JSON.parse(window.localStorage.getItem(AUTH_STORAGE_KEY) ?? '{}')).toMatchObject({
+      hasOnboarded: true,
+      isUnlocked: false,
+    });
   });
 
   it('creates an account and lands on the protected home route', async () => {

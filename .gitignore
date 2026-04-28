@@ -15,6 +15,7 @@ storybook-static/
 # Rust/Soroban
 target/
 Cargo.lock
+!contracts/Cargo.lock
 **/*.rs.bk
 
 # Testing
