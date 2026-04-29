@@ -20,18 +20,28 @@ function useOptionalFormContext() {
 // AddressInputBase – the pure presentational layer
 // ---------------------------------------------------------------------------
 
-export interface AddressInputBaseProps extends Omit<
-  React.InputHTMLAttributes<HTMLInputElement>,
-  'type'
-> {
+export interface RecentRecipientPick {
+  address: string;
+  name?: string;
+}
+
+export interface AddressInputBaseProps
+  extends Omit<React.InputHTMLAttributes<HTMLInputElement>, 'type'> {
   /** Field label */
   label?: string;
   /** Validation error message */
   error?: string;
+  /** List of recent recipients to show as quick picks */
+  recentRecipients?: RecentRecipientPick[];
+  /** Callback when a recent recipient is selected */
+  onSelectRecent?: (address: string) => void;
 }
 
 const AddressInputBase = React.forwardRef<HTMLInputElement, AddressInputBaseProps>(
-  ({ label = 'Address', error, className, id, ...props }, ref) => {
+  (
+    { label = 'Address', error, className, id, recentRecipients, onSelectRecent, ...props },
+    ref
+  ) => {
     const inputId = id ?? label.toLowerCase().replace(/\s+/g, '-');
 
     return (
@@ -58,6 +68,24 @@ const AddressInputBase = React.forwardRef<HTMLInputElement, AddressInputBaseProp
           )}
           {...props}
         />
+
+        {recentRecipients && recentRecipients.length > 0 && (
+          <div className="flex flex-wrap gap-2 pt-1 animate-in fade-in slide-in-from-top-1 duration-300">
+            {recentRecipients.map((recipient) => (
+              <button
+                key={recipient.address}
+                type="button"
+                onClick={() => onSelectRecent?.(recipient.address)}
+                className="inline-flex items-center gap-1.5 rounded-full bg-white/5 border border-white/10 px-2.5 py-1 text-[10px] font-bold text-slate-400 uppercase tracking-wider transition-all hover:bg-cyan-400/10 hover:border-cyan-400/30 hover:text-cyan-400 focus:outline-none focus:ring-1 focus:ring-cyan-400"
+              >
+                <div className="w-1 h-1 rounded-full bg-cyan-400/50" />
+                {recipient.name ||
+                  recipient.address.slice(0, 4) + '...' + recipient.address.slice(-4)}
+              </button>
+            ))}
+          </div>
+        )}
+
         {error && (
           <p id={`${inputId}-error`} role="alert" className="text-sm font-medium text-destructive">
             {error}
@@ -104,7 +132,7 @@ export interface AddressInputProps extends AddressInputBaseProps {
  * ```
  */
 const AddressInput = React.forwardRef<HTMLInputElement, AddressInputProps>(
-  ({ name, ...props }, ref) => {
+  ({ name, recentRecipients, onSelectRecent, ...props }, ref) => {
     const formCtx = useOptionalFormContext();
 
     if (formCtx && name) {
@@ -118,6 +146,11 @@ const AddressInput = React.forwardRef<HTMLInputElement, AddressInputProps>(
               {...props}
               {...field}
               ref={ref}
+              recentRecipients={recentRecipients}
+              onSelectRecent={(address) => {
+                field.onChange(address);
+                onSelectRecent?.(address);
+              }}
               error={props.error ?? fieldState.error?.message}
             />
           )}
@@ -125,7 +158,14 @@ const AddressInput = React.forwardRef<HTMLInputElement, AddressInputProps>(
       );
     }
 
-    return <AddressInputBase ref={ref} {...props} />;
+    return (
+      <AddressInputBase
+        ref={ref}
+        recentRecipients={recentRecipients}
+        onSelectRecent={onSelectRecent}
+        {...props}
+      />
+    );
   }
 );
 AddressInput.displayName = 'AddressInput';

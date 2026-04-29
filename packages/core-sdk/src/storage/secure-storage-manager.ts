@@ -1,4 +1,4 @@
-import { AccountData, EncryptedPayload, SessionKeysData, StorageAdapter } from './types';
+import { AccountData, EncryptedPayload, RecentRecipientsData, SessionKeysData, StorageAdapter } from './types';
 
 function toArrayBufferView(value: Uint8Array): Uint8Array<ArrayBuffer> {
   const normalized = new Uint8Array(new ArrayBuffer(value.byteLength));
@@ -320,6 +320,31 @@ export class SecureStorageManager {
     } catch {
       // Data corrupted
       return { keys: {} };
+    }
+  public async saveRecentRecipients(data: RecentRecipientsData): Promise<void> {
+    if (!this.encryptionKey) {
+      throw new Error('Storage manager is locked');
+    }
+    const payload = await this.encryptData(JSON.stringify(data));
+    await this.storage.set('recentRecipients', payload);
+    this.touch();
+  }
+
+  public async getRecentRecipients(): Promise<RecentRecipientsData | null> {
+    if (!this.encryptionKey) {
+      throw new Error('Storage manager is locked');
+    }
+    const payload = await this.storage.get<EncryptedPayload>('recentRecipients');
+    if (!payload) {
+      return { recipients: [] };
+    }
+    try {
+      const json = await this.decryptData(payload);
+      this.touch();
+      return JSON.parse(json);
+    } catch {
+      // Data corrupted
+      return { recipients: [] };
     }
   }
 }
