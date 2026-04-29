@@ -1,6 +1,6 @@
 import { Copy, Check, Globe } from 'lucide-react';
 import { Button } from '@ancore/ui-kit';
-import { Badge } from '@ancore/ui-kit';
+import { Badge, Tooltip } from '@ancore/ui-kit';
 
 interface AccountHeaderProps {
   address: string;
@@ -26,13 +26,25 @@ export function AccountHeader({
         <div className="mb-6">
           <div className="flex items-center justify-between mb-2">
             <h2 className="text-sm font-medium text-muted-foreground">Account Address</h2>
-            <Badge
-              variant="outline"
-              className="border-primary/30 bg-primary/5 text-primary font-medium"
+            <Tooltip
+              content={
+                network.toLowerCase() === 'mainnet'
+                  ? 'Environment: Production (Horizon Mainnet)'
+                  : network.toLowerCase() === 'staging'
+                    ? 'Environment: Staging (Horizon Testnet)'
+                    : 'Environment: Sandbox (Horizon Testnet)'
+              }
             >
-              <Globe className="w-3 h-3 mr-1" />
-              {network}
-            </Badge>
+              <div tabIndex={0} className="focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary rounded cursor-help">
+                <Badge
+                  variant="outline"
+                  className="border-primary/30 bg-primary/5 text-primary font-medium"
+                >
+                  <Globe className="w-3 h-3 mr-1" />
+                  {network}
+                </Badge>
+              </div>
+            </Tooltip>
           </div>
 
           <div className="flex items-center gap-3">

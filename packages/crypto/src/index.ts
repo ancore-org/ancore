@@ -18,8 +18,15 @@ export {
 } from './entropy';
 
 export { validatePasswordStrength } from './password';
-export { encryptSecretKey, decryptSecretKey } from './encryption';
+export { encryptSecretKey, decryptSecretKey, UnsupportedVersionError, InvalidPayloadError } from './encryption';
 export type { EncryptedSecretKeyPayload } from './encryption';
-export { generateMnemonic, validateMnemonic } from './mnemonic';
+export {
+  generateMnemonic,
+  validateMnemonic,
+  assertEnglishMnemonic,
+  UnsupportedMnemonicLanguageError,
+  SUPPORTED_MNEMONIC_LANGUAGE,
+} from './mnemonic';
 export { deriveKeypairFromMnemonic } from './key-derivation';
 export { randomBytes } from './random';
+export { toBase58, fromBase58 } from './encoding';

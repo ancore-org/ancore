@@ -67,6 +67,10 @@ export {
   InvalidAmountError,
 } from './errors';
 
+// Normalization helpers
+export type { ErrorCategory, NormalizedError } from './errors';
+export { normalizeError } from './errors';
+
 // Retry policy presets
 export {
   LOW_LATENCY,

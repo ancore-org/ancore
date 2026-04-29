@@ -1,6 +1,6 @@
 import { describe, expect, it } from '@jest/globals';
 
-import { decryptSecretKey, encryptSecretKey } from '../encryption';
+import { decryptSecretKey, encryptSecretKey, UnsupportedVersionError } from '../encryption';
 
 describe('encryptSecretKey()/decryptSecretKey() round-trip', () => {
   it('decrypts encrypted payload back to original secret key', async () => {
@@ -51,10 +51,10 @@ describe('encryptSecretKey()/decryptSecretKey() round-trip', () => {
         {
           ...encrypted,
           version: 2,
-        },
+        } as any,
         'Test-Password-Fixture-Delta!123'
       )
-    ).rejects.toThrow('Invalid password or corrupted encrypted payload.');
+    ).rejects.toThrow(UnsupportedVersionError);
   });
 
   it('fails gracefully for out-of-range PBKDF2 iterations', async () => {

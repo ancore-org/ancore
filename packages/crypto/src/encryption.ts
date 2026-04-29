@@ -11,8 +11,27 @@ const AES_KEY_LENGTH = 256;
 const VERSION = 1;
 const DECRYPT_FAILURE_MESSAGE = 'Invalid password or corrupted encrypted payload.';
 
+// Supported encryption payload versions
+const SUPPORTED_VERSIONS = [1] as const;
+type SupportedVersion = typeof SUPPORTED_VERSIONS[number];
+
+// Error classes for better error handling
+export class UnsupportedVersionError extends Error {
+  constructor(public readonly detectedVersion: number, public readonly supportedVersions: readonly number[]) {
+    super(`Unsupported encryption payload version: ${detectedVersion}. Supported versions: [${supportedVersions.join(', ')}]`);
+    this.name = 'UnsupportedVersionError';
+  }
+}
+
+export class InvalidPayloadError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = 'InvalidPayloadError';
+  }
+}
+
 export interface EncryptedSecretKeyPayload {
-  version: number;
+  version: SupportedVersion;
   iterations: number;
   salt: string;
   iv: string;
@@ -80,25 +99,31 @@ function validateInputs(secretKey: string, password: string): void {
 
 function validateEncryptedPayload(payload: unknown): EncryptedSecretKeyPayload {
   if (!payload || typeof payload !== 'object') {
-    throw new Error(DECRYPT_FAILURE_MESSAGE);
+    throw new InvalidPayloadError('Payload must be a non-null object');
   }
 
   const record = payload as Record<string, unknown>;
 
-  if (record.version !== VERSION) {
-    throw new Error(DECRYPT_FAILURE_MESSAGE);
+  // Validate version first to provide specific error for unsupported versions
+  if (typeof record.version !== 'number' || !Number.isSafeInteger(record.version)) {
+    throw new InvalidPayloadError('Payload version must be a safe integer');
   }
 
+  if (!SUPPORTED_VERSIONS.includes(record.version as SupportedVersion)) {
+    throw new UnsupportedVersionError(record.version, SUPPORTED_VERSIONS);
+  }
+
+  // Validate other required fields
   if (typeof record.salt !== 'string' || record.salt.length === 0) {
-    throw new Error(DECRYPT_FAILURE_MESSAGE);
+    throw new InvalidPayloadError('Payload salt must be a non-empty string');
   }
 
   if (typeof record.iv !== 'string' || record.iv.length === 0) {
-    throw new Error(DECRYPT_FAILURE_MESSAGE);
+    throw new InvalidPayloadError('Payload iv must be a non-empty string');
   }
 
   if (typeof record.ciphertext !== 'string' || record.ciphertext.length === 0) {
-    throw new Error(DECRYPT_FAILURE_MESSAGE);
+    throw new InvalidPayloadError('Payload ciphertext must be a non-empty string');
   }
 
   if (
@@ -106,11 +131,13 @@ function validateEncryptedPayload(payload: unknown): EncryptedSecretKeyPayload {
     (record.iterations as number) < PBKDF2_ITERATIONS ||
     (record.iterations as number) > MAX_PBKDF2_ITERATIONS
   ) {
-    throw new Error(DECRYPT_FAILURE_MESSAGE);
+    throw new InvalidPayloadError(
+      `Payload iterations must be a safe integer between ${PBKDF2_ITERATIONS} and ${MAX_PBKDF2_ITERATIONS}`
+    );
   }
 
   return {
-    version: record.version as number,
+    version: record.version as SupportedVersion,
     iterations: record.iterations as number,
     salt: record.salt,
     iv: record.iv,
@@ -144,7 +171,7 @@ export async function encryptSecretKey(
   );
 
   return {
-    version: VERSION,
+    version: VERSION as SupportedVersion,
     iterations: PBKDF2_ITERATIONS,
     salt: toBase64(salt),
     iv: toBase64(iv),
@@ -181,7 +208,13 @@ export async function decryptSecretKey(
     );
 
     return new TextDecoder().decode(plaintext);
-  } catch {
-    throw new Error(DECRYPT_FAILURE_MESSAGE);
+  } catch (error) {
+    // Re-throw our custom errors as-is
+    if (error instanceof UnsupportedVersionError || error instanceof InvalidPayloadError) {
+      throw error;
+    }
+    
+    // Wrap other errors as generic decryption failure
+    throw new InvalidPayloadError(DECRYPT_FAILURE_MESSAGE);
   }
 }

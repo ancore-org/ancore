@@ -15,8 +15,13 @@ const EXPECTED_EXPORTS = [
   'decryptSecretKey',
   'generateMnemonic',
   'validateMnemonic',
+  'assertEnglishMnemonic',
+  'UnsupportedMnemonicLanguageError',
+  'SUPPORTED_MNEMONIC_LANGUAGE',
   'deriveKeypairFromMnemonic',
   'randomBytes',
+  'toBase58',
+  'fromBase58',
 ] as const;
 
 describe('@ancore/crypto smoke test', () => {

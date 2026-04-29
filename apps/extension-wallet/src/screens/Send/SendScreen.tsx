@@ -21,6 +21,8 @@ import { SendHorizontal, Info, AlertCircle } from 'lucide-react';
 
 interface SendScreenProps {
   balance?: number;
+  /** Maximum decimal places for the asset being sent. Defaults to 7 (XLM). */
+  assetDecimals?: number;
   service?: SendService;
   pollIntervalMs?: number;
 }
@@ -30,10 +32,10 @@ interface SendScreenProps {
  *
  * Implements a premium dark UI with real-time validation and simulation feedback.
  */
-export function SendScreen({ balance, service, pollIntervalMs }: SendScreenProps) {
+export function SendScreen({ balance, assetDecimals, service, pollIntervalMs }: SendScreenProps) {
   const [form, setForm] = useState<SendFormValues>({ to: '', amount: '' });
 
-  const send = useSendTransaction({ balance, service, pollIntervalMs });
+  const send = useSendTransaction({ balance, assetDecimals, service, pollIntervalMs });
 
   const onMax = () => {
     setForm((current) => ({ ...current, amount: String(send.balance) }));
