@@ -303,5 +303,25 @@ describe('StellarClient', () => {
         cursor: 'pt-1',
       });
     });
+
+    it('should return null nextCursor for empty page', async () => {
+      const client = new StellarClient({ network: 'testnet' });
+      const call = jest.fn().mockResolvedValue({ records: [] });
+      const order = jest.fn().mockReturnValue({ call });
+      const limit = jest.fn().mockReturnValue({ call, order });
+      const forAccount = jest.fn().mockReturnValue({ call, limit, order });
+      const operations = jest.fn().mockReturnValue({ forAccount });
+
+      (client as unknown as { horizonServer: { operations: () => unknown } }).horizonServer = {
+        operations,
+      };
+
+      const page = await client.getAccountActivityPage('GABC123');
+
+      expect(page.records).toEqual([]);
+      expect(page.nextCursor).toBeNull();
+      expect(limit).toHaveBeenCalledWith(20);
+      expect(order).toHaveBeenCalledWith('desc');
+    });
   });
 });

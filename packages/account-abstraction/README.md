@@ -321,6 +321,19 @@ function processEventNotification(event: xdr.ContractEvent) {
 pnpm test
 ```
 
+### Updating Contract Error Code Snapshots
+
+The contract error mapping table is validated with an inline snapshot in
+`src/__tests__/errors.test.ts` (`CONTRACT_ERROR_CODES` suite).
+
+When contract error codes/messages change:
+
+```bash
+pnpm --filter @ancore/account-abstraction test -- -u
+```
+
+Review the snapshot diff carefully before committing to ensure mappings are intentional.
+
 ## License
 
 Apache-2.0
