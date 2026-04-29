@@ -1,6 +1,7 @@
 import React from 'react';
 import { render, screen } from '@testing-library/react';
 import { TransactionList } from '../TransactionList';
+import { TableDensityProvider } from '../../contexts/TableDensityContext';
 import type { Transaction } from '../../types/dashboard';
 
 describe('TransactionList', () => {
@@ -32,24 +33,28 @@ describe('TransactionList', () => {
     counterparty: 'GRECIPIENT2',
   };
 
+  const renderWithProvider = (ui: React.ReactElement, options = {}) => {
+    return render(ui, { wrapper: TableDensityProvider, ...options });
+  };
+
   it('renders transaction list', () => {
-    render(<TransactionList transactions={mockTransactions} />);
+    renderWithProvider(<TransactionList transactions={mockTransactions} />);
     expect(screen.getByText('Recent Transactions')).toBeInTheDocument();
   });
 
   it('displays confirmed transactions', () => {
-    render(<TransactionList transactions={mockTransactions} />);
-    expect(screen.getByText('100 XLM')).toBeInTheDocument();
-    expect(screen.getByText('50 XLM')).toBeInTheDocument();
+    renderWithProvider(<TransactionList transactions={mockTransactions} />);
+    expect(screen.getByText(/100\s*XLM/)).toBeInTheDocument();
+    expect(screen.getByText(/50\s*XLM/)).toBeInTheDocument();
   });
 
   it('shows empty state when no transactions', () => {
-    render(<TransactionList transactions={[]} />);
+    renderWithProvider(<TransactionList transactions={[]} />);
     expect(screen.getByText('No transactions found.')).toBeInTheDocument();
   });
 
   it('displays optimistic transaction at top', () => {
-    const { container } = render(
+    const { container } = renderWithProvider(
       <TransactionList
         transactions={mockTransactions}
         optimisticTransaction={mockOptimisticTransaction}
@@ -65,7 +70,7 @@ describe('TransactionList', () => {
   });
 
   it('includes optimistic transaction in total count', () => {
-    render(
+    renderWithProvider(
       <TransactionList
         transactions={mockTransactions}
         optimisticTransaction={mockOptimisticTransaction}
@@ -78,7 +83,7 @@ describe('TransactionList', () => {
   });
 
   it('marks optimistic transaction with pending status', () => {
-    render(
+    renderWithProvider(
       <TransactionList
         transactions={mockTransactions}
         optimisticTransaction={mockOptimisticTransaction}
@@ -89,18 +94,15 @@ describe('TransactionList', () => {
   });
 
   it('shows confirmed badge for regular transactions', () => {
-    const { container } = render(<TransactionList transactions={mockTransactions} />);
+    renderWithProvider(<TransactionList transactions={mockTransactions} />);
 
     // Count confirmed badges (should be 2)
-    const confirmBadges = Array.from(container.querySelectorAll('[class*="Badge"]')).filter(
-      (el) => el.textContent === 'confirmed'
-    );
-
+    const confirmBadges = screen.getAllByText('confirmed');
     expect(confirmBadges.length).toBeGreaterThanOrEqual(1);
   });
 
   it('handles optimistic transaction rollback', () => {
-    const { rerender } = render(
+    const { rerender } = renderWithProvider(
       <TransactionList
         transactions={mockTransactions}
         optimisticTransaction={mockOptimisticTransaction}
@@ -116,7 +118,7 @@ describe('TransactionList', () => {
   });
 
   it('exports CSV excluding optimistic transactions', () => {
-    const { container } = render(
+    renderWithProvider(
       <TransactionList
         transactions={mockTransactions}
         optimisticTransaction={mockOptimisticTransaction}
@@ -128,7 +130,7 @@ describe('TransactionList', () => {
   });
 
   it('displays clock icon for optimistic transactions', () => {
-    const { container } = render(
+    const { container } = renderWithProvider(
       <TransactionList
         transactions={mockTransactions}
         optimisticTransaction={mockOptimisticTransaction}
@@ -150,7 +152,7 @@ describe('TransactionList', () => {
       counterparty: `GRECIPIENT${i}`,
     }));
 
-    render(
+    renderWithProvider(
       <TransactionList
         transactions={manyTransactions}
         optimisticTransaction={mockOptimisticTransaction}
@@ -162,7 +164,7 @@ describe('TransactionList', () => {
   });
 
   it('maintains optimistic transaction visibility after update', () => {
-    const { rerender } = render(
+    const { rerender } = renderWithProvider(
       <TransactionList
         transactions={mockTransactions}
         optimisticTransaction={mockOptimisticTransaction}

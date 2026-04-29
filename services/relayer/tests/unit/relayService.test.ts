@@ -1,4 +1,6 @@
 import { RelayService } from '../../src/services/relayService';
+import { JobQueue } from '../../src/queue/JobQueue';
+import { IdempotencyStore } from '../../src/store/idempotency';
 import type { SignatureServiceContract, RelayExecuteRequest } from '../../src/types';
 
 const VALID_KEY = 'a'.repeat(64);
@@ -70,7 +72,11 @@ describe('RelayService', () => {
 
   describe('health', () => {
     it('returns status ok with uptime and timestamp', () => {
-      const svc = new RelayService(makeSignatureService(true));
+      const svc = new RelayService(
+        makeSignatureService(true),
+        new JobQueue(),
+        new IdempotencyStore()
+      );
       const h = svc.health();
       expect(h.status).toBe('ok');
       expect(typeof h.uptime).toBe('number');
