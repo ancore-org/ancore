@@ -211,7 +211,7 @@ export class StellarClient {
   async getAccountActivityPage(
     publicKey: string,
     request: AccountActivityPageRequest = {}
-  ): Promise<AccountActivityPage<Horizon.HorizonApi.OperationResponse>> {
+  ): Promise<AccountActivityPage<Horizon.HorizonApi.OperationResponseType>> {
     const { cursor = null, limit = 20, order = 'desc' } = request;
 
     return withRetry(async () => {
@@ -223,7 +223,8 @@ export class StellarClient {
           .order(order);
 
         const page = cursor ? await builder.cursor(cursor).call() : await builder.call();
-        const records = page.records as Horizon.HorizonApi.OperationResponse[];
+        // Cast via unknown to avoid overlap errors between Horizon response types
+        const records = page.records as unknown as Horizon.HorizonApi.OperationResponseType[];
         const nextCursor = this.getNextCursor(records);
 
         return { records, nextCursor };
@@ -241,7 +242,7 @@ export class StellarClient {
   async *iterateAccountActivity(
     publicKey: string,
     request: AccountActivityPageRequest = {}
-  ): AsyncGenerator<Horizon.HorizonApi.OperationResponse, void, unknown> {
+  ): AsyncGenerator<Horizon.HorizonApi.OperationResponseType, void, unknown> {
     let cursor = request.cursor ?? null;
 
     while (true) {
@@ -257,14 +258,12 @@ export class StellarClient {
     }
   }
 
-  private getNextCursor(
-    records: Array<{ paging_token?: string }>
-  ): string | null {
+  private getNextCursor(records: unknown[]): string | null {
     if (records.length === 0) {
       return null;
     }
-    const last = records[records.length - 1];
-    return last.paging_token ?? null;
+    const last = records[records.length - 1] as { paging_token?: string };
+    return last?.paging_token ?? null;
   }
 
   private resolveAssetMetadata(balance: Horizon.HorizonApi.BalanceLine): AssetMetadata {

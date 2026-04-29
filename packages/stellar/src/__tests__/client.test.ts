@@ -248,7 +248,7 @@ describe('StellarClient', () => {
       const records = [
         { id: '1', paging_token: 'pt-1' },
         { id: '2', paging_token: 'pt-2' },
-      ] as unknown as Horizon.HorizonApi.OperationResponse[];
+      ] as unknown as Horizon.HorizonApi.OperationResponseType[];
 
       const call = jest.fn().mockResolvedValue({ records });
       const cursor = jest.fn().mockReturnValue({ call });
@@ -280,11 +280,15 @@ describe('StellarClient', () => {
       const getAccountActivityPage = jest
         .spyOn(client, 'getAccountActivityPage')
         .mockResolvedValueOnce({
-          records: [{ id: '1', paging_token: 'pt-1' }] as unknown as Horizon.HorizonApi.OperationResponse[],
+          records: [
+            { id: '1', paging_token: 'pt-1' },
+          ] as unknown as Horizon.HorizonApi.OperationResponseType[],
           nextCursor: 'pt-1',
         })
         .mockResolvedValueOnce({
-          records: [{ id: '2', paging_token: 'pt-2' }] as unknown as Horizon.HorizonApi.OperationResponse[],
+          records: [
+            { id: '2', paging_token: 'pt-2' },
+          ] as unknown as Horizon.HorizonApi.OperationResponseType[],
           nextCursor: null,
         });
 
