@@ -17,6 +17,7 @@ import {
 import { ConfirmDialog } from '@/screens/Send/ConfirmDialog';
 import { ReviewScreen } from '@/screens/Send/ReviewScreen';
 import { StatusScreen } from '@/screens/Send/StatusScreen';
+import { TransferNoteInput } from '@/components/TransferNoteInput';
 import { SendHorizontal, Info, AlertCircle } from 'lucide-react';
 
 interface SendScreenProps {
@@ -33,7 +34,7 @@ interface SendScreenProps {
  * Implements a premium dark UI with real-time validation and simulation feedback.
  */
 export function SendScreen({ balance, assetDecimals, service, pollIntervalMs }: SendScreenProps) {
-  const [form, setForm] = useState<SendFormValues>({ to: '', amount: '' });
+  const [form, setForm] = useState<SendFormValues>({ to: '', amount: '', note: '' });
 
   const send = useSendTransaction({ balance, assetDecimals, service, pollIntervalMs });
 
@@ -103,6 +104,13 @@ export function SendScreen({ balance, assetDecimals, service, pollIntervalMs }: 
                 amount: event.target.value,
               }))
             }
+          />
+
+          <TransferNoteInput
+            value={form.note || ''}
+            onChange={(note) => setForm((current) => ({ ...current, note }))}
+            error={send.errors.note}
+            placeholder="Add a note (optional)"
           />
         </div>
 

@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { amountSchema, isStellarAddress, validateAmountPrecision } from '@ancore/ui-kit';
 import { mapRpcStatus, isTerminalStatus } from '@/utils/transaction-status';
+import { validateTransferNote, truncateTransferNote } from '@/utils/note-validation';
 
 export type SendStep = 'form' | 'review' | 'confirm' | 'status';
 export type TxStatus = 'idle' | 'pending' | 'confirmed' | 'failed';
@@ -8,6 +9,7 @@ export type TxStatus = 'idle' | 'pending' | 'confirmed' | 'failed';
 export interface SendFormValues {
   to: string;
   amount: string;
+  note?: string;
 }
 
 export interface FeeEstimate {
@@ -19,6 +21,7 @@ export interface FeeEstimate {
 export interface SendTransactionDraft extends SendFormValues {
   fee: FeeEstimate;
   total: string;
+  truncatedNote?: string;
 }
 
 export interface SendService {
@@ -40,6 +43,7 @@ export interface UseSendTransactionOptions {
 export interface ValidationErrors {
   to?: string;
   amount?: string;
+  note?: string;
   password?: string;
   simulation?: string;
 }
@@ -128,10 +132,11 @@ export function useSendTransaction(options: UseSendTransactionOptions = {}) {
       const nextErrors: ValidationErrors = {
         to: validateRecipientAddress(values.to),
         amount: validateAmount(values.amount, balance, assetDecimals),
+        note: values.note ? validateTransferNote(values.note) : undefined,
       };
 
       setErrors(nextErrors);
-      return !nextErrors.to && !nextErrors.amount;
+      return !nextErrors.to && !nextErrors.amount && !nextErrors.note;
     },
     [balance, assetDecimals]
   );
@@ -148,9 +153,10 @@ export function useSendTransaction(options: UseSendTransactionOptions = {}) {
       try {
         const estimatedFee = await service.estimateFee(values);
         const total = (Number(values.amount) + Number(estimatedFee.totalFee)).toFixed(7);
+        const truncatedNote = values.note ? truncateTransferNote(values.note) : undefined;
 
         setFee(estimatedFee);
-        setTx({ ...values, fee: estimatedFee, total });
+        setTx({ ...values, fee: estimatedFee, total, truncatedNote });
         setStep('review');
         return true;
       } catch (error) {
