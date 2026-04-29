@@ -13,6 +13,9 @@ const App: React.FC = () => (
         <Route index element={<Dashboard />} />
         <Route path="/account/:address" element={<Account />} />
         <Route path="/transactions" element={<TransactionList transactions={[]} />} />
+        <Route path="/send" element={<div className="p-8">Send Flow</div>} />
+        <Route path="/request" element={<div className="p-8">Request Flow</div>} />
+        <Route path="/scan" element={<div className="p-8">Scan Flow</div>} />
       </Route>
     </Routes>
   </BrowserRouter>

@@ -78,6 +78,9 @@ jobs:
       - name: Check formatting
         run: pnpm format:check
 
+      - name: Lint indexer migrations
+        run: pnpm indexer:lint-migrations
+
   test:
     name: Test
     runs-on: ubuntu-latest
@@ -150,7 +153,7 @@ jobs:
         run: |
           echo "## 📊 Coverage Report" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
-          
+
           for package in core-sdk account-abstraction crypto stellar; do
             if [ -f "packages/$package/coverage/coverage-summary.json" ]; then
               echo "### $package" >> $GITHUB_STEP_SUMMARY

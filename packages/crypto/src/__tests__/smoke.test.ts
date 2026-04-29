@@ -2,13 +2,21 @@ import * as CryptoAPI from '../index';
 
 const EXPECTED_EXPORTS = [
   'CRYPTO_VERSION',
+  'DEFAULT_ENTROPY_THRESHOLD',
+  'STRICT_ENTROPY_THRESHOLD',
+  'estimateEntropy',
+  'scoreEntropy',
+  'estimateCrackTime',
+  'analyzeEntropy',
+  'meetsEntropyThreshold',
+  'meetsStrictEntropyThreshold',
   'validatePasswordStrength',
   'encryptSecretKey',
   'decryptSecretKey',
   'generateMnemonic',
   'validateMnemonic',
   'deriveKeypairFromMnemonic',
-  'keyFingerprint',
+  'randomBytes',
 ] as const;
 
 describe('@ancore/crypto smoke test', () => {

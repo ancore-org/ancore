@@ -26,6 +26,7 @@
     "contracts:fmt": "cd contracts && cargo fmt --check",
     "contracts:clippy": "cd contracts && cargo clippy -- -D warnings",
     "indexer:check": "cd services/indexer && cargo check",
+    "indexer:lint-migrations": "node services/indexer/scripts/lint-migrations.mjs",
     "audit:security": "node tools/security-audit.js",
     "verify": "pnpm lint && pnpm typecheck && pnpm test",
     "prepare": "husky"

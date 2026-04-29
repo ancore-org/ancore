@@ -24,7 +24,7 @@
 use soroban_sdk::xdr::ToXdr;
 use soroban_sdk::{
     contract, contracterror, contractimpl, contracttype, symbol_short, Address, BytesN, Env,
-    Symbol, Vec,
+    Symbol, Val, Vec,
 };
 
 #[cfg(not(target_family = "wasm"))]
@@ -112,11 +112,26 @@ pub struct SessionKey {
     pub permissions: Vec<u32>,
 }
 
-const OWNER: Symbol = symbol_short!("OWNER");
-const NONCE: Symbol = symbol_short!("NONCE");
-const VERSION: Symbol = symbol_short!("VERSION");
+#[contracttype]
+pub enum DataKey {
+    Owner,
+    Nonce,
+    SessionKey(BytesN<32>),
+    Version,
+}
 
-pub struct AccountContract;
+const DAY_IN_LEDGERS: u32 = 17280; // 24 hours * 60 min * 60 sec / 5 sec per ledger
+const INSTANCE_BUMP_AMOUNT: u32 = 30 * DAY_IN_LEDGERS; // 30 days
+const INSTANCE_BUMP_THRESHOLD: u32 = 15 * DAY_IN_LEDGERS; // 15 days
+
+/// Permission bit for execute operations
+/// Permission bit for session-key execute authorization.
+/// Issue #188: Session keys must have this permission to invoke transactions.
+/// Without this bit set, execute() returns InsufficientPermission error.
+pub const PERMISSION_EXECUTE: u32 = 1;
+
+#[contract]
+pub struct AncoreAccount;
 
 fn verify_ed25519_signature(
     _env: &Env,
@@ -147,10 +162,11 @@ fn verify_ed25519_signature(
 }
 
 #[contractimpl]
-impl AccountContract {
-    pub fn initialize(env: Env, owner: Address) {
-        if env.storage().persistent().has(&OWNER) {
-            panic!("already initialized")
+impl AncoreAccount {
+    /// Initialize the account with an owner
+    pub fn initialize(env: Env, owner: Address) -> Result<(), ContractError> {
+        if env.storage().instance().has(&DataKey::Owner) {
+            return Err(ContractError::AlreadyInitialized);
         }
 
         owner.require_auth();
@@ -200,20 +216,14 @@ impl AccountContract {
         caller: CallerIdentity,
         to: Address,
         function: Symbol,
-        args: Vec< soroban_sdk::Val >,
+        args: Vec<Val>,
         expected_nonce: u64,
         session_pub_key: Option<BytesN<32>>,
         signature: Option<BytesN<64>>,
-    ) -> Result<bool, ContractError> {
-        // Check if initialized
-        if !env.storage().persistent().has(&OWNER) {
-            return Err(ContractError::NotInitialized);
-        }
+        signature_payload: Option<soroban_sdk::Bytes>,
+    ) -> Result<Val, ContractError> {
+        let current_nonce: u64 = Self::get_nonce(env.clone())?;
 
-        let owner: Address = env.storage().persistent().get(&OWNER).unwrap();
-        let current_nonce: u64 = env.storage().persistent().get(&NONCE).unwrap();
-
-        // Validate nonce
         if expected_nonce != current_nonce {
             return Err(ContractError::InvalidNonce);
         }
@@ -268,58 +278,40 @@ impl AccountContract {
             }
         }
 
-        // Increment nonce
-        env.storage().persistent().set(&NONCE, &(current_nonce + 1));
+        // Increment nonce before invocation (checks-effects-interactions)
+        env.storage()
+            .instance()
+            .set(&DataKey::Nonce, &(current_nonce + 1));
 
-        // Execute the function call
-        let result = env.invoke_contract(&to, &function, args);
+        // Extend instance TTL to keep contract alive
+        env.storage()
+            .instance()
+            .extend_ttl(INSTANCE_BUMP_THRESHOLD, INSTANCE_BUMP_AMOUNT);
 
-        // Emit event
+        // Emit executed event with transaction details
         env.events().publish(
-            (symbol_short!("executed"),),
-            (to, function, expected_nonce),
+            (events::executed(&env),),
+            (to.clone(), function.clone(), current_nonce),
         );
 
-        Ok(result.into_bool())
+        let result: Val = env.invoke_contract(&to, &function, args);
+
+        Ok(result)
     }
 
-    fn create_signature_payload(
-        env: &Env,
-        to: &Address,
-        function: &Symbol,
-        args: &Vec< soroban_sdk::Val >,
-        nonce: u64,
-    ) -> BytesN<32> {
-        let mut payload = Vec::new(env);
-        payload.push_back(to.to_val());
-        payload.push_back(function.to_val());
-        payload.push_back(args.to_val());
-        payload.push_back(nonce.to_val());
-        
-        env.crypto().sha256(&payload.to_val())
-    }
-
+    /// Add a session key
     pub fn add_session_key(
         env: Env,
         public_key: BytesN<32>,
         expires_at: u64,
         permissions: Vec<u32>,
     ) -> Result<(), ContractError> {
-        // Check if initialized
-        if !env.storage().persistent().has(&OWNER) {
-            return Err(ContractError::NotInitialized);
+        if expires_at == 0 {
+            return Err(ContractError::InvalidExpiration);
         }
 
-        // Only owner can add session keys
-        let owner: Address = env.storage().persistent().get(&OWNER).unwrap();
-        if env.invoker() != owner {
-            return Err(ContractError::Unauthorized);
-        }
-
-        // Validate expires_at is in the future
-        if expires_at <= env.ledger().timestamp() {
-            panic!("expires_at must be in the future");
-        }
+        let owner = Self::get_owner(env.clone())?;
+        owner.require_auth();
 
         if env
             .storage()
@@ -345,7 +337,9 @@ impl AccountContract {
             permissions,
         };
 
-        env.storage().persistent().set(&public_key, &session_key);
+        env.storage()
+            .persistent()
+            .set(&DataKey::SessionKey(public_key.clone()), &session_key);
 
         Self::extend_session_key_ttl(&env, &public_key, expires_at);
 
@@ -361,6 +355,7 @@ impl AccountContract {
         Ok(())
     }
 
+    /// Revoke a session key
     pub fn revoke_session_key(env: Env, public_key: BytesN<32>) -> Result<(), ContractError> {
         let owner = Self::get_owner(env.clone())?;
         owner.require_auth();
@@ -402,32 +397,66 @@ impl AccountContract {
             return Err(ContractError::InvalidWasmHash);
         }
 
-        // Only owner can revoke session keys
-        let owner: Address = env.storage().persistent().get(&OWNER).unwrap();
-        if env.invoker() != owner {
-            return Err(ContractError::Unauthorized);
-        }
+        // Increment version number
+        let current_version = Self::get_version(env.clone());
+        env.storage()
+            .instance()
+            .set(&DataKey::Version, &(current_version + 1));
 
-        // Check if session key exists
-        if !env.storage().persistent().has(&public_key) {
-            return Err(ContractError::SessionKeyNotFound);
-        }
+        env.deployer()
+            .update_current_contract_wasm(new_wasm_hash.clone());
 
-        env.storage().persistent().remove(&public_key);
+        // Extend instance TTL to keep contract alive
+        env.storage()
+            .instance()
+            .extend_ttl(INSTANCE_BUMP_THRESHOLD, INSTANCE_BUMP_AMOUNT);
 
-        env.events().publish(
-            (symbol_short!("session_key_revoked"),),
-            public_key,
-        );
+        // Emit upgraded event
+        env.events()
+            .publish((events::upgraded(&env),), new_wasm_hash);
 
         Ok(())
     }
 
-    pub fn get_session_key(env: Env, public_key: BytesN<32>) -> Option<SessionKey> {
-        env.storage().persistent().get(&public_key)
+    /// Execute a contract migration for a new version
+    ///
+    /// # Security
+    /// - Requires owner authorization
+    /// - Migration version must be strictly increasing
+    pub fn migrate(env: Env, new_version: u32) -> Result<(), ContractError> {
+        let owner = Self::get_owner(env.clone())?;
+        owner.require_auth();
+
+        let current_version = Self::get_version(env.clone());
+        if new_version <= current_version {
+            return Err(ContractError::InvalidVersion);
+        }
+
+        env.storage()
+            .instance()
+            .set(&DataKey::Version, &new_version);
+
+        // Extend instance TTL to keep contract alive
+        env.storage()
+            .instance()
+            .extend_ttl(INSTANCE_BUMP_THRESHOLD, INSTANCE_BUMP_AMOUNT);
+
+        // Emit migrated event
+        env.events()
+            .publish((events::migrated(&env),), (current_version, new_version));
+
+        Ok(())
     }
 
-    pub fn get_owner(env: Env) -> Result<Address, ContractError> {
+    /// Get a session key
+    pub fn get_session_key(env: Env, public_key: BytesN<32>) -> Option<SessionKey> {
+        env.storage()
+            .persistent()
+            .get(&DataKey::SessionKey(public_key))
+    }
+
+    /// Check if a session key exists
+    pub fn has_session_key(env: Env, public_key: BytesN<32>) -> bool {
         env.storage()
             .persistent()
             .has(&DataKey::SessionKey(public_key))

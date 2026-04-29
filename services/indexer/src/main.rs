@@ -4,7 +4,9 @@ use axum::{
 };
 use sqlx::postgres::PgPoolOptions;
 use std::net::SocketAddr;
-use tower_governor::{governor::GovernorConfigBuilder, GovernorLayer};
+use std::str::FromStr;
+use tower_governor::GovernorLayer;
+use tower_governor::governor::GovernorConfigBuilder;
 use tower_http::cors::CorsLayer;
 use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
 
@@ -41,18 +43,32 @@ async fn main() -> anyhow::Result<()> {
     let governor_conf = GovernorConfigBuilder::default()
         .per_second(per_second)
         .burst_size(burst_size)
-        .key_extractor(tower_governor::governor::DefaultKeyExtractorFactory)
         .finish()
         .unwrap();
+    let governor_conf = Box::leak(Box::new(governor_conf));
 
     // Get database URL from environment
-    let database_url = std::env::var("DATABASE_URL")
-        .expect("DATABASE_URL must be set");
+    let database_url = std::env::var("DATABASE_URL").expect("DATABASE_URL must be set");
+
+    // Get database timeout from environment (default to 30 seconds)
+    let db_timeout_sec = std::env::var("DB_QUERY_TIMEOUT_SEC")
+        .unwrap_or_else(|_| "30".to_string())
+        .parse::<u64>()
+        .unwrap_or(30);
+    let db_timeout = std::time::Duration::from_secs(db_timeout_sec);
+
+    // Create database connection options
+    let mut connect_options = sqlx::postgres::PgConnectOptions::from_str(&database_url)
+        .map_err(|e| anyhow::anyhow!("Invalid database URL: {}", e))?;
+
+    // Set statement timeout (query level)
+    connect_options = connect_options.options([("statement_timeout", format!("{}s", db_timeout_sec))]);
 
     // Create database connection pool
     let pool = PgPoolOptions::new()
         .max_connections(10)
-        .connect(&database_url)
+        .acquire_timeout(db_timeout)
+        .connect_with(connect_options)
         .await?;
 
     tracing::info!("Connected to database");
@@ -73,7 +89,9 @@ async fn main() -> anyhow::Result<()> {
             get(account_activity::list_types_handler),
         )
         .route("/health", get(health::health_handler))
-        .layer(GovernorLayer::new(&governor_conf))
+        .layer(GovernorLayer {
+            config: governor_conf,
+        })
         .layer(CorsLayer::permissive())
         .with_state(pool);
 

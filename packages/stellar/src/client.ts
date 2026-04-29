@@ -35,18 +35,47 @@ const NETWORK_CONFIG: Record<
 };
 
 const FRIENDBOT_URL = 'https://friendbot.stellar.org';
+const DEFAULT_ASSET_METADATA_CACHE_TTL_MS = 5 * 60 * 1000;
 
-export interface Balance {
+export interface AssetMetadata {
   asset: string;
-  balance: string;
   assetType: string;
   assetCode?: string;
   assetIssuer?: string;
 }
 
+export interface Balance extends AssetMetadata {
+  balance: string;
+}
+
+export interface AssetMetadataCacheMetrics {
+  hits: number;
+  misses: number;
+  expirations: number;
+  size: number;
+}
+
 export interface StellarClientConfig extends NetworkConfig {
   /** Custom retry options for network requests */
   retryOptions?: RetryOptions;
+  /** Time in milliseconds to cache resolved asset metadata. Set to 0 to disable caching. */
+  assetMetadataCacheTtlMs?: number;
+}
+
+export interface AccountActivityPageRequest {
+  cursor?: string | null;
+  limit?: number;
+  order?: 'asc' | 'desc';
+}
+
+export interface AccountActivityPage<TRecord> {
+  records: TRecord[];
+  nextCursor: string | null;
+}
+
+interface AssetMetadataCacheEntry {
+  metadata: AssetMetadata;
+  expiresAt: number;
 }
 
 /**
@@ -65,6 +94,13 @@ export class StellarClient {
   private readonly networkPassphrase: string;
   private readonly network: Network;
   private readonly retryOptions: RetryOptions;
+  private readonly assetMetadataCacheTtlMs: number;
+  private readonly assetMetadataCache = new Map<string, AssetMetadataCacheEntry>();
+  private assetMetadataCacheMetrics = {
+    hits: 0,
+    misses: 0,
+    expirations: 0,
+  };
 
   constructor(config: StellarClientConfig) {
     this.network = config.network;
@@ -81,6 +117,8 @@ export class StellarClient {
       baseDelayMs: 1000,
       exponential: true,
     };
+    this.assetMetadataCacheTtlMs =
+      config.assetMetadataCacheTtlMs ?? DEFAULT_ASSET_METADATA_CACHE_TTL_MS;
   }
 
   /**
@@ -95,6 +133,16 @@ export class StellarClient {
    */
   getNetwork(): Network {
     return this.network;
+  }
+
+  /**
+   * Get asset metadata cache metrics.
+   */
+  getAssetMetadataCacheMetrics(): AssetMetadataCacheMetrics {
+    return {
+      ...this.assetMetadataCacheMetrics,
+      size: this.assetMetadataCache.size,
+    };
   }
 
   /**
@@ -151,24 +199,126 @@ export class StellarClient {
   async getBalances(publicKey: string): Promise<Balance[]> {
     const account = await this.getAccount(publicKey);
 
-    return account.balances.map((balance) => {
-      if (balance.asset_type === 'native') {
-        return {
-          asset: 'XLM',
-          balance: balance.balance,
-          assetType: 'native',
-        };
+    return account.balances.map((balance) => ({
+      ...this.resolveAssetMetadata(balance),
+      balance: balance.balance,
+    }));
+  }
+
+  /**
+   * Fetch a paginated account activity page from Horizon operations endpoint.
+   */
+  async getAccountActivityPage(
+    publicKey: string,
+    request: AccountActivityPageRequest = {}
+  ): Promise<AccountActivityPage<Horizon.HorizonApi.OperationResponse>> {
+    const { cursor = null, limit = 20, order = 'desc' } = request;
+
+    return withRetry(async () => {
+      try {
+        const builder = this.horizonServer
+          .operations()
+          .forAccount(publicKey)
+          .limit(limit)
+          .order(order);
+
+        const page = cursor ? await builder.cursor(cursor).call() : await builder.call();
+        const records = page.records as Horizon.HorizonApi.OperationResponse[];
+        const nextCursor = this.getNextCursor(records);
+
+        return { records, nextCursor };
+      } catch (error) {
+        throw new NetworkError('Failed to fetch account activity page', {
+          cause: error instanceof Error ? error : undefined,
+        });
+      }
+    }, this.retryOptions);
+  }
+
+  /**
+   * Async iterator for account activity pagination.
+   */
+  async *iterateAccountActivity(
+    publicKey: string,
+    request: AccountActivityPageRequest = {}
+  ): AsyncGenerator<Horizon.HorizonApi.OperationResponse, void, unknown> {
+    let cursor = request.cursor ?? null;
+
+    while (true) {
+      const page = await this.getAccountActivityPage(publicKey, { ...request, cursor });
+      for (const record of page.records) {
+        yield record;
       }
 
-      const creditBalance = balance as Horizon.HorizonApi.BalanceLineAsset;
+      if (!page.nextCursor || page.records.length === 0) {
+        return;
+      }
+      cursor = page.nextCursor;
+    }
+  }
+
+  private getNextCursor(
+    records: Array<{ paging_token?: string }>
+  ): string | null {
+    if (records.length === 0) {
+      return null;
+    }
+    const last = records[records.length - 1];
+    return last.paging_token ?? null;
+  }
+
+  private resolveAssetMetadata(balance: Horizon.HorizonApi.BalanceLine): AssetMetadata {
+    const cacheKey = this.getAssetMetadataCacheKey(balance);
+    const cached = this.assetMetadataCache.get(cacheKey);
+    const now = Date.now();
+
+    if (cached) {
+      if (cached.expiresAt > now) {
+        this.assetMetadataCacheMetrics.hits += 1;
+        return cached.metadata;
+      }
+
+      this.assetMetadataCache.delete(cacheKey);
+      this.assetMetadataCacheMetrics.expirations += 1;
+    }
+
+    this.assetMetadataCacheMetrics.misses += 1;
+
+    const metadata = this.createAssetMetadata(balance);
+    if (this.assetMetadataCacheTtlMs > 0) {
+      this.assetMetadataCache.set(cacheKey, {
+        metadata,
+        expiresAt: now + this.assetMetadataCacheTtlMs,
+      });
+    }
+
+    return metadata;
+  }
+
+  private getAssetMetadataCacheKey(balance: Horizon.HorizonApi.BalanceLine): string {
+    if (balance.asset_type === 'native') {
+      return 'native:XLM';
+    }
+
+    const creditBalance = balance as Horizon.HorizonApi.BalanceLineAsset;
+    return `${creditBalance.asset_type}:${creditBalance.asset_code}:${creditBalance.asset_issuer}`;
+  }
+
+  private createAssetMetadata(balance: Horizon.HorizonApi.BalanceLine): AssetMetadata {
+    if (balance.asset_type === 'native') {
       return {
-        asset: `${creditBalance.asset_code}:${creditBalance.asset_issuer}`,
-        balance: creditBalance.balance,
-        assetType: creditBalance.asset_type,
-        assetCode: creditBalance.asset_code,
-        assetIssuer: creditBalance.asset_issuer,
+        asset: 'XLM',
+        assetType: 'native',
       };
-    });
+    }
+
+    const creditBalance = balance as Horizon.HorizonApi.BalanceLineAsset;
+    return {
+      asset: `${creditBalance.asset_code}:${creditBalance.asset_issuer}`,
+      assetType: creditBalance.asset_type,
+      assetCode: creditBalance.asset_code,
+      assetIssuer: creditBalance.asset_issuer,
+    };
   }
 
   /**

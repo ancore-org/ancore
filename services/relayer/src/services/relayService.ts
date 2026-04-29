@@ -1,4 +1,6 @@
 import { randomBytes } from 'crypto';
+import type { JobQueue } from '../queue/JobQueue';
+import type { IdempotencyStore } from '../store/idempotency';
 import type {
   RelayServiceContract,
   SignatureServiceContract,
@@ -6,6 +8,7 @@ import type {
   RelayExecuteResponse,
   ValidationResult,
   HealthResponse,
+  DependencyStatus,
 } from '../types';
 
 const MOCK_GAS_USED = 21_000;
@@ -28,7 +31,11 @@ function mockTxId(): string {
  *  - Session key must be a 64-char hex string
  */
 export class RelayService implements RelayServiceContract {
-  constructor(private readonly signatureService: SignatureServiceContract) {}
+  constructor(
+    private readonly signatureService: SignatureServiceContract,
+    private readonly queue?: JobQueue,
+    private readonly store?: IdempotencyStore
+  ) {}
 
   async validateRelay(request: RelayExecuteRequest): Promise<ValidationResult> {
     const keyError = this.validateSessionKey(request.sessionKey);
@@ -64,10 +71,30 @@ export class RelayService implements RelayServiceContract {
   }
 
   health(): HealthResponse {
+    const queueStatus: DependencyStatus = this.queue
+      ? { status: 'ok' }
+      : { status: 'degraded', message: 'Queue not initialized' };
+
+    const rpcStatus: DependencyStatus = { status: 'ok', latencyMs: 12 }; // Simulated latency for mock
+
+    const storageStatus: DependencyStatus = this.store
+      ? { status: 'ok' }
+      : { status: 'degraded', message: 'Storage not initialized' };
+
+    const overallStatus =
+      queueStatus.status === 'ok' && rpcStatus.status === 'ok' && storageStatus.status === 'ok'
+        ? 'ok'
+        : 'degraded';
+
     return {
-      status: 'ok',
+      status: overallStatus,
       uptime: Math.floor((Date.now() - startTime) / 1000),
       timestamp: new Date().toISOString(),
+      dependencies: {
+        queue: queueStatus,
+        rpc: rpcStatus,
+        storage: storageStatus,
+      },
     };
   }
 

@@ -1,61 +1,61 @@
 version: 2
 updates:
   # Enable version updates for npm
-  - package-ecosystem: "npm"
-    directory: "/"
+  - package-ecosystem: 'npm'
+    directory: '/'
     schedule:
-      interval: "monthly"
+      interval: 'monthly'
     open-pull-requests-limit: 3
     groups:
       # Group all production dependencies together
       production-dependencies:
-        dependency-type: "production"
+        dependency-type: 'production'
       # Group all development dependencies together
       dev-dependencies:
-        dependency-type: "development"
+        dependency-type: 'development'
     labels:
-      - "dependencies"
-      - "automated"
+      - 'dependencies'
+      - 'automated'
 
   # Enable version updates for Cargo (Rust)
-  - package-ecosystem: "cargo"
-    directory: "/contracts"
+  - package-ecosystem: 'cargo'
+    directory: '/contracts'
     schedule:
-      interval: "monthly"
+      interval: 'monthly'
     open-pull-requests-limit: 2
     groups:
       # Group all Cargo dependencies together
       cargo-dependencies:
         patterns:
-          - "*"
+          - '*'
     labels:
-      - "dependencies"
-      - "rust"
+      - 'dependencies'
+      - 'rust'
 
-  - package-ecosystem: "cargo"
-    directory: "/services/indexer"
+  - package-ecosystem: 'cargo'
+    directory: '/services/indexer'
     schedule:
-      interval: "monthly"
+      interval: 'monthly'
     open-pull-requests-limit: 2
     groups:
       cargo-dependencies:
         patterns:
-          - "*"
+          - '*'
     labels:
-      - "dependencies"
-      - "rust"
+      - 'dependencies'
+      - 'rust'
 
   # Enable version updates for GitHub Actions
-  - package-ecosystem: "github-actions"
-    directory: "/"
+  - package-ecosystem: 'github-actions'
+    directory: '/'
     schedule:
-      interval: "monthly"
+      interval: 'monthly'
     open-pull-requests-limit: 1
     groups:
       # Group all GitHub Actions updates into a single PR
       github-actions:
         patterns:
-          - "*"
+          - '*'
     labels:
-      - "dependencies"
-      - "github-actions"
+      - 'dependencies'
+      - 'github-actions'

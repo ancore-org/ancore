@@ -135,15 +135,18 @@ export class SecureStorageManager {
     if (base64Salt == null) return null; // genuinely not initialized
 
     if (typeof base64Salt !== 'string') {
-      throw new Error('Corrupted master_salt: expected string');
+      return null; // treat corrupted salt as missing to allow re-initialization
     }
 
-    const buffer = base64ToBuffer(base64Salt);
-    if (buffer.byteLength !== 16) {
-      throw new Error('Corrupted master_salt: expected 16 bytes');
+    try {
+      const buffer = base64ToBuffer(base64Salt);
+      if (buffer.byteLength !== 16) {
+        return null; // expected 16 bytes
+      }
+      return new Uint8Array(buffer);
+    } catch {
+      return null; // invalid base64
     }
-
-    return new Uint8Array(buffer);
   }
 
   /**
@@ -278,11 +281,19 @@ export class SecureStorageManager {
   }
 
   public async getAccount(): Promise<AccountData | null> {
+    if (!this.encryptionKey) {
+      throw new Error('Storage manager is locked');
+    }
     const payload = await this.storage.get<EncryptedPayload>('account');
     if (!payload) return null;
-    const json = await this.decryptData(payload);
-    this.touch();
-    return JSON.parse(json);
+    try {
+      const json = await this.decryptData(payload);
+      this.touch();
+      return JSON.parse(json);
+    } catch {
+      // Data corrupted or password changed out of sync
+      return null;
+    }
   }
 
   public async saveSessionKeys(sessionKeys: SessionKeysData): Promise<void> {
@@ -302,8 +313,13 @@ export class SecureStorageManager {
     if (!payload) {
       return { keys: {} };
     }
-    const json = await this.decryptData(payload);
-    this.touch();
-    return JSON.parse(json);
+    try {
+      const json = await this.decryptData(payload);
+      this.touch();
+      return JSON.parse(json);
+    } catch {
+      // Data corrupted
+      return { keys: {} };
+    }
   }
 }
