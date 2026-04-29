@@ -1,4 +1,3 @@
-
 import { useState, useEffect, useCallback, useRef } from 'react';
 import {
   BIOMETRIC_MAX_ATTEMPTS,
@@ -8,7 +7,7 @@ import {
 } from '../biometric-lockout.types';
 import { BiometricLockoutManager } from '../biometric-lockout-manager';
 
-//  Platform abstraction 
+//  Platform abstraction
 export interface IBiometricAuthService {
   isAvailable(): Promise<boolean>;
   authenticate(promptMessage: string): Promise<{
@@ -22,7 +21,7 @@ export interface IPasswordAuthService {
   authenticate(password: string): Promise<boolean>;
 }
 
-// Hook config 
+// Hook config
 export interface UseBiometricUnlockOptions {
   lockoutManager: BiometricLockoutManager;
   biometricService: IBiometricAuthService;
@@ -32,7 +31,7 @@ export interface UseBiometricUnlockOptions {
   onPermanentLockout?: () => void;
 }
 
-// Hook state shape 
+// Hook state shape
 export interface BiometricUnlockState {
   phase: 'idle' | 'prompting' | 'locked' | 'fallback' | 'success' | 'error';
   lockout: BiometricLockoutState;
@@ -67,13 +66,13 @@ export function useBiometricUnlock({
 
   const countdownRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const stopCountdown = useCallback(() => {
- if (countdownRef.current) {
-   clearInterval(countdownRef.current);
-   countdownRef.current = null;
- }
- }, []);
+    if (countdownRef.current) {
+      clearInterval(countdownRef.current);
+      countdownRef.current = null;
+    }
+  }, []);
 
-  //Init 
+  //Init
   useEffect(() => {
     let cancelled = false;
 
@@ -83,9 +82,8 @@ export function useBiometricUnlock({
       const isLocked = lockoutManager.isLocked();
       const lockout = lockoutManager.getState() as BiometricLockoutState;
 
-
       if (!cancelled) {
-        setState(prev => ({
+        setState((prev) => ({
           ...prev,
           isBiometricAvailable: available,
           lockout,
@@ -99,12 +97,14 @@ export function useBiometricUnlock({
     }
 
     init();
-    return () => { cancelled = true; };
+    return () => {
+      cancelled = true;
+    };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  //Countdown timer 
-  function startCountdown() {
+  //Countdown timer
+  const startCountdown = useCallback(() => {
     stopCountdown();
 
     countdownRef.current = setInterval(() => {
@@ -115,26 +115,29 @@ export function useBiometricUnlock({
         lockoutManager.isLocked(); // trigger lazy expiry/reset if implemented there
         const refreshedLockout = lockoutManager.getState() as BiometricLockoutState;
         // Lockout expired — allow retry
-        setState(prev => ({
-          ...(prev.phase !== 'locked' ? prev : {
-          ...prev,
-          phase: 'idle',
-          lockoutSecondsRemaining: 0,
-          lockout: refreshedLockout,
-          attemptsRemaining: Math.max(0,
-            BIOMETRIC_MAX_ATTEMPTS - refreshedLockout.failedAttempts,
-          ),
-          feedbackMessage: 'You can try again now.',
-           }),
+        setState((prev) => ({
+          ...(prev.phase !== 'locked'
+            ? prev
+            : {
+                ...prev,
+                phase: 'idle',
+                lockoutSecondsRemaining: 0,
+                lockout: refreshedLockout,
+                attemptsRemaining: Math.max(
+                  0,
+                  BIOMETRIC_MAX_ATTEMPTS - refreshedLockout.failedAttempts
+                ),
+                feedbackMessage: 'You can try again now.',
+              }),
         }));
       } else {
-        setState(prev => ({
+        setState((prev) => ({
           ...prev,
           lockoutSecondsRemaining: Math.ceil(remaining / 1000),
         }));
       }
     }, 500);
-  }
+  }, [lockoutManager, stopCountdown]);
 
   useEffect(() => {
     return () => {
@@ -147,13 +150,13 @@ export function useBiometricUnlock({
   const attemptBiometric = useCallback(async () => {
     if (lockoutManager.isLocked()) return;
 
-    setState(prev => ({ ...prev, phase: 'prompting', isLoading: true, feedbackMessage: null }));
+    setState((prev) => ({ ...prev, phase: 'prompting', isLoading: true, feedbackMessage: null }));
 
     let result;
     try {
       result = await biometricService.authenticate(promptMessage);
     } catch {
-      setState(prev => ({
+      setState((prev) => ({
         ...prev,
         phase: 'idle',
         isLoading: false,
@@ -164,7 +167,7 @@ export function useBiometricUnlock({
 
     if (result.success) {
       await lockoutManager.recordSuccess();
-      setState(prev => ({
+      setState((prev) => ({
         ...prev,
         phase: 'success',
         isLoading: false,
@@ -180,7 +183,7 @@ export function useBiometricUnlock({
     const isNowLocked = lockoutManager.isLocked();
 
     if (newLockout.permanentlyLocked) {
-      setState(prev => ({
+      setState((prev) => ({
         ...prev,
         phase: 'locked',
         lockout: newLockout,
@@ -194,7 +197,7 @@ export function useBiometricUnlock({
     if (isNowLocked) {
       startCountdown();
       const secsRemaining = Math.ceil(lockoutManager.remainingLockoutMs() / 1000);
-      setState(prev => ({
+      setState((prev) => ({
         ...prev,
         phase: 'locked',
         lockout: newLockout,
@@ -207,7 +210,7 @@ export function useBiometricUnlock({
     }
 
     const attemptsRemaining = Math.max(0, BIOMETRIC_MAX_ATTEMPTS - newLockout.failedAttempts);
-    setState(prev => ({
+    setState((prev) => ({
       ...prev,
       phase: 'idle',
       lockout: newLockout,
@@ -217,9 +220,9 @@ export function useBiometricUnlock({
     }));
   }, [biometricService, lockoutManager, onSuccess, onPermanentLockout, promptMessage]);
 
-  // Password fallback 
+  // Password fallback
   const switchToPasswordFallback = useCallback(() => {
-    setState(prev => ({
+    setState((prev) => ({
       ...prev,
       phase: 'fallback',
       feedbackMessage: null,
@@ -227,41 +230,44 @@ export function useBiometricUnlock({
     }));
   }, []);
 
-  const submitPassword = useCallback(async (password: string) => {
-    setState(prev => ({ ...prev, isLoading: true, passwordError: null }));
+  const submitPassword = useCallback(
+    async (password: string) => {
+      setState((prev) => ({ ...prev, isLoading: true, passwordError: null }));
 
-    let ok = false;
-    try {
-      ok = await passwordService.authenticate(password);
-    } catch {
-      setState(prev => ({
-        ...prev,
-        isLoading: false,
-        passwordError: 'Unable to verify password right now. Please try again.',
-      }));
-      return;
-    }
-    if (ok) {
-      stopCountdown();
-      await lockoutManager.recordSuccess();
-      setState(prev => ({
-        ...prev,
-        phase: 'success',
-        isLoading: false,
-        feedbackMessage: 'Access granted.',
-      }));
-      onSuccess?.({ success: true, method: 'password' });
-    } else {
-      setState(prev => ({
-        ...prev,
-        isLoading: false,
-        passwordError: 'Incorrect password. Please try again.',
-      }));
-    }
-  }, [lockoutManager, onSuccess, passwordService]);
+      let ok = false;
+      try {
+        ok = await passwordService.authenticate(password);
+      } catch {
+        setState((prev) => ({
+          ...prev,
+          isLoading: false,
+          passwordError: 'Unable to verify password right now. Please try again.',
+        }));
+        return;
+      }
+      if (ok) {
+        stopCountdown();
+        await lockoutManager.recordSuccess();
+        setState((prev) => ({
+          ...prev,
+          phase: 'success',
+          isLoading: false,
+          feedbackMessage: 'Access granted.',
+        }));
+        onSuccess?.({ success: true, method: 'password' });
+      } else {
+        setState((prev) => ({
+          ...prev,
+          isLoading: false,
+          passwordError: 'Incorrect password. Please try again.',
+        }));
+      }
+    },
+    [lockoutManager, onSuccess, passwordService]
+  );
 
   const backToBiometric = useCallback(() => {
-    setState(prev => ({
+    setState((prev) => ({
       ...prev,
       phase: lockoutManager.isLocked() ? 'locked' : 'idle',
       passwordError: null,
@@ -277,11 +283,11 @@ export function useBiometricUnlock({
   };
 }
 
-//Feedback message builder 
+//Feedback message builder
 function buildFeedbackMessage(
   reason: BiometricFailureReason,
   lockout: BiometricLockoutState,
-  secsRemaining: number,
+  secsRemaining: number
 ): string {
   if (lockout.permanentlyLocked) {
     return 'Biometric authentication has been permanently disabled by your device. Use your password to unlock.';
