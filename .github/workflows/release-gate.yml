@@ -17,7 +17,7 @@ permissions:
 
 concurrency:
   group: release-gate-${{ github.ref }}
-  cancel-in-progress: false   # never cancel an in-flight release gate
+  cancel-in-progress: false # never cancel an in-flight release gate
 
 # ─────────────────────────────────────────────────────────────────────────────
 # GATE 1 — TypeScript build & tests
@@ -56,9 +56,9 @@ jobs:
         if: always()
         run: echo "status=${{ job.status }}" >> "$GITHUB_OUTPUT"
 
-# ─────────────────────────────────────────────────────────────────────────────
-# GATE 2 — Rust contracts build, lint & tests
-# ─────────────────────────────────────────────────────────────────────────────
+  # ─────────────────────────────────────────────────────────────────────────────
+  # GATE 2 — Rust contracts build, lint & tests
+  # ─────────────────────────────────────────────────────────────────────────────
   gate-contracts:
     name: '[Gate 2] Contracts Build & Tests'
     runs-on: ubuntu-latest
@@ -110,9 +110,9 @@ jobs:
         if: always()
         run: echo "status=${{ job.status }}" >> "$GITHUB_OUTPUT"
 
-# ─────────────────────────────────────────────────────────────────────────────
-# GATE 3 — Security audit (npm + cargo)
-# ─────────────────────────────────────────────────────────────────────────────
+  # ─────────────────────────────────────────────────────────────────────────────
+  # GATE 3 — Security audit (npm + cargo)
+  # ─────────────────────────────────────────────────────────────────────────────
   gate-security:
     name: '[Gate 3] Security Audit'
     runs-on: ubuntu-latest
@@ -149,9 +149,9 @@ jobs:
         if: always()
         run: echo "status=${{ job.status }}" >> "$GITHUB_OUTPUT"
 
-# ─────────────────────────────────────────────────────────────────────────────
-# GATE 4 — Observability config validation
-# ─────────────────────────────────────────────────────────────────────────────
+  # ─────────────────────────────────────────────────────────────────────────────
+  # GATE 4 — Observability config validation
+  # ─────────────────────────────────────────────────────────────────────────────
   gate-observability:
     name: '[Gate 4] Observability Configs'
     runs-on: ubuntu-latest
@@ -190,9 +190,9 @@ jobs:
         if: always()
         run: echo "status=${{ job.status }}" >> "$GITHUB_OUTPUT"
 
-# ─────────────────────────────────────────────────────────────────────────────
-# GATE 5 — Release doc completeness
-# ─────────────────────────────────────────────────────────────────────────────
+  # ─────────────────────────────────────────────────────────────────────────────
+  # GATE 5 — Release doc completeness
+  # ─────────────────────────────────────────────────────────────────────────────
   gate-release-docs:
     name: '[Gate 5] Release Docs'
     runs-on: ubuntu-latest
@@ -250,9 +250,9 @@ jobs:
         if: always()
         run: echo "status=${{ job.status }}" >> "$GITHUB_OUTPUT"
 
-# ─────────────────────────────────────────────────────────────────────────────
-# GATE 6 — Extension E2E smoke suite
-# ─────────────────────────────────────────────────────────────────────────────
+  # ─────────────────────────────────────────────────────────────────────────────
+  # GATE 6 — Extension E2E smoke suite
+  # ─────────────────────────────────────────────────────────────────────────────
   gate-extension-e2e-smoke:
     name: '[Gate 6] Extension E2E Smoke'
     runs-on: ubuntu-latest
@@ -287,9 +287,9 @@ jobs:
         if: always()
         run: echo "status=${{ job.status }}" >> "$GITHUB_OUTPUT"
 
-# ─────────────────────────────────────────────────────────────────────────────
-# SUMMARY — Collect all gate results and publish artifact
-# ─────────────────────────────────────────────────────────────────────────────
+  # ─────────────────────────────────────────────────────────────────────────────
+  # SUMMARY — Collect all gate results and publish artifact
+  # ─────────────────────────────────────────────────────────────────────────────
   gate-summary:
     name: Release Gate Summary
     needs:
@@ -313,8 +313,8 @@ jobs:
           GATE4: ${{ needs.gate-observability.outputs.status }}
           GATE5: ${{ needs.gate-release-docs.outputs.status }}
           GATE6: ${{ needs.gate-extension-e2e-smoke.result }}
-          REF:   ${{ github.ref_name }}
-          SHA:   ${{ github.sha }}
+          REF: ${{ github.ref_name }}
+          SHA: ${{ github.sha }}
           ACTOR: ${{ github.actor }}
           OVERRIDE: ${{ github.event.inputs.override_reason }}
           RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}

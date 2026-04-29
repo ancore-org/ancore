@@ -1,5 +1,6 @@
 import React from 'react';
 import { useAccountBalance, formatBalance } from '@/hooks/useAccountBalance';
+import { EmptyState } from '@ancore/ui-kit';
 
 const HomeScreen: React.FC = () => {
   const { balance, isLoading, error, refreshBalance } = useAccountBalance();
@@ -62,7 +63,7 @@ const HomeScreen: React.FC = () => {
             <div className="w-4 h-4 border-2 border-cyan-400 border-t-transparent rounded-full animate-spin" />
           )}
         </div>
-        <p className="text-center py-6 text-sm text-slate-500">No transactions yet</p>
+        <EmptyState title="No transactions yet" />
       </section>
     </div>
   );

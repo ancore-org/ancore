@@ -2,6 +2,7 @@ import * as React from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { cn } from '@/lib/utils';
 import { TransactionItem } from '@/components/TransactionItem';
+import { EmptyState } from '@/components/ui/empty-state';
 import { groupTransactionsByDate, type TransactionRecord } from '@/utils/transaction-formatter';
 
 export interface TransactionHistoryProps extends React.HTMLAttributes<HTMLDivElement> {
@@ -44,9 +45,7 @@ export function TransactionHistory({
         {loading ? (
           <LoadingState />
         ) : groups.length === 0 ? (
-          <p className="rounded-lg border border-dashed border-slate-200 py-8 text-center text-sm text-slate-500">
-            {emptyMessage}
-          </p>
+          <EmptyState title={emptyMessage} />
         ) : (
           <div className="space-y-6">
             {groups.map((group) => (

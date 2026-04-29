@@ -11,11 +11,7 @@ module.exports = {
     '^@ancore/types/(.*)$': '<rootDir>/../types/src/$1',
   },
   collectCoverage: true,
-  collectCoverageFrom: [
-    'src/**/*.ts',
-    '!src/**/__tests__/**',
-    '!src/index.ts',
-  ],
+  collectCoverageFrom: ['src/**/*.ts', '!src/**/__tests__/**', '!src/index.ts'],
   coverageDirectory: 'coverage',
   coveragePathIgnorePatterns: ['/node_modules/'],
   coverageThreshold: {
