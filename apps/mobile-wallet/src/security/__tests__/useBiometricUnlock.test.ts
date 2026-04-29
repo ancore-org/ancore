@@ -5,7 +5,7 @@
  * mock services and a real BiometricLockoutManager with in-memory storage.
  */
 
-import { renderHook, act } from '@testing-library/react-hooks';
+import { renderHook, act, waitFor } from '@testing-library/react';
 import { useBiometricUnlock } from '../../security/hooks/useBiometricUnlock';
 import { BiometricLockoutManager } from '../../security/biometric-lockout-manager';
 import type {
@@ -19,15 +19,19 @@ function makeInMemoryStorage() {
   const store: Record<string, string> = {};
   return {
     getItem: async (k: string) => store[k] ?? null,
-    setItem: async (k: string, v: string) => { store[k] = v; },
-    removeItem: async (k: string) => { delete store[k]; },
+    setItem: async (k: string, v: string) => {
+      store[k] = v;
+    },
+    removeItem: async (k: string) => {
+      delete store[k];
+    },
   };
 }
 
 // ─── Mock services ────────────────────────────────────────────────────────────
 
 function makeBiometricService(
-  successOnCall: number | null = 1,
+  successOnCall: number | null = 1
 ): IBiometricAuthService & { callCount: number } {
   let callCount = 0;
   return {
@@ -51,7 +55,7 @@ function makePasswordService(correct = 'secret'): IPasswordAuthService {
 
 function makeTestHook(
   biometricService: IBiometricAuthService,
-  passwordService: IPasswordAuthService,
+  passwordService: IPasswordAuthService
 ) {
   const storage = makeInMemoryStorage();
   const lockoutManager = new BiometricLockoutManager(storage);
@@ -62,7 +66,7 @@ function makeTestHook(
       biometricService,
       passwordService,
       onSuccess: jest.fn(),
-    }),
+    })
   );
 }
 
@@ -73,19 +77,16 @@ describe('useBiometricUnlock', () => {
   afterEach(() => jest.useRealTimers());
 
   it('initializes with idle or loading phase', async () => {
-    const { result, waitForNextUpdate } = makeTestHook(
-      makeBiometricService(null),
-      makePasswordService(),
-    );
+    const { result } = makeTestHook(makeBiometricService(null), makePasswordService());
     expect(result.current.state.isLoading).toBe(true);
-    await waitForNextUpdate();
+    await waitFor(() => expect(result.current.state.isLoading).toBe(false));
     expect(['idle', 'prompting']).toContain(result.current.state.phase);
   });
 
   it('transitions to success on valid biometric', async () => {
     const biometric = makeBiometricService(1);
-    const { result, waitForNextUpdate } = makeTestHook(biometric, makePasswordService());
-    await waitForNextUpdate(); // init complete
+    const { result } = makeTestHook(biometric, makePasswordService());
+    await waitFor(() => expect(result.current.state.isLoading).toBe(false)); // init complete
 
     await act(async () => {
       await result.current.attemptBiometric();
@@ -96,8 +97,8 @@ describe('useBiometricUnlock', () => {
 
   it('decrements attemptsRemaining on failure', async () => {
     const biometric = makeBiometricService(null); // always fails
-    const { result, waitForNextUpdate } = makeTestHook(biometric, makePasswordService());
-    await waitForNextUpdate();
+    const { result } = makeTestHook(biometric, makePasswordService());
+    await waitFor(() => expect(result.current.state.isLoading).toBe(false));
 
     await act(async () => {
       await result.current.attemptBiometric();
@@ -109,11 +110,13 @@ describe('useBiometricUnlock', () => {
 
   it('locks after max failed attempts', async () => {
     const biometric = makeBiometricService(null);
-    const { result, waitForNextUpdate } = makeTestHook(biometric, makePasswordService());
-    await waitForNextUpdate();
+    const { result } = makeTestHook(biometric, makePasswordService());
+    await waitFor(() => expect(result.current.state.isLoading).toBe(false));
 
     for (let i = 0; i < 3; i++) {
-      await act(async () => { await result.current.attemptBiometric(); });
+      await act(async () => {
+        await result.current.attemptBiometric();
+      });
     }
 
     expect(result.current.state.phase).toBe('locked');
@@ -122,33 +125,43 @@ describe('useBiometricUnlock', () => {
 
   it('switches to fallback phase on switchToPasswordFallback()', async () => {
     const biometric = makeBiometricService(null);
-    const { result, waitForNextUpdate } = makeTestHook(biometric, makePasswordService());
-    await waitForNextUpdate();
+    const { result } = makeTestHook(biometric, makePasswordService());
+    await waitFor(() => expect(result.current.state.isLoading).toBe(false));
 
-    act(() => { result.current.switchToPasswordFallback(); });
+    act(() => {
+      result.current.switchToPasswordFallback();
+    });
 
     expect(result.current.state.phase).toBe('fallback');
   });
 
   it('unlocks via correct password', async () => {
     const biometric = makeBiometricService(null);
-    const { result, waitForNextUpdate } = makeTestHook(biometric, makePasswordService('secret'));
-    await waitForNextUpdate();
+    const { result } = makeTestHook(biometric, makePasswordService('secret'));
+    await waitFor(() => expect(result.current.state.isLoading).toBe(false));
 
-    act(() => { result.current.switchToPasswordFallback(); });
+    act(() => {
+      result.current.switchToPasswordFallback();
+    });
 
-    await act(async () => { await result.current.submitPassword('secret'); });
+    await act(async () => {
+      await result.current.submitPassword('secret');
+    });
 
     expect(result.current.state.phase).toBe('success');
   });
 
   it('shows passwordError on wrong password', async () => {
     const biometric = makeBiometricService(null);
-    const { result, waitForNextUpdate } = makeTestHook(biometric, makePasswordService('secret'));
-    await waitForNextUpdate();
+    const { result } = makeTestHook(biometric, makePasswordService('secret'));
+    await waitFor(() => expect(result.current.state.isLoading).toBe(false));
 
-    act(() => { result.current.switchToPasswordFallback(); });
-    await act(async () => { await result.current.submitPassword('wrong'); });
+    act(() => {
+      result.current.switchToPasswordFallback();
+    });
+    await act(async () => {
+      await result.current.submitPassword('wrong');
+    });
 
     expect(result.current.state.passwordError).not.toBeNull();
     expect(result.current.state.phase).toBe('fallback');
