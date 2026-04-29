@@ -1,11 +1,32 @@
-import { Badge, Card, CardContent, CardHeader, CardTitle, Button, cn } from '@ancore/ui-kit';
+import {
+  Badge,
+  Card,
+  CardContent,
+  CardHeader,
+  CardTitle,
+  Button,
+  cn,
+} from '@ancore/ui-kit';
 import type { TxStatus } from '@/hooks/useSendTransaction';
-import { CheckCircle2, XCircle, Clock, ExternalLink, ArrowLeft, Info } from 'lucide-react';
+import type { SendDraft } from '@/hooks/useSendDraft';
+import {
+  CheckCircle2,
+  XCircle,
+  Clock,
+  ExternalLink,
+  ArrowLeft,
+  Info,
+  RefreshCw,
+} from 'lucide-react';
 
 interface StatusScreenProps {
   txId: string;
   status: TxStatus;
+  /** The form values from the failed attempt, used to rehydrate the draft on retry. */
+  failedDraft?: SendDraft;
   onClose?: () => void;
+  /** Called when the user clicks Retry; parent resets to the send form with the draft. */
+  onRetry?: (draft: SendDraft) => void;
 }
 
 const STATUS_CONFIG: Record<
@@ -41,10 +62,24 @@ const STATUS_CONFIG: Record<
 /**
  * StatusScreen — Displays the result of the transaction submission.
  *
- * Implements a visually distinct feedback layout for success, failure, and pending states.
+ * When `status === 'failed'` a Retry CTA is rendered. Clicking it calls
+ * `onRetry` with the preserved `failedDraft` so the parent flow can
+ * rehydrate the send form without the user re-entering details.
  */
-export function StatusScreen({ txId, status, onClose }: StatusScreenProps) {
+export function StatusScreen({
+  txId,
+  status,
+  failedDraft,
+  onClose,
+  onRetry,
+}: StatusScreenProps) {
   const config = STATUS_CONFIG[status];
+
+  const handleRetry = () => {
+    if (onRetry && failedDraft) {
+      onRetry(failedDraft);
+    }
+  };
 
   return (
     <Card className="w-full max-w-md bg-slate-950 border-white/10 shadow-2xl overflow-hidden animate-in fade-in zoom-in-95 duration-500">
@@ -99,27 +134,43 @@ export function StatusScreen({ txId, status, onClose }: StatusScreenProps) {
           </div>
         </div>
 
-        <div className="bg-white/5 border border-white/10 rounded-2xl p-5 space-y-4">
-          <div className="flex justify-between items-center text-[10px] font-bold">
-            <span className="text-slate-500 uppercase tracking-widest">Transaction Hash</span>
-            <a
-              href={`https://stellar.expert/explorer/testnet/tx/${txId}`}
-              target="_blank"
-              rel="noreferrer"
-              className="text-cyan-400 hover:text-cyan-300 transition-colors flex items-center gap-1.5"
-            >
-              View Details
-              <ExternalLink className="w-3 h-3" />
-            </a>
+        {/* Transaction hash — hidden for non-terminal states that have no real hash yet */}
+        {txId && (
+          <div className="bg-white/5 border border-white/10 rounded-2xl p-5 space-y-4">
+            <div className="flex justify-between items-center text-[10px] font-bold">
+              <span className="text-slate-500 uppercase tracking-widest">Transaction Hash</span>
+              <a
+                href={`https://stellar.expert/explorer/testnet/tx/${txId}`}
+                target="_blank"
+                rel="noreferrer"
+                className="text-cyan-400 hover:text-cyan-300 transition-colors flex items-center gap-1.5"
+              >
+                View Details
+                <ExternalLink className="w-3 h-3" />
+              </a>
+            </div>
+            <div className="bg-slate-950 border border-white/5 rounded-xl p-3 font-mono text-[10px] text-slate-300 break-all leading-relaxed shadow-inner">
+              {txId}
+            </div>
           </div>
-          <div className="bg-slate-950 border border-white/5 rounded-xl p-3 font-mono text-[10px] text-slate-300 break-all leading-relaxed shadow-inner">
-            {txId}
-          </div>
-        </div>
+        )}
 
-        <div className="pt-2">
+        <div className="flex flex-col gap-3 pt-2">
+          {/* Retry CTA — only shown on failure, only when a draft and handler exist */}
+          {status === 'failed' && failedDraft && onRetry && (
+            <Button
+              onClick={handleRetry}
+              data-testid="retry-btn"
+              className="w-full bg-red-500/10 border border-red-500/30 text-red-400 hover:bg-red-500/20 rounded-2xl h-14 font-black uppercase tracking-widest text-[11px] transition-all flex items-center justify-center gap-2"
+            >
+              <RefreshCw className="w-4 h-4" />
+              Retry Transaction
+            </Button>
+          )}
+
           <Button
             onClick={onClose}
+            data-testid="close-btn"
             className="w-full bg-white/5 border border-white/10 text-white hover:bg-white/10 rounded-2xl h-14 font-black uppercase tracking-widest text-[11px] transition-all flex items-center justify-center gap-2"
           >
             <ArrowLeft className="w-4 h-4" />
