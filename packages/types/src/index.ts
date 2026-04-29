@@ -21,6 +21,7 @@ export type Network = 'testnet' | 'mainnet' | 'local';
 export interface NetworkConfig {
   network: Network;
   rpcUrl?: string;
+  rpcUrls?: string[];
   networkPassphrase?: string;
 }
 

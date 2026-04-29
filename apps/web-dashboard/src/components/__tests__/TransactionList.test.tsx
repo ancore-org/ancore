@@ -39,8 +39,8 @@ describe('TransactionList', () => {
 
   it('displays confirmed transactions', () => {
     render(<TransactionList transactions={mockTransactions} />);
-    expect(screen.getByText('100 XLM')).toBeInTheDocument();
-    expect(screen.getByText('50 XLM')).toBeInTheDocument();
+    expect(screen.getByText('-100 XLM')).toBeInTheDocument();
+    expect(screen.getByText('+50 XLM')).toBeInTheDocument();
   });
 
   it('shows empty state when no transactions', () => {
@@ -89,14 +89,9 @@ describe('TransactionList', () => {
   });
 
   it('shows confirmed badge for regular transactions', () => {
-    const { container } = render(<TransactionList transactions={mockTransactions} />);
+    render(<TransactionList transactions={mockTransactions} />);
 
-    // Count confirmed badges (should be 2)
-    const confirmBadges = Array.from(container.querySelectorAll('[class*="Badge"]')).filter(
-      (el) => el.textContent === 'confirmed'
-    );
-
-    expect(confirmBadges.length).toBeGreaterThanOrEqual(1);
+    expect(screen.getAllByText('confirmed')).toHaveLength(2);
   });
 
   it('handles optimistic transaction rollback', () => {
