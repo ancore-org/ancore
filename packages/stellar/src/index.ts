@@ -24,6 +24,7 @@ export {
   TransactionError,
   RetryExhaustedError,
 } from './errors';
+export { toCanonicalError as toCanonicalStellarError } from './errors';
 
 // Retry utilities
 export { withRetry, calculateDelay } from './retry';
