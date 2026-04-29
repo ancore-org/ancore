@@ -18,7 +18,7 @@ export {
 } from './entropy';
 
 export { validatePasswordStrength } from './password';
-export { encryptSecretKey, decryptSecretKey } from './encryption';
+export { encryptSecretKey, decryptSecretKey, UnsupportedVersionError, InvalidPayloadError } from './encryption';
 export type { EncryptedSecretKeyPayload } from './encryption';
 export { generateMnemonic, validateMnemonic } from './mnemonic';
 export { deriveKeypairFromMnemonic } from './key-derivation';
