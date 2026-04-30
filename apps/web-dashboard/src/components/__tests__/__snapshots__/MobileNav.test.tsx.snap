@@ -1,0 +1,43 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`MobileNav > should match visual snapshot when open 1`] = `
+<DocumentFragment>
+  <button
+    aria-expanded="true"
+    aria-label="Toggle navigation menu"
+    class="p-2 -ml-2 text-muted-foreground hover:text-foreground transition-colors"
+  >
+    <svg
+      class="lucide lucide-menu w-6 h-6"
+      fill="none"
+      height="24"
+      stroke="currentColor"
+      stroke-linecap="round"
+      stroke-linejoin="round"
+      stroke-width="2"
+      viewBox="0 0 24 24"
+      width="24"
+      xmlns="http://www.w3.org/2000/svg"
+    >
+      <line
+        x1="4"
+        x2="20"
+        y1="12"
+        y2="12"
+      />
+      <line
+        x1="4"
+        x2="20"
+        y1="6"
+        y2="6"
+      />
+      <line
+        x1="4"
+        x2="20"
+        y1="18"
+        y2="18"
+      />
+    </svg>
+  </button>
+</DocumentFragment>
+`;

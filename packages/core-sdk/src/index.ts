@@ -22,6 +22,7 @@ export { AncoreClient, type AncoreClientOptions } from './ancore-client';
 // Session key helpers
 export { addSessionKey, type AddSessionKeyParams } from './add-session-key';
 export { revokeSessionKey, type RevokeSessionKeyParams } from './revoke-session-key';
+export { permissionToLabel, permissionsToLabels, formatPermissions } from './session-key-utils';
 
 // Payment
 export {
@@ -30,6 +31,12 @@ export {
   type SendPaymentDeps,
   type PaymentSigner,
 } from './send-payment';
+
+// Payment Request
+export { parsePaymentRequest, type PaymentRequest } from './payment-request';
+
+// Amount normalization
+export { normalizeAmount, type NormalizationOptions } from './amount';
 
 // Account transaction builder (wrapper around Stellar SDK's TransactionBuilder)
 export {
@@ -56,7 +63,23 @@ export {
   SimulationExpiredError,
   SimulationFailedError,
   TransactionSubmissionError,
+  PaymentRequestValidationError,
+  InvalidAmountError,
 } from './errors';
+
+// Normalization helpers
+export type { ErrorCategory, NormalizedError } from './errors';
+export { normalizeError } from './errors';
+
+// Retry policy presets
+export {
+  LOW_LATENCY,
+  RELIABLE,
+  AGGRESSIVE,
+  RETRY_PRESETS,
+  type RetryPresetName,
+  getRetryPreset,
+} from './retry-presets';
 
 export {
   mapExecuteWithSessionKeyError,
@@ -81,6 +104,8 @@ export { getSessionKeys, type GetSessionKeysDeps } from './storage/get-session-k
 export type {
   AccountData,
   EncryptedPayload,
+  RecentRecipient,
+  RecentRecipientsData,
   SessionKeysData,
   StorageAdapter,
 } from './storage/types';

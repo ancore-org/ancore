@@ -195,3 +195,17 @@ export function mapContractError(
   }
   return new ContractInvocationError(message, raw);
 }
+
+/** Map account-abstraction errors into the core-sdk normalized shape.
+ * Keep this local to avoid circular dependency on core-sdk; consumers can
+ * call into core-sdk's normalizeError for final normalization.
+ */
+export function toCanonicalError(err: unknown) {
+  if (err instanceof AccountContractError) {
+    return { code: err.code, message: err.message, name: err.name };
+  }
+  if (err instanceof Error) {
+    return { code: (err as any).code ?? 'ACCOUNT_CONTRACT_ERROR', message: err.message, name: err.name };
+  }
+  return { code: 'ACCOUNT_CONTRACT_ERROR', message: String(err) };
+}

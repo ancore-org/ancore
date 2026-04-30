@@ -24,7 +24,7 @@
 use soroban_sdk::xdr::ToXdr;
 use soroban_sdk::{
     contract, contracterror, contractimpl, contracttype, symbol_short, Address, BytesN, Env,
-    Symbol, Vec,
+    Symbol, Val, Vec,
 };
 
 #[cfg(not(target_family = "wasm"))]
@@ -112,11 +112,26 @@ pub struct SessionKey {
     pub permissions: Vec<u32>,
 }
 
-const OWNER: Symbol = symbol_short!("OWNER");
-const NONCE: Symbol = symbol_short!("NONCE");
-const VERSION: Symbol = symbol_short!("VERSION");
+#[contracttype]
+pub enum DataKey {
+    Owner,
+    Nonce,
+    SessionKey(BytesN<32>),
+    Version,
+}
 
-pub struct AccountContract;
+const DAY_IN_LEDGERS: u32 = 17280; // 24 hours * 60 min * 60 sec / 5 sec per ledger
+const INSTANCE_BUMP_AMOUNT: u32 = 30 * DAY_IN_LEDGERS; // 30 days
+const INSTANCE_BUMP_THRESHOLD: u32 = 15 * DAY_IN_LEDGERS; // 15 days
+
+/// Permission bit for execute operations
+/// Permission bit for session-key execute authorization.
+/// Issue #188: Session keys must have this permission to invoke transactions.
+/// Without this bit set, execute() returns InsufficientPermission error.
+pub const PERMISSION_EXECUTE: u32 = 1;
+
+#[contract]
+pub struct AncoreAccount;
 
 fn verify_ed25519_signature(
     _env: &Env,
@@ -147,10 +162,11 @@ fn verify_ed25519_signature(
 }
 
 #[contractimpl]
-impl AccountContract {
-    pub fn initialize(env: Env, owner: Address) {
-        if env.storage().persistent().has(&OWNER) {
-            panic!("already initialized")
+impl AncoreAccount {
+    /// Initialize the account with an owner
+    pub fn initialize(env: Env, owner: Address) -> Result<(), ContractError> {
+        if env.storage().instance().has(&DataKey::Owner) {
+            return Err(ContractError::AlreadyInitialized);
         }
 
         owner.require_auth();
@@ -200,20 +216,14 @@ impl AccountContract {
         caller: CallerIdentity,
         to: Address,
         function: Symbol,
-        args: Vec< soroban_sdk::Val >,
+        args: Vec<Val>,
         expected_nonce: u64,
         session_pub_key: Option<BytesN<32>>,
         signature: Option<BytesN<64>>,
-    ) -> Result<bool, ContractError> {
-        // Check if initialized
-        if !env.storage().persistent().has(&OWNER) {
-            return Err(ContractError::NotInitialized);
-        }
+        signature_payload: Option<soroban_sdk::Bytes>,
+    ) -> Result<Val, ContractError> {
+        let current_nonce: u64 = Self::get_nonce(env.clone())?;
 
-        let owner: Address = env.storage().persistent().get(&OWNER).unwrap();
-        let current_nonce: u64 = env.storage().persistent().get(&NONCE).unwrap();
-
-        // Validate nonce
         if expected_nonce != current_nonce {
             return Err(ContractError::InvalidNonce);
         }
@@ -268,58 +278,40 @@ impl AccountContract {
             }
         }
 
-        // Increment nonce
-        env.storage().persistent().set(&NONCE, &(current_nonce + 1));
+        // Increment nonce before invocation (checks-effects-interactions)
+        env.storage()
+            .instance()
+            .set(&DataKey::Nonce, &(current_nonce + 1));
 
-        // Execute the function call
-        let result = env.invoke_contract(&to, &function, args);
+        // Extend instance TTL to keep contract alive
+        env.storage()
+            .instance()
+            .extend_ttl(INSTANCE_BUMP_THRESHOLD, INSTANCE_BUMP_AMOUNT);
 
-        // Emit event
+        // Emit executed event with transaction details
         env.events().publish(
-            (symbol_short!("executed"),),
-            (to, function, expected_nonce),
+            (events::executed(&env),),
+            (to.clone(), function.clone(), current_nonce),
         );
 
-        Ok(result.into_bool())
+        let result: Val = env.invoke_contract(&to, &function, args);
+
+        Ok(result)
     }
 
-    fn create_signature_payload(
-        env: &Env,
-        to: &Address,
-        function: &Symbol,
-        args: &Vec< soroban_sdk::Val >,
-        nonce: u64,
-    ) -> BytesN<32> {
-        let mut payload = Vec::new(env);
-        payload.push_back(to.to_val());
-        payload.push_back(function.to_val());
-        payload.push_back(args.to_val());
-        payload.push_back(nonce.to_val());
-        
-        env.crypto().sha256(&payload.to_val())
-    }
-
+    /// Add a session key
     pub fn add_session_key(
         env: Env,
         public_key: BytesN<32>,
         expires_at: u64,
         permissions: Vec<u32>,
     ) -> Result<(), ContractError> {
-        // Check if initialized
-        if !env.storage().persistent().has(&OWNER) {
-            return Err(ContractError::NotInitialized);
+        if expires_at == 0 {
+            return Err(ContractError::InvalidExpiration);
         }
 
-        // Only owner can add session keys
-        let owner: Address = env.storage().persistent().get(&OWNER).unwrap();
-        if env.invoker() != owner {
-            return Err(ContractError::Unauthorized);
-        }
-
-        // Validate expires_at is in the future
-        if expires_at <= env.ledger().timestamp() {
-            panic!("expires_at must be in the future");
-        }
+        let owner = Self::get_owner(env.clone())?;
+        owner.require_auth();
 
         if env
             .storage()
@@ -345,7 +337,9 @@ impl AccountContract {
             permissions,
         };
 
-        env.storage().persistent().set(&public_key, &session_key);
+        env.storage()
+            .persistent()
+            .set(&DataKey::SessionKey(public_key.clone()), &session_key);
 
         Self::extend_session_key_ttl(&env, &public_key, expires_at);
 
@@ -361,6 +355,7 @@ impl AccountContract {
         Ok(())
     }
 
+    /// Revoke a session key
     pub fn revoke_session_key(env: Env, public_key: BytesN<32>) -> Result<(), ContractError> {
         let owner = Self::get_owner(env.clone())?;
         owner.require_auth();
@@ -402,32 +397,66 @@ impl AccountContract {
             return Err(ContractError::InvalidWasmHash);
         }
 
-        // Only owner can revoke session keys
-        let owner: Address = env.storage().persistent().get(&OWNER).unwrap();
-        if env.invoker() != owner {
-            return Err(ContractError::Unauthorized);
-        }
+        // Increment version number
+        let current_version = Self::get_version(env.clone());
+        env.storage()
+            .instance()
+            .set(&DataKey::Version, &(current_version + 1));
 
-        // Check if session key exists
-        if !env.storage().persistent().has(&public_key) {
-            return Err(ContractError::SessionKeyNotFound);
-        }
+        env.deployer()
+            .update_current_contract_wasm(new_wasm_hash.clone());
 
-        env.storage().persistent().remove(&public_key);
+        // Extend instance TTL to keep contract alive
+        env.storage()
+            .instance()
+            .extend_ttl(INSTANCE_BUMP_THRESHOLD, INSTANCE_BUMP_AMOUNT);
 
-        env.events().publish(
-            (symbol_short!("session_key_revoked"),),
-            public_key,
-        );
+        // Emit upgraded event
+        env.events()
+            .publish((events::upgraded(&env),), new_wasm_hash);
 
         Ok(())
     }
 
-    pub fn get_session_key(env: Env, public_key: BytesN<32>) -> Option<SessionKey> {
-        env.storage().persistent().get(&public_key)
+    /// Execute a contract migration for a new version
+    ///
+    /// # Security
+    /// - Requires owner authorization
+    /// - Migration version must be strictly increasing
+    pub fn migrate(env: Env, new_version: u32) -> Result<(), ContractError> {
+        let owner = Self::get_owner(env.clone())?;
+        owner.require_auth();
+
+        let current_version = Self::get_version(env.clone());
+        if new_version <= current_version {
+            return Err(ContractError::InvalidVersion);
+        }
+
+        env.storage()
+            .instance()
+            .set(&DataKey::Version, &new_version);
+
+        // Extend instance TTL to keep contract alive
+        env.storage()
+            .instance()
+            .extend_ttl(INSTANCE_BUMP_THRESHOLD, INSTANCE_BUMP_AMOUNT);
+
+        // Emit migrated event
+        env.events()
+            .publish((events::migrated(&env),), (current_version, new_version));
+
+        Ok(())
     }
 
-    pub fn get_owner(env: Env) -> Result<Address, ContractError> {
+    /// Get a session key
+    pub fn get_session_key(env: Env, public_key: BytesN<32>) -> Option<SessionKey> {
+        env.storage()
+            .persistent()
+            .get(&DataKey::SessionKey(public_key))
+    }
+
+    /// Check if a session key exists
+    pub fn has_session_key(env: Env, public_key: BytesN<32>) -> bool {
         env.storage()
             .persistent()
             .has(&DataKey::SessionKey(public_key))
@@ -515,9 +544,12 @@ mod test {
     use ed25519_dalek::{Signer, SigningKey};
     use rand::rngs::OsRng;
     use soroban_sdk::{
-        testutils::{Address as _, Events, Ledger, MockAuth, MockAuthInvoke},
+        testutils::{Address as _, Events, Ledger, MockAuth, MockAuthInvoke, Snapshot},
+        xdr::ToXdr,
         Address, Bytes, Env, IntoVal,
     };
+
+    const HIGH_SESSION_KEY_COUNT: usize = 64;
 
     fn sign_payload(
         env: &Env,
@@ -541,6 +573,49 @@ mod test {
     fn init(env: &Env, client: &AncoreAccountClient, owner: &Address) {
         env.mock_all_auths();
         client.initialize(owner);
+    }
+
+    fn is_instance_entry_key(key_repr: &str) -> bool {
+        key_repr.contains("ContractInstance") || key_repr.contains("ledger_key_contract_instance")
+    }
+
+    fn session_key_entry_count(snapshot: &Snapshot) -> usize {
+        snapshot
+            .ledger
+            .ledger_entries
+            .iter()
+            .filter(|(key, _)| format!("{:?}", key).contains("SessionKey"))
+            .count()
+    }
+
+    fn instance_entry_ttl(snapshot: &Snapshot) -> u32 {
+        snapshot
+            .ledger
+            .ledger_entries
+            .iter()
+            .find_map(|(key, (_, live_until_ledger))| {
+                let key_repr = format!("{:?}", key);
+                if is_instance_entry_key(&key_repr) {
+                    *live_until_ledger
+                } else {
+                    None
+                }
+            })
+            .expect("contract instance entry must exist in snapshot")
+    }
+
+    fn set_instance_entry_ttl(snapshot: &mut Snapshot, ttl: u32) {
+        let (_, (_, live_until_ledger)) = snapshot
+            .ledger
+            .ledger_entries
+            .iter_mut()
+            .find(|(key, _)| {
+                let key_repr = format!("{:?}", key);
+                is_instance_entry_key(&key_repr)
+            })
+            .expect("contract instance entry must exist in snapshot");
+
+        *live_until_ledger = Some(ttl);
     }
 
     #[test]
@@ -1882,7 +1957,7 @@ mod tests {
     }
 
     #[test]
-    fn test_write_paths_bump_instance_ttl() {
+    fn test_high_session_key_storage_growth_is_linear() {
         let env = Env::default();
         let contract_id = env.register_contract(None, AncoreAccount);
         let client = AncoreAccountClient::new(&env, &contract_id);
@@ -1891,14 +1966,127 @@ mod tests {
         init(&env, &client, &owner);
         env.mock_all_auths();
 
-        let session_pk = BytesN::from_array(&env, &[32u8; 32]);
+        let permissions = Vec::new(&env);
+        let initial_snapshot = env.to_snapshot();
+        assert_eq!(
+            session_key_entry_count(&initial_snapshot),
+            0,
+            "initialized accounts should not allocate session-key storage"
+        );
 
-        // We can't directly check the TTL value easily in Soroban tests without host functions,
-        // but we can verify the functions execute and don't panic.
-        // In a real environment, we'd use ledger snapshots.
-        client.add_session_key(&session_pk, &1000u64, &Vec::new(&env));
+        // Extreme inputs are expected to grow storage linearly. The contract has
+        // no explicit count cap today, so rejection is delegated to host budget
+        // and storage limits rather than an in-contract guard.
+        for i in 0..HIGH_SESSION_KEY_COUNT {
+            let mut key_bytes = [0u8; 32];
+            key_bytes[0] = i as u8;
+            key_bytes[31] = (HIGH_SESSION_KEY_COUNT - i) as u8;
+
+            let session_pk = BytesN::from_array(&env, &key_bytes);
+            let expires_at = 10_000u64 + i as u64;
+            client.add_session_key(&session_pk, &expires_at, &permissions);
+            assert!(
+                client.has_session_key(&session_pk),
+                "session key {i} should remain addressable after insertion"
+            );
+        }
+
+        let final_snapshot = env.to_snapshot();
+        assert_eq!(
+            session_key_entry_count(&final_snapshot),
+            HIGH_SESSION_KEY_COUNT,
+            "each added session key should consume exactly one persistent storage entry"
+        );
+    }
+
+    #[test]
+    fn test_read_paths_do_not_bump_instance_ttl() {
+        let env = Env::default();
+        let contract_id = env.register_contract(None, AncoreAccount);
+        let client = AncoreAccountClient::new(&env, &contract_id);
+
+        let owner = Address::generate(&env);
+        client.initialize(&owner);
+
+        let mut snapshot = env.to_snapshot();
+        let baseline_ttl = INSTANCE_BUMP_THRESHOLD + 25;
+        set_instance_entry_ttl(&mut snapshot, baseline_ttl);
+
+        let env = Env::from_snapshot(snapshot);
+        let client = AncoreAccountClient::new(&env, &contract_id);
+
+        assert_eq!(instance_entry_ttl(&env.to_snapshot()), baseline_ttl);
+
+        assert_eq!(client.get_owner(), owner);
+        assert_eq!(client.get_nonce(), 0u64);
+        assert_eq!(client.get_version(), 1u32);
+
+        let ttl_after_reads = instance_entry_ttl(&env.to_snapshot());
+        assert_eq!(
+            ttl_after_reads, baseline_ttl,
+            "pure read paths must not consume the instance TTL bump budget"
+        );
+    }
+
+    #[test]
+    fn test_write_paths_bump_instance_ttl_below_threshold() {
+        let env = Env::default();
+        let contract_id = env.register_contract(None, AncoreAccount);
+        let client = AncoreAccountClient::new(&env, &contract_id);
+
+        let owner = Address::generate(&env);
+        client.initialize(&owner);
+        env.mock_all_auths();
+
+        let session_pk = BytesN::from_array(&env, &[33u8; 32]);
+        let expires_at = 20_000u64;
+        client.add_session_key(&session_pk, &expires_at, &Vec::new(&env));
+
+        let mut snapshot = env.to_snapshot();
+        set_instance_entry_ttl(&mut snapshot, INSTANCE_BUMP_THRESHOLD - 1);
+
+        let env = Env::from_snapshot(snapshot);
+        let client = AncoreAccountClient::new(&env, &contract_id);
+        env.mock_all_auths();
+
         client.refresh_session_key_ttl(&session_pk);
-        client.revoke_session_key(&session_pk);
+
+        let ttl_after_write = instance_entry_ttl(&env.to_snapshot());
+        assert_eq!(
+            ttl_after_write, INSTANCE_BUMP_AMOUNT,
+            "write paths should restore the instance TTL to the configured bump amount once below threshold"
+        );
+    }
+
+    #[test]
+    fn test_write_paths_do_not_over_bump_instance_ttl_above_threshold() {
+        let env = Env::default();
+        let contract_id = env.register_contract(None, AncoreAccount);
+        let client = AncoreAccountClient::new(&env, &contract_id);
+
+        let owner = Address::generate(&env);
+        client.initialize(&owner);
+        env.mock_all_auths();
+
+        let session_pk = BytesN::from_array(&env, &[34u8; 32]);
+        let expires_at = 21_000u64;
+        client.add_session_key(&session_pk, &expires_at, &Vec::new(&env));
+
+        let mut snapshot = env.to_snapshot();
+        let baseline_ttl = INSTANCE_BUMP_THRESHOLD + 42;
+        set_instance_entry_ttl(&mut snapshot, baseline_ttl);
+
+        let env = Env::from_snapshot(snapshot);
+        let client = AncoreAccountClient::new(&env, &contract_id);
+        env.mock_all_auths();
+
+        client.refresh_session_key_ttl(&session_pk);
+
+        let ttl_after_write = instance_entry_ttl(&env.to_snapshot());
+        assert_eq!(
+            ttl_after_write, baseline_ttl,
+            "write paths should leave instance TTL untouched when the entry is already above the refresh threshold"
+        );
     }
 
     // ─────────────────────────────────────────────────────────────────────────

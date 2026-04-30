@@ -99,12 +99,16 @@ describe('POST /relay/validate', () => {
 });
 
 describe('GET /relay/status', () => {
-  it('200 with status ok (no auth required)', async () => {
+  it('200 with status ok and dependency details (no auth required)', async () => {
     const res = await request(makeApp()).get('/relay/status');
     expect(res.status).toBe(200);
     expect(res.body.status).toBe('ok');
     expect(typeof res.body.uptime).toBe('number');
     expect(res.body.timestamp).toMatch(/^\d{4}-\d{2}-\d{2}T/);
+    expect(res.body.dependencies).toBeDefined();
+    expect(res.body.dependencies.queue.status).toBe('ok');
+    expect(res.body.dependencies.rpc.status).toBe('ok');
+    expect(res.body.dependencies.storage.status).toBe('ok');
   });
 });
 

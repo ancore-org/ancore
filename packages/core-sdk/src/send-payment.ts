@@ -13,7 +13,9 @@ import {
   TransactionSubmissionError,
   SimulationFailedError,
   SimulationExpiredError,
+  InvalidAmountError,
 } from './errors';
+import { normalizeAmount } from './amount';
 
 // ---------------------------------------------------------------------------
 // Public interfaces
@@ -150,11 +152,14 @@ function validateSendPaymentParams(params: SendPaymentParams): void {
   if (typeof params.to !== 'string' || params.to.trim().length === 0) {
     throw new BuilderValidationError('sendPayment: "to" must be a non-empty Stellar address.');
   }
-  if (typeof params.amount !== 'string' || params.amount.trim().length === 0) {
-    throw new BuilderValidationError('sendPayment: "amount" must be a non-empty string.');
-  }
-  if (isNaN(parseFloat(params.amount)) || parseFloat(params.amount) <= 0) {
-    throw new BuilderValidationError('sendPayment: "amount" must be a positive numeric string.');
+  try {
+    // Normalize and validate the amount string
+    params.amount = normalizeAmount(params.amount);
+  } catch (error) {
+    if (error instanceof InvalidAmountError) {
+      throw new BuilderValidationError(`sendPayment: ${error.message}`);
+    }
+    throw error;
   }
   if (!params.signer || typeof params.signer.sign !== 'function') {
     throw new BuilderValidationError(
