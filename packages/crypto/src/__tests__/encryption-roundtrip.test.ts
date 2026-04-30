@@ -71,6 +71,6 @@ describe('encryptSecretKey()/decryptSecretKey() round-trip', () => {
         },
         'Test-Password-Fixture-Epsilon!123'
       )
-    ).rejects.toThrow('Invalid password or corrupted encrypted payload.');
+    ).rejects.toThrow('Payload iterations must be a safe integer between 100000 and 600000');
   });
 });

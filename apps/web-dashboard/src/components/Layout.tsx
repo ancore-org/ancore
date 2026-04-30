@@ -28,43 +28,6 @@ const DensityToggle: React.FC = () => {
   );
 };
 
-export const Layout: React.FC = () => (
-  <div className="min-h-screen bg-background text-foreground">
-    <header className="border-b px-6 py-3 flex items-center gap-6">
-      <div className="lg:hidden">
-        <MobileNav links={NAV_LINKS} />
-      </div>
-      <span className="font-semibold text-lg">Ancore</span>
-      <nav className="hidden lg:flex gap-4">
-        {NAV_LINKS.map(({ to, label, end }) => (
-          <NavLink
-            key={to}
-            to={to}
-            end={end}
-            className={({ isActive }) =>
-              cn(
-                'text-sm transition-colors hover:text-foreground',
-                isActive ? 'text-foreground font-medium' : 'text-muted-foreground'
-              )
-            }
-          >
-            {label}
-          </NavLink>
-        ))}
-      </nav>
-      <div className="flex-1 flex justify-center">
-        <QuickActionBar />
-      </div>
-      <div className="flex items-center gap-2">
-        <DensityToggle />
-        <Settings className="w-4 h-4 text-muted-foreground" />
-      </div>
-    </header>
-    <main className="container mx-auto px-6 py-8">
-      <Outlet />
-    </main>
-  </div>
-);
 export const Layout: React.FC = () => {
   const { accounts, currentAccount, setCurrentAccount, loading } = useAccountState();
 

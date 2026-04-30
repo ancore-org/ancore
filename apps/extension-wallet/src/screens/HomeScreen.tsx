@@ -1,6 +1,6 @@
 import React from 'react';
 import { useAccountBalance, formatBalance } from '@/hooks/useAccountBalance';
-import { EmptyState } from '@ancore/ui-kit';
+import { EmptyState, Skeleton } from '@ancore/ui-kit';
 
 const HomeScreen: React.FC = () => {
   const { balance, isLoading, error, refreshBalance } = useAccountBalance();
@@ -36,13 +36,15 @@ const HomeScreen: React.FC = () => {
 
   return (
     <div className="flex flex-col gap-4">
-      <header
-        className={`rounded-3xl border border-white/10 bg-white/5 p-4 backdrop-blur-sm transition-opacity ${isLoading ? 'opacity-50' : 'opacity-100'}`}
-      >
+      <header className="rounded-3xl border border-white/10 bg-white/5 p-4 backdrop-blur-sm">
         <p className="text-xs uppercase tracking-[0.25em] text-cyan-400">Main Account</p>
-        <h2 className="mt-1 text-2xl font-bold text-white">
-          {isLoading ? '---' : formatBalance(balance)}
-        </h2>
+        <div className="mt-1 h-8 flex items-center">
+          {isLoading ? (
+            <Skeleton className="h-6 w-32 bg-white/10" />
+          ) : (
+            <h2 className="text-2xl font-bold text-white">{formatBalance(balance)}</h2>
+          )}
+        </div>
       </header>
 
       <div className="grid grid-cols-2 gap-3">
@@ -59,11 +61,16 @@ const HomeScreen: React.FC = () => {
           <h3 className="text-sm font-medium text-slate-400 uppercase tracking-widest">
             Recent Activity
           </h3>
-          {isLoading && (
-            <div className="w-4 h-4 border-2 border-cyan-400 border-t-transparent rounded-full animate-spin" />
-          )}
         </div>
-        <EmptyState title="No transactions yet" />
+        {isLoading ? (
+          <div className="space-y-3">
+            <Skeleton className="h-12 w-full bg-white/5 rounded-2xl" />
+            <Skeleton className="h-12 w-full bg-white/5 rounded-2xl" />
+            <Skeleton className="h-12 w-full bg-white/5 rounded-2xl" />
+          </div>
+        ) : (
+          <EmptyState title="No transactions yet" />
+        )}
       </section>
     </div>
   );

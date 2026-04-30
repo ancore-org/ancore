@@ -1,5 +1,5 @@
 import React, { useState, useMemo } from 'react';
-import { Card, CardContent, CardHeader, CardTitle, Badge, Button } from '@ancore/ui-kit';
+import { Card, CardContent, CardHeader, CardTitle, Badge, Button, EmptyState } from '@ancore/ui-kit';
 import { Download, Clock, ChevronUp, ChevronDown } from 'lucide-react';
 import type { Transaction } from '../types/dashboard';
 import { useTableDensity } from '../contexts/TableDensityContext';

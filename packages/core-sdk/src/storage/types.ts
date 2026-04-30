@@ -22,3 +22,12 @@ export interface SessionKeysData {
   keys: Record<string, string>;
   [key: string]: unknown;
 }
+export interface RecentRecipient {
+  address: string;
+  name?: string;
+  timestamp: number;
+}
+
+export interface RecentRecipientsData {
+  recipients: RecentRecipient[];
+}

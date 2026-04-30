@@ -403,7 +403,7 @@ describe('StellarClient', () => {
       const records = [
         { id: '1', paging_token: 'pt-1' },
         { id: '2', paging_token: 'pt-2' },
-      ] as unknown as Horizon.HorizonApi.OperationResponse[];
+      ] as unknown as Horizon.HorizonApi.OperationResponseType[];
 
       const call = jest.fn().mockResolvedValue({ records });
       const cursor = jest.fn().mockReturnValue({ call });
@@ -435,11 +435,15 @@ describe('StellarClient', () => {
       const getAccountActivityPage = jest
         .spyOn(client, 'getAccountActivityPage')
         .mockResolvedValueOnce({
-          records: [{ id: '1', paging_token: 'pt-1' }] as unknown as Horizon.HorizonApi.OperationResponse[],
+          records: [
+            { id: '1', paging_token: 'pt-1' },
+          ] as unknown as Horizon.HorizonApi.OperationResponseType[],
           nextCursor: 'pt-1',
         })
         .mockResolvedValueOnce({
-          records: [{ id: '2', paging_token: 'pt-2' }] as unknown as Horizon.HorizonApi.OperationResponse[],
+          records: [
+            { id: '2', paging_token: 'pt-2' },
+          ] as unknown as Horizon.HorizonApi.OperationResponseType[],
           nextCursor: null,
         });
 
@@ -457,6 +461,26 @@ describe('StellarClient', () => {
         limit: 1,
         cursor: 'pt-1',
       });
+    });
+
+    it('should return null nextCursor for empty page', async () => {
+      const client = new StellarClient({ network: 'testnet' });
+      const call = jest.fn().mockResolvedValue({ records: [] });
+      const order = jest.fn().mockReturnValue({ call });
+      const limit = jest.fn().mockReturnValue({ call, order });
+      const forAccount = jest.fn().mockReturnValue({ call, limit, order });
+      const operations = jest.fn().mockReturnValue({ forAccount });
+
+      (client as unknown as { horizonServer: { operations: () => unknown } }).horizonServer = {
+        operations,
+      };
+
+      const page = await client.getAccountActivityPage('GABC123');
+
+      expect(page.records).toEqual([]);
+      expect(page.nextCursor).toBeNull();
+      expect(limit).toHaveBeenCalledWith(20);
+      expect(order).toHaveBeenCalledWith('desc');
     });
   });
 });

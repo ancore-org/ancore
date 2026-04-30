@@ -170,6 +170,18 @@ export class PaymentRequestValidationError extends AncoreSdkError {
   }
 }
 
+/**
+ * Thrown when an amount string or number is invalid, out of range, or has too
+ * much precision for the target asset.
+ */
+export class InvalidAmountError extends AncoreSdkError {
+  constructor(message: string) {
+    super('INVALID_AMOUNT', message);
+    this.name = 'InvalidAmountError';
+    Object.setPrototypeOf(this, new.target.prototype);
+  }
+}
+
 // ---------------------------------------------------------------------------
 // Normalization helpers (canonical contract with UI/frontend)
 // ---------------------------------------------------------------------------

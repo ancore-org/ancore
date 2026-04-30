@@ -35,6 +35,9 @@ export {
 // Payment Request
 export { parsePaymentRequest, type PaymentRequest } from './payment-request';
 
+// Amount normalization
+export { normalizeAmount, type NormalizationOptions } from './amount';
+
 // Account transaction builder (wrapper around Stellar SDK's TransactionBuilder)
 export {
   AccountTransactionBuilder,
@@ -61,6 +64,7 @@ export {
   SimulationFailedError,
   TransactionSubmissionError,
   PaymentRequestValidationError,
+  InvalidAmountError,
 } from './errors';
 
 // Normalization helpers
@@ -100,6 +104,8 @@ export { getSessionKeys, type GetSessionKeysDeps } from './storage/get-session-k
 export type {
   AccountData,
   EncryptedPayload,
+  RecentRecipient,
+  RecentRecipientsData,
   SessionKeysData,
   StorageAdapter,
 } from './storage/types';

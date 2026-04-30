@@ -55,3 +55,9 @@ export {
   scValToOptionalSessionKey,
   sessionKeyToScVal,
 } from './xdr-utils';
+
+export {
+  formatPermissionLabel,
+  formatPermissionLabels,
+  formatPermissions,
+} from './permission-formatter';

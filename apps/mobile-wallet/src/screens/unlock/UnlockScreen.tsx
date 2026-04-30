@@ -4,7 +4,10 @@ import { useBiometricUnlock } from '../../security/hooks/useBiometricUnlock';
 import { AttemptsIndicator } from '../../components/AttemptsIndicator';
 import { BiometricLockoutBanner } from '../../components/BiometricLockoutBanner';
 import { PasswordFallbackForm } from '../../components/PasswordFallbackForm';
-import type { IBiometricAuthService, IPasswordAuthService } from '../../security/hooks/useBiometricUnlock';
+import type {
+  IBiometricAuthService,
+  IPasswordAuthService,
+} from '../../security/hooks/useBiometricUnlock';
 import type { UnlockResult } from '../../security/biometric-lockout.types';
 
 type Props = {
@@ -21,38 +24,32 @@ export const UnlockScreen = ({
   onUnlocked,
 }: Props) => {
   const hasAutoTriggered = useRef(false);
-  const {
-    state,
-    attemptBiometric,
-    switchToPasswordFallback,
-    submitPassword,
-    backToBiometric,
-  } = useBiometricUnlock({
-    lockoutManager,
-    biometricService,
-    passwordService,
-    onSuccess: onUnlocked,
-  });
+  const { state, attemptBiometric, switchToPasswordFallback, submitPassword, backToBiometric } =
+    useBiometricUnlock({
+      lockoutManager,
+      biometricService,
+      passwordService,
+      onSuccess: onUnlocked,
+    });
 
   // Auto-trigger biometric prompt on mount
   useEffect(() => {
     if (
       !hasAutoTriggered.current &&
-    !state.isLoading &&
-    state.phase === 'idle' &&
-    state.isBiometricAvailable
-  ) {
-    hasAutoTriggered.current = true;
+      !state.isLoading &&
+      state.phase === 'idle' &&
+      state.isBiometricAvailable
+    ) {
+      hasAutoTriggered.current = true;
       attemptBiometric();
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [state.isLoading, state.phase, state.isBiometricAvailable, attemptBiometric]);
 
   if (state.isLoading) {
     return <p aria-live="polite">Loading…</p>;
   }
 
-  // Password fallback phase 
+  // Password fallback phase
   if (state.phase === 'fallback') {
     return (
       <section>
@@ -118,8 +115,8 @@ export const UnlockScreen = ({
 
       {state.lockout.permanentlyLocked && (
         <p>
-          Biometric authentication has been permanently disabled by your device.
-          Contact support if you need further assistance.
+          Biometric authentication has been permanently disabled by your device. Contact support if
+          you need further assistance.
         </p>
       )}
     </section>
