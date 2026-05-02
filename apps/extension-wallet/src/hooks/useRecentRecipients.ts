@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { SecureStorageManager, type RecentRecipient } from '@ancore/core-sdk';
 import { createStorageAdapter } from '@ancore/core-sdk';
 
@@ -13,6 +13,7 @@ function getStorageManager() {
 
 export function useRecentRecipients() {
   const [recipients, setRecipients] = useState<RecentRecipient[]>([]);
+  const recipientsRef = useRef<RecentRecipient[]>([]);
   const [isLoading, setIsLoading] = useState(true);
 
   const load = useCallback(async () => {
@@ -24,7 +25,9 @@ export function useRecentRecipients() {
 
     try {
       const data = await manager.getRecentRecipients();
-      setRecipients(data?.recipients || []);
+      const loaded = data?.recipients || [];
+      recipientsRef.current = loaded;
+      setRecipients(loaded);
     } catch (err) {
       console.error('Failed to load recent recipients', err);
     } finally {
@@ -36,8 +39,7 @@ export function useRecentRecipients() {
     const manager = getStorageManager();
     if (!manager.isUnlocked) return;
 
-    const data = await manager.getRecentRecipients();
-    const current = data?.recipients || [];
+    const current = recipientsRef.current;
 
     // Remove if already exists (to move it to top)
     const filtered = current.filter(
@@ -52,6 +54,7 @@ export function useRecentRecipients() {
     const updated = [newItem, ...filtered].slice(0, 5);
 
     await manager.saveRecentRecipients({ recipients: updated });
+    recipientsRef.current = updated;
     setRecipients(updated);
   }, []);
 

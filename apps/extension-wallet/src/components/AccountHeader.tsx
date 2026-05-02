@@ -32,7 +32,9 @@ export function AccountHeader({
                   ? 'Environment: Production (Horizon Mainnet)'
                   : network.toLowerCase() === 'staging'
                     ? 'Environment: Staging (Horizon Testnet)'
-                    : 'Environment: Sandbox (Horizon Testnet)'
+                    : network.toLowerCase() === 'testnet'
+                      ? 'Environment: Sandbox (Horizon Testnet)'
+                      : `Environment: ${network}`
               }
             >
               <div

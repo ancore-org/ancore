@@ -67,7 +67,8 @@ describe('Note Validation Utilities', () => {
     });
 
     it('should preserve content when truncating', () => {
-      const longNote = 'This is a very long note that should be truncated';
+      const longNote =
+        'This is a very long note that should be truncated '.repeat(5) + 'with extra content';
       const result = truncateTransferNote(longNote);
       expect(result).toContain('This is a very long note that should be trunc');
       expect(result).toMatch(/\.\.\.$/);

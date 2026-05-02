@@ -7,15 +7,22 @@
 
 export const MAX_NOTE_LENGTH = 140;
 
+function asString(note: unknown): string {
+  return typeof note === 'string' ? note : '';
+}
+
+function charCount(value: string): number {
+  return Array.from(value).length;
+}
+
 /**
  * Validates a transfer note against the 140-character limit
  * @param note - The note to validate
  * @returns Error message if invalid, undefined if valid
  */
 export function validateTransferNote(note: string): string | undefined {
-  const trimmedNote = note.trim();
-
-  if (trimmedNote.length > MAX_NOTE_LENGTH) {
+  const normalized = asString(note);
+  if (charCount(normalized) > MAX_NOTE_LENGTH) {
     return `Note must be ${MAX_NOTE_LENGTH} characters or less`;
   }
 
@@ -29,15 +36,15 @@ export function validateTransferNote(note: string): string | undefined {
  * @returns Truncated note (max 140 chars)
  */
 export function truncateTransferNote(note: string): string {
-  const trimmedNote = note.trim();
+  const trimmedNote = asString(note).trim();
 
-  if (trimmedNote.length <= MAX_NOTE_LENGTH) {
+  if (charCount(trimmedNote) <= MAX_NOTE_LENGTH) {
     return trimmedNote;
   }
 
-  // Reserve space for ellipsis (3 chars)
+  // Reserve space for ellipsis (3 chars) while counting Unicode code points.
   const maxLength = MAX_NOTE_LENGTH - 3;
-  return trimmedNote.substring(0, maxLength) + '...';
+  return Array.from(trimmedNote).slice(0, maxLength).join('') + '...';
 }
 
 /**
@@ -46,7 +53,7 @@ export function truncateTransferNote(note: string): string {
  * @returns Number of remaining characters
  */
 export function getRemainingCharacters(note: string): number {
-  return MAX_NOTE_LENGTH - note.trim().length;
+  return MAX_NOTE_LENGTH - charCount(asString(note).trim());
 }
 
 /**
@@ -56,7 +63,7 @@ export function getRemainingCharacters(note: string): number {
  * @returns Sanitized note safe for rendering
  */
 export function sanitizeTransferNote(note: string): string {
-  return note
+  return asString(note)
     .replace(/&/g, '&amp;')
     .replace(/</g, '&lt;')
     .replace(/>/g, '&gt;')
@@ -70,7 +77,7 @@ export function sanitizeTransferNote(note: string): string {
  * @returns True if note is empty or whitespace only
  */
 export function isNoteEmpty(note: string): boolean {
-  return note.trim().length === 0;
+  return asString(note).trim().length === 0;
 }
 
 /**
