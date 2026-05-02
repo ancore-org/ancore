@@ -1,5 +1,3 @@
-import { Buffer } from 'node:buffer';
-
 /**
  * Convert bytes to lowercase hex string with optional '0x' prefix
  * @param bytes - The bytes to convert
@@ -7,7 +5,10 @@ import { Buffer } from 'node:buffer';
  * @returns Hex string representation
  */
 export function toHex(bytes: Uint8Array, includePrefix = false): string {
-  const hex = Buffer.from(bytes).toString('hex');
+  let hex = '';
+  for (let i = 0; i < bytes.length; i++) {
+    hex += bytes[i]!.toString(16).padStart(2, '0');
+  }
   return includePrefix ? `0x${hex}` : hex;
 }
 
@@ -24,7 +25,29 @@ export function fromHex(hex: string): Uint8Array {
     throw new Error(`Invalid hex string: ${hex}`);
   }
 
-  return new Uint8Array(Buffer.from(cleaned, 'hex'));
+  const len = cleaned.length / 2;
+  const out = new Uint8Array(len);
+  for (let i = 0; i < len; i++) {
+    out[i] = parseInt(cleaned.slice(i * 2, i * 2 + 2), 16);
+  }
+  return out;
+}
+
+/** Binary string helpers for environments without Buffer (browser extension bundles). */
+function bytesToLatin1(bytes: Uint8Array): string {
+  let s = '';
+  for (let i = 0; i < bytes.length; i++) {
+    s += String.fromCharCode(bytes[i]!);
+  }
+  return s;
+}
+
+function latin1ToBytes(binary: string): Uint8Array {
+  const out = new Uint8Array(binary.length);
+  for (let i = 0; i < binary.length; i++) {
+    out[i] = binary.charCodeAt(i);
+  }
+  return out;
 }
 
 /**
@@ -33,7 +56,10 @@ export function fromHex(hex: string): Uint8Array {
  * @returns Base64 string representation
  */
 export function toBase64(bytes: Uint8Array): string {
-  return Buffer.from(bytes).toString('base64');
+  if (typeof globalThis.btoa === 'undefined') {
+    throw new Error('btoa is not available');
+  }
+  return globalThis.btoa(bytesToLatin1(bytes));
 }
 
 /**
@@ -49,7 +75,11 @@ export function fromBase64(b64: string): Uint8Array {
     throw new Error(`Invalid base64 string: ${b64}`);
   }
 
-  return new Uint8Array(Buffer.from(normalized, 'base64'));
+  if (typeof globalThis.atob === 'undefined') {
+    throw new Error('atob is not available');
+  }
+  const binary = globalThis.atob(normalized);
+  return latin1ToBytes(binary);
 }
 
 /**

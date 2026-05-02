@@ -1,6 +1,4 @@
-/* eslint-disable no-undef */
-import { webcrypto } from 'node:crypto';
-import { TextDecoder, TextEncoder } from 'node:util';
+/* global BufferSource */
 import { toBase64, fromBase64 } from './signature-format';
 
 const PBKDF2_ITERATIONS = 100000;
@@ -43,8 +41,8 @@ export interface EncryptedSecretKeyPayload {
   ciphertext: string;
 }
 
-function asBufferSource(value: Uint8Array): BufferSource {
-  return value as unknown as BufferSource;
+function asCryptoBufferSource(value: Uint8Array): BufferSource {
+  return value as BufferSource;
 }
 
 function getCrypto(): Crypto {
@@ -59,11 +57,11 @@ async function deriveEncryptionKey(
   password: string,
   salt: Uint8Array,
   iterations: number
-): Promise<webcrypto.CryptoKey> {
+): Promise<CryptoKey> {
   const cryptoApi = getCrypto();
   const passwordKey = await cryptoApi.subtle.importKey(
     'raw',
-    new TextEncoder().encode(password),
+    new globalThis.TextEncoder().encode(password),
     { name: 'PBKDF2' },
     false,
     ['deriveKey']
@@ -72,7 +70,7 @@ async function deriveEncryptionKey(
   return cryptoApi.subtle.deriveKey(
     {
       name: 'PBKDF2',
-      salt: asBufferSource(salt),
+      salt: asCryptoBufferSource(salt),
       iterations,
       hash: 'SHA-256',
     },
@@ -160,10 +158,10 @@ export async function encryptSecretKey(
   const ciphertext = await cryptoApi.subtle.encrypt(
     {
       name: 'AES-GCM',
-      iv: asBufferSource(iv),
+      iv: asCryptoBufferSource(iv),
     },
     encryptionKey,
-    new TextEncoder().encode(secretKey)
+    new globalThis.TextEncoder().encode(secretKey)
   );
 
   return {
@@ -197,13 +195,13 @@ export async function decryptSecretKey(
     const plaintext = await cryptoApi.subtle.decrypt(
       {
         name: 'AES-GCM',
-        iv: asBufferSource(iv),
+        iv: asCryptoBufferSource(iv),
       },
       encryptionKey,
-      asBufferSource(ciphertext)
+      asCryptoBufferSource(ciphertext)
     );
 
-    return new TextDecoder().decode(plaintext);
+    return new globalThis.TextDecoder().decode(plaintext);
   } catch (error) {
     // Re-throw our custom errors as-is
     if (error instanceof UnsupportedVersionError || error instanceof InvalidPayloadError) {

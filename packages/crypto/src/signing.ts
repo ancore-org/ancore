@@ -1,5 +1,4 @@
-import { Buffer } from 'node:buffer';
-import { TextEncoder } from 'node:util';
+import type { Buffer } from 'node:buffer';
 import { Keypair, Transaction, FeeBumpTransaction } from '@stellar/stellar-sdk';
 import { decodeSignature } from './signature-format';
 
@@ -7,7 +6,7 @@ type SignableValue = string | Uint8Array;
 type SignableKeypair = Keypair | string;
 
 function toMessageBytes(message: SignableValue): Uint8Array {
-  return typeof message === 'string' ? new TextEncoder().encode(message) : message;
+  return typeof message === 'string' ? new globalThis.TextEncoder().encode(message) : message;
 }
 
 /**
@@ -55,7 +54,8 @@ export async function verifySignature(
     const signatureBytes = decodeSignature(signature);
     const keypair = Keypair.fromPublicKey(publicKey);
 
-    return keypair.verify(Buffer.from(messageBytes), Buffer.from(signatureBytes));
+    // Stellar SDK types use Node Buffer; Uint8Array works at runtime (browser + Node).
+    return keypair.verify(messageBytes as unknown as Buffer, signatureBytes as unknown as Buffer);
   } catch {
     return false;
   }
