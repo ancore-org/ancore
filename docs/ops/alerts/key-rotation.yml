@@ -1,0 +1,410 @@
+# Prometheus Alert Rules for Key Rotation Operations
+#
+# These alerts monitor key rotation procedures and detect issues
+# that may require immediate attention or rollback.
+#
+# Alert severity levels:
+#   - critical: Immediate action required, potential service impact
+#   - warning: Investigation needed, may escalate if not addressed
+
+groups:
+  - name: key_rotation_monitoring
+    interval: 30s
+    rules:
+      # ── Authentication Failures ─────────────────────────────────────────────
+      
+      - alert: HighAuthFailureRateDuringRotation
+        expr: |
+          (
+            rate(relayer_auth_failures_total[5m]) 
+            / 
+            rate(relayer_auth_attempts_total[5m])
+          ) > 0.10
+        for: 2m
+        labels:
+          severity: warning
+          component: relayer-auth
+          rotation_phase: active
+        annotations:
+          summary: "High authentication failure rate during key rotation"
+          description: |
+            Authentication failure rate is {{ $value | humanizePercentage }} over the last 5 minutes.
+            This may indicate issues with API token rotation or client migration.
+            
+            Current failure rate: {{ $value | humanizePercentage }}
+            Threshold: 10%
+            
+            Check:
+            - Verify new API tokens are valid
+            - Check if clients have migrated to new tokens
+            - Review auth service logs for specific error patterns
+          runbook_url: "https://github.com/ancore/ancore/blob/main/docs/ops/runbooks/key-rotation.md#api-authentication-token-rotation"
+          dashboard_url: "{{ $externalURL }}/d/relayer-auth/authentication-metrics"
+      
+      - alert: CriticalAuthFailureSpike
+        expr: |
+          (
+            rate(relayer_auth_failures_total[2m]) 
+            / 
+            rate(relayer_auth_attempts_total[2m])
+          ) > 0.50
+        for: 1m
+        labels:
+          severity: critical
+          component: relayer-auth
+          rotation_phase: active
+        annotations:
+          summary: "Critical authentication failure spike - immediate rollback recommended"
+          description: |
+            Authentication failure rate has spiked to {{ $value | humanizePercentage }}.
+            This indicates a severe issue with credential rotation.
+            
+            IMMEDIATE ACTIONS:
+            1. Initiate rollback procedure
+            2. Restore previous credentials
+            3. Investigate root cause
+            
+            Current failure rate: {{ $value | humanizePercentage }}
+            Critical threshold: 50%
+          runbook_url: "https://github.com/ancore/ancore/blob/main/docs/ops/runbooks/key-rotation.md#rollback-procedures"
+          dashboard_url: "{{ $externalURL }}/d/relayer-auth/authentication-metrics"
+      
+      # ── Transaction Failures ────────────────────────────────────────────────
+      
+      - alert: TransactionFailureSpikeDuringRotation
+        expr: |
+          (
+            rate(relayer_transaction_failures_total[5m]) 
+            / 
+            rate(relayer_transaction_attempts_total[5m])
+          ) > 0.05
+        for: 3m
+        labels:
+          severity: critical
+          component: relayer
+          rotation_phase: active
+        annotations:
+          summary: "Transaction failure spike during key rotation"
+          description: |
+            Transaction failure rate is {{ $value | humanizePercentage }} during key rotation.
+            This may indicate issues with signing key rotation.
+            
+            Current failure rate: {{ $value | humanizePercentage }}
+            Threshold: 5%
+            
+            ACTIONS:
+            1. Verify new signing key is correctly configured
+            2. Check Stellar network connectivity
+            3. Review transaction error types
+            4. Consider rollback if rate continues to increase
+          runbook_url: "https://github.com/ancore/ancore/blob/main/docs/ops/runbooks/key-rotation.md#relayer-signing-key-rotation"
+          dashboard_url: "{{ $externalURL }}/d/relayer-overview/transaction-metrics"
+      
+      - alert: SignatureVerificationFailures
+        expr: |
+          rate(relayer_signature_verification_failures_total[5m]) > 1
+        for: 2m
+        labels:
+          severity: warning
+          component: relayer
+          rotation_phase: active
+        annotations:
+          summary: "Signature verification failures detected during rotation"
+          description: |
+            Signature verification is failing at {{ $value }} failures/sec.
+            This may indicate issues with session key validation or signing key mismatch.
+            
+            Check:
+            - Verify signing key matches expected public key
+            - Check for key format issues (hex encoding)
+            - Review signature service logs
+          runbook_url: "https://github.com/ancore/ancore/blob/main/docs/ops/runbooks/key-rotation.md#validation-checklist"
+      
+      # ── Database Connectivity ───────────────────────────────────────────────
+      
+      - alert: DatabaseConnectionFailuresDuringRotation
+        expr: |
+          rate(relayer_database_connection_errors_total[5m]) > 0.5
+        for: 2m
+        labels:
+          severity: critical
+          component: database
+          rotation_phase: active
+        annotations:
+          summary: "Database connection failures during credential rotation"
+          description: |
+            Database connection errors at {{ $value }} errors/sec.
+            This indicates issues with database credential rotation.
+            
+            IMMEDIATE ACTIONS:
+            1. Verify new database credentials are correct
+            2. Check connection string format
+            3. Verify database user permissions
+            4. Consider rollback if connections cannot be established
+            
+            Current error rate: {{ $value }} errors/sec
+          runbook_url: "https://github.com/ancore/ancore/blob/main/docs/ops/runbooks/key-rotation.md#database-credential-rotation"
+      
+      - alert: DatabaseConnectionPoolExhausted
+        expr: |
+          relayer_database_connection_pool_active 
+          / 
+          relayer_database_connection_pool_max > 0.90
+        for: 5m
+        labels:
+          severity: warning
+          component: database
+          rotation_phase: active
+        annotations:
+          summary: "Database connection pool near exhaustion during rotation"
+          description: |
+            Connection pool utilization is {{ $value | humanizePercentage }}.
+            This may indicate connection leaks or insufficient pool size after credential rotation.
+            
+            Check:
+            - Verify connections are being properly closed
+            - Check for connection timeout issues
+            - Review connection pool configuration
+          runbook_url: "https://github.com/ancore/ancore/blob/main/docs/ops/runbooks/key-rotation.md#database-credential-rotation"
+      
+      # ── Service Health ──────────────────────────────────────────────────────
+      
+      - alert: ServiceUnavailableDuringRotation
+        expr: |
+          up{job="relayer"} == 0
+        for: 2m
+        labels:
+          severity: critical
+          component: relayer
+          rotation_phase: active
+        annotations:
+          summary: "Relayer service unavailable during key rotation"
+          description: |
+            Relayer service is down during key rotation.
+            
+            IMMEDIATE ACTIONS:
+            1. Check pod status: kubectl get pods -n ancore -l app=relayer
+            2. Review pod logs: kubectl logs -n ancore deployment/relayer
+            3. Initiate rollback if service cannot be restored quickly
+            
+            Downtime: {{ $value }}m
+          runbook_url: "https://github.com/ancore/ancore/blob/main/docs/ops/runbooks/key-rotation.md#rollback-procedures"
+      
+      - alert: PodRestartsDuringRotation
+        expr: |
+          rate(kube_pod_container_status_restarts_total{namespace="ancore",pod=~"relayer.*"}[10m]) > 0.1
+        for: 5m
+        labels:
+          severity: warning
+          component: relayer
+          rotation_phase: active
+        annotations:
+          summary: "Frequent pod restarts during key rotation"
+          description: |
+            Relayer pods are restarting at {{ $value }} restarts/sec.
+            This may indicate configuration issues with rotated credentials.
+            
+            Check:
+            - Pod logs for crash reasons
+            - Secret mounting issues
+            - Environment variable configuration
+          runbook_url: "https://github.com/ancore/ancore/blob/main/docs/ops/runbooks/key-rotation.md#validation-checklist"
+      
+      # ── Performance Degradation ─────────────────────────────────────────────
+      
+      - alert: HighLatencyDuringRotation
+        expr: |
+          histogram_quantile(0.95, 
+            rate(relayer_request_duration_seconds_bucket[5m])
+          ) > 5
+        for: 5m
+        labels:
+          severity: warning
+          component: relayer
+          rotation_phase: active
+        annotations:
+          summary: "High request latency during key rotation"
+          description: |
+            P95 request latency is {{ $value }}s during key rotation.
+            This may indicate performance issues with new credentials or configuration.
+            
+            Current P95 latency: {{ $value }}s
+            Threshold: 5s
+            
+            Check:
+            - Database query performance
+            - Network connectivity to Stellar RPC
+            - Resource utilization (CPU, memory)
+          runbook_url: "https://github.com/ancore/ancore/blob/main/docs/ops/runbooks/key-rotation.md#monitoring-and-alerts"
+      
+      # ── Encryption Key Rotation ─────────────────────────────────────────────
+      
+      - alert: ReencryptionJobStalled
+        expr: |
+          (
+            time() - kube_job_status_start_time{job_name=~"reencrypt-secrets.*"}
+          ) > 3600
+          and
+          kube_job_status_active{job_name=~"reencrypt-secrets.*"} == 1
+        for: 10m
+        labels:
+          severity: warning
+          component: encryption
+          rotation_phase: active
+        annotations:
+          summary: "Re-encryption job has been running for over 1 hour"
+          description: |
+            Re-encryption job {{ $labels.job_name }} has been running for {{ $value | humanizeDuration }}.
+            
+            Check:
+            - Job logs for errors or performance issues
+            - Database performance
+            - Job resource limits
+            
+            Job: {{ $labels.job_name }}
+            Duration: {{ $value | humanizeDuration }}
+          runbook_url: "https://github.com/ancore/ancore/blob/main/docs/ops/runbooks/key-rotation.md#encryption-key-rotation-aes-256-gcm"
+      
+      - alert: ReencryptionJobFailed
+        expr: |
+          kube_job_status_failed{job_name=~"reencrypt-secrets.*"} > 0
+        for: 1m
+        labels:
+          severity: critical
+          component: encryption
+          rotation_phase: active
+        annotations:
+          summary: "Re-encryption job failed"
+          description: |
+            Re-encryption job {{ $labels.job_name }} has failed.
+            
+            IMMEDIATE ACTIONS:
+            1. Review job logs: kubectl logs job/{{ $labels.job_name }} -n ancore
+            2. Check for database connectivity issues
+            3. Verify encryption key configuration
+            4. Restart job if transient failure
+            
+            Job: {{ $labels.job_name }}
+          runbook_url: "https://github.com/ancore/ancore/blob/main/docs/ops/runbooks/key-rotation.md#encryption-key-rotation-aes-256-gcm"
+      
+      # ── Security Alerts ─────────────────────────────────────────────────────
+      
+      - alert: UnauthorizedAccessSpikeDuringRotation
+        expr: |
+          rate(relayer_unauthorized_access_attempts_total[5m]) > 5
+        for: 3m
+        labels:
+          severity: warning
+          component: security
+          rotation_phase: active
+        annotations:
+          summary: "Spike in unauthorized access attempts during rotation"
+          description: |
+            Unauthorized access attempts at {{ $value }} attempts/sec.
+            This may indicate:
+            - Clients using old/invalid credentials
+            - Potential security incident
+            - Configuration issues
+            
+            Check:
+            - Review access logs for patterns
+            - Verify credential migration status
+            - Check for suspicious IP addresses or user agents
+          runbook_url: "https://github.com/ancore/ancore/blob/main/docs/ops/runbooks/key-rotation.md#emergency-rotation-compromise-response"
+      
+      - alert: SuspiciousKeyAccessPattern
+        expr: |
+          rate(relayer_key_access_total{result="denied"}[10m]) > 1
+        for: 5m
+        labels:
+          severity: critical
+          component: security
+          rotation_phase: active
+        annotations:
+          summary: "Suspicious key access pattern detected"
+          description: |
+            Denied key access attempts at {{ $value }} attempts/sec.
+            This may indicate:
+            - Unauthorized key access attempts
+            - Compromised credentials
+            - Misconfigured permissions
+            
+            IMMEDIATE ACTIONS:
+            1. Review security logs
+            2. Verify key access permissions
+            3. Consider emergency rotation if compromise suspected
+          runbook_url: "https://github.com/ancore/ancore/blob/main/docs/ops/runbooks/key-rotation.md#emergency-rotation-compromise-response"
+      
+      # ── Stellar Network Connectivity ────────────────────────────────────────
+      
+      - alert: StellarRPCConnectionFailures
+        expr: |
+          rate(relayer_stellar_rpc_errors_total[5m]) > 0.5
+        for: 3m
+        labels:
+          severity: warning
+          component: stellar-rpc
+          rotation_phase: active
+        annotations:
+          summary: "Stellar RPC connection failures during credential rotation"
+          description: |
+            Stellar RPC errors at {{ $value }} errors/sec.
+            This may indicate issues with RPC credential rotation.
+            
+            Check:
+            - Verify new RPC credentials are valid
+            - Check RPC endpoint configuration
+            - Test RPC connectivity manually
+            - Review rate limiting status
+          runbook_url: "https://github.com/ancore/ancore/blob/main/docs/ops/runbooks/key-rotation.md#stellar-network-credentials-rotation"
+      
+      # ── Rollback Indicators ─────────────────────────────────────────────────
+      
+      - alert: MultipleRotationAlertsActive
+        expr: |
+          count(ALERTS{alertname=~".*DuringRotation",alertstate="firing"}) >= 3
+        for: 2m
+        labels:
+          severity: critical
+          component: rotation-orchestration
+          rotation_phase: active
+        annotations:
+          summary: "Multiple rotation alerts active - consider rollback"
+          description: |
+            {{ $value }} rotation-related alerts are currently firing.
+            This indicates systemic issues with the key rotation.
+            
+            RECOMMENDATION: Initiate rollback procedure
+            
+            Active alerts: {{ $value }}
+            
+            Review all active alerts and assess impact before proceeding.
+          runbook_url: "https://github.com/ancore/ancore/blob/main/docs/ops/runbooks/key-rotation.md#rollback-procedures"
+
+  # ── Post-Rotation Validation ──────────────────────────────────────────────
+  
+  - name: key_rotation_validation
+    interval: 1m
+    rules:
+      - alert: RotationValidationRequired
+        expr: |
+          time() - key_rotation_completion_timestamp < 3600
+        for: 5m
+        labels:
+          severity: info
+          component: rotation-orchestration
+          rotation_phase: validation
+        annotations:
+          summary: "Key rotation validation period active"
+          description: |
+            A key rotation was completed {{ $value | humanizeDuration }} ago.
+            Validation monitoring is active for 1 hour post-rotation.
+            
+            Monitor:
+            - Error rates
+            - Authentication success rates
+            - Transaction success rates
+            - Service health metrics
+            
+            If any issues detected, rollback window is still open.
+          runbook_url: "https://github.com/ancore/ancore/blob/main/docs/ops/runbooks/key-rotation.md#post-rotation-validation"

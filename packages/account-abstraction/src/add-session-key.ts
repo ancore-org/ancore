@@ -32,7 +32,12 @@ export function addSessionKey(
   options?: AccountContractReadOptions
 ): InvocationArgs | Promise<AccountContractWriteResult> {
   if (options) {
-    return getContract(contract).addSessionKey(publicKey, permissions, expiresAt, options);
+    const resolvedContract = getContract(contract);
+    const invocation = resolvedContract.addSessionKey(publicKey, permissions, expiresAt);
+    return Promise.resolve({
+      invocation,
+      operation: resolvedContract.buildInvokeOperation(invocation),
+    });
   }
 
   return getContract(contract).addSessionKey(publicKey, permissions, expiresAt);

@@ -2,11 +2,36 @@
  * Tests for StellarClient
  */
 
-import { StellarClient } from '../client';
-import { AccountNotFoundError } from '../errors';
 import type { Horizon } from '@stellar/stellar-sdk';
+import { StellarClient } from '../client';
+import { AccountNotFoundError, NetworkError } from '../errors';
 
-// Mock Horizon server responses
+type MockRpcServer = {
+  getHealth: jest.Mock<Promise<unknown>, []>;
+};
+
+const mockRpcServers = new Map<string, MockRpcServer>();
+const mockRpcServerConstructor = jest.fn((url: string) => {
+  const server: MockRpcServer = {
+    getHealth: jest.fn().mockResolvedValue({}),
+  };
+  mockRpcServers.set(url, server);
+  return server;
+});
+const mockHorizonServerConstructor = jest.fn(() => ({
+  loadAccount: jest.fn(),
+  submitTransaction: jest.fn(),
+}));
+
+jest.mock('@stellar/stellar-sdk', () => ({
+  rpc: {
+    Server: jest.fn((url: string) => mockRpcServerConstructor(url)),
+  },
+  Horizon: {
+    Server: jest.fn(() => mockHorizonServerConstructor()),
+  },
+}));
+
 const mockAccountResponse: Horizon.AccountResponse = {
   id: 'GABC123',
   account_id: 'GABC123',
@@ -51,7 +76,28 @@ const mockAccountResponse: Horizon.AccountResponse = {
   },
 };
 
+const getMockRpcServer = (url: string): MockRpcServer => {
+  const server = mockRpcServers.get(url);
+
+  if (!server) {
+    throw new Error(`Missing mock RPC server for ${url}`);
+  }
+
+  return server;
+};
+
 describe('StellarClient', () => {
+  beforeEach(() => {
+    mockRpcServers.clear();
+    mockRpcServerConstructor.mockClear();
+    mockHorizonServerConstructor.mockClear();
+  });
+
+  afterEach(() => {
+    jest.useRealTimers();
+    jest.restoreAllMocks();
+  });
+
   describe('constructor', () => {
     it('should create a client with testnet network', () => {
       const client = new StellarClient({ network: 'testnet' });
@@ -75,6 +121,33 @@ describe('StellarClient', () => {
       });
 
       expect(client.getNetwork()).toBe('testnet');
+      expect(client.getRpcUrls()).toEqual([customRpcUrl]);
+      expect(client.getCurrentRpcUrl()).toBe(customRpcUrl);
+    });
+
+    it('should allow custom RPC URLs in order', () => {
+      const rpcUrls = ['https://primary-rpc.example.com', 'https://fallback-rpc.example.com'];
+      const client = new StellarClient({
+        network: 'testnet',
+        rpcUrls,
+      });
+
+      expect(client.getRpcUrls()).toEqual(rpcUrls);
+      expect(client.getCurrentRpcUrl()).toBe(rpcUrls[0]);
+      expect(mockRpcServerConstructor).toHaveBeenNthCalledWith(1, rpcUrls[0]);
+      expect(mockRpcServerConstructor).toHaveBeenNthCalledWith(2, rpcUrls[1]);
+    });
+
+    it('should ignore blank RPC URL entries and reject an unusable RPC URL list', () => {
+      const client = new StellarClient({
+        network: 'testnet',
+        rpcUrls: [' https://primary-rpc.example.com ', '', '   '],
+      });
+
+      expect(client.getRpcUrls()).toEqual(['https://primary-rpc.example.com']);
+      expect(() => new StellarClient({ network: 'testnet', rpcUrls: ['', '   '] })).toThrow(
+        NetworkError
+      );
     });
 
     it('should allow custom network passphrase', () => {
@@ -97,6 +170,24 @@ describe('StellarClient', () => {
       });
 
       expect(client.getNetwork()).toBe('testnet');
+    });
+
+    it('should allow custom asset metadata cache TTL', async () => {
+      const client = new StellarClient({
+        network: 'testnet',
+        assetMetadataCacheTtlMs: 1000,
+      });
+
+      jest.spyOn(client, 'getAccount').mockResolvedValue(mockAccountResponse);
+
+      await client.getBalances('GABC123');
+
+      expect(client.getAssetMetadataCacheMetrics()).toEqual({
+        hits: 0,
+        misses: 2,
+        expirations: 0,
+        size: 2,
+      });
     });
   });
 
@@ -124,7 +215,6 @@ describe('StellarClient', () => {
     it('should return balances for an account', async () => {
       const client = new StellarClient({ network: 'testnet' });
 
-      // Mock the getAccount method
       jest.spyOn(client, 'getAccount').mockResolvedValue(mockAccountResponse);
 
       const balances = await client.getBalances('GABC123');
@@ -151,14 +241,246 @@ describe('StellarClient', () => {
 
       await expect(client.getBalances('GABC123')).rejects.toThrow(AccountNotFoundError);
     });
+
+    it('should report asset metadata cache misses on first resolution', async () => {
+      const client = new StellarClient({ network: 'testnet' });
+
+      jest.spyOn(client, 'getAccount').mockResolvedValue(mockAccountResponse);
+
+      await client.getBalances('GABC123');
+
+      expect(client.getAssetMetadataCacheMetrics()).toEqual({
+        hits: 0,
+        misses: 2,
+        expirations: 0,
+        size: 2,
+      });
+    });
+
+    it('should report asset metadata cache hits before TTL expiry', async () => {
+      const client = new StellarClient({
+        network: 'testnet',
+        assetMetadataCacheTtlMs: 1000,
+      });
+
+      jest.spyOn(client, 'getAccount').mockResolvedValue(mockAccountResponse);
+
+      await client.getBalances('GABC123');
+      await client.getBalances('GABC123');
+
+      expect(client.getAssetMetadataCacheMetrics()).toEqual({
+        hits: 2,
+        misses: 2,
+        expirations: 0,
+        size: 2,
+      });
+    });
+
+    it('should invalidate asset metadata cache entries after TTL expiry', async () => {
+      jest.useFakeTimers();
+      jest.setSystemTime(new Date('2024-01-01T00:00:00Z'));
+
+      const client = new StellarClient({
+        network: 'testnet',
+        assetMetadataCacheTtlMs: 1000,
+      });
+
+      jest.spyOn(client, 'getAccount').mockResolvedValue(mockAccountResponse);
+
+      await client.getBalances('GABC123');
+      jest.advanceTimersByTime(1001);
+      await client.getBalances('GABC123');
+
+      expect(client.getAssetMetadataCacheMetrics()).toEqual({
+        hits: 0,
+        misses: 4,
+        expirations: 2,
+        size: 2,
+      });
+    });
   });
 
   describe('isHealthy', () => {
     it('should return true if network is healthy', async () => {
       const client = new StellarClient({ network: 'testnet' });
 
-      // We can't easily mock the private rpcServer, so we just test the method exists
-      expect(typeof client.isHealthy).toBe('function');
+      await expect(client.isHealthy()).resolves.toBe(true);
+    });
+
+    it('should fail over to fallback when the primary endpoint fails', async () => {
+      const rpcUrls = ['https://primary-rpc.example.com', 'https://fallback-rpc.example.com'];
+      const client = new StellarClient({
+        network: 'testnet',
+        rpcUrls,
+        retryOptions: { maxRetries: 0, baseDelayMs: 0 },
+      });
+      const primary = getMockRpcServer(rpcUrls[0]);
+      const fallback = getMockRpcServer(rpcUrls[1]);
+      primary.getHealth.mockRejectedValue(new Error('primary down'));
+
+      await expect(client.isHealthy()).resolves.toBe(true);
+
+      expect(primary.getHealth).toHaveBeenCalledTimes(1);
+      expect(fallback.getHealth).toHaveBeenCalledTimes(1);
+      expect(client.getCurrentRpcUrl()).toBe(rpcUrls[1]);
+    });
+
+    it('should reuse the successful fallback endpoint on the next health check', async () => {
+      const rpcUrls = ['https://primary-rpc.example.com', 'https://fallback-rpc.example.com'];
+      const client = new StellarClient({
+        network: 'testnet',
+        rpcUrls,
+        retryOptions: { maxRetries: 0, baseDelayMs: 0 },
+      });
+      const primary = getMockRpcServer(rpcUrls[0]);
+      const fallback = getMockRpcServer(rpcUrls[1]);
+      primary.getHealth.mockRejectedValueOnce(new Error('primary down'));
+
+      await expect(client.isHealthy()).resolves.toBe(true);
+      await expect(client.isHealthy()).resolves.toBe(true);
+
+      expect(primary.getHealth).toHaveBeenCalledTimes(1);
+      expect(fallback.getHealth).toHaveBeenCalledTimes(2);
+      expect(client.getCurrentRpcUrl()).toBe(rpcUrls[1]);
+    });
+
+    it('should rotate from a later failed endpoint and recover on another endpoint', async () => {
+      const rpcUrls = ['https://primary-rpc.example.com', 'https://fallback-rpc.example.com'];
+      const client = new StellarClient({
+        network: 'testnet',
+        rpcUrls,
+        retryOptions: { maxRetries: 0, baseDelayMs: 0 },
+      });
+      const primary = getMockRpcServer(rpcUrls[0]);
+      const fallback = getMockRpcServer(rpcUrls[1]);
+      primary.getHealth.mockRejectedValueOnce(new Error('primary down')).mockResolvedValue({});
+      fallback.getHealth
+        .mockResolvedValueOnce({})
+        .mockRejectedValueOnce(new Error('fallback down'));
+
+      await expect(client.isHealthy()).resolves.toBe(true);
+      expect(client.getCurrentRpcUrl()).toBe(rpcUrls[1]);
+
+      await expect(client.isHealthy()).resolves.toBe(true);
+
+      expect(primary.getHealth).toHaveBeenCalledTimes(2);
+      expect(fallback.getHealth).toHaveBeenCalledTimes(2);
+      expect(client.getCurrentRpcUrl()).toBe(rpcUrls[0]);
+    });
+
+    it('should return false when all endpoints fail and recover on the next call', async () => {
+      const rpcUrls = ['https://primary-rpc.example.com', 'https://fallback-rpc.example.com'];
+      const client = new StellarClient({
+        network: 'testnet',
+        rpcUrls,
+        retryOptions: { maxRetries: 0, baseDelayMs: 0 },
+      });
+      const primary = getMockRpcServer(rpcUrls[0]);
+      const fallback = getMockRpcServer(rpcUrls[1]);
+      primary.getHealth.mockRejectedValue(new Error('primary down'));
+      fallback.getHealth.mockRejectedValue(new Error('fallback down'));
+
+      await expect(client.isHealthy()).resolves.toBe(false);
+
+      expect(primary.getHealth).toHaveBeenCalledTimes(1);
+      expect(fallback.getHealth).toHaveBeenCalledTimes(1);
+      expect(client.getCurrentRpcUrl()).toBe(rpcUrls[0]);
+
+      primary.getHealth.mockReset().mockResolvedValue({});
+      fallback.getHealth.mockClear();
+
+      await expect(client.isHealthy()).resolves.toBe(true);
+
+      expect(primary.getHealth).toHaveBeenCalledTimes(1);
+      expect(fallback.getHealth).not.toHaveBeenCalled();
+      expect(client.getCurrentRpcUrl()).toBe(rpcUrls[0]);
+    });
+  });
+
+  describe('account activity pagination helpers', () => {
+    it('should fetch account activity page and return next cursor', async () => {
+      const client = new StellarClient({ network: 'testnet' });
+      const records = [
+        { id: '1', paging_token: 'pt-1' },
+        { id: '2', paging_token: 'pt-2' },
+      ] as unknown as Horizon.HorizonApi.OperationResponseType[];
+
+      const call = jest.fn().mockResolvedValue({ records });
+      const cursor = jest.fn().mockReturnValue({ call });
+      const order = jest.fn().mockReturnValue({ call, cursor });
+      const limit = jest.fn().mockReturnValue({ call, order, cursor });
+      const forAccount = jest.fn().mockReturnValue({ call, limit, order, cursor });
+      const operations = jest.fn().mockReturnValue({ forAccount });
+
+      (client as unknown as { horizonServer: { operations: () => unknown } }).horizonServer = {
+        operations,
+      };
+
+      const page = await client.getAccountActivityPage('GABC123', {
+        cursor: 'start',
+        limit: 2,
+        order: 'desc',
+      });
+
+      expect(page.records).toHaveLength(2);
+      expect(page.nextCursor).toBe('pt-2');
+      expect(forAccount).toHaveBeenCalledWith('GABC123');
+      expect(limit).toHaveBeenCalledWith(2);
+      expect(order).toHaveBeenCalledWith('desc');
+      expect(cursor).toHaveBeenCalledWith('start');
+    });
+
+    it('should iterate through pages until completion', async () => {
+      const client = new StellarClient({ network: 'testnet' });
+      const getAccountActivityPage = jest
+        .spyOn(client, 'getAccountActivityPage')
+        .mockResolvedValueOnce({
+          records: [
+            { id: '1', paging_token: 'pt-1' },
+          ] as unknown as Horizon.HorizonApi.OperationResponseType[],
+          nextCursor: 'pt-1',
+        })
+        .mockResolvedValueOnce({
+          records: [
+            { id: '2', paging_token: 'pt-2' },
+          ] as unknown as Horizon.HorizonApi.OperationResponseType[],
+          nextCursor: null,
+        });
+
+      const seen: string[] = [];
+      for await (const op of client.iterateAccountActivity('GABC123', { limit: 1 })) {
+        seen.push((op as unknown as { id: string }).id);
+      }
+
+      expect(seen).toEqual(['1', '2']);
+      expect(getAccountActivityPage).toHaveBeenNthCalledWith(1, 'GABC123', {
+        limit: 1,
+        cursor: null,
+      });
+      expect(getAccountActivityPage).toHaveBeenNthCalledWith(2, 'GABC123', {
+        limit: 1,
+        cursor: 'pt-1',
+      });
+    });
+
+    it('should return null nextCursor for empty page', async () => {
+      const client = new StellarClient({ network: 'testnet' });
+      const call = jest.fn().mockResolvedValue({ records: [] });
+      const order = jest.fn().mockReturnValue({ call });
+      const limit = jest.fn().mockReturnValue({ call, order });
+      const forAccount = jest.fn().mockReturnValue({ call, limit, order });
+      const operations = jest.fn().mockReturnValue({ forAccount });
+
+      (client as unknown as { horizonServer: { operations: () => unknown } }).horizonServer = {
+        operations,
+      };
+
+      const page = await client.getAccountActivityPage('GABC123');
+
+      expect(page.records).toEqual([]);
+      expect(page.nextCursor).toBeNull();
+      expect(limit).toHaveBeenCalledWith(20);
+      expect(order).toHaveBeenCalledWith('desc');
     });
   });
 });

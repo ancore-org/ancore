@@ -2,15 +2,28 @@ import * as CryptoAPI from '../index';
 
 const EXPECTED_EXPORTS = [
   'CRYPTO_VERSION',
-  'verifySignature',
+  'estimateEntropy',
+  'scoreEntropy',
+  'estimateCrackTime',
+  'analyzeEntropy',
+  'meetsEntropyThreshold',
+  'meetsStrictEntropyThreshold',
+  'DEFAULT_ENTROPY_THRESHOLD',
+  'STRICT_ENTROPY_THRESHOLD',
+  'toHex',
+  'fromHex',
+  'toBase64',
+  'fromBase64',
+  'encodeSignature',
+  'decodeSignature',
   'validatePasswordStrength',
   'encryptSecretKey',
   'decryptSecretKey',
   'generateMnemonic',
   'validateMnemonic',
   'deriveKeypairFromMnemonic',
-  'validateMnemonicForStellar',
-  'deriveMultipleKeypairsFromMnemonic',
+  'signTransaction',
+  'verifySignature',
 ] as const;
 
 describe('@ancore/crypto smoke test', () => {
@@ -50,34 +63,13 @@ describe('@ancore/crypto smoke test', () => {
     }
   });
 
-  it('does not log to console when calling verifySignature with valid inputs', async () => {
-    const { Keypair } = await import('@stellar/stellar-sdk');
-    const seed = Buffer.from(Array.from({ length: 32 }, (_, i) => i + 1));
-    const keypair = Keypair.fromRawEd25519Seed(seed);
-    const message = 'smoke test message';
-    const sig = keypair.sign(Buffer.from(message));
-
-    await CryptoAPI.verifySignature(
-      message,
-      Buffer.from(sig).toString('base64'),
-      keypair.publicKey()
-    );
+  it('does not log to console when calling public helpers', () => {
+    CryptoAPI.validatePasswordStrength('Correct-Horse-Battery-42!');
+    CryptoAPI.validateMnemonic(CryptoAPI.generateMnemonic());
 
     expect(consoleSpy.log).not.toHaveBeenCalled();
     expect(consoleSpy.warn).not.toHaveBeenCalled();
     expect(consoleSpy.error).not.toHaveBeenCalled();
-  });
-
-  it('verifySignature resolves to true for a valid signature', async () => {
-    const { Keypair } = await import('@stellar/stellar-sdk');
-    const seed = Buffer.from(Array.from({ length: 32 }, (_, i) => i + 1));
-    const keypair = Keypair.fromRawEd25519Seed(seed);
-    const message = 'smoke test';
-    const sig = keypair.sign(Buffer.from(message));
-
-    await expect(
-      CryptoAPI.verifySignature(message, Buffer.from(sig).toString('base64'), keypair.publicKey())
-    ).resolves.toBe(true);
   });
 
   it('CRYPTO_VERSION is a non-empty string', () => {

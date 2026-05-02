@@ -46,8 +46,8 @@ The following components undergo rigorous security review:
 #### Smart Contracts
 
 - `contracts/account/` - Core account logic
-- `contracts/validation-modules/` - Signature validation
-- `contracts/upgrade/` - Upgrade mechanisms
+- `contracts/validation-modules/` - Planned validation module scaffold
+- `contracts/upgrade/` - Planned upgrade module scaffold
 
 **Process**:
 
@@ -280,4 +280,4 @@ We thank the following security researchers:
 
 ---
 
-**Last Updated**: January 2026
+**Last Updated**: April 2026

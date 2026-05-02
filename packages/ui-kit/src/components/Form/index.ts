@@ -18,6 +18,8 @@ export {
   parseAmount,
   formatAmount,
   getPasswordStrength,
+  getDecimalPlaces,
+  validateAmountPrecision,
   STELLAR_ADDRESS_REGEX,
 } from './validation';
 export type { PasswordStrength } from './validation';

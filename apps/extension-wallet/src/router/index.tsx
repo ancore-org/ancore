@@ -21,9 +21,16 @@ import {
   Wallet,
 } from 'lucide-react';
 import { NotificationProvider } from '@ancore/ui-kit';
-import { AuthGuard, ExtensionAuthProvider, PublicOnlyGuard, useExtensionAuth } from './AuthGuard';
+import {
+  AuthGuard,
+  ExtensionAuthProvider,
+  PublicOnlyGuard,
+  UnlockVerifier,
+  useExtensionAuth,
+} from './AuthGuard';
 import { NavBar } from '../components/Navigation/NavBar';
 import { SettingsScreen } from '../screens/Settings/SettingsScreen';
+import { useDashboardSettingsStore } from '../state/dashboard-settings';
 
 const APP_TITLE = 'Ancore Extension';
 
@@ -54,8 +61,13 @@ function TitleSync() {
 }
 
 function PopupFrame({ children }: { children: React.ReactNode }) {
+  const displayPreference = useDashboardSettingsStore((state) => state.displayPreference);
+
   return (
-    <div className="mx-auto min-h-screen w-[360px] bg-background text-foreground shadow-xl">
+    <div
+      className={`mx-auto min-h-screen w-[360px] bg-background text-foreground shadow-xl ${displayPreference === 'compact' ? 'text-[13px]' : ''}`.trim()}
+      data-display-preference={displayPreference}
+    >
       {children}
     </div>
   );
@@ -252,20 +264,23 @@ function CreateAccountScreen() {
 function UnlockScreen() {
   const navigate = useNavigate();
   const location = useLocation();
-  const { authState, unlockWallet, resetWallet } = useExtensionAuth();
+  const { authState, unlockError, unlockWallet, resetWallet } = useExtensionAuth();
   const [password, setPassword] = React.useState('');
-  const [error, setError] = React.useState<string | null>(null);
+  const [isSubmitting, setIsSubmitting] = React.useState(false);
   const from = (location.state as { from?: string } | null)?.from ?? '/home';
 
   async function handleUnlock(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    setError(null);
-    const didUnlock = await unlockWallet(password);
-    if (!didUnlock) {
-      setError('Invalid password. Please try again.');
-      return;
+    setIsSubmitting(true);
+
+    try {
+      const didUnlock = await unlockWallet(password);
+      if (didUnlock) {
+        navigate(from, { replace: true });
+      }
+    } finally {
+      setIsSubmitting(false);
     }
-    navigate(from, { replace: true });
   }
 
   return (
@@ -286,14 +301,17 @@ function UnlockScreen() {
               value={password}
             />
           </label>
-          <PrimaryButton disabled={!password.trim()} type="submit">
-            Unlock
-          </PrimaryButton>
-          {error ? (
-            <p className="rounded-lg border border-red-300 bg-red-50 px-3 py-2 text-sm text-red-700" role="alert">
-              {error}
+          {unlockError ? (
+            <p
+              className="rounded-xl border border-red-500/20 bg-red-500/10 px-3 py-2 text-sm text-red-600"
+              role="alert"
+            >
+              {unlockError}
             </p>
           ) : null}
+          <PrimaryButton disabled={isSubmitting || !password.trim()} type="submit">
+            {isSubmitting ? 'Unlocking…' : 'Unlock'}
+          </PrimaryButton>
         </form>
       </Card>
       <button
@@ -309,6 +327,8 @@ function UnlockScreen() {
 
 function HomeScreen() {
   const { authState, lockWallet } = useExtensionAuth();
+  const network = useDashboardSettingsStore((state) => state.network);
+  const environment = useDashboardSettingsStore((state) => state.environment);
 
   return (
     <PageScaffold
@@ -326,7 +346,10 @@ function HomeScreen() {
         </button>
       }
     >
-      <Card title={authState.walletName} description="Demo session wallet">
+      <Card
+        title={authState.walletName}
+        description={`Demo session wallet • ${network} • ${environment}`}
+      >
         <div className="rounded-xl bg-accent px-4 py-3 text-sm text-muted-foreground">
           <p className="font-medium text-foreground">Available balance</p>
           <p className="mt-1 text-2xl font-bold text-foreground">1,245.80 XLM</p>
@@ -371,13 +394,18 @@ function SendScreen() {
 }
 
 function ReceiveScreen() {
+  const network = useDashboardSettingsStore((state) => state.network);
+
   return (
     <PageScaffold
       eyebrow="Payments"
       title="Receive"
       description="Expose the wallet address and handoff to copy or QR actions."
     >
-      <Card title="Receive funds" description="Share this demo address with another wallet.">
+      <Card
+        title="Receive funds"
+        description={`Share this demo address with another wallet on ${network}.`}
+      >
         <div className="rounded-xl border border-dashed border-border bg-background px-4 py-4 text-sm text-muted-foreground">
           GCFX...WALLET
         </div>
@@ -545,11 +573,17 @@ export function ExtensionRouter() {
   );
 }
 
-export function ExtensionRouterTestHarness({ initialEntries }: { initialEntries: string[] }) {
+export function ExtensionRouterTestHarness({
+  initialEntries,
+  unlockVerifier,
+}: {
+  initialEntries: string[];
+  unlockVerifier?: UnlockVerifier;
+}) {
   return (
     <MemoryRouter initialEntries={initialEntries}>
       <NotificationProvider>
-        <ExtensionAuthProvider>
+        <ExtensionAuthProvider unlockVerifier={unlockVerifier}>
           <ExtensionRouterContent />
         </ExtensionAuthProvider>
       </NotificationProvider>

@@ -133,4 +133,66 @@ describe('signTransaction', () => {
     expect(isValid).toBe(true);
     expect(feeBumpTx.signatures.length).toBe(1);
   });
+
+  it('returns false when verifying with a malformed public key', async () => {
+    const kp = Keypair.random();
+    const tx = new TransactionBuilder(mockAccount(kp.publicKey(), '1'), {
+      fee: '100',
+      networkPassphrase,
+    })
+      .addOperation(Operation.bumpSequence({ bumpTo: '2' }))
+      .setTimeout(0)
+      .build();
+
+    const signature = await signTransaction(tx, kp);
+
+    await expect(verifySignature(tx.hash(), signature, 'not-a-public-key')).resolves.toBe(false);
+  });
+
+  it('returns false when verifying a malformed signature string', async () => {
+    const kp = Keypair.random();
+
+    await expect(verifySignature('message', '%%%not-base64%%%', kp.publicKey())).resolves.toBe(
+      false
+    );
+  });
+
+  it('verifies signatures in different formats (hex, base64, raw)', async () => {
+    const kp = Keypair.random();
+    const tx = new TransactionBuilder(mockAccount(kp.publicKey(), '1'), {
+      fee: '100',
+      networkPassphrase,
+    })
+      .addOperation(
+        Operation.payment({
+          destination: Keypair.random().publicKey(),
+          asset: Asset.native(),
+          amount: '10',
+        })
+      )
+      .setTimeout(0)
+      .build();
+
+    const signature = await signTransaction(tx, kp);
+    const txHash = tx.hash();
+
+    // Test raw bytes format
+    const isValidRaw = await verifySignature(txHash, signature, kp.publicKey());
+    expect(isValidRaw).toBe(true);
+
+    // Test hex format
+    const hexSignature = Buffer.from(signature).toString('hex');
+    const isValidHex = await verifySignature(txHash, hexSignature, kp.publicKey());
+    expect(isValidHex).toBe(true);
+
+    // Test hex with 0x prefix
+    const hexWithPrefix = `0x${hexSignature}`;
+    const isValidHexPrefix = await verifySignature(txHash, hexWithPrefix, kp.publicKey());
+    expect(isValidHexPrefix).toBe(true);
+
+    // Test base64 format
+    const base64Signature = Buffer.from(signature).toString('base64');
+    const isValidBase64 = await verifySignature(txHash, base64Signature, kp.publicKey());
+    expect(isValidBase64).toBe(true);
+  });
 });

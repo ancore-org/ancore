@@ -2,10 +2,13 @@
   "extends": "../../tsconfig.base.json",
   "compilerOptions": {
     "outDir": "./dist",
-    "rootDir": "./src"
+    "rootDir": "./src",
+    "composite": true,
+    "tsBuildInfoFile": "./dist/.tsbuildinfo"
   },
   "references": [
     { "path": "../types" },
+    { "path": "../crypto" },
     { "path": "../account-abstraction" },
     { "path": "../stellar" }
   ],

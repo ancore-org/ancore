@@ -1,0 +1,11 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1280" height="800" viewBox="0 0 1280 800">
+  <rect width="1280" height="800" fill="#eef3ff"/>
+  <rect x="420" y="80" width="440" height="640" rx="22" fill="#ffffff" stroke="#d2ddff"/>
+  <text x="470" y="170" font-family="Inter, Segoe UI, Arial" font-size="38" font-weight="700" fill="#10204a">Meet your Ancore wallet</text>
+  <text x="470" y="220" font-family="Inter, Segoe UI, Arial" font-size="22" fill="#4f5f86">Start securely on Stellar in minutes.</text>
+  <rect x="470" y="320" width="340" height="64" rx="14" fill="#1d3678"/>
+  <text x="555" y="362" font-family="Inter, Segoe UI, Arial" font-size="24" fill="#ffffff">Create a wallet</text>
+  <rect x="470" y="404" width="340" height="64" rx="14" fill="#e7edff"/>
+  <text x="536" y="446" font-family="Inter, Segoe UI, Arial" font-size="24" fill="#1d3678">I already have a wallet</text>
+  <text x="30" y="770" font-family="Inter, Segoe UI, Arial" font-size="24" fill="#344675">Screenshot 1: Onboarding welcome flow</text>
+</svg>

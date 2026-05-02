@@ -1,6 +1,7 @@
-import { render, screen } from '@testing-library/react';
+import { render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import type { UnlockVerifier } from '../AuthGuard';
 import { AUTH_STORAGE_KEY, DEFAULT_AUTH_STATE } from '../AuthGuard';
 import { ExtensionRouterTestHarness } from '..';
 
@@ -26,9 +27,18 @@ vi.mock('@ancore/core-sdk', async () => {
   };
 });
 
-function renderRouter(pathname: string, authState = DEFAULT_AUTH_STATE) {
+function renderRouter(
+  pathname: string,
+  authState = DEFAULT_AUTH_STATE,
+  options?: { unlockVerifier?: UnlockVerifier }
+) {
   window.localStorage.setItem(AUTH_STORAGE_KEY, JSON.stringify(authState));
-  return render(<ExtensionRouterTestHarness initialEntries={[pathname]} />);
+  return render(
+    <ExtensionRouterTestHarness
+      initialEntries={[pathname]}
+      unlockVerifier={options?.unlockVerifier}
+    />
+  );
 }
 
 describe('extension router', () => {
@@ -56,6 +66,33 @@ describe('extension router', () => {
 
     expect(screen.getByRole('heading', { name: /unlock wallet/i })).toBeInTheDocument();
     expect(document.title).toBe('Unlock Wallet | Ancore Extension');
+  });
+
+  it('keeps locked users on unlock when password verification fails', async () => {
+    const user = userEvent.setup();
+    renderRouter(
+      '/send',
+      {
+        ...DEFAULT_AUTH_STATE,
+        hasOnboarded: true,
+        walletName: 'Locked Wallet',
+      },
+      {
+        unlockVerifier: async () => false,
+      }
+    );
+
+    await user.type(screen.getByLabelText(/password/i), 'wrong-password');
+    await user.click(screen.getByRole('button', { name: /unlock/i }));
+
+    expect(await screen.findByRole('alert')).toHaveTextContent(/incorrect password/i);
+    expect(screen.getByRole('heading', { name: /unlock wallet/i })).toBeInTheDocument();
+    expect(screen.queryByRole('heading', { name: /home/i })).not.toBeInTheDocument();
+    expect(document.title).toBe('Unlock Wallet | Ancore Extension');
+    expect(JSON.parse(window.localStorage.getItem(AUTH_STORAGE_KEY) ?? '{}')).toMatchObject({
+      hasOnboarded: true,
+      isUnlocked: false,
+    });
   });
 
   it('creates an account and lands on the protected home route', async () => {
@@ -128,8 +165,37 @@ describe('extension router', () => {
     await user.type(screen.getByLabelText(/password/i), 'wrong-password');
     await user.click(screen.getByRole('button', { name: /unlock/i }));
 
-    expect(await screen.findByRole('alert')).toHaveTextContent(/invalid password/i);
+    expect(await screen.findByRole('alert')).toHaveTextContent(/incorrect password/i);
     expect(screen.getByRole('heading', { name: /unlock wallet/i })).toBeInTheDocument();
     expect(screen.queryByRole('heading', { name: /home/i })).not.toBeInTheDocument();
+  });
+
+  it('applies network and display settings across pages without reload', async () => {
+    const user = userEvent.setup();
+    renderRouter('/settings', {
+      ...DEFAULT_AUTH_STATE,
+      hasOnboarded: true,
+      isUnlocked: true,
+    });
+
+    await user.click(screen.getByRole('button', { name: /environment/i }));
+    await user.click(screen.getByRole('button', { name: /staging/i }));
+    await user.click(screen.getByRole('button', { name: /go back/i }));
+
+    await user.click(screen.getByRole('button', { name: /network/i }));
+    await user.click(screen.getByRole('button', { name: /^testnet/i }));
+
+    const navBar = screen.getByTestId('nav-bar');
+    await user.click(within(navBar).getByRole('link', { name: /home/i }));
+    expect(await screen.findByText(/testnet • staging/i)).toBeInTheDocument();
+
+    await user.click(within(navBar).getByRole('link', { name: /settings/i }));
+    await user.click(screen.getByRole('button', { name: /density/i }));
+    await user.click(screen.getByRole('button', { name: /compact/i }));
+    await user.click(screen.getByRole('button', { name: /go back/i }));
+
+    await user.click(within(navBar).getByRole('link', { name: /receive/i }));
+    expect(await screen.findByText(/on testnet/i)).toBeInTheDocument();
+    expect(document.querySelector('[data-display-preference="compact"]')).toBeTruthy();
   });
 });

@@ -56,7 +56,7 @@ export class ChromeStorageAdapter implements StorageAdapter {
     this.area = area;
   }
 
-  async get(key: string): Promise<unknown> {
+  async get<T = unknown>(key: string): Promise<T | null> {
     try {
       return await new Promise((resolve, reject) => {
         this.area.get(key, (result) => {
@@ -64,7 +64,7 @@ export class ChromeStorageAdapter implements StorageAdapter {
             reject(new Error(chrome.runtime.lastError.message));
             return;
           }
-          resolve(result[key] ?? null);
+          resolve((result[key] ?? null) as T | null);
         });
       });
     } catch (err) {
@@ -134,10 +134,10 @@ export class BrowserStorageAdapter implements StorageAdapter {
     this.area = area ?? browser.storage.local;
   }
 
-  async get(key: string): Promise<unknown> {
+  async get<T = unknown>(key: string): Promise<T | null> {
     try {
       const result = await this.area.get(key);
-      return result[key] ?? null;
+      return (result[key] ?? null) as T | null;
     } catch (err) {
       throw mapToStorageError(err);
     }
@@ -184,10 +184,10 @@ export function createStorageAdapter(): StorageAdapter {
 // ─── LocalStorage Fallback (dev/test) ────────────────────────────────────────
 
 export class LocalStorageAdapter implements StorageAdapter {
-  async get(key: string): Promise<unknown> {
+  async get<T = unknown>(key: string): Promise<T | null> {
     try {
       const raw = localStorage.getItem(key);
-      return raw !== null ? JSON.parse(raw) : null;
+      return raw !== null ? (JSON.parse(raw) as T) : null;
     } catch (err) {
       throw mapToStorageError(err);
     }

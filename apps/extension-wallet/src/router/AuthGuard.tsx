@@ -20,6 +20,7 @@ export const DEFAULT_AUTH_STATE: AuthState = {
 
 interface AuthContextValue {
   authState: AuthState;
+  unlockError: string | null;
   completeOnboarding: (walletName: string) => void;
   unlockWallet: (password: string) => Promise<boolean>;
   lockWallet: () => void;
@@ -35,6 +36,10 @@ function getStorageManager(): SecureStorageManager {
   }
   return storageManager;
 }
+
+export type UnlockVerifier = (password: string) => boolean | Promise<boolean>;
+
+const DEFAULT_UNLOCK_ERROR = 'Incorrect password. Please try again.';
 
 export function readAuthState(): AuthState {
   if (typeof window === 'undefined') {
@@ -60,9 +65,16 @@ function writeAuthState(authState: AuthState): void {
   window.localStorage.setItem(AUTH_STORAGE_KEY, JSON.stringify(authState));
 }
 
-export function ExtensionAuthProvider({ children }: { children: React.ReactNode }) {
+export function ExtensionAuthProvider({
+  children,
+  unlockVerifier,
+}: {
+  children: React.ReactNode;
+  unlockVerifier?: UnlockVerifier;
+}) {
   const [authState, setAuthState] = React.useState<AuthState>(readAuthState);
   const storage = React.useMemo(() => getStorageManager(), []);
+  const [unlockError, setUnlockError] = React.useState<string | null>(null);
 
   React.useEffect(() => {
     writeAuthState(authState);
@@ -82,7 +94,9 @@ export function ExtensionAuthProvider({ children }: { children: React.ReactNode 
   const value = React.useMemo<AuthContextValue>(
     () => ({
       authState,
+      unlockError,
       completeOnboarding: (walletName: string) => {
+        setUnlockError(null);
         setAuthState({
           hasOnboarded: true,
           isUnlocked: true,
@@ -92,8 +106,12 @@ export function ExtensionAuthProvider({ children }: { children: React.ReactNode 
       },
       unlockWallet: async (password: string) => {
         try {
-          const didUnlock = await storage.unlock(password);
-          if (!didUnlock) {
+          const isValid = unlockVerifier
+            ? await unlockVerifier(password)
+            : await storage.unlock(password);
+
+          if (!isValid) {
+            setUnlockError(DEFAULT_UNLOCK_ERROR);
             setAuthState((current) => ({
               ...current,
               isUnlocked: false,
@@ -101,6 +119,7 @@ export function ExtensionAuthProvider({ children }: { children: React.ReactNode 
             return false;
           }
 
+          setUnlockError(null);
           setAuthState((current) => ({
             ...current,
             hasOnboarded: true,
@@ -108,6 +127,7 @@ export function ExtensionAuthProvider({ children }: { children: React.ReactNode 
           }));
           return true;
         } catch {
+          setUnlockError(DEFAULT_UNLOCK_ERROR);
           setAuthState((current) => ({
             ...current,
             isUnlocked: false,
@@ -116,6 +136,7 @@ export function ExtensionAuthProvider({ children }: { children: React.ReactNode 
         }
       },
       lockWallet: () => {
+        setUnlockError(null);
         storage.lock();
         setAuthState((current) => ({
           ...current,
@@ -123,11 +144,12 @@ export function ExtensionAuthProvider({ children }: { children: React.ReactNode 
         }));
       },
       resetWallet: () => {
+        setUnlockError(null);
         storage.lock();
         setAuthState(DEFAULT_AUTH_STATE);
       },
     }),
-    [authState, storage]
+    [authState, unlockError, unlockVerifier, storage]
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

@@ -10,10 +10,51 @@ concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
 
+permissions:
+  contents: read
+  issues: write
+  pull-requests: write
+
 jobs:
+  quarantine-registry:
+    name: Flaky Test Quarantine Registry
+    runs-on: ubuntu-latest
+    outputs:
+      active_count: ${{ steps.validate.outputs.active_count }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Validate quarantine registry
+        id: validate
+        run: node scripts/ci/flaky-quarantine.js validate
+
+      - name: Publish quarantine report
+        run: node scripts/ci/flaky-quarantine.js report
+
+      - name: Auto-tag PR with active quarantine labels
+        if: github.event_name == 'pull_request' && steps.validate.outputs.active_count != '0'
+        uses: actions/github-script@v7
+        continue-on-error: true
+        with:
+          script: |
+            const fs = require('fs');
+            const registry = JSON.parse(fs.readFileSync('.github/flaky-test-quarantine.json', 'utf8'));
+            await github.rest.issues.addLabels({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.issue.number,
+              labels: registry.labels
+            });
+
   lint:
     name: Lint
     runs-on: ubuntu-latest
+    needs: quarantine-registry
     steps:
       - uses: actions/checkout@v4
 
@@ -37,9 +78,13 @@ jobs:
       - name: Check formatting
         run: pnpm format:check
 
+      - name: Lint indexer migrations
+        run: pnpm indexer:lint-migrations
+
   test:
     name: Test
     runs-on: ubuntu-latest
+    needs: quarantine-registry
     steps:
       - uses: actions/checkout@v4
 
@@ -63,14 +108,141 @@ jobs:
       - name: Run tests
         run: pnpm test
 
+      - name: Check coverage gates
+        run: node scripts/coverage-gate.js
+        continue-on-error: false
+
+      - name: Upload coverage reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage-reports
+          path: packages/*/coverage/
+          retention-days: 30
+
+  coverage-report:
+    name: Coverage Report
+    runs-on: ubuntu-latest
+    needs: test
+    if: always()
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v2
+        with:
+          version: 9
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'pnpm'
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Build packages
+        run: pnpm build
+
+      - name: Run tests with coverage
+        run: pnpm test
+        continue-on-error: true
+
+      - name: Generate coverage summary
+        run: |
+          echo "## 📊 Coverage Report" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+
+          for package in core-sdk account-abstraction crypto stellar; do
+            if [ -f "packages/$package/coverage/coverage-summary.json" ]; then
+              echo "### $package" >> $GITHUB_STEP_SUMMARY
+              echo '```' >> $GITHUB_STEP_SUMMARY
+              node -e "
+                const data = require('./packages/$package/coverage/coverage-summary.json');
+                const total = data.total;
+                console.log('Branch:    ' + total.branches.pct + '%');
+                console.log('Functions: ' + total.functions.pct + '%');
+                console.log('Lines:     ' + total.lines.pct + '%');
+                console.log('Statements: ' + total.statements.pct + '%');
+              " >> $GITHUB_STEP_SUMMARY
+              echo '```' >> $GITHUB_STEP_SUMMARY
+            fi
+          done
+
+  extension-e2e-smoke:
+    name: Extension E2E Smoke
+    runs-on: ubuntu-latest
+    needs: quarantine-registry
+    strategy:
+      fail-fast: false
+      matrix:
+        browser: [chromium, firefox]
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v2
+        with:
+          version: 9
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'pnpm'
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Install Playwright browser dependencies
+        run: pnpm --filter @ancore/extension-wallet exec playwright install --with-deps ${{ matrix.browser }}
+
+      - name: Run extension smoke suite
+        id: smoke
+        run: node scripts/ci/flaky-quarantine.js run --area extension-wallet -- pnpm --filter @ancore/extension-wallet exec playwright test --config=tests/playwright.config.ts --grep @smoke --project=${{ matrix.browser }}
+
+      - name: Auto-tag PR when quarantine absorbs a smoke failure
+        if: github.event_name == 'pull_request' && steps.smoke.outputs.quarantined == 'true'
+        uses: actions/github-script@v7
+        continue-on-error: true
+        with:
+          script: |
+            const fs = require('fs');
+            const registry = JSON.parse(fs.readFileSync('.github/flaky-test-quarantine.json', 'utf8'));
+            await github.rest.issues.addLabels({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.issue.number,
+              labels: registry.labels
+            });
+
+      - name: Upload flaky quarantine report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: flaky-quarantine-report-${{ matrix.browser }}
+          path: .ci/flaky-quarantine-report.md
+          if-no-files-found: ignore
+          retention-days: 30
+
+      - name: Upload extension E2E failure artifacts
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: extension-e2e-failure-artifacts-${{ matrix.browser }}
+          path: apps/extension-wallet/test-results/
+          retention-days: 7
+
   contracts:
     name: Build & Test Contracts
     runs-on: ubuntu-latest
+    needs: quarantine-registry
     steps:
       - uses: actions/checkout@v4
 
       - name: Setup Rust
-        uses: dtolnay/rust-toolchain@stable
+        uses: dtolnay/rust-toolchain@1.81.0
 
       - name: Ensure Cargo cache directories exist
         run: |
@@ -117,9 +289,18 @@ jobs:
         working-directory: ./contracts
         run: cargo test
 
+      - name: Upload contract build logs on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: contract-failure-logs
+          path: contracts/target/wasm32-unknown-unknown/release/*.wasm
+          retention-days: 7
+
   security:
     name: Security Audit
     runs-on: ubuntu-latest
+    needs: quarantine-registry
     steps:
       - uses: actions/checkout@v4
 

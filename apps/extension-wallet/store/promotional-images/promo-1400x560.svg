@@ -1,0 +1,21 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1400" height="560" viewBox="0 0 1400 560">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#081027"/>
+      <stop offset="100%" stop-color="#1d3678"/>
+    </linearGradient>
+  </defs>
+  <rect width="1400" height="560" fill="url(#bg)"/>
+  <ellipse cx="1210" cy="100" rx="260" ry="180" fill="#36d6c5" opacity="0.14"/>
+  <ellipse cx="120" cy="520" rx="260" ry="180" fill="#5aa8ff" opacity="0.12"/>
+  <text x="90" y="190" font-family="Inter, Segoe UI, Arial" font-size="84" font-weight="700" fill="#ffffff">Ancore Wallet</text>
+  <text x="90" y="250" font-family="Inter, Segoe UI, Arial" font-size="36" fill="#d7e3ff">Account abstraction wallet for Stellar</text>
+  <text x="90" y="302" font-family="Inter, Segoe UI, Arial" font-size="36" fill="#d7e3ff">with session keys and seamless Web3 experience.</text>
+  <rect x="90" y="350" rx="14" ry="14" width="370" height="70" fill="#36d6c5"/>
+  <text x="118" y="395" font-family="Inter, Segoe UI, Arial" font-size="30" font-weight="700" fill="#081027">Secure. Fast. User-first.</text>
+  <rect x="940" y="110" rx="28" ry="28" width="340" height="350" fill="#0f1b3a" stroke="#9fc6ff" stroke-opacity="0.5"/>
+  <text x="980" y="178" font-family="Inter, Segoe UI, Arial" font-size="34" fill="#ffffff">Session Keys</text>
+  <text x="980" y="228" font-family="Inter, Segoe UI, Arial" font-size="24" fill="#d7e3ff">Time-bound</text>
+  <text x="980" y="264" font-family="Inter, Segoe UI, Arial" font-size="24" fill="#d7e3ff">Permission-scoped</text>
+  <text x="980" y="300" font-family="Inter, Segoe UI, Arial" font-size="24" fill="#d7e3ff">Easy to revoke</text>
+</svg>

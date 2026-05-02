@@ -1,5 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { amountSchema, isStellarAddress } from '@ancore/ui-kit';
+import { amountSchema, isStellarAddress, validateAmountPrecision } from '@ancore/ui-kit';
+import { mapRpcStatus, isTerminalStatus } from '@/utils/transaction-status';
+import { validateTransferNote, truncateTransferNote } from '@/utils/note-validation';
 
 export type SendStep = 'form' | 'review' | 'confirm' | 'status';
 export type TxStatus = 'idle' | 'pending' | 'confirmed' | 'failed';
@@ -7,6 +9,7 @@ export type TxStatus = 'idle' | 'pending' | 'confirmed' | 'failed';
 export interface SendFormValues {
   to: string;
   amount: string;
+  note?: string;
 }
 
 export interface FeeEstimate {
@@ -18,6 +21,7 @@ export interface FeeEstimate {
 export interface SendTransactionDraft extends SendFormValues {
   fee: FeeEstimate;
   total: string;
+  truncatedNote?: string;
 }
 
 export interface SendService {
@@ -30,6 +34,8 @@ export interface SendService {
 
 export interface UseSendTransactionOptions {
   balance?: number;
+  /** Maximum decimal places allowed for the asset being sent. Defaults to 7 (XLM). */
+  assetDecimals?: number;
   service?: SendService;
   pollIntervalMs?: number;
 }
@@ -37,7 +43,9 @@ export interface UseSendTransactionOptions {
 export interface ValidationErrors {
   to?: string;
   amount?: string;
+  note?: string;
   password?: string;
+  simulation?: string;
 }
 
 const DEFAULT_BALANCE = 250;
@@ -70,11 +78,20 @@ export function validateRecipientAddress(value: string): string | undefined {
   return undefined;
 }
 
-export function validateAmount(value: string, balance: number): string | undefined {
+export function validateAmount(
+  value: string,
+  balance: number,
+  assetDecimals: number = 7
+): string | undefined {
   const parsed = amountSchema.safeParse(value);
 
   if (!parsed.success) {
     return parsed.error.issues[0]?.message ?? 'Invalid amount';
+  }
+
+  const precisionError = validateAmountPrecision(value, assetDecimals);
+  if (precisionError) {
+    return precisionError;
   }
 
   const numeric = Number(value);
@@ -88,6 +105,7 @@ export function validateAmount(value: string, balance: number): string | undefin
 
 export function useSendTransaction(options: UseSendTransactionOptions = {}) {
   const balance = options.balance ?? DEFAULT_BALANCE;
+  const assetDecimals = options.assetDecimals ?? 7;
   const pollIntervalMs = options.pollIntervalMs ?? DEFAULT_POLL_MS;
   const service = useMemo(() => options.service ?? createDefaultService(), [options.service]);
 
@@ -113,13 +131,14 @@ export function useSendTransaction(options: UseSendTransactionOptions = {}) {
     (values: SendFormValues): boolean => {
       const nextErrors: ValidationErrors = {
         to: validateRecipientAddress(values.to),
-        amount: validateAmount(values.amount, balance),
+        amount: validateAmount(values.amount, balance, assetDecimals),
+        note: values.note ? validateTransferNote(values.note) : undefined,
       };
 
       setErrors(nextErrors);
-      return !nextErrors.to && !nextErrors.amount;
+      return !nextErrors.to && !nextErrors.amount && !nextErrors.note;
     },
-    [balance]
+    [balance, assetDecimals]
   );
 
   const goToReview = useCallback(
@@ -128,13 +147,26 @@ export function useSendTransaction(options: UseSendTransactionOptions = {}) {
         return false;
       }
 
-      const estimatedFee = await service.estimateFee(values);
-      const total = (Number(values.amount) + Number(estimatedFee.totalFee)).toFixed(7);
+      setSubmitting(true);
+      setErrors((current) => ({ ...current, simulation: undefined }));
 
-      setFee(estimatedFee);
-      setTx({ ...values, fee: estimatedFee, total });
-      setStep('review');
-      return true;
+      try {
+        const estimatedFee = await service.estimateFee(values);
+        const total = (Number(values.amount) + Number(estimatedFee.totalFee)).toFixed(7);
+        const truncatedNote = values.note ? truncateTransferNote(values.note) : undefined;
+
+        setFee(estimatedFee);
+        setTx({ ...values, fee: estimatedFee, total, truncatedNote });
+        setStep('review');
+        return true;
+      } catch (error) {
+        console.error('Simulation failed:', error);
+        const msg = error instanceof Error ? error.message : 'Simulation failed';
+        setErrors((current) => ({ ...current, simulation: msg }));
+        return false;
+      } finally {
+        setSubmitting(false);
+      }
     },
     [service, validateForm]
   );
@@ -169,10 +201,11 @@ export function useSendTransaction(options: UseSendTransactionOptions = {}) {
         setStep('status');
 
         pollRef.current = setInterval(async () => {
-          const next = await service.fetchTransactionStatus(submission.txId);
-          setStatus(next);
+          const raw = await service.fetchTransactionStatus(submission.txId);
+          const appStatus = mapRpcStatus(raw);
+          setStatus(raw); // keep TxStatus in local state for hook consumers
 
-          if (next === 'confirmed' || next === 'failed') {
+          if (isTerminalStatus(appStatus)) {
             if (pollRef.current) {
               clearInterval(pollRef.current);
             }

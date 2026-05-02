@@ -60,7 +60,7 @@ describe('LockManager', () => {
     manager.destroy();
   });
 
-  it('fails closed when storage unlock resolves false', async () => {
+  it('fails closed when storage unlock returns false', async () => {
     const storage = {
       unlock: vi.fn(async () => false),
       lock: vi.fn(),
@@ -76,6 +76,7 @@ describe('LockManager', () => {
 
     await expect(manager.unlock('correct')).rejects.toThrow('Invalid password or corrupted data');
     expect(manager.isLocked).toBe(true);
+    expect(storage.lock).toHaveBeenCalledOnce();
     expect(onUnlock).not.toHaveBeenCalled();
     manager.destroy();
   });

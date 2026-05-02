@@ -1,0 +1,6 @@
+{
+  "version": 1,
+  "maxQuarantineDays": 30,
+  "labels": ["ci", "flaky-test", "quarantine-required"],
+  "tests": []
+}

@@ -28,7 +28,7 @@
   "license": "Apache-2.0",
   "dependencies": {
     "@ancore/types": "workspace:*",
-    "@stellar/stellar-sdk": "^13.0.0"
+    "@stellar/stellar-sdk": "^13.3.0"
   },
   "devDependencies": {
     "@eslint/js": "^9.0.0",
