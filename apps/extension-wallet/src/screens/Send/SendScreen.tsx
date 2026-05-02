@@ -14,13 +14,17 @@ import {
   type SendFormValues,
   type SendService,
 } from '@/hooks/useSendTransaction';
+import { useRecentRecipients } from '@/hooks/useRecentRecipients';
 import { ConfirmDialog } from '@/screens/Send/ConfirmDialog';
 import { ReviewScreen } from '@/screens/Send/ReviewScreen';
 import { StatusScreen } from '@/screens/Send/StatusScreen';
+import { TransferNoteInput } from '@/components/TransferNoteInput';
 import { SendHorizontal, Info, AlertCircle } from 'lucide-react';
 
 interface SendScreenProps {
   balance?: number;
+  /** Maximum decimal places for the asset being sent. Defaults to 7 (XLM). */
+  assetDecimals?: number;
   service?: SendService;
   pollIntervalMs?: number;
 }
@@ -30,14 +34,22 @@ interface SendScreenProps {
  *
  * Implements a premium dark UI with real-time validation and simulation feedback.
  */
-export function SendScreen({ balance, service, pollIntervalMs }: SendScreenProps) {
-  const [form, setForm] = useState<SendFormValues>({ to: '', amount: '' });
+export function SendScreen({ balance, assetDecimals, service, pollIntervalMs }: SendScreenProps) {
+  const [form, setForm] = useState<SendFormValues>({ to: '', amount: '', note: '' });
 
-  const send = useSendTransaction({ balance, service, pollIntervalMs });
+  const send = useSendTransaction({ balance, assetDecimals, service, pollIntervalMs });
+  const { recipients, addRecipient } = useRecentRecipients();
 
   const onMax = () => {
     setForm((current) => ({ ...current, amount: String(send.balance) }));
     send.setMaxAmount();
+  };
+
+  const handleReview = async () => {
+    const success = await send.goToReview(form);
+    if (success) {
+      await addRecipient({ address: form.to });
+    }
   };
 
   if (send.step === 'review' && send.tx) {
@@ -83,6 +95,8 @@ export function SendScreen({ balance, service, pollIntervalMs }: SendScreenProps
             value={form.to}
             error={send.errors.to}
             className="group"
+            recentRecipients={recipients}
+            onSelectRecent={(address) => setForm((current) => ({ ...current, to: address }))}
             onChange={(event: React.ChangeEvent<HTMLInputElement>) =>
               setForm((current) => ({ ...current, to: event.target.value }))
             }
@@ -101,6 +115,13 @@ export function SendScreen({ balance, service, pollIntervalMs }: SendScreenProps
                 amount: event.target.value,
               }))
             }
+          />
+
+          <TransferNoteInput
+            value={form.note || ''}
+            onChange={(note) => setForm((current) => ({ ...current, note }))}
+            error={send.errors.note}
+            placeholder="Add a note (optional)"
           />
         </div>
 
@@ -124,7 +145,7 @@ export function SendScreen({ balance, service, pollIntervalMs }: SendScreenProps
               'bg-cyan-400 text-slate-950 shadow-[0_15px_30px_rgba(34,211,238,0.15)] hover:bg-cyan-300 hover:scale-[1.02] hover:shadow-[0_20px_40px_rgba(34,211,238,0.2)]',
               'disabled:opacity-50 disabled:grayscale disabled:scale-100'
             )}
-            onClick={() => void send.goToReview(form)}
+            onClick={handleReview}
             loading={send.submitting}
             disabled={send.submitting}
           >

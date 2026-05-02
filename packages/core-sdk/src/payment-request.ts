@@ -1,5 +1,6 @@
 import { StrKey } from '@stellar/stellar-sdk';
-import { PaymentRequestValidationError } from './errors';
+import { PaymentRequestValidationError, InvalidAmountError } from './errors';
+import { normalizeAmount } from './amount';
 
 /**
  * Represents a standardized request for payment that can be parsed from
@@ -84,12 +85,18 @@ export function parsePaymentRequest(payload: unknown): PaymentRequest {
 
   // 2. Amount validation
   const amount = raw.amount;
-  if (typeof amount !== 'string' || amount.trim().length === 0) {
-    throw new PaymentRequestValidationError('amount is required and must be a non-empty string.');
+  if (typeof amount !== 'string' && typeof amount !== 'number') {
+    throw new PaymentRequestValidationError('amount is required and must be a string or number.');
   }
-  const parsedAmount = parseFloat(amount);
-  if (isNaN(parsedAmount) || parsedAmount <= 0) {
-    throw new PaymentRequestValidationError('amount must be a positive numeric string.');
+
+  let normalizedAmount: string;
+  try {
+    normalizedAmount = normalizeAmount(amount);
+  } catch (error) {
+    if (error instanceof InvalidAmountError) {
+      throw new PaymentRequestValidationError(error.message);
+    }
+    throw error;
   }
 
   // 3. Asset validation & normalization
@@ -125,7 +132,7 @@ export function parsePaymentRequest(payload: unknown): PaymentRequest {
   // 5. Build normalized object
   const request: PaymentRequest = {
     destination,
-    amount,
+    amount: normalizedAmount,
     asset,
   };
 

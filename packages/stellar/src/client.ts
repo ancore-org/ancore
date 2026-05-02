@@ -6,6 +6,7 @@ import { rpc as StellarRpc, Horizon } from '@stellar/stellar-sdk';
 import type { Transaction } from '@stellar/stellar-sdk';
 import type { Network, NetworkConfig } from '@ancore/types';
 import {
+  StellarError,
   NetworkError,
   AccountNotFoundError,
   TransactionError,
@@ -78,8 +79,6 @@ interface AssetMetadataCacheEntry {
   expiresAt: number;
 }
 
-type HorizonOperationRecord = { paging_token?: string };
-
 /**
  * StellarClient provides methods for interacting with the Stellar network
  *
@@ -91,7 +90,8 @@ type HorizonOperationRecord = { paging_token?: string };
  * ```
  */
 export class StellarClient {
-  private readonly rpcServer: StellarRpc.Server;
+  private readonly rpcUrls: string[];
+  private readonly rpcServers: StellarRpc.Server[];
   private readonly horizonServer: Horizon.Server;
   private readonly networkPassphrase: string;
   private readonly network: Network;
@@ -103,16 +103,17 @@ export class StellarClient {
     misses: 0,
     expirations: 0,
   };
+  private currentRpcEndpointIndex = 0;
 
   constructor(config: StellarClientConfig) {
     this.network = config.network;
 
     const networkConfig = NETWORK_CONFIG[config.network];
-    const rpcUrl = config.rpcUrl ?? networkConfig.rpcUrl;
+    this.rpcUrls = this.resolveRpcUrls(config, networkConfig.rpcUrl);
     const horizonUrl = networkConfig.horizonUrl;
     this.networkPassphrase = config.networkPassphrase ?? networkConfig.networkPassphrase;
 
-    this.rpcServer = new StellarRpc.Server(rpcUrl);
+    this.rpcServers = this.rpcUrls.map((rpcUrl) => new StellarRpc.Server(rpcUrl));
     this.horizonServer = new Horizon.Server(horizonUrl);
     this.retryOptions = config.retryOptions ?? {
       maxRetries: 3,
@@ -121,6 +122,102 @@ export class StellarClient {
     };
     this.assetMetadataCacheTtlMs =
       config.assetMetadataCacheTtlMs ?? DEFAULT_ASSET_METADATA_CACHE_TTL_MS;
+  }
+
+  private resolveRpcUrls(config: StellarClientConfig, defaultRpcUrl: string): string[] {
+    const configuredRpcUrls =
+      config.rpcUrls && config.rpcUrls.length > 0 ? config.rpcUrls : undefined;
+    const rpcUrls = configuredRpcUrls ?? (config.rpcUrl ? [config.rpcUrl] : [defaultRpcUrl]);
+    const usableRpcUrls = rpcUrls
+      .map((rpcUrl) => rpcUrl.trim())
+      .filter((rpcUrl) => rpcUrl.length > 0);
+
+    if (usableRpcUrls.length === 0) {
+      throw new NetworkError('At least one usable RPC endpoint is required');
+    }
+
+    return usableRpcUrls;
+  }
+
+  private getCurrentRpcServer(): StellarRpc.Server {
+    return this.rpcServers[this.currentRpcEndpointIndex];
+  }
+
+  private rotateRpcEndpoint(): boolean {
+    if (this.rpcServers.length <= 1) {
+      return false;
+    }
+
+    this.currentRpcEndpointIndex = (this.currentRpcEndpointIndex + 1) % this.rpcServers.length;
+    return true;
+  }
+
+  private getRpcFailoverAttemptCount(): number {
+    const maxRetries = this.retryOptions.maxRetries ?? 3;
+    return Math.max(this.rpcServers.length, maxRetries + 1);
+  }
+
+  private getErrorStatusCode(error: Error): number | undefined {
+    if (error instanceof NetworkError) {
+      return error.statusCode;
+    }
+
+    if ('statusCode' in error && typeof error.statusCode === 'number') {
+      return error.statusCode;
+    }
+
+    if ('status' in error && typeof error.status === 'number') {
+      return error.status;
+    }
+
+    if (
+      'response' in error &&
+      error.response &&
+      typeof error.response === 'object' &&
+      'status' in error.response &&
+      typeof error.response.status === 'number'
+    ) {
+      return error.response.status;
+    }
+
+    return undefined;
+  }
+
+  private isRetryableRpcError(error: Error): boolean {
+    if (error instanceof StellarError && !(error instanceof NetworkError)) {
+      return false;
+    }
+
+    const statusCode = this.getErrorStatusCode(error);
+
+    if (statusCode !== undefined) {
+      return statusCode === 429 || statusCode >= 500;
+    }
+
+    return true;
+  }
+
+  private async executeRpcWithFailover<T>(
+    operation: (server: StellarRpc.Server) => Promise<T>
+  ): Promise<T> {
+    let lastError: Error | undefined;
+    const attemptCount = this.getRpcFailoverAttemptCount();
+
+    for (let attempt = 1; attempt <= attemptCount; attempt++) {
+      try {
+        return await operation(this.getCurrentRpcServer());
+      } catch (error) {
+        lastError = error instanceof Error ? error : new Error(String(error));
+
+        if (!this.isRetryableRpcError(lastError)) {
+          throw lastError;
+        }
+
+        this.rotateRpcEndpoint();
+      }
+    }
+
+    throw lastError ?? new NetworkError('RPC request failed');
   }
 
   /**
@@ -135,6 +232,14 @@ export class StellarClient {
    */
   getNetwork(): Network {
     return this.network;
+  }
+
+  getRpcUrls(): string[] {
+    return [...this.rpcUrls];
+  }
+
+  getCurrentRpcUrl(): string {
+    return this.rpcUrls[this.currentRpcEndpointIndex];
   }
 
   /**
@@ -213,7 +318,7 @@ export class StellarClient {
   async getAccountActivityPage(
     publicKey: string,
     request: AccountActivityPageRequest = {}
-  ): Promise<AccountActivityPage<HorizonOperationRecord>> {
+  ): Promise<AccountActivityPage<Horizon.HorizonApi.OperationResponseType>> {
     const { cursor = null, limit = 20, order = 'desc' } = request;
 
     return withRetry(async () => {
@@ -225,7 +330,8 @@ export class StellarClient {
           .order(order);
 
         const page = cursor ? await builder.cursor(cursor).call() : await builder.call();
-        const records = page.records as unknown as HorizonOperationRecord[];
+        // Cast via unknown to avoid overlap errors between Horizon response types
+        const records = page.records as unknown as Horizon.HorizonApi.OperationResponseType[];
         const nextCursor = this.getNextCursor(records);
 
         return { records, nextCursor };
@@ -243,7 +349,7 @@ export class StellarClient {
   async *iterateAccountActivity(
     publicKey: string,
     request: AccountActivityPageRequest = {}
-  ): AsyncGenerator<HorizonOperationRecord, void, unknown> {
+  ): AsyncGenerator<Horizon.HorizonApi.OperationResponseType, void, unknown> {
     let cursor = request.cursor ?? null;
 
     while (true) {
@@ -259,12 +365,12 @@ export class StellarClient {
     }
   }
 
-  private getNextCursor(records: Array<{ paging_token?: string }>): string | null {
+  private getNextCursor(records: unknown[]): string | null {
     if (records.length === 0) {
       return null;
     }
-    const last = records[records.length - 1];
-    return last.paging_token ?? null;
+    const last = records[records.length - 1] as { paging_token?: string };
+    return last?.paging_token ?? null;
   }
 
   private resolveAssetMetadata(balance: Horizon.HorizonApi.BalanceLine): AssetMetadata {
@@ -421,7 +527,7 @@ export class StellarClient {
    */
   async isHealthy(): Promise<boolean> {
     try {
-      await this.rpcServer.getHealth();
+      await this.executeRpcWithFailover((rpcServer) => rpcServer.getHealth());
       return true;
     } catch {
       return false;

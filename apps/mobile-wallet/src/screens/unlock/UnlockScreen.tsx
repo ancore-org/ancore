@@ -43,7 +43,6 @@ export const UnlockScreen = ({
       hasAutoTriggered.current = true;
       attemptBiometric();
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [state.isLoading, state.phase, state.isBiometricAvailable, attemptBiometric]);
 
   if (state.isLoading) {

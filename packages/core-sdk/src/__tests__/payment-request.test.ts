@@ -84,13 +84,13 @@ describe('PaymentRequest Parser', () => {
 
     it('throws when amount is missing or invalid', () => {
       expect(() => parsePaymentRequest({ destination: VALID_ADDRESS })).toThrow(
-        'amount is required and must be a non-empty string.'
+        'amount is required and must be a string or number.'
       );
       expect(() => parsePaymentRequest({ destination: VALID_ADDRESS, amount: '' })).toThrow(
         PaymentRequestValidationError
       );
       expect(() => parsePaymentRequest({ destination: VALID_ADDRESS, amount: 'abc' })).toThrow(
-        'amount must be a positive numeric string.'
+        'Invalid amount: "abc". Must be a valid numeric value.'
       );
       expect(() => parsePaymentRequest({ destination: VALID_ADDRESS, amount: '-1' })).toThrow(
         PaymentRequestValidationError

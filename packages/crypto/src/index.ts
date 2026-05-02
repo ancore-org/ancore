@@ -17,9 +17,39 @@ export {
   type EntropyScore,
 } from './entropy';
 
+// Signature Format Helpers
+/**
+ * Centralized signature format helpers for hex/base64/raw conversions
+ * @example
+ * ```typescript
+ * // Convert bytes to hex
+ * const hex = toHex(sigBytes);
+ *
+ * // Auto-detect and decode any format
+ * const raw = decodeSignature('0xdeadbeef');
+ * ```
+ */
+export {
+  toHex,
+  fromHex,
+  toBase64,
+  fromBase64,
+  encodeSignature,
+  decodeSignature,
+} from './signature-format';
+
+// Password Management
 export { validatePasswordStrength } from './password';
+
+// Encryption
 export { encryptSecretKey, decryptSecretKey } from './encryption';
 export type { EncryptedSecretKeyPayload } from './encryption';
+
+// Mnemonics
 export { generateMnemonic, validateMnemonic } from './mnemonic';
+
+// Key Derivation
 export { deriveKeypairFromMnemonic } from './key-derivation';
-export { randomBytes } from './random';
+
+// Signing & Verification
+export { signTransaction, verifySignature } from './signing';

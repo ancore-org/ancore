@@ -1,18 +1,18 @@
 import React from 'react';
 import { render, screen, fireEvent } from '@testing-library/react';
-import { BrowserRouter, Routes, Route } from 'react-router-dom';
+import { MemoryRouter, Routes, Route } from 'react-router-dom';
 import { QuickActionBar } from '../QuickActionBar';
 
 const renderWithRouter = (component: React.ReactNode) => {
   return render(
-    <BrowserRouter>
+    <MemoryRouter initialEntries={['/']}>
       <Routes>
         <Route path="/" element={component} />
         <Route path="/send" element={<div>Send Page</div>} />
         <Route path="/request" element={<div>Request Page</div>} />
         <Route path="/scan" element={<div>Scan Page</div>} />
       </Routes>
-    </BrowserRouter>
+    </MemoryRouter>
   );
 };
 

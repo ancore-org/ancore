@@ -104,7 +104,7 @@ export function useBiometricUnlock({
   }, []);
 
   //Countdown timer
-  function startCountdown() {
+  const startCountdown = useCallback(() => {
     stopCountdown();
 
     countdownRef.current = setInterval(() => {
@@ -137,7 +137,7 @@ export function useBiometricUnlock({
         }));
       }
     }, 500);
-  }
+  }, [lockoutManager, stopCountdown]);
 
   useEffect(() => {
     return () => {

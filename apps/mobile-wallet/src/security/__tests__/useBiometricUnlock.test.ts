@@ -5,7 +5,7 @@
  * mock services and a real BiometricLockoutManager with in-memory storage.
  */
 
-import { renderHook, act } from '@testing-library/react-hooks';
+import { renderHook, act, waitFor } from '@testing-library/react';
 import { useBiometricUnlock } from '../../security/hooks/useBiometricUnlock';
 import { BiometricLockoutManager } from '../../security/biometric-lockout-manager';
 import type {
@@ -77,19 +77,16 @@ describe('useBiometricUnlock', () => {
   afterEach(() => jest.useRealTimers());
 
   it('initializes with idle or loading phase', async () => {
-    const { result, waitForNextUpdate } = makeTestHook(
-      makeBiometricService(null),
-      makePasswordService()
-    );
+    const { result } = makeTestHook(makeBiometricService(null), makePasswordService());
     expect(result.current.state.isLoading).toBe(true);
-    await waitForNextUpdate();
+    await waitFor(() => expect(result.current.state.isLoading).toBe(false));
     expect(['idle', 'prompting']).toContain(result.current.state.phase);
   });
 
   it('transitions to success on valid biometric', async () => {
     const biometric = makeBiometricService(1);
-    const { result, waitForNextUpdate } = makeTestHook(biometric, makePasswordService());
-    await waitForNextUpdate(); // init complete
+    const { result } = makeTestHook(biometric, makePasswordService());
+    await waitFor(() => expect(result.current.state.isLoading).toBe(false)); // init complete
 
     await act(async () => {
       await result.current.attemptBiometric();
@@ -100,8 +97,8 @@ describe('useBiometricUnlock', () => {
 
   it('decrements attemptsRemaining on failure', async () => {
     const biometric = makeBiometricService(null); // always fails
-    const { result, waitForNextUpdate } = makeTestHook(biometric, makePasswordService());
-    await waitForNextUpdate();
+    const { result } = makeTestHook(biometric, makePasswordService());
+    await waitFor(() => expect(result.current.state.isLoading).toBe(false));
 
     await act(async () => {
       await result.current.attemptBiometric();
@@ -113,8 +110,8 @@ describe('useBiometricUnlock', () => {
 
   it('locks after max failed attempts', async () => {
     const biometric = makeBiometricService(null);
-    const { result, waitForNextUpdate } = makeTestHook(biometric, makePasswordService());
-    await waitForNextUpdate();
+    const { result } = makeTestHook(biometric, makePasswordService());
+    await waitFor(() => expect(result.current.state.isLoading).toBe(false));
 
     for (let i = 0; i < 3; i++) {
       await act(async () => {
@@ -128,8 +125,8 @@ describe('useBiometricUnlock', () => {
 
   it('switches to fallback phase on switchToPasswordFallback()', async () => {
     const biometric = makeBiometricService(null);
-    const { result, waitForNextUpdate } = makeTestHook(biometric, makePasswordService());
-    await waitForNextUpdate();
+    const { result } = makeTestHook(biometric, makePasswordService());
+    await waitFor(() => expect(result.current.state.isLoading).toBe(false));
 
     act(() => {
       result.current.switchToPasswordFallback();
@@ -140,8 +137,8 @@ describe('useBiometricUnlock', () => {
 
   it('unlocks via correct password', async () => {
     const biometric = makeBiometricService(null);
-    const { result, waitForNextUpdate } = makeTestHook(biometric, makePasswordService('secret'));
-    await waitForNextUpdate();
+    const { result } = makeTestHook(biometric, makePasswordService('secret'));
+    await waitFor(() => expect(result.current.state.isLoading).toBe(false));
 
     act(() => {
       result.current.switchToPasswordFallback();
@@ -156,8 +153,8 @@ describe('useBiometricUnlock', () => {
 
   it('shows passwordError on wrong password', async () => {
     const biometric = makeBiometricService(null);
-    const { result, waitForNextUpdate } = makeTestHook(biometric, makePasswordService('secret'));
-    await waitForNextUpdate();
+    const { result } = makeTestHook(biometric, makePasswordService('secret'));
+    await waitFor(() => expect(result.current.state.isLoading).toBe(false));
 
     act(() => {
       result.current.switchToPasswordFallback();

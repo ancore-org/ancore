@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { Button, Card, CardContent, CardHeader, CardTitle, Separator, cn } from '@ancore/ui-kit';
 import type { SendTransactionDraft } from '@/hooks/useSendTransaction';
+import { TransferNotePreview } from '@/components/TransferNotePreview';
 import { ShieldCheck, ArrowRight, Wallet, Globe, Info } from 'lucide-react';
 
 interface ReviewScreenProps {
@@ -67,6 +68,9 @@ export function ReviewScreen({ transaction, onBack, onConfirm }: ReviewScreenPro
             </div>
           </div>
         </div>
+
+        {/* Transfer Note */}
+        {transaction.truncatedNote && <TransferNotePreview note={transaction.truncatedNote} />}
 
         {/* Fees Summary */}
         <div className="space-y-3 bg-white/5 border border-white/10 rounded-2xl p-5">

@@ -16,6 +16,7 @@ mod repositories;
 
 use api::account_activity;
 use api::health;
+use api::metrics;
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
@@ -89,6 +90,7 @@ async fn main() -> anyhow::Result<()> {
             get(account_activity::list_types_handler),
         )
         .route("/health", get(health::health_handler))
+        .route("/metrics", get(metrics::metrics_handler))
         .layer(GovernorLayer {
             config: governor_conf,
         })

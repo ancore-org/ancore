@@ -16,6 +16,7 @@
     "build": "tsup src/index.ts --format cjs,esm --tsconfig ./tsconfig.json",
     "dev": "tsup src/index.ts --format cjs,esm --dts --watch",
     "test": "jest --coverage --runInBand",
+    "check": "tsc -p tsconfig.json --noEmit",
     "test:integration": "jest --testPathPattern=integration --no-coverage",
     "lint": "eslint src/",
     "clean": "rm -rf dist"

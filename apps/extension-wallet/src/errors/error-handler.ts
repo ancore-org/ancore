@@ -6,6 +6,7 @@
  */
 
 import { ErrorMessage, getErrorMessage } from './error-messages';
+import { normalizeError } from '@ancore/core-sdk';
 
 /**
  * Error categories for classification
@@ -145,24 +146,26 @@ export class ErrorHandler {
    * @returns Error code if found
    */
   extractErrorCode(error: unknown): string | undefined {
+    try {
+      const normalized = normalizeError(error);
+      if (normalized.code && normalized.code !== ErrorCategory.UNKNOWN) {
+        return normalized.code;
+      }
+    } catch {}
+
+    // Fallback to previous heuristics
     if (error instanceof Error) {
-      // Check for common error code patterns (e.g., ECONNREFUSED, ERR_NETWORK)
+      if ('code' in error && typeof (error as { code?: unknown }).code === 'string') {
+        return (error as { code: string }).code;
+      }
+
       const codeMatch = error.message.match(/\b([A-Z][A-Z0-9_]+)\b/);
-      if (codeMatch) {
-        return codeMatch[1];
-      }
+      if (codeMatch) return codeMatch[1];
 
-      // Check for HTTP status codes
       const statusMatch = error.message.match(/\b(4\d{2}|5\d{2})\b/);
-      if (statusMatch) {
-        return statusMatch[1];
-      }
-
-      // Check for node error code property
-      if ('code' in error && typeof error.code === 'string') {
-        return error.code;
-      }
+      if (statusMatch) return statusMatch[1];
     }
+
     return undefined;
   }
 
@@ -222,9 +225,10 @@ export class ErrorHandler {
       return getErrorMessage(errInfo.category, errInfo.code);
     }
 
-    // Handle unknown error
-    const errorInfo = this.handleError(error);
-    return getErrorMessage(errorInfo.category, errorInfo.code);
+    // Handle unknown error by normalizing first
+    const normalized = normalizeError(error);
+    const category = (normalized.category as ErrorCategory) ?? ErrorCategory.UNKNOWN;
+    return getErrorMessage(category, normalized.code);
   }
 
   /**
