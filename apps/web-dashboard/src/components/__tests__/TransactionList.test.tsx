@@ -250,12 +250,12 @@ describe('TransactionList', () => {
     );
 
     const rows = getTransactionRows(container);
-    const firstRowDate = rows[0].textContent;
-    const lastRowDate = rows[rows.length - 1].textContent;
+    const firstRowContent = rows[0].textContent ?? '';
+    const lastRowContent = rows[rows.length - 1].textContent ?? '';
 
-    // Most recent date should appear first (descending order)
-    expect(firstRowDate).toContain('1/3/2024');
-    expect(lastRowDate).toContain('1/1/2024');
+    // Most recent date should appear first (tx-2), oldest last (tx-1)
+    expect(firstRowContent).toContain('+50 XLM');
+    expect(lastRowContent).toContain('-100 XLM');
   });
 
   it('sorts transactions by amount in ascending order', () => {
@@ -355,11 +355,12 @@ describe('TransactionList', () => {
     fireEvent.click(screen.getByText('Date'));
 
     const rows = getTransactionRows(container);
-    const firstRowDate = rows[0].textContent;
-    const lastRowDate = rows[rows.length - 1].textContent;
+    const firstRowContent = rows[0].textContent ?? '';
+    const lastRowContent = rows[rows.length - 1].textContent ?? '';
 
-    expect(firstRowDate).toContain('1/1/2024');
-    expect(lastRowDate).toContain('1/2/2024');
+    // Ascending date order after toggling date sort once
+    expect(firstRowContent).toContain('-100 XLM');
+    expect(lastRowContent).toContain('+50 XLM');
   });
 
   it('preserves sort state during pagination', () => {

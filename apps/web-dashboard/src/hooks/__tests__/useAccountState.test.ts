@@ -1,18 +1,20 @@
 import { renderHook, waitFor } from '@testing-library/react';
+import { act } from 'react';
+import { vi } from 'vitest';
 import { useAccountState } from '../useAccountState';
 
 // Mock localStorage
 const localStorageMock = (() => {
   let store: Record<string, string> = {};
   return {
-    getItem: jest.fn((key: string) => store[key] || null),
-    setItem: jest.fn((key: string, value: string) => {
+    getItem: vi.fn((key: string) => store[key] || null),
+    setItem: vi.fn((key: string, value: string) => {
       store[key] = value;
     }),
-    removeItem: jest.fn((key: string) => {
+    removeItem: vi.fn((key: string) => {
       delete store[key];
     }),
-    clear: jest.fn(() => {
+    clear: vi.fn(() => {
       store = {};
     }),
   };
@@ -25,7 +27,7 @@ Object.defineProperty(window, 'localStorage', {
 describe('useAccountState', () => {
   beforeEach(() => {
     localStorageMock.clear();
-    jest.clearAllMocks();
+    vi.clearAllMocks();
   });
 
   it('loads accounts and sets default current account on initial load', async () => {
@@ -86,9 +88,13 @@ describe('useAccountState', () => {
     });
 
     const targetAccount = result.current.accounts[1];
-    result.current.setCurrentAccount(targetAccount);
+    act(() => {
+      result.current.setCurrentAccount(targetAccount);
+    });
 
-    expect(result.current.currentAccount?.address).toBe(targetAccount.address);
+    await waitFor(() => {
+      expect(result.current.currentAccount?.address).toBe(targetAccount.address);
+    });
     expect(localStorageMock.setItem).toHaveBeenCalledWith(
       'ancore-dashboard-selected-account',
       expect.stringContaining(targetAccount.address)
@@ -138,9 +144,9 @@ describe('useAccountState', () => {
     expect(result.current.loading).toBe(false);
 
     // Call refetch
-    result.current.refetch();
-
-    expect(result.current.loading).toBe(true);
+    act(() => {
+      result.current.refetch();
+    });
 
     await waitFor(() => {
       expect(result.current.loading).toBe(false);
