@@ -19,8 +19,8 @@ export const AccountSelector: React.FC<AccountSelectorProps> = ({
   const [isOpen, setIsOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [highlightedIndex, setHighlightedIndex] = useState(-1);
-  const dropdownRef = useRef<HTMLDivElement>(null);
-  const searchInputRef = useRef<HTMLInputElement>(null);
+  const dropdownRef = useRef<globalThis.HTMLDivElement>(null);
+  const searchInputRef = useRef<globalThis.HTMLInputElement>(null);
 
   const filteredAccounts = accounts.filter((account) =>
     account.address.toLowerCase().includes(searchQuery.toLowerCase())
@@ -76,8 +76,8 @@ export const AccountSelector: React.FC<AccountSelectorProps> = ({
     [onAccountChange]
   );
 
-  const handleClickOutside = useCallback((e: MouseEvent) => {
-    if (dropdownRef.current && !dropdownRef.current.contains(e.target as Node)) {
+  const handleClickOutside = useCallback((e: globalThis.MouseEvent) => {
+    if (dropdownRef.current && !dropdownRef.current.contains(e.target as globalThis.Node)) {
       setIsOpen(false);
       setSearchQuery('');
       setHighlightedIndex(-1);
