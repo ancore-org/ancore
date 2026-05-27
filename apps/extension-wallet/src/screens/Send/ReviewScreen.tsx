@@ -2,10 +2,13 @@ import { useState } from 'react';
 import { Button, Card, CardContent, CardHeader, CardTitle, Separator, cn } from '@ancore/ui-kit';
 import type { SendTransactionDraft } from '@/hooks/useSendTransaction';
 import { TransferNotePreview } from '@/components/TransferNotePreview';
-import { ShieldCheck, ArrowRight, Wallet, Globe, Info } from 'lucide-react';
+import { ShieldCheck, ArrowRight, Wallet, Globe, Info, CalendarClock } from 'lucide-react';
+import type { ScheduleConfig, TransferTiming } from '@/screens/Send/ScheduleControls';
 
 interface ReviewScreenProps {
   transaction: SendTransactionDraft;
+  timing?: TransferTiming;
+  schedule?: ScheduleConfig;
   onBack: () => void;
   onConfirm: () => void;
 }
@@ -17,7 +20,7 @@ interface ReviewScreenProps {
  * To prevent misdirected payments, the "Continue" button is blocked until the
  * user explicitly interacts with the recipient confirmation checkbox.
  */
-export function ReviewScreen({ transaction, onBack, onConfirm }: ReviewScreenProps) {
+export function ReviewScreen({ transaction, timing, schedule, onBack, onConfirm }: ReviewScreenProps) {
   const [isConfirmed, setIsConfirmed] = useState(false);
 
   return (
@@ -71,6 +74,34 @@ export function ReviewScreen({ transaction, onBack, onConfirm }: ReviewScreenPro
 
         {/* Transfer Note */}
         {transaction.truncatedNote && <TransferNotePreview note={transaction.truncatedNote} />}
+
+        {timing === 'scheduled' && schedule && (
+          <div className="space-y-2 rounded-2xl border border-cyan-400/20 bg-cyan-400/5 p-4">
+            <div className="flex items-center gap-2">
+              <CalendarClock className="h-4 w-4 text-cyan-400" />
+              <span className="text-[10px] font-black uppercase tracking-widest text-cyan-300">
+                Scheduled Transfer
+              </span>
+            </div>
+            <p className="text-xs text-slate-300">
+              Frequency: <span className="font-semibold text-white">{schedule.frequency}</span>
+            </p>
+            <p className="text-xs text-slate-300">
+              Starts:{' '}
+              <span className="font-semibold text-white">
+                {new Date(schedule.startAt).toLocaleString()}
+              </span>
+            </p>
+            {schedule.endAt && (
+              <p className="text-xs text-slate-300">
+                Ends:{' '}
+                <span className="font-semibold text-white">
+                  {new Date(schedule.endAt).toLocaleString()}
+                </span>
+              </p>
+            )}
+          </div>
+        )}
 
         {/* Fees Summary */}
         <div className="space-y-3 bg-white/5 border border-white/10 rounded-2xl p-5">

@@ -21,7 +21,7 @@ function makeApp(sigValid = true, idempotencyStore?: IdempotencyStore) {
   const signatureService: SignatureServiceContract = {
     verify: jest.fn().mockReturnValue(sigValid),
   };
-  return createApp(authService, signatureService, idempotencyStore);
+  return createApp(authService, signatureService, idempotencyStore, { startScheduler: false });
 }
 
 describe('POST /relay/execute', () => {

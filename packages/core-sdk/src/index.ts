@@ -81,6 +81,22 @@ export {
   getRetryPreset,
 } from './retry-presets';
 
+// Scheduled transfers
+export {
+  HttpSchedulerClient,
+  createSchedulerClient,
+  getSchedulerClient,
+  resetSchedulerClientForTests,
+  resolveRelayerBaseUrl,
+  buildDefaultRelayPayload,
+  toIsoStartAt,
+  defaultScheduleStartAt,
+  SCHEDULE_FREQUENCY_OPTIONS,
+  DEMO_ACCOUNT_ADDRESS,
+  type SchedulerClient,
+  type SchedulerClientOptions,
+} from './scheduler-client';
+
 export {
   mapExecuteWithSessionKeyError,
   type ExecuteWithSessionKeyParams,

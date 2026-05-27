@@ -20,6 +20,13 @@ import { ReviewScreen } from '@/screens/Send/ReviewScreen';
 import { StatusScreen } from '@/screens/Send/StatusScreen';
 import { TransferNoteInput } from '@/components/TransferNoteInput';
 import { SendHorizontal, Info, AlertCircle } from 'lucide-react';
+import {
+  ScheduleControls,
+  createDefaultScheduleConfig,
+  type ScheduleConfig,
+  type TransferTiming,
+} from '@/screens/Send/ScheduleControls';
+import { ScheduledConfirmationScreen } from '@/screens/ScheduledTransfers/ScheduledConfirmationScreen';
 
 interface SendScreenProps {
   balance?: number;
@@ -35,7 +42,13 @@ interface SendScreenProps {
  * Implements a premium dark UI with real-time validation and simulation feedback.
  */
 export function SendScreen({ balance, assetDecimals, service, pollIntervalMs }: SendScreenProps) {
-  const [form, setForm] = useState<SendFormValues>({ to: '', amount: '', note: '' });
+  const [form, setForm] = useState<SendFormValues>({
+    to: '',
+    amount: '',
+    note: '',
+    timing: 'immediate',
+    schedule: createDefaultScheduleConfig(),
+  });
 
   const send = useSendTransaction({ balance, assetDecimals, service, pollIntervalMs });
   const { recipients, addRecipient } = useRecentRecipients();
@@ -56,6 +69,8 @@ export function SendScreen({ balance, assetDecimals, service, pollIntervalMs }: 
     return (
       <ReviewScreen
         transaction={send.tx}
+        timing={send.timing}
+        schedule={send.schedule}
         onBack={() => send.setStep('form')}
         onConfirm={send.requestConfirm}
       />
@@ -66,12 +81,17 @@ export function SendScreen({ balance, assetDecimals, service, pollIntervalMs }: 
     return (
       <ConfirmDialog
         transaction={send.tx}
+        timing={send.timing}
         error={send.errors.password}
         loading={send.submitting}
         onBack={() => send.setStep('review')}
         onSign={send.confirmAndSubmit}
       />
     );
+  }
+
+  if (send.step === 'scheduled' && send.scheduledTransfer) {
+    return <ScheduledConfirmationScreen transfer={send.scheduledTransfer} />;
   }
 
   if (send.step === 'status' && send.txId) {
@@ -122,6 +142,26 @@ export function SendScreen({ balance, assetDecimals, service, pollIntervalMs }: 
             onChange={(note) => setForm((current) => ({ ...current, note }))}
             error={send.errors.note}
             placeholder="Add a note (optional)"
+          />
+
+          <ScheduleControls
+            timing={(form.timing ?? 'immediate') as TransferTiming}
+            schedule={(form.schedule ?? createDefaultScheduleConfig()) as ScheduleConfig}
+            error={send.errors.simulation}
+            onTimingChange={(timing) =>
+              setForm((current) => ({
+                ...current,
+                timing,
+                schedule: current.schedule ?? createDefaultScheduleConfig(),
+              }))
+            }
+            onScheduleChange={(schedule) =>
+              setForm((current) => ({
+                ...current,
+                timing: 'scheduled',
+                schedule,
+              }))
+            }
           />
         </div>
 

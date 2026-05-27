@@ -30,6 +30,8 @@ import {
 } from './AuthGuard';
 import { NavBar } from '../components/Navigation/NavBar';
 import { SettingsScreen } from '../screens/Settings/SettingsScreen';
+import { SendScreen as SendFlowScreen } from '../screens/Send/SendScreen';
+import { ScheduledTransfersScreen } from '../screens/ScheduledTransfers/ScheduledTransfersScreen';
 import { useDashboardSettingsStore } from '../state/dashboard-settings';
 
 const APP_TITLE = 'Ancore Extension';
@@ -40,6 +42,7 @@ const pageTitles: Record<string, string> = {
   '/create-account': 'Create Account',
   '/home': 'Home',
   '/send': 'Send',
+  '/scheduled': 'Scheduled Transfers',
   '/receive': 'Receive',
   '/history': 'History',
   '/settings': 'Settings',
@@ -358,6 +361,7 @@ function HomeScreen() {
       </Card>
       <div className="grid grid-cols-2 gap-3">
         <SecondaryLink to="/send">Send funds</SecondaryLink>
+        <SecondaryLink to="/scheduled">Scheduled transfers</SecondaryLink>
         <SecondaryLink to="/receive">Receive funds</SecondaryLink>
         <SecondaryLink to="/history">View history</SecondaryLink>
         <SecondaryLink to="/session-keys">Session keys</SecondaryLink>
@@ -366,29 +370,26 @@ function HomeScreen() {
   );
 }
 
-function SendScreen() {
+function SendScreenRoute() {
   return (
     <PageScaffold
       eyebrow="Payments"
       title="Send"
-      description="Draft a payment flow and keep users inside the authenticated part of the popup."
+      description="Send now or schedule a one-time or recurring transfer."
     >
-      <Card
-        title="New transaction"
-        description="This screen is wired into routing and ready for the real send form."
-      >
-        <div className="space-y-3">
-          <input
-            className="w-full rounded-xl border border-border bg-background px-3 py-3 text-sm outline-none transition focus:border-primary"
-            placeholder="Recipient address"
-          />
-          <input
-            className="w-full rounded-xl border border-border bg-background px-3 py-3 text-sm outline-none transition focus:border-primary"
-            placeholder="Amount"
-          />
-          <PrimaryButton>Review transaction</PrimaryButton>
-        </div>
-      </Card>
+      <SendFlowScreen />
+    </PageScaffold>
+  );
+}
+
+function ScheduledTransfersRoute() {
+  return (
+    <PageScaffold
+      eyebrow="Payments"
+      title="Scheduled Transfers"
+      description="Pause, cancel, and review execution outcomes for scheduled jobs."
+    >
+      <ScheduledTransfersScreen />
     </PageScaffold>
   );
 }
@@ -548,7 +549,8 @@ export function ExtensionRouterContent() {
         <Route element={<AuthGuard />}>
           <Route element={<ProtectedLayout />}>
             <Route element={<HomeScreen />} path="/home" />
-            <Route element={<SendScreen />} path="/send" />
+            <Route element={<SendScreenRoute />} path="/send" />
+            <Route element={<ScheduledTransfersRoute />} path="/scheduled" />
             <Route element={<ReceiveScreen />} path="/receive" />
             <Route element={<HistoryScreen />} path="/history" />
             <Route element={<SettingsScreen />} path="/settings" />

@@ -21,9 +21,16 @@ function manifestPlugin(): Plugin {
 export default defineConfig({
   plugins: [react(), manifestPlugin()],
   publicDir: 'public',
+  define: {
+    'import.meta.env.VITE_RELAYER_URL': JSON.stringify(
+      process.env.VITE_RELAYER_URL ?? 'http://localhost:3000'
+    ),
+  },
   resolve: {
     alias: {
       '@': path.resolve(__dirname, './src'),
+      '@ancore/core-sdk': path.resolve(__dirname, '../../packages/core-sdk/src/index.ts'),
+      '@ancore/types': path.resolve(__dirname, '../../packages/types/src/index.ts'),
     },
   },
   css: {

@@ -1,4 +1,4 @@
-import express, { Express, Request } from 'express';
+import express, { Express, Request, Response, NextFunction } from 'express';
 import rateLimit from 'express-rate-limit';
 import { z } from 'zod';
 import { RelayService } from './services/relayService';
@@ -9,6 +9,18 @@ import { createExecuteRelayHandler } from './handlers/executeRelay';
 import { createValidateRelayHandler } from './handlers/validateRelay';
 import { IdempotencyStore } from './store/idempotency';
 import { JobQueue } from './queue/JobQueue';
+import {
+  ScheduledTransferStore,
+  ScheduledTransferService,
+  SchedulerEngine,
+  createCancelScheduledTransferHandler,
+  createGetScheduledTransferHandler,
+  createListExecutionsHandler,
+  createListScheduledTransfersHandler,
+  createPauseScheduledTransferHandler,
+  createScheduledTransferHandler,
+  createScheduledTransferSchema,
+} from './scheduler';
 import type { AuthServiceContract, SignatureServiceContract } from './types';
 
 // ── Request schema ────────────────────────────────────────────────────────────
@@ -48,9 +60,22 @@ const stubSignatureService: SignatureServiceContract = {
 export function createApp(
   authService: AuthServiceContract = stubAuthService,
   signatureService: SignatureServiceContract = stubSignatureService,
-  idempotencyStore: IdempotencyStore = new IdempotencyStore()
+  idempotencyStore: IdempotencyStore = new IdempotencyStore(),
+  options: { startScheduler?: boolean } = {}
 ): Express {
   const app = express();
+
+  app.use((req: Request, res: Response, next: NextFunction) => {
+    res.header('Access-Control-Allow-Origin', process.env.CORS_ORIGIN ?? '*');
+    res.header('Access-Control-Allow-Headers', 'Authorization, Content-Type');
+    res.header('Access-Control-Allow-Methods', 'GET, POST, PATCH, OPTIONS');
+    if (req.method === 'OPTIONS') {
+      res.sendStatus(204);
+      return;
+    }
+    next();
+  });
+
   app.use(express.json());
 
   // Rate limiting for relay operations
@@ -81,9 +106,58 @@ export function createApp(
   const executeHandler = createExecuteRelayHandler(relayService);
   const validateHandler = createValidateRelayHandler(relayService);
 
+  const scheduledTransferStore = new ScheduledTransferStore();
+  const scheduledTransferService = new ScheduledTransferService(
+    scheduledTransferStore,
+    relayService
+  );
+  const schedulerEngine = new SchedulerEngine(scheduledTransferService, {
+    pollIntervalMs: process.env.SCHEDULER_POLL_INTERVAL_MS
+      ? parseInt(process.env.SCHEDULER_POLL_INTERVAL_MS, 10)
+      : 1_000,
+  });
+
+  if (options.startScheduler !== false) {
+    schedulerEngine.start();
+  }
+
+  const validateScheduledTransfer = validateBody(createScheduledTransferSchema);
+
   app.post('/relay/execute', auth, relayLimiter, validate, idempotency, executeHandler);
   app.post('/relay/validate', auth, relayLimiter, validate, validateHandler);
   app.get('/relay/status', statusLimiter, (_req, res) => res.json(relayService.health()));
+
+  app.post(
+    '/api/v1/scheduled-transfers',
+    auth,
+    validateScheduledTransfer,
+    createScheduledTransferHandler(scheduledTransferService)
+  );
+  app.get(
+    '/api/v1/scheduled-transfers',
+    auth,
+    createListScheduledTransfersHandler(scheduledTransferService)
+  );
+  app.get(
+    '/api/v1/scheduled-transfers/:id',
+    auth,
+    createGetScheduledTransferHandler(scheduledTransferService)
+  );
+  app.patch(
+    '/api/v1/scheduled-transfers/:id/pause',
+    auth,
+    createPauseScheduledTransferHandler(scheduledTransferService)
+  );
+  app.patch(
+    '/api/v1/scheduled-transfers/:id/cancel',
+    auth,
+    createCancelScheduledTransferHandler(scheduledTransferService)
+  );
+  app.get(
+    '/api/v1/scheduled-transfers/:id/executions',
+    auth,
+    createListExecutionsHandler(scheduledTransferService)
+  );
 
   return app;
 }

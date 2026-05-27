@@ -5,6 +5,7 @@ import { KeyRound, ArrowRight, ShieldCheck, Info } from 'lucide-react';
 
 interface ConfirmDialogProps {
   transaction: SendTransactionDraft;
+  timing?: 'immediate' | 'scheduled';
   error?: string;
   loading?: boolean;
   onBack: () => void;
@@ -17,7 +18,7 @@ interface ConfirmDialogProps {
  * Implements a secure-looking password entry field with high-contrast feedback.
  * Shows a summary of the action being authenticated.
  */
-export function ConfirmDialog({ transaction, error, loading, onBack, onSign }: ConfirmDialogProps) {
+export function ConfirmDialog({ transaction, timing, error, loading, onBack, onSign }: ConfirmDialogProps) {
   const [password, setPassword] = useState('');
 
   const handleSubmit = (e?: React.FormEvent) => {
@@ -42,8 +43,17 @@ export function ConfirmDialog({ transaction, error, loading, onBack, onSign }: C
             Authentication Required
           </p>
           <p className="text-sm text-slate-300 font-medium">
-            Sending <span className="text-white font-black">{transaction.amount} XLM</span> to
-            recipient
+            {timing === 'scheduled' ? (
+              <>
+                Approving a scheduled transfer of{' '}
+                <span className="text-white font-black">{transaction.amount} XLM</span>
+              </>
+            ) : (
+              <>
+                Sending <span className="text-white font-black">{transaction.amount} XLM</span> to
+                recipient
+              </>
+            )}
           </p>
         </div>
 
