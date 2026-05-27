@@ -1,98 +1,188 @@
 import { xdr } from '@stellar/stellar-sdk';
-import { mapExecuteWithSessionKeyError, AncoreClient } from '../execute-with-session-key';
 import {
-  AncoreSdkError,
-  SessionKeyExecutionError,
-  SessionKeyExecutionValidationError,
-} from '../errors';
+  AccountContractError,
+  InvalidNonceError,
+  NotInitializedError,
+  UnauthorizedError,
+} from '@ancore/account-abstraction';
 
-// Mock account-abstraction to avoid full contract setup
-jest.mock('@ancore/account-abstraction', () => {
-  class AccountContractError extends Error {
-    constructor(msg: string) {
-      super(msg);
-      this.name = 'AccountContractError';
-    }
-  }
-  class UnauthorizedError extends Error {
-    constructor(msg: string) {
-      super(msg);
-      this.name = 'UnauthorizedError';
-    }
-  }
-  class InvalidNonceError extends Error {
-    constructor(msg: string) {
-      super(msg);
-      this.name = 'InvalidNonceError';
-    }
-  }
-  class NotInitializedError extends Error {
-    constructor(msg: string) {
-      super(msg);
-      this.name = 'NotInitializedError';
-    }
-  }
-  return {
-    AccountContractError,
-    UnauthorizedError,
-    InvalidNonceError,
-    NotInitializedError,
-    AccountContract: class {
-      execute() {
-        return {};
-      }
-    },
-  };
+import { AncoreClient, mapExecuteWithSessionKeyError } from '../execute-with-session-key';
+import { SessionKeyExecutionError, SessionKeyExecutionValidationError } from '../errors';
+
+const VALID_CONTRACT = 'CA3D5KRYM6CB7OWQ6TWYRR3Z4T7GNZLKERYNZGGA5SOAOPIFY6YQGAXE';
+const VALID_PUBLIC_KEY = 'GCM5WPR4DDR24FSAX5LIEM4J7AI3KOWJYANSXEPKYXCSZOTAYXE75AFN';
+
+describe('execute-with-session-key', () => {
+  it('forwards validated request to execution layer', async () => {
+    const invocation = { method: 'execute', args: [] };
+    const accountContract = {
+      execute: jest.fn().mockReturnValue(invocation),
+    } as any;
+    const executionLayer = {
+      executeWithSessionKey: jest.fn().mockResolvedValue({ result: xdr.ScVal.scvVoid() }),
+    };
+    const client = new AncoreClient({
+      accountContract,
+      executionLayer,
+    });
+
+    const result = await client.executeWithSessionKey({
+      target: VALID_CONTRACT,
+      function: 'transfer',
+      args: [xdr.ScVal.scvU32(7)],
+      expectedNonce: 2,
+      signer: {
+        publicKey: VALID_PUBLIC_KEY,
+        signAuthEntryXdr: jest.fn().mockResolvedValue('sig'),
+      },
+    });
+
+    expect(result).toEqual({ result: xdr.ScVal.scvVoid() });
+    expect(accountContract.execute).toHaveBeenCalledWith(
+      VALID_CONTRACT,
+      'transfer',
+      [xdr.ScVal.scvU32(7)],
+      2,
+      VALID_PUBLIC_KEY,
+      undefined
+    );
+    expect(executionLayer.executeWithSessionKey).toHaveBeenCalledWith(
+      expect.objectContaining({
+        target: VALID_CONTRACT,
+        function: 'transfer',
+        expectedNonce: 2,
+        invocation,
+      })
+    );
+  });
+
+  it('validates target address', async () => {
+    const client = new AncoreClient({
+      accountContract: { execute: jest.fn() } as any,
+      executionLayer: { executeWithSessionKey: jest.fn() },
+    });
+
+    await expect(
+      client.executeWithSessionKey({
+        target: 'not-a-stellar-address',
+        function: 'transfer',
+        args: [],
+        expectedNonce: 0,
+        signer: {
+          publicKey: VALID_PUBLIC_KEY,
+          signAuthEntryXdr: jest.fn(),
+        },
+      })
+    ).rejects.toBeInstanceOf(SessionKeyExecutionValidationError);
+  });
+
+  it('validates function name, args, nonce, and signer fields', async () => {
+    const client = new AncoreClient({
+      accountContract: { execute: jest.fn() } as any,
+      executionLayer: { executeWithSessionKey: jest.fn() },
+    });
+
+    await expect(
+      client.executeWithSessionKey({
+        target: VALID_CONTRACT,
+        function: '   ',
+        args: [],
+        expectedNonce: 0,
+        signer: { publicKey: VALID_PUBLIC_KEY, signAuthEntryXdr: jest.fn() },
+      })
+    ).rejects.toBeInstanceOf(SessionKeyExecutionValidationError);
+
+    await expect(
+      client.executeWithSessionKey({
+        target: VALID_CONTRACT,
+        function: 'transfer',
+        args: 'nope' as unknown as xdr.ScVal[],
+        expectedNonce: 0,
+        signer: { publicKey: VALID_PUBLIC_KEY, signAuthEntryXdr: jest.fn() },
+      })
+    ).rejects.toBeInstanceOf(SessionKeyExecutionValidationError);
+
+    await expect(
+      client.executeWithSessionKey({
+        target: VALID_CONTRACT,
+        function: 'transfer',
+        args: [],
+        expectedNonce: -1,
+        signer: { publicKey: VALID_PUBLIC_KEY, signAuthEntryXdr: jest.fn() },
+      })
+    ).rejects.toBeInstanceOf(SessionKeyExecutionValidationError);
+
+    await expect(
+      client.executeWithSessionKey({
+        target: VALID_CONTRACT,
+        function: 'transfer',
+        args: [],
+        expectedNonce: 0,
+        signer: { publicKey: 'BAD', signAuthEntryXdr: jest.fn() },
+      })
+    ).rejects.toBeInstanceOf(SessionKeyExecutionValidationError);
+
+    await expect(
+      client.executeWithSessionKey({
+        target: VALID_CONTRACT,
+        function: 'transfer',
+        args: [],
+        expectedNonce: 0,
+        signer: { publicKey: VALID_PUBLIC_KEY, signAuthEntryXdr: 'nope' as unknown as any },
+      })
+    ).rejects.toBeInstanceOf(SessionKeyExecutionValidationError);
+  });
+
+  it('maps account-abstraction and generic errors to session-key errors', async () => {
+    const accountContract = {
+      execute: jest.fn().mockImplementationOnce(() => {
+        throw new UnauthorizedError('unauthorized');
+      }),
+    } as any;
+    const client = new AncoreClient({
+      accountContract,
+      executionLayer: { executeWithSessionKey: jest.fn() },
+    });
+
+    await expect(
+      client.executeWithSessionKey({
+        target: VALID_CONTRACT,
+        function: 'transfer',
+        args: [],
+        expectedNonce: 0,
+        signer: { publicKey: VALID_PUBLIC_KEY, signAuthEntryXdr: jest.fn() },
+      })
+    ).rejects.toMatchObject({
+      code: 'SESSION_KEY_EXECUTION_UNAUTHORIZED',
+    });
+  });
 });
 
-// Pull the mocked classes out for use in tests
-const { UnauthorizedError, InvalidNonceError, NotInitializedError, AccountContractError } =
-  jest.requireMock('@ancore/account-abstraction');
-
 describe('mapExecuteWithSessionKeyError', () => {
-  it('passes through AncoreSdkError unchanged', () => {
-    const err = new SessionKeyExecutionError('SESSION_KEY_EXECUTION_FAILED', 'already sdk error');
+  it('passes through AncoreSdkError', () => {
+    const err = new SessionKeyExecutionError('SESSION_KEY_EXECUTION_FAILED', 'failed');
     expect(mapExecuteWithSessionKeyError(err)).toBe(err);
   });
 
-  it('maps UnauthorizedError to SESSION_KEY_EXECUTION_UNAUTHORIZED', () => {
-    const err = new UnauthorizedError('not allowed');
-    const result = mapExecuteWithSessionKeyError(err);
-    expect(result).toBeInstanceOf(SessionKeyExecutionError);
-    expect((result as SessionKeyExecutionError).code).toBe('SESSION_KEY_EXECUTION_UNAUTHORIZED');
+  it('maps known contract errors', () => {
+    expect(mapExecuteWithSessionKeyError(new UnauthorizedError()).code).toBe(
+      'SESSION_KEY_EXECUTION_UNAUTHORIZED'
+    );
+    expect(mapExecuteWithSessionKeyError(new InvalidNonceError()).code).toBe(
+      'SESSION_KEY_EXECUTION_INVALID_NONCE'
+    );
+    expect(mapExecuteWithSessionKeyError(new NotInitializedError()).code).toBe(
+      'SESSION_KEY_EXECUTION_NOT_INITIALIZED'
+    );
+    expect(mapExecuteWithSessionKeyError(new AccountContractError('contract'))).toMatchObject({
+      code: 'SESSION_KEY_EXECUTION_CONTRACT',
+    });
   });
 
-  it('maps InvalidNonceError to SESSION_KEY_EXECUTION_INVALID_NONCE', () => {
-    const err = new InvalidNonceError('bad nonce');
-    const result = mapExecuteWithSessionKeyError(err);
-    expect(result).toBeInstanceOf(SessionKeyExecutionError);
-    expect((result as SessionKeyExecutionError).code).toBe('SESSION_KEY_EXECUTION_INVALID_NONCE');
-  });
-
-  it('maps NotInitializedError to SESSION_KEY_EXECUTION_NOT_INITIALIZED', () => {
-    const err = new NotInitializedError('not init');
-    const result = mapExecuteWithSessionKeyError(err);
-    expect(result).toBeInstanceOf(SessionKeyExecutionError);
-    expect((result as SessionKeyExecutionError).code).toBe('SESSION_KEY_EXECUTION_NOT_INITIALIZED');
-  });
-
-  it('maps AccountContractError to SESSION_KEY_EXECUTION_CONTRACT', () => {
-    const err = new AccountContractError('contract error');
-    const result = mapExecuteWithSessionKeyError(err);
-    expect(result).toBeInstanceOf(SessionKeyExecutionError);
-    expect((result as SessionKeyExecutionError).code).toBe('SESSION_KEY_EXECUTION_CONTRACT');
-  });
-
-  it('maps generic Error to SESSION_KEY_EXECUTION_FAILED', () => {
-    const err = new Error('unexpected');
-    const result = mapExecuteWithSessionKeyError(err);
-    expect(result).toBeInstanceOf(SessionKeyExecutionError);
-    expect((result as SessionKeyExecutionError).code).toBe('SESSION_KEY_EXECUTION_FAILED');
-  });
-
-  it('maps unknown non-Error to SESSION_KEY_EXECUTION_FAILED', () => {
-    const result = mapExecuteWithSessionKeyError('string error');
-    expect(result).toBeInstanceOf(SessionKeyExecutionError);
-    expect((result as SessionKeyExecutionError).code).toBe('SESSION_KEY_EXECUTION_FAILED');
+  it('maps generic and unknown errors', () => {
+    expect(mapExecuteWithSessionKeyError(new Error('boom')).code).toBe(
+      'SESSION_KEY_EXECUTION_FAILED'
+    );
+    expect(mapExecuteWithSessionKeyError('boom').code).toBe('SESSION_KEY_EXECUTION_FAILED');
   });
 });
