@@ -15,7 +15,20 @@ import { SettingsScreen } from '../SettingsScreen';
 import { NetworkSettings } from '../NetworkSettings';
 import { SecuritySettings } from '../SecuritySettings';
 import { AboutScreen } from '../AboutScreen';
+import { revealVaultSecret, VaultExportError } from '../../../security/vault-export';
 import { SettingsGroup, SettingItem } from '../../../components/SettingsGroup';
+
+vi.mock('../../../security/vault-export', () => ({
+  VaultExportError: class VaultExportError extends Error {
+    constructor(message: string) {
+      super(message);
+      this.name = 'VaultExportError';
+    }
+  },
+  revealVaultSecret: vi.fn(async ({ kind }: { kind: 'privateKey' | 'mnemonic' }) =>
+    kind === 'privateKey' ? 'STESTPRIVATEKEY' : 'word '.repeat(12).trim()
+  ),
+}));
 
 function renderSettingsScreen() {
   return render(
@@ -174,6 +187,12 @@ describe('SecuritySettings', () => {
     onBack: vi.fn(),
   };
 
+  beforeEach(() => {
+    vi.mocked(revealVaultSecret).mockImplementation(async ({ kind }) =>
+      kind === 'privateKey' ? 'STESTPRIVATEKEY' : 'word '.repeat(12).trim()
+    );
+  });
+
   it('renders security menu items', () => {
     render(<SecuritySettings {...defaultProps} />);
     expect(screen.getByText('Change Password')).toBeInTheDocument();
@@ -246,10 +265,30 @@ describe('SecuritySettings', () => {
     await userEvent.click(screen.getByText('Export Private Key'));
     await userEvent.type(screen.getByPlaceholderText(/enter password/i), 'mypassword');
     await userEvent.click(screen.getByRole('button', { name: /reveal/i }));
+    expect(revealVaultSecret).toHaveBeenCalledWith({
+      kind: 'privateKey',
+      password: 'mypassword',
+      requirePassword: true,
+    });
     expect(screen.getByText(/never share this with anyone/i)).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /reveal/i })).toBeInTheDocument();
+  });
+
+  it('shows vault export errors without leaking secret material', async () => {
+    vi.mocked(revealVaultSecret).mockRejectedValueOnce(new VaultExportError('Incorrect password.'));
+
+    render(<SecuritySettings {...defaultProps} />);
+    await userEvent.click(screen.getByText('Export Private Key'));
+    await userEvent.type(screen.getByPlaceholderText(/enter password/i), 'wrong-password');
+    await userEvent.click(screen.getByRole('button', { name: /reveal/i }));
+
+    expect(screen.getByText('Incorrect password.')).toBeInTheDocument();
+    expect(screen.queryByText('STESTPRIVATEKEY')).not.toBeInTheDocument();
   });
 
   it('shows error when reveal attempted without password', async () => {
+    vi.mocked(revealVaultSecret).mockRejectedValueOnce(new VaultExportError('Enter your password.'));
+
     render(<SecuritySettings {...defaultProps} />);
     await userEvent.click(screen.getByText('Export Private Key'));
     await userEvent.click(screen.getByRole('button', { name: /reveal/i }));

@@ -1,6 +1,11 @@
 import * as React from 'react';
 import { AlertTriangle, Eye, EyeOff, Check, Copy } from 'lucide-react';
 import { Button, Input } from '@ancore/ui-kit';
+import {
+  VaultExportError,
+  revealVaultSecret,
+  type VaultExportKind,
+} from '../../security/vault-export';
 import { ScreenHeader } from './NetworkSettings';
 
 type SecurityView = 'menu' | 'change-password' | 'auto-lock' | 'export-key' | 'export-mnemonic';
@@ -168,11 +173,13 @@ function AutoLockView({
 // ── Export warning wrapper ───────────────────────────────────────────────────
 
 function ExportWarningView({
+  exportKind,
   warningText,
   requirePassword,
   onConfirm,
   onCancel,
 }: {
+  exportKind: VaultExportKind;
   title: string;
   warningText: string;
   requirePassword: boolean;
@@ -181,29 +188,53 @@ function ExportWarningView({
 }) {
   const [password, setPassword] = React.useState('');
   const [confirmed, setConfirmed] = React.useState(false);
-  const [secret] = React.useState('SCZANGBA5WGGU4NBKMJQJZ7WHKDXGZNZEBCV3LTXNZXR4XMXAMPLE');
+  const [secret, setSecret] = React.useState<string | null>(null);
   const [show, setShow] = React.useState(false);
   const [copied, setCopied] = React.useState(false);
   const [error, setError] = React.useState('');
+  const [isRevealing, setIsRevealing] = React.useState(false);
 
-  function handleReveal(e: React.FormEvent) {
+  React.useEffect(() => {
+    return () => {
+      setSecret(null);
+      setPassword('');
+    };
+  }, []);
+
+  async function handleReveal(e: React.FormEvent) {
     e.preventDefault();
-    if (requirePassword && !password) {
-      setError('Enter your password.');
-      return;
-    }
-    // TODO: decrypt vault with crypto package
-    setConfirmed(true);
     setError('');
+    setIsRevealing(true);
+
+    try {
+      const revealed = await revealVaultSecret({
+        kind: exportKind,
+        password,
+        requirePassword,
+      });
+      setSecret(revealed);
+      setConfirmed(true);
+    } catch (revealError) {
+      setSecret(null);
+      setError(
+        revealError instanceof VaultExportError
+          ? revealError.message
+          : 'Unable to reveal secret.'
+      );
+    } finally {
+      setPassword('');
+      setIsRevealing(false);
+    }
   }
 
   async function handleCopy() {
+    if (!secret) return;
     await navigator.clipboard.writeText(secret).catch(() => {});
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
   }
 
-  if (confirmed) {
+  if (confirmed && secret) {
     return (
       <div className="flex flex-col gap-4 p-4">
         <div className="flex items-start gap-3 rounded-xl border border-destructive/30 bg-destructive/5 p-3">
@@ -276,8 +307,8 @@ function ExportWarningView({
         <Button type="button" variant="outline" className="flex-1" onClick={onCancel}>
           Cancel
         </Button>
-        <Button type="submit" variant="destructive" className="flex-1">
-          Reveal
+        <Button type="submit" variant="destructive" className="flex-1" disabled={isRevealing}>
+          {isRevealing ? 'Verifying…' : 'Reveal'}
         </Button>
       </div>
     </form>
@@ -330,6 +361,7 @@ export function SecuritySettings({
       )}
       {view === 'export-key' && (
         <ExportWarningView
+          exportKind="privateKey"
           title="Export Private Key"
           warningText="Your private key grants full control of your account. Anyone with it can steal your funds immediately."
           requirePassword={requirePasswordForSensitiveActions}
@@ -339,6 +371,7 @@ export function SecuritySettings({
       )}
       {view === 'export-mnemonic' && (
         <ExportWarningView
+          exportKind="mnemonic"
           title="Export Recovery Phrase"
           warningText="Your recovery phrase can restore your entire wallet. Keep it offline, never share it with anyone."
           requirePassword={requirePasswordForSensitiveActions}
