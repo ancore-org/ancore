@@ -2,6 +2,7 @@ import express, { Express, Request } from 'express';
 import rateLimit from 'express-rate-limit';
 import { z } from 'zod';
 import { RelayService } from './services/relayService';
+import { createStellarSubmitterFromEnv } from './services/stellarSubmitter';
 import { createAuthMiddleware } from './middleware/auth';
 import { createIdempotencyMiddleware } from './middleware/idempotency';
 import { validateBody } from './validation/middleware';
@@ -9,7 +10,7 @@ import { createExecuteRelayHandler } from './handlers/executeRelay';
 import { createValidateRelayHandler } from './handlers/validateRelay';
 import { IdempotencyStore } from './store/idempotency';
 import { JobQueue } from './queue/JobQueue';
-import type { AuthServiceContract, SignatureServiceContract } from './types';
+import type { AuthServiceContract, SignatureServiceContract, TransactionSubmitterContract, RelayServiceOptions } from './types';
 
 // ── Request schema ────────────────────────────────────────────────────────────
 
@@ -48,10 +49,18 @@ const stubSignatureService: SignatureServiceContract = {
 export function createApp(
   authService: AuthServiceContract = stubAuthService,
   signatureService: SignatureServiceContract = stubSignatureService,
-  idempotencyStore: IdempotencyStore = new IdempotencyStore()
+  idempotencyStore: IdempotencyStore = new IdempotencyStore(),
+  transactionSubmitter?: TransactionSubmitterContract,
+  relayOptions?: RelayServiceOptions
 ): Express {
   const app = express();
   app.use(express.json());
+
+  const useMockSubmission =
+    relayOptions?.useMockSubmission === true ||
+    process.env.RELAYER_USE_MOCK_SUBMISSION === 'true';
+  const submitter =
+    transactionSubmitter ?? (useMockSubmission ? undefined : createStellarSubmitterFromEnv());
 
   // Rate limiting for relay operations
   const relayLimiter = rateLimit({
@@ -73,7 +82,13 @@ export function createApp(
   });
 
   const jobQueue = new JobQueue();
-  const relayService = new RelayService(signatureService, jobQueue, idempotencyStore);
+  const relayService = new RelayService(
+    signatureService,
+    jobQueue,
+    idempotencyStore,
+    submitter,
+    { useMockSubmission, ...relayOptions }
+  );
   const auth = createAuthMiddleware(authService);
   const validate = validateBody(relayRequestSchema);
   const idempotency = createIdempotencyMiddleware(idempotencyStore);

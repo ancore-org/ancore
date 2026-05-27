@@ -793,6 +793,15 @@ importers:
 
   services/relayer:
     dependencies:
+      '@ancore/stellar':
+        specifier: workspace:*
+        version: link:../../packages/stellar
+      '@ancore/types':
+        specifier: workspace:*
+        version: link:../../packages/types
+      '@stellar/stellar-sdk':
+        specifier: ^13.3.0
+        version: 13.3.0
       express:
         specifier: ^4.18.2
         version: 4.22.1
