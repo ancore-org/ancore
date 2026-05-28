@@ -1,7 +1,4 @@
-/**
- * Shared HTTP client for the relayer scheduled-transfer API.
- */
-
+/* eslint-disable no-undef */
 import type {
   CreateScheduledTransferInput,
   ScheduledTransfer,
