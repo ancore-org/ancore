@@ -334,8 +334,8 @@ function ActiveSessionsView({ onDone }: { onDone: () => void }) {
         >
           <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-yellow-500" />
           <p className="flex-1 text-xs text-yellow-700 dark:text-yellow-400 leading-relaxed">
-            A new device signed in to your wallet. Review below and revoke if you don't recognise
-            it.
+            A new device signed in to your wallet. Review below and revoke if you don&apos;t
+            recognise it.
           </p>
           <button
             type="button"
