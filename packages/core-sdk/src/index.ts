@@ -37,6 +37,7 @@ export { parsePaymentRequest, type PaymentRequest } from './payment-request';
 
 // Amount normalization
 export { normalizeAmount, type NormalizationOptions } from './amount';
+export { formatFiatAmount, type FiatFormatOptions } from './fiat-formatter';
 
 // Account transaction builder (wrapper around Stellar SDK's TransactionBuilder)
 export {

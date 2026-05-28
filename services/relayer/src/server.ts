@@ -2,6 +2,7 @@ import express, { Express, Request, Response, NextFunction } from 'express';
 import rateLimit from 'express-rate-limit';
 import { z } from 'zod';
 import { RelayService } from './services/relayService';
+import { createStellarSubmitterFromEnv } from './services/stellarSubmitter';
 import { createAuthMiddleware } from './middleware/auth';
 import { createIdempotencyMiddleware } from './middleware/idempotency';
 import { validateBody } from './validation/middleware';
@@ -9,19 +10,8 @@ import { createExecuteRelayHandler } from './handlers/executeRelay';
 import { createValidateRelayHandler } from './handlers/validateRelay';
 import { IdempotencyStore } from './store/idempotency';
 import { JobQueue } from './queue/JobQueue';
-import {
-  ScheduledTransferStore,
-  ScheduledTransferService,
-  SchedulerEngine,
-  createCancelScheduledTransferHandler,
-  createGetScheduledTransferHandler,
-  createListExecutionsHandler,
-  createListScheduledTransfersHandler,
-  createPauseScheduledTransferHandler,
-  createScheduledTransferHandler,
-  createScheduledTransferSchema,
-} from './scheduler';
-import type { AuthServiceContract, SignatureServiceContract } from './types';
+import type { AuthServiceContract, SignatureServiceContract, TransactionSubmitterContract, RelayServiceOptions } from './types';
+import { Ed25519SignatureService } from './services/ed25519SignatureService';
 
 // ── Request schema ────────────────────────────────────────────────────────────
 
@@ -48,20 +38,16 @@ const stubAuthService: AuthServiceContract = {
   },
 };
 
-const stubSignatureService: SignatureServiceContract = {
-  verify(_publicKey: string, _payload: string, _signature: string): boolean {
-    // TODO: replace with real Ed25519 verification (e.g. @noble/ed25519)
-    return true;
-  },
-};
+const defaultSignatureService: SignatureServiceContract = new Ed25519SignatureService();
 
 // ── App factory (exported for testing) ───────────────────────────────────────
 
 export function createApp(
   authService: AuthServiceContract = stubAuthService,
-  signatureService: SignatureServiceContract = stubSignatureService,
+  signatureService: SignatureServiceContract = defaultSignatureService,
   idempotencyStore: IdempotencyStore = new IdempotencyStore(),
-  options: { startScheduler?: boolean } = {}
+  transactionSubmitter?: TransactionSubmitterContract,
+  relayOptions?: RelayServiceOptions
 ): Express {
   const app = express();
 
@@ -77,6 +63,12 @@ export function createApp(
   });
 
   app.use(express.json());
+
+  const useMockSubmission =
+    relayOptions?.useMockSubmission === true ||
+    process.env.RELAYER_USE_MOCK_SUBMISSION === 'true';
+  const submitter =
+    transactionSubmitter ?? (useMockSubmission ? undefined : createStellarSubmitterFromEnv());
 
   // Rate limiting for relay operations
   const relayLimiter = rateLimit({
@@ -98,7 +90,13 @@ export function createApp(
   });
 
   const jobQueue = new JobQueue();
-  const relayService = new RelayService(signatureService, jobQueue, idempotencyStore);
+  const relayService = new RelayService(
+    signatureService,
+    jobQueue,
+    idempotencyStore,
+    submitter,
+    { useMockSubmission, ...relayOptions }
+  );
   const auth = createAuthMiddleware(authService);
   const validate = validateBody(relayRequestSchema);
   const idempotency = createIdempotencyMiddleware(idempotencyStore);

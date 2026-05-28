@@ -4,30 +4,45 @@ import { vi } from 'vitest';
 import { useAccountState } from '../useAccountState';
 
 // Mock localStorage
-const localStorageMock = (() => {
-  let store: Record<string, string> = {};
-  return {
-    getItem: vi.fn((key: string) => store[key] || null),
-    setItem: vi.fn((key: string, value: string) => {
-      store[key] = value;
-    }),
-    removeItem: vi.fn((key: string) => {
-      delete store[key];
-    }),
-    clear: vi.fn(() => {
-      store = {};
-    }),
-  };
-})();
+const originalLocalStorage = window.localStorage;
+let store: Record<string, string> = {};
+
+const localStorageMock = {
+  getItem: vi.fn((key: string) => store[key] || null),
+  setItem: vi.fn((key: string, value: string) => {
+    store[key] = value;
+  }),
+  removeItem: vi.fn((key: string) => {
+    delete store[key];
+  }),
+  clear: vi.fn(() => {
+    store = {};
+  }),
+};
 
 Object.defineProperty(window, 'localStorage', {
   value: localStorageMock,
+  configurable: true,
 });
 
 describe('useAccountState', () => {
   beforeEach(() => {
-    localStorageMock.clear();
+    store = {};
+    localStorageMock.setItem.mockImplementation((key: string, value: string) => {
+      store[key] = value;
+    });
+    localStorageMock.getItem.mockImplementation((key: string) => store[key] || null);
+    localStorageMock.removeItem.mockImplementation((key: string) => {
+      delete store[key];
+    });
     vi.clearAllMocks();
+  });
+
+  afterAll(() => {
+    Object.defineProperty(window, 'localStorage', {
+      value: originalLocalStorage,
+      configurable: true,
+    });
   });
 
   it('loads accounts and sets default current account on initial load', async () => {

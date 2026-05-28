@@ -61,7 +61,7 @@ export function formatFiatAmount(amount: number, options: FiatFormatOptions = {}
       minimumFractionDigits,
       maximumFractionDigits,
     }).format(amount);
-  } catch (error) {
+  } catch {
     // Fallback if Intl fails (e.g., due to an invalid locale input)
     try {
       return new Intl.NumberFormat('en-US', {
@@ -70,7 +70,7 @@ export function formatFiatAmount(amount: number, options: FiatFormatOptions = {}
         minimumFractionDigits,
         maximumFractionDigits,
       }).format(amount);
-    } catch (fallbackError) {
+    } catch {
       // Ultimate fallback if even en-US fails (e.g., completely invalid currency code)
       // Return a basic string representation with maximum fraction digits and the currency code.
       return `${amount.toFixed(maximumFractionDigits)} ${currency}`;

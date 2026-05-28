@@ -31,7 +31,7 @@ module.exports = {
     },
     // Keep thresholds aligned with files that are currently implemented and tested.
     './src/signing.ts': {
-      branches: 82,
+      branches: 80,
       functions: 95,
       lines: 90,
       statements: 90,

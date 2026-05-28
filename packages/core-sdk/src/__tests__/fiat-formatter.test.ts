@@ -1,4 +1,4 @@
-import { formatFiatAmount } from './fiat-formatter';
+import { formatFiatAmount } from '../fiat-formatter';
 
 describe('formatFiatAmount', () => {
   it('formats USD with en-US locale by default', () => {

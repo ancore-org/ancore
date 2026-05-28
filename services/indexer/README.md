@@ -203,6 +203,23 @@ cargo test --test account_activity_api_test
 
 Tests are marked with `#[ignore]` to prevent accidental execution without a test database. Remove the attribute to run them.
 
+## CI Quality Gates
+
+The following checks run automatically on every PR via the `indexer` CI job:
+
+```bash
+# Check formatting (must pass before merge)
+cargo fmt --check
+
+# Lint with all warnings as errors
+cargo clippy -- -D warnings
+
+# Run unit tests
+cargo test
+```
+
+Run these locally from `services/indexer/` before pushing to avoid CI failures.
+
 ## License
 
 Apache-2.0 OR MIT

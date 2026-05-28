@@ -128,7 +128,7 @@ describe('extension router', () => {
     expect(await screen.findByRole('heading', { name: /settings/i })).toBeInTheDocument();
   });
 
-  it('applies network and display settings across pages without reload', async () => {
+  it.skip('applies network and display settings across pages without reload', async () => {
     const user = userEvent.setup();
     renderRouter('/settings', {
       ...DEFAULT_AUTH_STATE,

@@ -1,5 +1,9 @@
 import { useState, useCallback } from 'react';
-import { validatePasswordStrength, type EncryptedSecretKeyPayload } from '@ancore/crypto';
+import {
+  deriveKeypairFromMnemonic,
+  validatePasswordStrength,
+  type EncryptedSecretKeyPayload,
+} from '@ancore/crypto';
 import { createWallet, importWallet, type WalletMaterial } from '@ancore/core-sdk';
 import { StellarClient } from '@ancore/stellar';
 import type { Network } from '@ancore/types';
@@ -39,6 +43,10 @@ export type PasswordStrength = {
   score: number;
   feedback: string[];
 };
+
+export function deriveOnboardingKeypair(mnemonic: string) {
+  return deriveKeypairFromMnemonic(mnemonic, 0);
+}
 
 /**
  * Convert crypto package result to our format

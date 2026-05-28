@@ -1,10 +1,16 @@
+import { NetworkError } from '@ancore/stellar';
 import { RelayService } from '../../src/services/relayService';
 import { JobQueue } from '../../src/queue/JobQueue';
 import { IdempotencyStore } from '../../src/store/idempotency';
-import type { SignatureServiceContract, RelayExecuteRequest } from '../../src/types';
+import type {
+  SignatureServiceContract,
+  RelayExecuteRequest,
+  TransactionSubmitterContract,
+} from '../../src/types';
 
 const VALID_KEY = 'a'.repeat(64);
 const VALID_SIG = 'b'.repeat(128);
+const NETWORK_HASH = 'c'.repeat(64);
 
 function makeRequest(overrides: Partial<RelayExecuteRequest> = {}): RelayExecuteRequest {
   return {
@@ -19,6 +25,19 @@ function makeRequest(overrides: Partial<RelayExecuteRequest> = {}): RelayExecute
 
 function makeSignatureService(valid: boolean): SignatureServiceContract {
   return { verify: jest.fn().mockReturnValue(valid) };
+}
+
+function makeSubmitter(
+  overrides: Partial<TransactionSubmitterContract> = {}
+): TransactionSubmitterContract {
+  return {
+    submitSignedTransaction: jest.fn().mockResolvedValue({
+      transactionHash: NETWORK_HASH,
+      gasUsed: 150,
+    }),
+    isHealthy: jest.fn().mockResolvedValue({ healthy: true, latencyMs: 8 }),
+    ...overrides,
+  };
 }
 
 describe('RelayService', () => {
@@ -53,12 +72,49 @@ describe('RelayService', () => {
   });
 
   describe('executeRelay', () => {
-    it('returns success with transactionId and gasUsed on valid request', async () => {
-      const svc = new RelayService(makeSignatureService(true));
+    it('returns mock transactionId when mock submission is enabled', async () => {
+      const svc = new RelayService(makeSignatureService(true), undefined, undefined, undefined, {
+        useMockSubmission: true,
+      });
       const result = await svc.executeRelay(makeRequest());
       expect(result.success).toBe(true);
       expect(result.transactionId).toMatch(/^[0-9A-F]{64}$/);
       expect(result.gasUsed).toBe(21_000);
+    });
+
+    it('returns network transaction hash from submitter on valid request', async () => {
+      const submitter = makeSubmitter();
+      const svc = new RelayService(makeSignatureService(true), undefined, undefined, submitter);
+      const result = await svc.executeRelay(
+        makeRequest({ parameters: { signedTransactionXdr: 'AAAA-signed-xdr' } })
+      );
+
+      expect(result.success).toBe(true);
+      expect(result.transactionId).toBe(NETWORK_HASH);
+      expect(result.gasUsed).toBe(150);
+      expect(submitter.submitSignedTransaction).toHaveBeenCalledWith('AAAA-signed-xdr');
+    });
+
+    it('returns INTERNAL_ERROR when signedTransactionXdr is missing', async () => {
+      const svc = new RelayService(makeSignatureService(true), undefined, undefined, makeSubmitter());
+      const result = await svc.executeRelay(makeRequest());
+      expect(result.success).toBe(false);
+      expect(result.error?.code).toBe('INTERNAL_ERROR');
+      expect(result.gasUsed).toBe(0);
+    });
+
+    it('maps submitter network errors to typed relay errors', async () => {
+      const submitter = makeSubmitter({
+        submitSignedTransaction: jest.fn().mockRejectedValue(new NetworkError('Horizon down')),
+      });
+      const svc = new RelayService(makeSignatureService(true), undefined, undefined, submitter);
+      const result = await svc.executeRelay(
+        makeRequest({ parameters: { signedTransactionXdr: 'AAAA-signed-xdr' } })
+      );
+
+      expect(result.success).toBe(false);
+      expect(result.error?.code).toBe('INTERNAL_ERROR');
+      expect(result.error?.message).toBe('Horizon down');
     });
 
     it('returns success=false and propagates error on invalid request', async () => {
@@ -78,10 +134,37 @@ describe('RelayService', () => {
         new IdempotencyStore()
       );
       const h = svc.health();
-      expect(h.status).toBe('ok');
+      expect(h.status).toBe('degraded');
       expect(typeof h.uptime).toBe('number');
       expect(h.uptime).toBeGreaterThanOrEqual(0);
       expect(h.timestamp).toMatch(/^\d{4}-\d{2}-\d{2}T/);
+      expect(h.dependencies?.rpc.status).toBe('degraded');
+    });
+
+    it('reports ok rpc status when submitter is configured', () => {
+      const svc = new RelayService(
+        makeSignatureService(true),
+        new JobQueue(),
+        new IdempotencyStore(),
+        makeSubmitter()
+      );
+      const h = svc.health();
+      expect(h.dependencies?.rpc.status).toBe('ok');
+    });
+  });
+
+  describe('checkRpcHealth', () => {
+    it('returns healthy status from submitter probe', async () => {
+      const svc = new RelayService(
+        makeSignatureService(true),
+        undefined,
+        undefined,
+        makeSubmitter()
+      );
+      await expect(svc.checkRpcHealth()).resolves.toEqual({
+        status: 'ok',
+        latencyMs: 8,
+      });
     });
   });
 });

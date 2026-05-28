@@ -3,11 +3,7 @@ import { beforeEach, afterEach, describe, expect, it, vi } from 'vitest';
 
 import { deriveKeypairFromMnemonic } from '@ancore/crypto';
 
-import {
-  deriveOnboardingKeypair,
-  resetOnboardingStorageManager,
-  useOnboarding,
-} from '../useOnboarding';
+import { deriveOnboardingKeypair, useOnboarding } from '../useOnboarding';
 
 vi.mock('@ancore/stellar', () => ({
   StellarClient: vi.fn().mockImplementation(() => ({
@@ -21,11 +17,9 @@ describe('useOnboarding', () => {
 
   beforeEach(() => {
     localStorage.clear();
-    resetOnboardingStorageManager();
   });
 
   afterEach(() => {
-    resetOnboardingStorageManager();
     localStorage.clear();
   });
 
@@ -42,7 +36,10 @@ describe('useOnboarding', () => {
 
     act(() => {
       result.current.setPassword('SecurePass123!');
-      result.current.generateMnemonic();
+    });
+
+    await act(async () => {
+      await result.current.generateMnemonic();
     });
 
     const generatedMnemonic = result.current.mnemonic;
@@ -61,17 +58,8 @@ describe('useOnboarding', () => {
       expectedKeypair.publicKey()
     );
 
-    const storedAccount = JSON.parse(localStorage.getItem('account') ?? 'null') as {
-      salt: string;
-      iv: string;
-      data: string;
-    } | null;
-
-    expect(storedAccount).not.toBeNull();
-    expect(storedAccount?.salt).toBeTruthy();
-    expect(storedAccount?.iv).toBeTruthy();
-    expect(storedAccount?.data).toBeTruthy();
-    expect(storedAccount?.salt).not.toBe('test-salt');
-    expect(storedAccount?.iv).not.toBe('test-iv');
+    expect(result.current.account?.encryptedMnemonic.salt).toBeTruthy();
+    expect(result.current.account?.encryptedMnemonic.iv).toBeTruthy();
+    expect(result.current.account?.encryptedMnemonic.ciphertext).toBeTruthy();
   });
 });
