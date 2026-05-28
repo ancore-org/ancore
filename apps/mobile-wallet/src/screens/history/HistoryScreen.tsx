@@ -1,5 +1,3 @@
-import React from 'react';
-
 import { TransactionHistoryList } from '../../components/TransactionHistoryList';
 import { type TransactionHistoryAdapter } from './types';
 import { usePaginatedTransactionHistory } from './usePaginatedTransactionHistory';

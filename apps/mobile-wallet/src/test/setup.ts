@@ -1,1 +1,1 @@
-import '@testing-library/jest-dom';
+// Reserved for mobile wallet test environment setup.
