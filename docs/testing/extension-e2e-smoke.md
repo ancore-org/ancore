@@ -18,16 +18,29 @@ This suite is the minimum release-candidate confidence gate for the extension wa
 
 ## Local Runner
 
-From repository root:
+From the `apps/extension-wallet` directory:
 
 ```bash
-pnpm --filter @ancore/extension-wallet test:e2e:smoke
+# Short alias — runs @smoke-tagged tests on chromium and firefox
+pnpm e2e
+
+# Full suite (all specs, both browsers)
+pnpm test:e2e
+
+# Smoke only, explicit
+pnpm test:e2e:smoke
 ```
 
-Debug mode:
+From repository root (via turbo):
 
 ```bash
-pnpm --filter @ancore/extension-wallet test:e2e:smoke:debug
+pnpm --filter @ancore/extension-wallet e2e
+```
+
+Debug mode (headed, single worker, trace on):
+
+```bash
+pnpm test:e2e:smoke:debug
 ```
 
 ## Debugging Tips
@@ -39,6 +52,6 @@ pnpm --filter @ancore/extension-wallet test:e2e:smoke:debug
 
 ## CI Integration
 
-- Pull request and branch CI includes a required `Extension E2E Smoke` job.
+- Pull request and branch CI runs `Extension E2E Smoke` as a browser matrix (`chromium`, `firefox`).
 - Release gate includes `[Gate 6] Extension E2E Smoke`.
 - Any failure blocks release gate completion unless a manual override is explicitly used for other failing gates.

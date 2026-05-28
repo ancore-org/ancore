@@ -25,6 +25,7 @@ export {
   CONTRACT_ERROR_MESSAGES,
   CONTRACT_ERROR_CODES,
 } from './errors';
+export { toCanonicalError as toCanonicalAccountError } from './errors';
 
 export {
   addressToScVal,
@@ -54,3 +55,9 @@ export {
   scValToOptionalSessionKey,
   sessionKeyToScVal,
 } from './xdr-utils';
+
+export {
+  formatPermissionLabel,
+  formatPermissionLabels,
+  formatPermissions,
+} from './permission-formatter';

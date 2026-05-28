@@ -72,6 +72,7 @@
 - [ ] I have added tests that prove my fix is effective or that my feature works
 - [ ] New and existing unit tests pass locally with my changes
 - [ ] Any dependent changes have been merged and published
+- [ ] Any flaky-test quarantine entry includes a linked follow-up issue, owner, expiry, and stable failure signature
 
 ### For High-Security Changes
 

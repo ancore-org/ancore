@@ -1,4 +1,4 @@
-export type NetworkType = "mainnet" | "testnet";
+export type NetworkType = 'mainnet' | 'testnet';
 
 export interface NetworkState {
   network: NetworkType;

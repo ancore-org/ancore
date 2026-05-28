@@ -12,6 +12,9 @@ contracts/
 └── upgrade/              # Upgrade mechanisms
 ```
 
+> `validation-modules`, `invoice`, and `upgrade` are currently scaffold directories.
+> They are intentionally preserved for planned features and contributor onboarding.
+
 ## Security
 
 ⚠️ **CRITICAL**: All contracts in this directory are security-critical.

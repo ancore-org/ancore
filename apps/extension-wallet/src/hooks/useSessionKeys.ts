@@ -64,7 +64,7 @@ export function useSessionKeys(): UseSessionKeysReturn {
         setIsLoading(false);
       }
     },
-    [addKey, removeKey],
+    [addKey, removeKey]
   );
 
   const revokeSessionKey = useCallback(
@@ -89,7 +89,7 @@ export function useSessionKeys(): UseSessionKeysReturn {
         setIsLoading(false);
       }
     },
-    [keys, addKey, removeKey],
+    [keys, addKey, removeKey]
   );
 
   const refreshSessionKey = useCallback(
@@ -114,7 +114,7 @@ export function useSessionKeys(): UseSessionKeysReturn {
         setIsLoading(false);
       }
     },
-    [keys, updateKey],
+    [keys, updateKey]
   );
 
   return {

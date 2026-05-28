@@ -6,9 +6,9 @@ The Stellar client uses a resilient retry policy with the following default conf
 
 ```typescript
 const DEFAULT_RETRY_POLICY = {
-  maxRetries: 3,           // Maximum number of retry attempts
-  baseDelayMs: 1000,       // Base delay between retries (1 second)
-  exponential: true,       // Use exponential backoff
+  maxRetries: 3, // Maximum number of retry attempts
+  baseDelayMs: 1000, // Base delay between retries (1 second)
+  exponential: true, // Use exponential backoff
 };
 ```
 
@@ -16,7 +16,7 @@ const DEFAULT_RETRY_POLICY = {
 
 - **Attempt 1**: Immediate execution
 - **Attempt 2**: 1 second delay (if attempt 1 fails)
-- **Attempt 3**: 2 second delay (if attempt 2 fails)  
+- **Attempt 3**: 2 second delay (if attempt 2 fails)
 - **Attempt 4**: 4 second delay (if attempt 3 fails)
 - **Failure**: Throws `RetryExhaustedError` after 4 total attempts
 
@@ -66,9 +66,9 @@ import { StellarClient } from '@ancore/stellar';
 const client = new StellarClient({
   network: 'testnet',
   retryOptions: {
-    maxRetries: 5,        // Increase retry attempts
-    baseDelayMs: 500,     // Reduce base delay
-    exponential: false,   // Use linear backoff
+    maxRetries: 5, // Increase retry attempts
+    baseDelayMs: 500, // Reduce base delay
+    exponential: false, // Use linear backoff
   },
 });
 ```
@@ -105,30 +105,24 @@ Different operations can have different retry requirements:
 
 ```typescript
 // For account queries (more forgiving)
-const account = await withRetry(
-  () => client.getAccount(publicKey),
-  {
-    maxRetries: 5,
-    baseDelayMs: 2000,
-    isRetryable: (error) => !(error instanceof AccountNotFoundError),
-  }
-);
+const account = await withRetry(() => client.getAccount(publicKey), {
+  maxRetries: 5,
+  baseDelayMs: 2000,
+  isRetryable: (error) => !(error instanceof AccountNotFoundError),
+});
 
 // For transaction submission (more strict)
-const result = await withRetry(
-  () => client.submitTransaction(transaction),
-  {
-    maxRetries: 2,
-    baseDelayMs: 500,
-    isRetryable: (error) => {
-      if (error instanceof TransactionError) {
-        // Don't retry bad sequence numbers
-        return error.resultCode !== 'tx_bad_seq';
-      }
-      return error instanceof NetworkError && error.statusCode !== 400;
-    },
-  }
-);
+const result = await withRetry(() => client.submitTransaction(transaction), {
+  maxRetries: 2,
+  baseDelayMs: 500,
+  isRetryable: (error) => {
+    if (error instanceof TransactionError) {
+      // Don't retry bad sequence numbers
+      return error.resultCode !== 'tx_bad_seq';
+    }
+    return error instanceof NetworkError && error.statusCode !== 400;
+  },
+});
 ```
 
 ## Network Failure Scenarios
@@ -148,7 +142,7 @@ const client = new StellarClient({
 
 // Will retry on:
 // - Connection timeouts
-// - DNS failures  
+// - DNS failures
 // - HTTP 503 Service Unavailable
 // - Rate limiting (429)
 ```
@@ -160,9 +154,9 @@ const client = new StellarClient({
 const bulkClient = new StellarClient({
   network: 'mainnet',
   retryOptions: {
-    maxRetries: 2,        // Faster failures
-    baseDelayMs: 200,     // Shorter delays
-    exponential: false,    // Linear backoff for predictability
+    maxRetries: 2, // Faster failures
+    baseDelayMs: 200, // Shorter delays
+    exponential: false, // Linear backoff for predictability
   },
 });
 ```
@@ -174,9 +168,9 @@ const bulkClient = new StellarClient({
 const criticalClient = new StellarClient({
   network: 'mainnet',
   retryOptions: {
-    maxRetries: 8,        // More attempts
-    baseDelayMs: 3000,     // Longer delays
-    exponential: true,     // Exponential backoff
+    maxRetries: 8, // More attempts
+    baseDelayMs: 3000, // Longer delays
+    exponential: true, // Exponential backoff
   },
 });
 ```
@@ -225,8 +219,7 @@ class CircuitBreakerStellarClient {
   }
 
   private isOpen(): boolean {
-    return this.failures >= this.threshold && 
-           Date.now() - this.lastFailure < this.timeout;
+    return this.failures >= this.threshold && Date.now() - this.lastFailure < this.timeout;
   }
 
   private recordFailure(): void {
@@ -259,7 +252,7 @@ function calculateDelayWithJitter(attempt: number, baseDelayMs: number): number 
 describe('retry behavior', () => {
   it('should retry on transient errors', async () => {
     const client = new StellarClient({ network: 'testnet' });
-    
+
     // Mock network failure then success
     const mockFn = jest
       .fn()
@@ -282,9 +275,9 @@ describe('retry behavior', () => {
 ```typescript
 describe('network resilience', () => {
   it('should handle real network failures', async () => {
-    const client = new StellarClient({ 
+    const client = new StellarClient({
       network: 'testnet',
-      retryOptions: { maxRetries: 3, baseDelayMs: 100 }
+      retryOptions: { maxRetries: 3, baseDelayMs: 100 },
     });
 
     // Test with invalid URL to simulate network failure
@@ -353,7 +346,7 @@ const client = new StellarClient({
 const client = new StellarClient({ network: 'testnet' });
 client.setRetryPolicy({ attempts: 3, delay: 1000 });
 
-// New v2 approach  
+// New v2 approach
 const client = new StellarClient({
   network: 'testnet',
   retryOptions: {
@@ -365,6 +358,7 @@ const client = new StellarClient({
 ```
 
 The new retry policy provides:
+
 - Better error classification
 - Configurable exponential backoff
 - More granular control over retry behavior

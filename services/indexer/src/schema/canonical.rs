@@ -42,7 +42,7 @@ impl std::fmt::Display for EventKind {
 
 /// A raw contract event as received from the Stellar horizon/RPC stream.
 /// Fields mirror the Stellar contract event structure.
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct RawEvent {
     /// Ledger sequence number the event was emitted in.
     pub ledger_seq: u32,

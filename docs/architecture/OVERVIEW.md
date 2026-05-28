@@ -26,15 +26,27 @@ This document provides a high-level overview of the Ancore system architecture.
                          │
 ┌────────────────────────▼────────────────────────────────────┐
 │                  Stellar/Soroban Layer                       │
-│  ┌──────────────┐  ┌──────────────┐  ┌──────────────┐      │
-│  │   Account    │  │  Validation  │  │   Invoice    │      │
-│  │   Contract   │  │   Modules    │  │   Contract   │      │
-│  └──────────────┘  └──────────────┘  └──────────────┘      │
+│  ┌──────────────┐                                            │
+│  │   Account    │                                            │
+│  │   Contract   │                                            │
+│  └──────────────┘                                            │
 └────────────────────────┬────────────────────────────────────┘
                          │
                          │
                     Stellar Network
 ```
+
+## Financial OS Positioning
+
+Ancore is designed as a financial operating system on top of Stellar:
+
+- **Stellar (on-chain)**: settlement, assets, programmable transfer authorization
+- **Ancore apps/services (off-chain)**: UX, identity, analytics, compliance workflows, notifications, support tooling
+
+Decision rule:
+
+- If blockchain adds trust/settlement/interoperability value -> use Stellar.
+- If traditional software is faster/safer for user experience or operations -> keep it off-chain.
 
 ## Core Concepts
 
@@ -173,4 +185,7 @@ Optional relayer network for:
 
 ---
 
-**Last Updated**: January 2026
+> Note: Additional contract modules (validation, invoice, etc.) remain planned
+> roadmap items and are not part of the current repository layout.
+
+**Last Updated**: April 2026

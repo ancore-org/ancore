@@ -117,7 +117,7 @@ describe('execute integration', () => {
       );
 
       expect(invocation.method).toBe('execute');
-      expect(invocation.args).toHaveLength(4);
+      expect(invocation.args).toHaveLength(6);
     });
   });
 });

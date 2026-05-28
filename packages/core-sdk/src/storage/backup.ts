@@ -29,7 +29,12 @@ export interface BackupPayloadV1 {
 export type BackupPayload = BackupPayloadV1;
 
 export interface BackupValidationError extends Error {
-  code: 'INVALID_VERSION' | 'MALFORMED_BACKUP' | 'CHECKSUM_MISMATCH' | 'ENCRYPTION_ERROR' | 'MIGRATION_ERROR';
+  code:
+    | 'INVALID_VERSION'
+    | 'MALFORMED_BACKUP'
+    | 'CHECKSUM_MISMATCH'
+    | 'ENCRYPTION_ERROR'
+    | 'MIGRATION_ERROR';
   details?: unknown;
 }
 
@@ -118,9 +123,7 @@ export async function importBackup(
   let migrationResult: MigrationResult | undefined;
   if (backup.version !== CURRENT_BACKUP_VERSION) {
     migrationResult = await migrateBackup(backup, password);
-    backup = migrationResult.success ? 
-      await migrateToCurrentVersion(backup, password) : 
-      backup;
+    backup = migrationResult.success ? await migrateToCurrentVersion(backup, password) : backup;
   }
 
   // Restore account data if present
@@ -131,7 +134,8 @@ export async function importBackup(
       validateAccountData(accountData);
       await storage.set('account', accountData);
     } catch (error) {
-      throw createBackupError('ENCRYPTION_ERROR', 
+      throw createBackupError(
+        'ENCRYPTION_ERROR',
         `Failed to restore account data: ${error instanceof Error ? error.message : String(error)}`,
         { error }
       );
@@ -146,7 +150,8 @@ export async function importBackup(
       validateSessionKeysData(sessionKeysData);
       await storage.set('sessionKeys', sessionKeysData);
     } catch (error) {
-      throw createBackupError('ENCRYPTION_ERROR',
+      throw createBackupError(
+        'ENCRYPTION_ERROR',
         `Failed to restore session keys: ${error instanceof Error ? error.message : String(error)}`,
         { error }
       );
@@ -174,7 +179,8 @@ function validateBackupStructure(backup: BackupPayload): void {
   }
 
   if (!SUPPORTED_BACKUP_VERSIONS.includes(version)) {
-    throw createBackupError('INVALID_VERSION', 
+    throw createBackupError(
+      'INVALID_VERSION',
       `Unsupported backup version: ${version}. Supported versions: ${SUPPORTED_BACKUP_VERSIONS.join(', ')}`
     );
   }
@@ -185,7 +191,7 @@ function validateBackupStructure(backup: BackupPayload): void {
  */
 async function verifyBackupIntegrity(backup: BackupPayload): Promise<void> {
   const { checksum } = backup.metadata;
-  
+
   if (typeof checksum !== 'string' || checksum.length === 0) {
     throw createBackupError('MALFORMED_BACKUP', 'Missing or invalid checksum in backup metadata');
   }
@@ -196,11 +202,12 @@ async function verifyBackupIntegrity(backup: BackupPayload): Promise<void> {
     account: backup.account,
     sessionKeys: backup.sessionKeys,
   };
-  
+
   const calculatedChecksum = await calculateChecksum(backupDataForChecksum);
-  
+
   if (checksum !== calculatedChecksum) {
-    throw createBackupError('CHECKSUM_MISMATCH', 
+    throw createBackupError(
+      'CHECKSUM_MISMATCH',
       'Backup integrity check failed: checksum mismatch. Backup may be corrupted or tampered with.'
     );
   }
@@ -218,12 +225,12 @@ async function calculateChecksum(data: unknown): Promise<string> {
   const dataString = JSON.stringify(data, Object.keys(data as any).sort());
   const encoder = new (globalThis as any).TextEncoder();
   const dataBuffer = encoder.encode(dataString);
-  
+
   const hashBuffer = await crypto.subtle.digest('SHA-256', dataBuffer);
   const hashArray = new Uint8Array(hashBuffer);
-  
+
   return Array.from(hashArray)
-    .map(b => b.toString(16).padStart(2, '0'))
+    .map((b) => b.toString(16).padStart(2, '0'))
     .join('');
 }
 
@@ -256,7 +263,8 @@ async function migrateBackup(backup: BackupPayload, _password: string): Promise<
       warnings,
     };
   } catch (error) {
-    throw createBackupError('MIGRATION_ERROR',
+    throw createBackupError(
+      'MIGRATION_ERROR',
       `Failed to migrate backup from version ${fromVersion} to ${toVersion}: ${error instanceof Error ? error.message : String(error)}`,
       { error }
     );
@@ -266,7 +274,10 @@ async function migrateBackup(backup: BackupPayload, _password: string): Promise<
 /**
  * Create a migrated backup payload in current version format
  */
-async function migrateToCurrentVersion(oldBackup: BackupPayload, _password: string): Promise<BackupPayload> {
+async function migrateToCurrentVersion(
+  oldBackup: BackupPayload,
+  _password: string
+): Promise<BackupPayload> {
   // For now, since we only have version 1, just return the backup
   // This function is prepared for future version migrations
   return oldBackup;
@@ -281,7 +292,10 @@ function validateAccountData(data: AccountData): void {
   }
 
   if (typeof data.privateKey !== 'string' || data.privateKey.length === 0) {
-    throw createBackupError('MALFORMED_BACKUP', 'Invalid account data: missing or invalid privateKey');
+    throw createBackupError(
+      'MALFORMED_BACKUP',
+      'Invalid account data: missing or invalid privateKey'
+    );
   }
 }
 
@@ -294,7 +308,10 @@ function validateSessionKeysData(data: SessionKeysData): void {
   }
 
   if (!data.keys || typeof data.keys !== 'object') {
-    throw createBackupError('MALFORMED_BACKUP', 'Invalid session keys data: missing or invalid keys object');
+    throw createBackupError(
+      'MALFORMED_BACKUP',
+      'Invalid session keys data: missing or invalid keys object'
+    );
   }
 }
 

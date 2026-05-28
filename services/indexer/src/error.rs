@@ -20,6 +20,9 @@ pub enum ApiError {
     #[error("Database error: {0}")]
     Database(#[from] sqlx::Error),
 
+    #[error("Query timed out: {0}")]
+    QueryTimeout(String),
+
     #[error("Internal server error: {0}")]
     Internal(#[from] anyhow::Error),
 }
@@ -30,9 +33,16 @@ impl IntoResponse for ApiError {
             ApiError::InvalidCursor(msg) => (StatusCode::BAD_REQUEST, "invalid_cursor", msg),
             ApiError::InvalidFilter(msg) => (StatusCode::BAD_REQUEST, "invalid_filter", msg),
             ApiError::NotFound => (StatusCode::NOT_FOUND, "not_found", "Resource not found".to_string()),
+            ApiError::QueryTimeout(msg) => (StatusCode::GATEWAY_TIMEOUT, "query_timeout", msg),
             ApiError::Database(err) => {
-                tracing::error!("Database error: {:?}", err);
-                (StatusCode::INTERNAL_SERVER_ERROR, "internal_error", "Database error".to_string())
+                if matches!(err, sqlx::Error::PoolTimedOut) {
+                    (StatusCode::GATEWAY_TIMEOUT, "query_timeout", "Database pool timed out".to_string())
+                } else if err.as_database_error().and_then(|db_err| db_err.code()).map(|c| c == "57014").unwrap_or(false) {
+                    (StatusCode::GATEWAY_TIMEOUT, "query_timeout", "Database query timed out".to_string())
+                } else {
+                    tracing::error!("Database error: {:?}", err);
+                    (StatusCode::INTERNAL_SERVER_ERROR, "internal_error", "Database error".to_string())
+                }
             }
             ApiError::Internal(err) => {
                 tracing::error!("Internal error: {:?}", err);

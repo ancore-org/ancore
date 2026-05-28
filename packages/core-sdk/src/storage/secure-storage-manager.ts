@@ -1,4 +1,10 @@
-import { AccountData, EncryptedPayload, SessionKeysData, StorageAdapter } from './types';
+import {
+  AccountData,
+  EncryptedPayload,
+  RecentRecipientsData,
+  SessionKeysData,
+  StorageAdapter,
+} from './types';
 
 function toArrayBufferView(value: Uint8Array): Uint8Array<ArrayBuffer> {
   const normalized = new Uint8Array(new ArrayBuffer(value.byteLength));
@@ -135,15 +141,18 @@ export class SecureStorageManager {
     if (base64Salt == null) return null; // genuinely not initialized
 
     if (typeof base64Salt !== 'string') {
-      throw new Error('Corrupted master_salt: expected string');
+      return null; // treat corrupted salt as missing to allow re-initialization
     }
 
-    const buffer = base64ToBuffer(base64Salt);
-    if (buffer.byteLength !== 16) {
-      throw new Error('Corrupted master_salt: expected 16 bytes');
+    try {
+      const buffer = base64ToBuffer(base64Salt);
+      if (buffer.byteLength !== 16) {
+        return null; // expected 16 bytes
+      }
+      return new Uint8Array(buffer);
+    } catch {
+      return null; // invalid base64
     }
-
-    return new Uint8Array(buffer);
   }
 
   /**
@@ -278,11 +287,19 @@ export class SecureStorageManager {
   }
 
   public async getAccount(): Promise<AccountData | null> {
+    if (!this.encryptionKey) {
+      throw new Error('Storage manager is locked');
+    }
     const payload = await this.storage.get<EncryptedPayload>('account');
     if (!payload) return null;
-    const json = await this.decryptData(payload);
-    this.touch();
-    return JSON.parse(json);
+    try {
+      const json = await this.decryptData(payload);
+      this.touch();
+      return JSON.parse(json);
+    } catch {
+      // Data corrupted or password changed out of sync
+      return null;
+    }
   }
 
   public async saveSessionKeys(sessionKeys: SessionKeysData): Promise<void> {
@@ -302,8 +319,40 @@ export class SecureStorageManager {
     if (!payload) {
       return { keys: {} };
     }
-    const json = await this.decryptData(payload);
+    try {
+      const json = await this.decryptData(payload);
+      this.touch();
+      return JSON.parse(json);
+    } catch {
+      // Data corrupted
+      return { keys: {} };
+    }
+  }
+
+  public async saveRecentRecipients(data: RecentRecipientsData): Promise<void> {
+    if (!this.encryptionKey) {
+      throw new Error('Storage manager is locked');
+    }
+    const payload = await this.encryptData(JSON.stringify(data));
+    await this.storage.set('recentRecipients', payload);
     this.touch();
-    return JSON.parse(json);
+  }
+
+  public async getRecentRecipients(): Promise<RecentRecipientsData | null> {
+    if (!this.encryptionKey) {
+      throw new Error('Storage manager is locked');
+    }
+    const payload = await this.storage.get<EncryptedPayload>('recentRecipients');
+    if (!payload) {
+      return { recipients: [] };
+    }
+    try {
+      const json = await this.decryptData(payload);
+      this.touch();
+      return JSON.parse(json);
+    } catch {
+      // Data corrupted
+      return { recipients: [] };
+    }
   }
 }

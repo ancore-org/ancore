@@ -1,5 +1,9 @@
 import { useState, useCallback } from 'react';
-import { validatePasswordStrength, type EncryptedSecretKeyPayload } from '@ancore/crypto';
+import {
+  deriveKeypairFromMnemonic,
+  validatePasswordStrength,
+  type EncryptedSecretKeyPayload,
+} from '@ancore/crypto';
 import { createWallet, importWallet, type WalletMaterial } from '@ancore/core-sdk';
 import { StellarClient } from '@ancore/stellar';
 import type { Network } from '@ancore/types';
@@ -39,6 +43,10 @@ export type PasswordStrength = {
   score: number;
   feedback: string[];
 };
+
+export function deriveOnboardingKeypair(mnemonic: string) {
+  return deriveKeypairFromMnemonic(mnemonic, 0);
+}
 
 /**
  * Convert crypto package result to our format
@@ -81,7 +89,14 @@ export function useOnboarding() {
    * Move to the next step
    */
   const goToNextStep = useCallback(() => {
-    const steps: OnboardingStep[] = ['welcome', 'generate', 'verify', 'password', 'deploy', 'success'];
+    const steps: OnboardingStep[] = [
+      'welcome',
+      'generate',
+      'verify',
+      'password',
+      'deploy',
+      'success',
+    ];
     const currentIndex = steps.indexOf(state.step);
     if (currentIndex < steps.length - 1) {
       setState((prev: OnboardingState) => ({ ...prev, step: steps[currentIndex + 1] }));
@@ -92,7 +107,14 @@ export function useOnboarding() {
    * Move to the previous step
    */
   const goToPreviousStep = useCallback(() => {
-    const steps: OnboardingStep[] = ['welcome', 'generate', 'verify', 'password', 'deploy', 'success'];
+    const steps: OnboardingStep[] = [
+      'welcome',
+      'generate',
+      'verify',
+      'password',
+      'deploy',
+      'success',
+    ];
     setState((prev: OnboardingState) => {
       const currentIndex = steps.indexOf(prev.step);
       if (currentIndex > 0) {

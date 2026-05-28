@@ -1,7 +1,7 @@
-import { create } from "zustand";
-import { createWalletSlice } from "./wallet.slice";
-import { createSessionSlice } from "./session.slice";
-import { createNetworkSlice } from "./network.slice";
+import { create } from 'zustand';
+import { createWalletSlice } from './wallet.slice';
+import { createSessionSlice } from './session.slice';
+import { createNetworkSlice } from './network.slice';
 
 export const useStore = create((set, get) => ({
   ...createWalletSlice(set, get),
@@ -11,6 +11,6 @@ export const useStore = create((set, get) => ({
   resetAll: () => {
     get().resetWallet();
     get().logout();
-    get().setNetwork("testnet");
+    get().setNetwork('testnet');
   },
 }));

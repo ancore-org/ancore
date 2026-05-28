@@ -128,6 +128,10 @@ release artifact store and link paths below.
 | Authentication / authorisation | #287, #289 | Must be fully implemented, not stubbed |
 | Relayer service endpoints | #290 | Stub signature service must be replaced |
 | Error reporting and structured errors | #128, #129 | All services |
+| Indexer offline/CI build reliability | #403, #404 | Build must work without hidden local setup assumptions |
+| Contributor pre-commit quality checks | #405 | Lint-staged should include apps and services |
+| Extension background lock/unlock handler tests | #406 | Security-sensitive state transitions need focused tests |
+| Documentation drift checks | #407 | README/architecture should match on-disk layout |
 | Security audit | TBD | Open tracking issue before gate review |
 | Performance optimisation | TBD | Open tracking issue before gate review |
 

@@ -110,6 +110,7 @@ CREATE TABLE account_activity (
 ```bash
 DATABASE_URL=postgresql://user:password@localhost:5432/ancore
 TEST_DATABASE_URL=postgresql://user:password@localhost:5432/ancore_test
+DB_QUERY_TIMEOUT_SEC=30 # Optional, defaults to 30
 ```
 
 ### Running Migrations
@@ -118,6 +119,22 @@ TEST_DATABASE_URL=postgresql://user:password@localhost:5432/ancore_test
 # Apply migrations
 psql $DATABASE_URL -f migrations/001_create_account_activity_table.sql
 ```
+
+### Linting Migrations
+
+The lint script validates that every file in `migrations/` follows the naming convention and that no two files share the same sequence number.
+
+**Convention:** `NNN_snake_case_description.sql` — three zero-padded digits, lowercase body, `.sql` extension.
+
+```bash
+# From the repo root
+pnpm indexer:lint-migrations
+
+# Or directly
+node services/indexer/scripts/lint-migrations.mjs
+```
+
+The script also runs automatically in CI as part of the `lint` job.
 
 ### Development
 
@@ -185,6 +202,23 @@ cargo test --test account_activity_api_test
 ```
 
 Tests are marked with `#[ignore]` to prevent accidental execution without a test database. Remove the attribute to run them.
+
+## CI Quality Gates
+
+The following checks run automatically on every PR via the `indexer` CI job:
+
+```bash
+# Check formatting (must pass before merge)
+cargo fmt --check
+
+# Lint with all warnings as errors
+cargo clippy -- -D warnings
+
+# Run unit tests
+cargo test
+```
+
+Run these locally from `services/indexer/` before pushing to avoid CI failures.
 
 ## License
 

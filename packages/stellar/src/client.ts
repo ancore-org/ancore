@@ -6,6 +6,7 @@ import { rpc as StellarRpc, Horizon } from '@stellar/stellar-sdk';
 import type { Transaction } from '@stellar/stellar-sdk';
 import type { Network, NetworkConfig } from '@ancore/types';
 import {
+  StellarError,
   NetworkError,
   AccountNotFoundError,
   TransactionError,
@@ -35,18 +36,47 @@ const NETWORK_CONFIG: Record<
 };
 
 const FRIENDBOT_URL = 'https://friendbot.stellar.org';
+const DEFAULT_ASSET_METADATA_CACHE_TTL_MS = 5 * 60 * 1000;
 
-export interface Balance {
+export interface AssetMetadata {
   asset: string;
-  balance: string;
   assetType: string;
   assetCode?: string;
   assetIssuer?: string;
 }
 
+export interface Balance extends AssetMetadata {
+  balance: string;
+}
+
+export interface AssetMetadataCacheMetrics {
+  hits: number;
+  misses: number;
+  expirations: number;
+  size: number;
+}
+
 export interface StellarClientConfig extends NetworkConfig {
   /** Custom retry options for network requests */
   retryOptions?: RetryOptions;
+  /** Time in milliseconds to cache resolved asset metadata. Set to 0 to disable caching. */
+  assetMetadataCacheTtlMs?: number;
+}
+
+export interface AccountActivityPageRequest {
+  cursor?: string | null;
+  limit?: number;
+  order?: 'asc' | 'desc';
+}
+
+export interface AccountActivityPage<TRecord> {
+  records: TRecord[];
+  nextCursor: string | null;
+}
+
+interface AssetMetadataCacheEntry {
+  metadata: AssetMetadata;
+  expiresAt: number;
 }
 
 /**
@@ -60,27 +90,134 @@ export interface StellarClientConfig extends NetworkConfig {
  * ```
  */
 export class StellarClient {
-  private readonly rpcServer: StellarRpc.Server;
+  private readonly rpcUrls: string[];
+  private readonly rpcServers: StellarRpc.Server[];
   private readonly horizonServer: Horizon.Server;
   private readonly networkPassphrase: string;
   private readonly network: Network;
   private readonly retryOptions: RetryOptions;
+  private readonly assetMetadataCacheTtlMs: number;
+  private readonly assetMetadataCache = new Map<string, AssetMetadataCacheEntry>();
+  private assetMetadataCacheMetrics = {
+    hits: 0,
+    misses: 0,
+    expirations: 0,
+  };
+  private currentRpcEndpointIndex = 0;
 
   constructor(config: StellarClientConfig) {
     this.network = config.network;
 
     const networkConfig = NETWORK_CONFIG[config.network];
-    const rpcUrl = config.rpcUrl ?? networkConfig.rpcUrl;
+    this.rpcUrls = this.resolveRpcUrls(config, networkConfig.rpcUrl);
     const horizonUrl = networkConfig.horizonUrl;
     this.networkPassphrase = config.networkPassphrase ?? networkConfig.networkPassphrase;
 
-    this.rpcServer = new StellarRpc.Server(rpcUrl);
+    this.rpcServers = this.rpcUrls.map((rpcUrl) => new StellarRpc.Server(rpcUrl));
     this.horizonServer = new Horizon.Server(horizonUrl);
     this.retryOptions = config.retryOptions ?? {
       maxRetries: 3,
       baseDelayMs: 1000,
       exponential: true,
     };
+    this.assetMetadataCacheTtlMs =
+      config.assetMetadataCacheTtlMs ?? DEFAULT_ASSET_METADATA_CACHE_TTL_MS;
+  }
+
+  private resolveRpcUrls(config: StellarClientConfig, defaultRpcUrl: string): string[] {
+    const configuredRpcUrls =
+      config.rpcUrls && config.rpcUrls.length > 0 ? config.rpcUrls : undefined;
+    const rpcUrls = configuredRpcUrls ?? (config.rpcUrl ? [config.rpcUrl] : [defaultRpcUrl]);
+    const usableRpcUrls = rpcUrls
+      .map((rpcUrl) => rpcUrl.trim())
+      .filter((rpcUrl) => rpcUrl.length > 0);
+
+    if (usableRpcUrls.length === 0) {
+      throw new NetworkError('At least one usable RPC endpoint is required');
+    }
+
+    return usableRpcUrls;
+  }
+
+  private getCurrentRpcServer(): StellarRpc.Server {
+    return this.rpcServers[this.currentRpcEndpointIndex];
+  }
+
+  private rotateRpcEndpoint(): boolean {
+    if (this.rpcServers.length <= 1) {
+      return false;
+    }
+
+    this.currentRpcEndpointIndex = (this.currentRpcEndpointIndex + 1) % this.rpcServers.length;
+    return true;
+  }
+
+  private getRpcFailoverAttemptCount(): number {
+    const maxRetries = this.retryOptions.maxRetries ?? 3;
+    return Math.max(this.rpcServers.length, maxRetries + 1);
+  }
+
+  private getErrorStatusCode(error: Error): number | undefined {
+    if (error instanceof NetworkError) {
+      return error.statusCode;
+    }
+
+    if ('statusCode' in error && typeof error.statusCode === 'number') {
+      return error.statusCode;
+    }
+
+    if ('status' in error && typeof error.status === 'number') {
+      return error.status;
+    }
+
+    if (
+      'response' in error &&
+      error.response &&
+      typeof error.response === 'object' &&
+      'status' in error.response &&
+      typeof error.response.status === 'number'
+    ) {
+      return error.response.status;
+    }
+
+    return undefined;
+  }
+
+  private isRetryableRpcError(error: Error): boolean {
+    if (error instanceof StellarError && !(error instanceof NetworkError)) {
+      return false;
+    }
+
+    const statusCode = this.getErrorStatusCode(error);
+
+    if (statusCode !== undefined) {
+      return statusCode === 429 || statusCode >= 500;
+    }
+
+    return true;
+  }
+
+  private async executeRpcWithFailover<T>(
+    operation: (server: StellarRpc.Server) => Promise<T>
+  ): Promise<T> {
+    let lastError: Error | undefined;
+    const attemptCount = this.getRpcFailoverAttemptCount();
+
+    for (let attempt = 1; attempt <= attemptCount; attempt++) {
+      try {
+        return await operation(this.getCurrentRpcServer());
+      } catch (error) {
+        lastError = error instanceof Error ? error : new Error(String(error));
+
+        if (!this.isRetryableRpcError(lastError)) {
+          throw lastError;
+        }
+
+        this.rotateRpcEndpoint();
+      }
+    }
+
+    throw lastError ?? new NetworkError('RPC request failed');
   }
 
   /**
@@ -95,6 +232,24 @@ export class StellarClient {
    */
   getNetwork(): Network {
     return this.network;
+  }
+
+  getRpcUrls(): string[] {
+    return [...this.rpcUrls];
+  }
+
+  getCurrentRpcUrl(): string {
+    return this.rpcUrls[this.currentRpcEndpointIndex];
+  }
+
+  /**
+   * Get asset metadata cache metrics.
+   */
+  getAssetMetadataCacheMetrics(): AssetMetadataCacheMetrics {
+    return {
+      ...this.assetMetadataCacheMetrics,
+      size: this.assetMetadataCache.size,
+    };
   }
 
   /**
@@ -151,24 +306,125 @@ export class StellarClient {
   async getBalances(publicKey: string): Promise<Balance[]> {
     const account = await this.getAccount(publicKey);
 
-    return account.balances.map((balance) => {
-      if (balance.asset_type === 'native') {
-        return {
-          asset: 'XLM',
-          balance: balance.balance,
-          assetType: 'native',
-        };
+    return account.balances.map((balance) => ({
+      ...this.resolveAssetMetadata(balance),
+      balance: balance.balance,
+    }));
+  }
+
+  /**
+   * Fetch a paginated account activity page from Horizon operations endpoint.
+   */
+  async getAccountActivityPage(
+    publicKey: string,
+    request: AccountActivityPageRequest = {}
+  ): Promise<AccountActivityPage<Horizon.HorizonApi.OperationResponseType>> {
+    const { cursor = null, limit = 20, order = 'desc' } = request;
+
+    return withRetry(async () => {
+      try {
+        const builder = this.horizonServer
+          .operations()
+          .forAccount(publicKey)
+          .limit(limit)
+          .order(order);
+
+        const page = cursor ? await builder.cursor(cursor).call() : await builder.call();
+        // Cast via unknown to avoid overlap errors between Horizon response types
+        const records = page.records as unknown as Horizon.HorizonApi.OperationResponseType[];
+        const nextCursor = this.getNextCursor(records);
+
+        return { records, nextCursor };
+      } catch (error) {
+        throw new NetworkError('Failed to fetch account activity page', {
+          cause: error instanceof Error ? error : undefined,
+        });
+      }
+    }, this.retryOptions);
+  }
+
+  /**
+   * Async iterator for account activity pagination.
+   */
+  async *iterateAccountActivity(
+    publicKey: string,
+    request: AccountActivityPageRequest = {}
+  ): AsyncGenerator<Horizon.HorizonApi.OperationResponseType, void, unknown> {
+    let cursor = request.cursor ?? null;
+
+    while (true) {
+      const page = await this.getAccountActivityPage(publicKey, { ...request, cursor });
+      for (const record of page.records) {
+        yield record;
       }
 
-      const creditBalance = balance as Horizon.HorizonApi.BalanceLineAsset;
+      if (!page.nextCursor || page.records.length === 0) {
+        return;
+      }
+      cursor = page.nextCursor;
+    }
+  }
+
+  private getNextCursor(records: unknown[]): string | null {
+    if (records.length === 0) {
+      return null;
+    }
+    const last = records[records.length - 1] as { paging_token?: string };
+    return last?.paging_token ?? null;
+  }
+
+  private resolveAssetMetadata(balance: Horizon.HorizonApi.BalanceLine): AssetMetadata {
+    const cacheKey = this.getAssetMetadataCacheKey(balance);
+    const cached = this.assetMetadataCache.get(cacheKey);
+    const now = Date.now();
+
+    if (cached) {
+      if (cached.expiresAt > now) {
+        this.assetMetadataCacheMetrics.hits += 1;
+        return cached.metadata;
+      }
+
+      this.assetMetadataCache.delete(cacheKey);
+      this.assetMetadataCacheMetrics.expirations += 1;
+    }
+
+    this.assetMetadataCacheMetrics.misses += 1;
+
+    const metadata = this.createAssetMetadata(balance);
+    if (this.assetMetadataCacheTtlMs > 0) {
+      this.assetMetadataCache.set(cacheKey, {
+        metadata,
+        expiresAt: now + this.assetMetadataCacheTtlMs,
+      });
+    }
+
+    return metadata;
+  }
+
+  private getAssetMetadataCacheKey(balance: Horizon.HorizonApi.BalanceLine): string {
+    if (balance.asset_type === 'native') {
+      return 'native:XLM';
+    }
+
+    const creditBalance = balance as Horizon.HorizonApi.BalanceLineAsset;
+    return `${creditBalance.asset_type}:${creditBalance.asset_code}:${creditBalance.asset_issuer}`;
+  }
+
+  private createAssetMetadata(balance: Horizon.HorizonApi.BalanceLine): AssetMetadata {
+    if (balance.asset_type === 'native') {
       return {
-        asset: `${creditBalance.asset_code}:${creditBalance.asset_issuer}`,
-        balance: creditBalance.balance,
-        assetType: creditBalance.asset_type,
-        assetCode: creditBalance.asset_code,
-        assetIssuer: creditBalance.asset_issuer,
+        asset: 'XLM',
+        assetType: 'native',
       };
-    });
+    }
+
+    const creditBalance = balance as Horizon.HorizonApi.BalanceLineAsset;
+    return {
+      asset: `${creditBalance.asset_code}:${creditBalance.asset_issuer}`,
+      assetType: creditBalance.asset_type,
+      assetCode: creditBalance.asset_code,
+      assetIssuer: creditBalance.asset_issuer,
+    };
   }
 
   /**
@@ -271,7 +527,7 @@ export class StellarClient {
    */
   async isHealthy(): Promise<boolean> {
     try {
-      await this.rpcServer.getHealth();
+      await this.executeRpcWithFailover((rpcServer) => rpcServer.getHealth());
       return true;
     } catch {
       return false;

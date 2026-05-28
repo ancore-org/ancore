@@ -142,6 +142,7 @@ pub async fn list_handler(
     // Query repository
     let result = crate::repositories::account_activity::get_account_activity(&db, &account_id, &filter, &page).await?;
 
+    let count = result.items.len();
     let response = ActivityListResponse {
         data: result.items,
         pagination: PaginationInfo {
@@ -149,7 +150,7 @@ pub async fn list_handler(
             has_previous_page: result.has_previous_page,
             next_cursor: result.next_cursor,
             prev_cursor: result.prev_cursor,
-            count: result.items.len(),
+            count,
         },
     };
 

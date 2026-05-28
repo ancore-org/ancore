@@ -39,13 +39,16 @@ CREATE TABLE IF NOT EXISTS account_activity (
 ## Migration Path to Production
 
 ### Phase 1: MVP (Current)
+
 - Single table schema
 - In-memory event processing
 - Basic query endpoints
 - Mock storage adapters
 
 ### Phase 2: Production Hardening
+
 **Migration 002: Add Partitioning**
+
 ```sql
 -- Partition by account_id for better performance at scale
 CREATE TABLE account_activity_partitioned (
@@ -59,25 +62,29 @@ CREATE TABLE account_activity_part_0 PARTITION OF account_activity_partitioned
 ```
 
 **Migration 003: Add Versioning**
+
 ```sql
 ALTER TABLE account_activity ADD COLUMN schema_version INTEGER DEFAULT 1;
 ALTER TABLE account_activity ADD COLUMN ingested_at TIMESTAMPTZ DEFAULT NOW();
 ```
 
 **Migration 004: Enhanced Indexes**
+
 ```sql
 -- Composite indexes for common query patterns
-CREATE INDEX idx_account_activity_composite 
+CREATE INDEX idx_account_activity_composite
 ON account_activity (account_id, activity_type, asset, created_at DESC);
 
 -- Partial indexes for better performance
-CREATE INDEX idx_account_activity_payments 
-ON account_activity (account_id, created_at DESC) 
+CREATE INDEX idx_account_activity_payments
+ON account_activity (account_id, created_at DESC)
 WHERE activity_type = 'payment';
 ```
 
 ### Phase 3: Scalability
+
 **Migration 005: Add Event Sourcing**
+
 ```sql
 -- Separate events table for audit trail
 CREATE TABLE account_events (
@@ -92,21 +99,23 @@ CREATE TABLE account_events (
 ```
 
 **Migration 006: Add Materialized Views**
+
 ```sql
 -- Pre-aggregated views for common queries
 CREATE MATERIALIZED VIEW account_summary AS
-SELECT 
+SELECT
     account_id,
     COUNT(*) as total_transactions,
     MAX(created_at) as last_activity,
     COUNT(DISTINCT activity_type) as activity_types
-FROM account_activity 
+FROM account_activity
 GROUP BY account_id;
 ```
 
 ## Production Datastore Migration
 
 ### From Mock to PostgreSQL
+
 1. **Data Export**: Export mock data to JSON/CSV format
 2. **Schema Validation**: Ensure data conforms to production schema
 3. **Bulk Import**: Use `COPY` command for efficient loading
@@ -114,6 +123,7 @@ GROUP BY account_id;
 5. **Validation**: Run data integrity checks
 
 ### Migration Script Template
+
 ```bash
 #!/bin/bash
 # migration_v1_to_v2.sh
@@ -144,10 +154,12 @@ echo "Migration completed successfully!"
 ## Backward Compatibility
 
 ### API Versioning
+
 - `/api/v1/` - Current MVP endpoints
 - `/api/v2/` - Future production endpoints with enhanced features
 
 ### Data Migration Rules
+
 1. **Never delete columns** - Add new columns with DEFAULT values
 2. **Maintain old endpoints** - Support v1 clients during transition
 3. **Feature flags** - Enable new features incrementally
@@ -156,11 +168,13 @@ echo "Migration completed successfully!"
 ## Performance Considerations
 
 ### Query Optimization
+
 - Use `EXPLAIN ANALYZE` to verify query plans
 - Monitor index usage with `pg_stat_user_indexes`
 - Consider `VACUUM ANALYZE` after large data imports
 
 ### Storage Optimization
+
 - JSONB compression for metadata
 - Table partitioning for large datasets
 - Consider TimescaleDB for time-series optimization
@@ -168,33 +182,37 @@ echo "Migration completed successfully!"
 ## Monitoring and Alerting
 
 ### Key Metrics
+
 - Query latency by endpoint
 - Database connection pool usage
 - Event ingestion lag
 - Index hit ratios
 
 ### Health Checks
+
 ```sql
 -- Simple health check
 SELECT 1 as health_check;
 
 -- Table size monitoring
-SELECT 
+SELECT
     schemaname,
     tablename,
     pg_size_pretty(pg_total_relation_size(schemaname||'.'||tablename)) as size
-FROM pg_tables 
+FROM pg_tables
 WHERE tablename = 'account_activity';
 ```
 
 ## Security Considerations
 
 ### Data Protection
+
 - Row-level security for multi-tenant scenarios
 - Encryption at rest for sensitive metadata
 - Audit logging for data access
 
 ### Access Control
+
 ```sql
 -- Read-only user for query endpoints
 CREATE USER indexer_read WITH PASSWORD 'secure_password';

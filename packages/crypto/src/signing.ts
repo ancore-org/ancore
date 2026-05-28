@@ -1,28 +1,13 @@
 import { Buffer } from 'node:buffer';
 import { TextEncoder } from 'node:util';
 import { Keypair, Transaction, FeeBumpTransaction } from '@stellar/stellar-sdk';
+import { decodeSignature } from './signature-format';
 
 type SignableValue = string | Uint8Array;
 type SignableKeypair = Keypair | string;
 
 function toMessageBytes(message: SignableValue): Uint8Array {
   return typeof message === 'string' ? new TextEncoder().encode(message) : message;
-}
-
-function isHex(value: string): boolean {
-  return value.length % 2 === 0 && /^[0-9a-fA-F]+$/.test(value);
-}
-
-function decodeSignature(signature: SignableValue): Uint8Array {
-  if (signature instanceof Uint8Array) {
-    return signature;
-  }
-
-  if (isHex(signature)) {
-    return Uint8Array.from(Buffer.from(signature, 'hex'));
-  }
-
-  return Uint8Array.from(Buffer.from(signature, 'base64'));
 }
 
 /**

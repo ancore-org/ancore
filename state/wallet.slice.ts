@@ -1,4 +1,4 @@
-import { WalletState, WalletActions } from "../types/wallet";
+import { WalletState, WalletActions } from '../types/wallet';
 
 export const createWalletSlice = (set: any): WalletState & WalletActions => ({
   address: null,

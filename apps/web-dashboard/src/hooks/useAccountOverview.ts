@@ -26,7 +26,7 @@ export function useAccountOverview(publicKey: string): UseAccountOverviewReturn 
 
   const fetchData = useCallback(async () => {
     if (!publicKey) return;
-    
+
     setIsLoading(true);
     setError(null);
 
@@ -43,7 +43,7 @@ export function useAccountOverview(publicKey: string): UseAccountOverviewReturn 
 
       // Simulate partial/missing data edge cases if needed for testing
       // (Though the hook itself should probably return consistent types)
-      
+
       setData(mockData);
     } catch (err) {
       setError(err instanceof Error ? err : new Error('Failed to fetch account data'));

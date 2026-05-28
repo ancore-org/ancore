@@ -9,9 +9,30 @@ const MOCK_ACCOUNT: AccountData = {
 };
 
 const MOCK_TRANSACTIONS: Transaction[] = [
-  { id: 'tx1', type: 'receive', amount: 100, timestamp: new Date('2026-04-24T09:00:00Z'), status: 'confirmed', counterparty: 'GDEF...ABC' },
-  { id: 'tx2', type: 'send',    amount: 50,  timestamp: new Date('2026-04-23T15:30:00Z'), status: 'confirmed', counterparty: 'GHIJ...DEF' },
-  { id: 'tx3', type: 'send',    amount: 25,  timestamp: new Date('2026-04-22T08:00:00Z'), status: 'pending',   counterparty: 'GKLM...GHI' },
+  {
+    id: 'tx1',
+    type: 'receive',
+    amount: 100,
+    timestamp: new Date('2026-04-24T09:00:00Z'),
+    status: 'confirmed',
+    counterparty: 'GDEF...ABC',
+  },
+  {
+    id: 'tx2',
+    type: 'send',
+    amount: 50,
+    timestamp: new Date('2026-04-23T15:30:00Z'),
+    status: 'confirmed',
+    counterparty: 'GHIJ...DEF',
+  },
+  {
+    id: 'tx3',
+    type: 'send',
+    amount: 25,
+    timestamp: new Date('2026-04-22T08:00:00Z'),
+    status: 'pending',
+    counterparty: 'GKLM...GHI',
+  },
 ];
 
 export interface UseAccountDataReturn {
@@ -43,7 +64,9 @@ export function useAccountData(address: string): UseAccountDataReturn {
     }
   }, [address]);
 
-  useEffect(() => { fetchData(); }, [fetchData]);
+  useEffect(() => {
+    fetchData();
+  }, [fetchData]);
 
   return { account, transactions, loading, error, refetch: fetchData };
 }

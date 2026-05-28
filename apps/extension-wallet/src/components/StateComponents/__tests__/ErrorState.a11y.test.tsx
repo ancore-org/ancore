@@ -6,6 +6,7 @@
 
 import React from 'react';
 import { render, screen } from '@testing-library/react';
+import { describe, expect, it, vi } from 'vitest';
 import { ErrorState } from '../ErrorState';
 
 describe('ErrorState Accessibility', () => {
@@ -27,8 +28,8 @@ describe('ErrorState Accessibility', () => {
       <ErrorState
         message="Error"
         actions={[
-          { label: 'Retry', onClick: jest.fn(), variant: 'primary' },
-          { label: 'Cancel', onClick: jest.fn(), variant: 'secondary' },
+          { label: 'Retry', onClick: vi.fn(), variant: 'primary' },
+          { label: 'Cancel', onClick: vi.fn(), variant: 'secondary' },
         ]}
       />
     );
@@ -42,7 +43,7 @@ describe('ErrorState Accessibility', () => {
 
   it('should have keyboard navigable buttons', () => {
     const { container } = render(
-      <ErrorState message="Error" actions={[{ label: 'Try Again', onClick: jest.fn() }]} />
+      <ErrorState message="Error" actions={[{ label: 'Try Again', onClick: vi.fn() }]} />
     );
 
     const buttons = container.querySelectorAll('button');
@@ -52,10 +53,8 @@ describe('ErrorState Accessibility', () => {
   });
 
   it('should maintain focus trap for modal pattern', () => {
-    const handleDismiss = jest.fn();
-    const { container } = render(
-      <ErrorState message="Error" onDismiss={handleDismiss} />
-    );
+    const handleDismiss = vi.fn();
+    const { container } = render(<ErrorState message="Error" onDismiss={handleDismiss} />);
 
     const errorElement = container.querySelector('[role="alert"]');
     expect(errorElement).toHaveAttribute('tabindex', '-1');

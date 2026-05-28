@@ -8,7 +8,7 @@
     "lib": ["ES2022", "DOM"],
     "moduleResolution": "node",
     "types": ["node", "jest"],
-    "composite": true,
+    "composite": false,
     "tsBuildInfoFile": "./dist/.tsbuildinfo"
   },
   "references": [{ "path": "../types" }],

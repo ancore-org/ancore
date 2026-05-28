@@ -1,11 +1,17 @@
-import express, { Express } from 'express';
+import express, { Express, Request, Response, NextFunction } from 'express';
+import rateLimit from 'express-rate-limit';
 import { z } from 'zod';
 import { RelayService } from './services/relayService';
+import { createStellarSubmitterFromEnv } from './services/stellarSubmitter';
 import { createAuthMiddleware } from './middleware/auth';
+import { createIdempotencyMiddleware } from './middleware/idempotency';
 import { validateBody } from './validation/middleware';
 import { createExecuteRelayHandler } from './handlers/executeRelay';
 import { createValidateRelayHandler } from './handlers/validateRelay';
-import type { AuthServiceContract, SignatureServiceContract } from './types';
+import { IdempotencyStore } from './store/idempotency';
+import { JobQueue } from './queue/JobQueue';
+import type { AuthServiceContract, SignatureServiceContract, TransactionSubmitterContract, RelayServiceOptions } from './types';
+import { Ed25519SignatureService } from './services/ed25519SignatureService';
 
 // ── Request schema ────────────────────────────────────────────────────────────
 
@@ -32,32 +38,124 @@ const stubAuthService: AuthServiceContract = {
   },
 };
 
-const stubSignatureService: SignatureServiceContract = {
-  verify(_publicKey: string, _payload: string, _signature: string): boolean {
-    // TODO: replace with real Ed25519 verification (e.g. @noble/ed25519)
-    return true;
-  },
-};
+const defaultSignatureService: SignatureServiceContract = new Ed25519SignatureService();
 
 // ── App factory (exported for testing) ───────────────────────────────────────
 
 export function createApp(
   authService: AuthServiceContract = stubAuthService,
-  signatureService: SignatureServiceContract = stubSignatureService
+  signatureService: SignatureServiceContract = defaultSignatureService,
+  idempotencyStore: IdempotencyStore = new IdempotencyStore(),
+  transactionSubmitter?: TransactionSubmitterContract,
+  relayOptions?: RelayServiceOptions
 ): Express {
   const app = express();
+
+  app.use((req: Request, res: Response, next: NextFunction) => {
+    res.header('Access-Control-Allow-Origin', process.env.CORS_ORIGIN ?? '*');
+    res.header('Access-Control-Allow-Headers', 'Authorization, Content-Type');
+    res.header('Access-Control-Allow-Methods', 'GET, POST, PATCH, OPTIONS');
+    if (req.method === 'OPTIONS') {
+      res.sendStatus(204);
+      return;
+    }
+    next();
+  });
+
   app.use(express.json());
 
-  const relayService = new RelayService(signatureService);
+  const useMockSubmission =
+    relayOptions?.useMockSubmission === true ||
+    process.env.RELAYER_USE_MOCK_SUBMISSION === 'true';
+  const submitter =
+    transactionSubmitter ?? (useMockSubmission ? undefined : createStellarSubmitterFromEnv());
+
+  // Rate limiting for relay operations
+  const relayLimiter = rateLimit({
+    windowMs: 15 * 60 * 1000, // 15 minutes
+    max: process.env.RELAY_RATE_LIMIT_MAX ? parseInt(process.env.RELAY_RATE_LIMIT_MAX) : 50, // limit each IP to 50 requests per windowMs
+    message: 'Too many relay requests from this IP, please try again later.',
+    keyGenerator: (req: Request) => {
+      // If authenticated, use callerId, else use IP
+      const callerId = (req as any).callerId;
+      return callerId || req.ip;
+    },
+  });
+
+  // Rate limiting for status
+  const statusLimiter = rateLimit({
+    windowMs: 15 * 60 * 1000, // 15 minutes
+    max: process.env.STATUS_RATE_LIMIT_MAX ? parseInt(process.env.STATUS_RATE_LIMIT_MAX) : 200, // higher limit for status
+    message: 'Too many status requests from this IP, please try again later.',
+  });
+
+  const jobQueue = new JobQueue();
+  const relayService = new RelayService(
+    signatureService,
+    jobQueue,
+    idempotencyStore,
+    submitter,
+    { useMockSubmission, ...relayOptions }
+  );
   const auth = createAuthMiddleware(authService);
   const validate = validateBody(relayRequestSchema);
+  const idempotency = createIdempotencyMiddleware(idempotencyStore);
 
   const executeHandler = createExecuteRelayHandler(relayService);
   const validateHandler = createValidateRelayHandler(relayService);
 
-  app.post('/relay/execute', auth, validate, executeHandler);
-  app.post('/relay/validate', auth, validate, validateHandler);
-  app.get('/relay/status', (_req, res) => res.json(relayService.health()));
+  const scheduledTransferStore = new ScheduledTransferStore();
+  const scheduledTransferService = new ScheduledTransferService(
+    scheduledTransferStore,
+    relayService
+  );
+  const schedulerEngine = new SchedulerEngine(scheduledTransferService, {
+    pollIntervalMs: process.env.SCHEDULER_POLL_INTERVAL_MS
+      ? parseInt(process.env.SCHEDULER_POLL_INTERVAL_MS, 10)
+      : 1_000,
+  });
+
+  if (options.startScheduler !== false) {
+    schedulerEngine.start();
+  }
+
+  const validateScheduledTransfer = validateBody(createScheduledTransferSchema);
+
+  app.post('/relay/execute', auth, relayLimiter, validate, idempotency, executeHandler);
+  app.post('/relay/validate', auth, relayLimiter, validate, validateHandler);
+  app.get('/relay/status', statusLimiter, (_req, res) => res.json(relayService.health()));
+
+  app.post(
+    '/api/v1/scheduled-transfers',
+    auth,
+    validateScheduledTransfer,
+    createScheduledTransferHandler(scheduledTransferService)
+  );
+  app.get(
+    '/api/v1/scheduled-transfers',
+    auth,
+    createListScheduledTransfersHandler(scheduledTransferService)
+  );
+  app.get(
+    '/api/v1/scheduled-transfers/:id',
+    auth,
+    createGetScheduledTransferHandler(scheduledTransferService)
+  );
+  app.patch(
+    '/api/v1/scheduled-transfers/:id/pause',
+    auth,
+    createPauseScheduledTransferHandler(scheduledTransferService)
+  );
+  app.patch(
+    '/api/v1/scheduled-transfers/:id/cancel',
+    auth,
+    createCancelScheduledTransferHandler(scheduledTransferService)
+  );
+  app.get(
+    '/api/v1/scheduled-transfers/:id/executions',
+    auth,
+    createListExecutionsHandler(scheduledTransferService)
+  );
 
   return app;
 }

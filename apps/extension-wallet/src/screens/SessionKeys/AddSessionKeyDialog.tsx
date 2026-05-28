@@ -18,11 +18,16 @@ const PERMISSION_OPTIONS: { label: string; value: SessionPermission }[] = [
 function expiryDurationToMs(expiry: string): number {
   const now = Date.now();
   switch (expiry) {
-    case '1h':  return now + 60 * 60 * 1000;
-    case '1d':  return now + 24 * 60 * 60 * 1000;
-    case '1w':  return now + 7 * 24 * 60 * 60 * 1000;
-    case '30d': return now + 30 * 24 * 60 * 60 * 1000;
-    default:    return now + 24 * 60 * 60 * 1000;
+    case '1h':
+      return now + 60 * 60 * 1000;
+    case '1d':
+      return now + 24 * 60 * 60 * 1000;
+    case '1w':
+      return now + 7 * 24 * 60 * 60 * 1000;
+    case '30d':
+      return now + 30 * 24 * 60 * 60 * 1000;
+    default:
+      return now + 24 * 60 * 60 * 1000;
   }
 }
 
@@ -39,7 +44,7 @@ export const AddSessionKeyDialog: React.FC<AddSessionKeyDialogProps> = ({
 
   const togglePermission = (value: SessionPermission) => {
     setPermissions((prev) =>
-      prev.includes(value) ? prev.filter((p) => p !== value) : [...prev, value],
+      prev.includes(value) ? prev.filter((p) => p !== value) : [...prev, value]
     );
   };
 

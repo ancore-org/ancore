@@ -3,15 +3,20 @@
   "compilerOptions": {
     "rootDir": "./src",
     "outDir": "./dist",
-    "composite": true,
+    "composite": false,
     "declarationDir": "./dist",
-    "tsBuildInfoFile": "./dist/.tsbuildinfo"
+    "tsBuildInfoFile": "./dist/.tsbuildinfo",
+    "baseUrl": ".",
+    "paths": {
+      "@ancore/types": ["../types/dist"],
+      "@ancore/types/*": ["../types/dist/*"],
+      "@ancore/crypto": ["../crypto/dist"],
+      "@ancore/crypto/*": ["../crypto/dist/*"],
+      "@ancore/stellar": ["../stellar/dist"],
+      "@ancore/stellar/*": ["../stellar/dist/*"]
+    }
   },
-  "references": [
-    { "path": "../types" },
-    { "path": "../crypto" },
-    { "path": "../stellar" }
-  ],
+  "references": [{ "path": "../types" }, { "path": "../crypto" }, { "path": "../stellar" }],
   "include": ["src/**/*"],
   "exclude": ["node_modules", "dist", "**/*.test.ts"]
 }

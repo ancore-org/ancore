@@ -21,6 +21,7 @@ export type Network = 'testnet' | 'mainnet' | 'local';
 export interface NetworkConfig {
   network: Network;
   rpcUrl?: string;
+  rpcUrls?: string[];
   networkPassphrase?: string;
 }
 
@@ -32,3 +33,4 @@ export * from './user-operation';
 export * from './wallet';
 export * from './guards';
 export * from './schemas';
+export * from './payment-request';

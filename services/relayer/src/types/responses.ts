@@ -30,9 +30,20 @@ export interface ValidationResult {
   error?: RelayError;
 }
 
+export interface DependencyStatus {
+  status: 'ok' | 'degraded';
+  message?: string;
+  latencyMs?: number;
+}
+
 /** Response for GET /relay/status */
 export interface HealthResponse {
   status: 'ok' | 'degraded';
   uptime: number;
   timestamp: string;
+  dependencies?: {
+    queue: DependencyStatus;
+    rpc: DependencyStatus;
+    storage: DependencyStatus;
+  };
 }

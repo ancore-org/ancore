@@ -1,0 +1,16 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1280" height="800" viewBox="0 0 1280 800">
+  <rect width="1280" height="800" fill="#eef3ff"/>
+  <rect x="420" y="60" width="440" height="680" rx="22" fill="#ffffff" stroke="#d2ddff"/>
+  <text x="460" y="120" font-family="Inter, Segoe UI, Arial" font-size="34" font-weight="700" fill="#10204a">Receive</text>
+  <rect x="535" y="170" width="210" height="210" rx="16" fill="#f5f8ff" stroke="#cfdafc"/>
+  <rect x="560" y="195" width="160" height="160" fill="#1d3678"/>
+  <text x="603" y="286" font-family="Inter, Segoe UI, Arial" font-size="40" fill="#ffffff">QR</text>
+  <text x="460" y="430" font-family="Inter, Segoe UI, Arial" font-size="20" fill="#5c6d96">Wallet address</text>
+  <rect x="460" y="446" width="360" height="58" rx="12" fill="#f6f9ff" stroke="#cfdafc"/>
+  <text x="476" y="482" font-family="Inter, Segoe UI, Arial" font-size="18" fill="#7a87a9">GCFX...WALLET</text>
+  <rect x="460" y="530" width="172" height="58" rx="12" fill="#1d3678"/>
+  <text x="500" y="566" font-family="Inter, Segoe UI, Arial" font-size="20" fill="#ffffff">Copy address</text>
+  <rect x="648" y="530" width="172" height="58" rx="12" fill="#e7edff"/>
+  <text x="694" y="566" font-family="Inter, Segoe UI, Arial" font-size="20" fill="#1d3678">Show QR</text>
+  <text x="30" y="770" font-family="Inter, Segoe UI, Arial" font-size="24" fill="#344675">Screenshot 4: Receive screen with QR and copy actions</text>
+</svg>
