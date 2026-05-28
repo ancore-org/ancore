@@ -36,6 +36,15 @@ module.exports = [
         chrome: 'readonly',
         browser: 'readonly',
         localStorage: 'readonly',
+        // Fetch API globals
+        fetch: 'readonly',
+        Request: 'readonly',
+        RequestInit: 'readonly',
+        Response: 'readonly',
+        URLSearchParams: 'readonly',
+        URL: 'readonly',
+        // Runtime environment detection
+        process: 'readonly',
       },
     },
     plugins: {
