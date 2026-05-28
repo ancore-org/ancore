@@ -125,9 +125,9 @@ describe('POST /relay/execute', () => {
   });
 
   it('401 when Authorization header is missing', async () => {
-    const res = await request(
-      makeApp(true, undefined, undefined, { useMockSubmission: true })
-    ).post('/relay/execute').send(validBody);
+    const res = await request(makeApp(true, undefined, undefined, { useMockSubmission: true }))
+      .post('/relay/execute')
+      .send(validBody);
 
     expect(res.status).toBe(401);
   });

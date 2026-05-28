@@ -1,10 +1,7 @@
 import { Button, cn } from '@ancore/ui-kit';
 import type { ScheduleFrequency } from '@ancore/types';
 import { CalendarClock } from 'lucide-react';
-import {
-  defaultScheduleStartAt,
-  SCHEDULE_FREQUENCY_OPTIONS,
-} from '@/services/scheduler-client';
+import { defaultScheduleStartAt, SCHEDULE_FREQUENCY_OPTIONS } from '@/services/scheduler-client';
 
 export type TransferTiming = 'immediate' | 'scheduled';
 

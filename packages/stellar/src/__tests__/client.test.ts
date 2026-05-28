@@ -712,7 +712,9 @@ describe('StellarClient', () => {
         retryOptions: { maxRetries: 1, baseDelayMs: 0 },
       });
       const primary = getMockRpcServer(rpcUrls[0]);
-      primary.getHealth.mockRejectedValue(Object.assign(new Error('server error'), { status: 503 }));
+      primary.getHealth.mockRejectedValue(
+        Object.assign(new Error('server error'), { status: 503 })
+      );
 
       await expect(client.isHealthy()).resolves.toBe(false);
       expect(primary.getHealth).toHaveBeenCalledTimes(2);
@@ -789,7 +791,9 @@ describe('StellarClient', () => {
         retryOptions: { maxRetries: 3, baseDelayMs: 0 },
       });
       const primary = getMockRpcServer(rpcUrls[0]);
-      primary.getHealth.mockRejectedValue(new NetworkError('upstream unavailable', { statusCode: 400 }));
+      primary.getHealth.mockRejectedValue(
+        new NetworkError('upstream unavailable', { statusCode: 400 })
+      );
 
       await expect(client.isHealthy()).resolves.toBe(false);
       expect(primary.getHealth).toHaveBeenCalledTimes(1);
@@ -926,10 +930,12 @@ describe('StellarClient', () => {
 
     it('should stop iterating when a page has no records', async () => {
       const client = new StellarClient({ network: 'testnet' });
-      const getAccountActivityPage = jest.spyOn(client, 'getAccountActivityPage').mockResolvedValue({
-        records: [],
-        nextCursor: null,
-      });
+      const getAccountActivityPage = jest
+        .spyOn(client, 'getAccountActivityPage')
+        .mockResolvedValue({
+          records: [],
+          nextCursor: null,
+        });
 
       const seen: string[] = [];
       for await (const op of client.iterateAccountActivity('GABC123')) {

@@ -18,12 +18,7 @@ const isoDateTimeSchema = z.string().datetime({ offset: true });
 
 export const scheduleFrequencySchema = z.enum(['once', 'daily', 'weekly', 'monthly']);
 
-export const scheduledTransferStatusSchema = z.enum([
-  'active',
-  'paused',
-  'cancelled',
-  'completed',
-]);
+export const scheduledTransferStatusSchema = z.enum(['active', 'paused', 'cancelled', 'completed']);
 
 export const scheduledExecutionOutcomeSchema = z.enum(['success', 'failed']);
 
@@ -56,10 +51,10 @@ export const createScheduledTransferSchema = z
     }),
     relayPayload: relayPayloadSchema,
   })
-  .refine(
-    (data) => new Date(data.startAt).getTime() >= Date.now() - 60_000,
-    { message: 'startAt must be in the future', path: ['startAt'] }
-  );
+  .refine((data) => new Date(data.startAt).getTime() >= Date.now() - 60_000, {
+    message: 'startAt must be in the future',
+    path: ['startAt'],
+  });
 
 export interface ScheduledTransfer {
   id: string;

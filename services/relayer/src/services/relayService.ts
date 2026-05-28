@@ -24,9 +24,7 @@ function mockTxId(): string {
 }
 
 function isMockSubmissionEnabled(options?: RelayServiceOptions): boolean {
-  return (
-    options?.useMockSubmission === true || process.env.RELAYER_USE_MOCK_SUBMISSION === 'true'
-  );
+  return options?.useMockSubmission === true || process.env.RELAYER_USE_MOCK_SUBMISSION === 'true';
 }
 
 /**
@@ -164,7 +162,11 @@ export class RelayService implements RelayServiceContract {
     try {
       const result = await this.transactionSubmitter.isHealthy();
       if (!result.healthy) {
-        return { status: 'degraded', message: 'Soroban RPC unreachable', latencyMs: result.latencyMs };
+        return {
+          status: 'degraded',
+          message: 'Soroban RPC unreachable',
+          latencyMs: result.latencyMs,
+        };
       }
       return { status: 'ok', latencyMs: result.latencyMs };
     } catch {

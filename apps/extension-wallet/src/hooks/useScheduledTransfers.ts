@@ -17,15 +17,10 @@ export interface UseScheduledTransfersOptions {
 export function useScheduledTransfers(options: UseScheduledTransfersOptions = {}) {
   const accountAddress = options.accountAddress ?? DEMO_ACCOUNT_ADDRESS;
   const refreshIntervalMs = options.refreshIntervalMs ?? REFRESH_INTERVAL_MS;
-  const client = useMemo(
-    () => options.client ?? getExtensionSchedulerClient(),
-    [options.client]
-  );
+  const client = useMemo(() => options.client ?? getExtensionSchedulerClient(), [options.client]);
 
   const [transfers, setTransfers] = useState<ScheduledTransfer[]>([]);
-  const [executions, setExecutions] = useState<Record<string, ScheduledTransferExecutionLog[]>>(
-    {}
-  );
+  const [executions, setExecutions] = useState<Record<string, ScheduledTransferExecutionLog[]>>({});
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 

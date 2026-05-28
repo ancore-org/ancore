@@ -38,7 +38,10 @@ export function ScheduledTransfersScreen() {
                   </p>
                   <p className="text-xs text-slate-400">To {transfer.to.slice(0, 12)}...</p>
                 </div>
-                <Badge className="" variant={transfer.status === 'active' ? 'default' : 'secondary'}>
+                <Badge
+                  className=""
+                  variant={transfer.status === 'active' ? 'default' : 'secondary'}
+                >
                   {transfer.status}
                 </Badge>
               </div>

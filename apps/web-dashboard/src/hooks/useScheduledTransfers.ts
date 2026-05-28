@@ -45,9 +45,7 @@ export function useScheduledTransfers(options: UseScheduledTransfersOptions = {}
   );
 
   const [transfers, setTransfers] = useState<ScheduledTransfer[]>([]);
-  const [executions, setExecutions] = useState<Record<string, ScheduledTransferExecutionLog[]>>(
-    {}
-  );
+  const [executions, setExecutions] = useState<Record<string, ScheduledTransferExecutionLog[]>>({});
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);

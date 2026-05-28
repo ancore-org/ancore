@@ -69,7 +69,10 @@ export interface ValidationErrors {
 const DEFAULT_BALANCE = 250;
 const DEFAULT_POLL_MS = 1000;
 
-function createDefaultService(schedulerClient: SchedulerClient, accountAddress: string): SendService {
+function createDefaultService(
+  schedulerClient: SchedulerClient,
+  accountAddress: string
+): SendService {
   return {
     estimateFee: async () => ({
       baseFee: '0.0000100',

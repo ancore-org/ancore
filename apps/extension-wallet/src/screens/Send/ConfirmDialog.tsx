@@ -18,7 +18,14 @@ interface ConfirmDialogProps {
  * Implements a secure-looking password entry field with high-contrast feedback.
  * Shows a summary of the action being authenticated.
  */
-export function ConfirmDialog({ transaction, timing, error, loading, onBack, onSign }: ConfirmDialogProps) {
+export function ConfirmDialog({
+  transaction,
+  timing,
+  error,
+  loading,
+  onBack,
+  onSign,
+}: ConfirmDialogProps) {
   const [password, setPassword] = useState('');
 
   const handleSubmit = (e?: React.FormEvent) => {
