@@ -96,7 +96,12 @@ describe('RelayService', () => {
     });
 
     it('returns INTERNAL_ERROR when signedTransactionXdr is missing', async () => {
-      const svc = new RelayService(makeSignatureService(true), undefined, undefined, makeSubmitter());
+      const svc = new RelayService(
+        makeSignatureService(true),
+        undefined,
+        undefined,
+        makeSubmitter()
+      );
       const result = await svc.executeRelay(makeRequest());
       expect(result.success).toBe(false);
       expect(result.error?.code).toBe('INTERNAL_ERROR');

@@ -20,7 +20,13 @@ interface ReviewScreenProps {
  * To prevent misdirected payments, the "Continue" button is blocked until the
  * user explicitly interacts with the recipient confirmation checkbox.
  */
-export function ReviewScreen({ transaction, timing, schedule, onBack, onConfirm }: ReviewScreenProps) {
+export function ReviewScreen({
+  transaction,
+  timing,
+  schedule,
+  onBack,
+  onConfirm,
+}: ReviewScreenProps) {
   const [isConfirmed, setIsConfirmed] = useState(false);
 
   return (

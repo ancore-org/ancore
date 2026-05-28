@@ -80,7 +80,7 @@ export function usePaymentRequest(baseUrl?: string): UsePaymentRequestReturn {
       const base = baseUrl ?? window.location.origin;
       return encodeRequestToUrl(req, base);
     },
-    [baseUrl],
+    [baseUrl]
   );
 
   const clearRequests = useCallback(() => setRequests([]), []);

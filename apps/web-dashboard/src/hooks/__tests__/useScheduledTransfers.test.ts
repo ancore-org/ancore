@@ -1,9 +1,6 @@
 import { renderHook, waitFor } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
-import type {
-  ScheduledTransfer,
-  ScheduledTransferExecutionLog,
-} from '@ancore/types';
+import type { ScheduledTransfer, ScheduledTransferExecutionLog } from '@ancore/types';
 
 vi.mock('../../auth', () => ({
   useDashboardAuth: () => ({

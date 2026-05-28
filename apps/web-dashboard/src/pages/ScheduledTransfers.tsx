@@ -15,8 +15,16 @@ function defaultStartAt(): string {
 }
 
 export function ScheduledTransfersPage() {
-  const { transfers, executions, loading, error, submitting, createTransfer, pauseTransfer, cancelTransfer } =
-    useScheduledTransfers();
+  const {
+    transfers,
+    executions,
+    loading,
+    error,
+    submitting,
+    createTransfer,
+    pauseTransfer,
+    cancelTransfer,
+  } = useScheduledTransfers();
 
   const [form, setForm] = useState<CreateScheduledTransferForm>({
     to: '',
@@ -160,7 +168,8 @@ export function ScheduledTransfersPage() {
                       {transfer.amount} {transfer.asset} → {transfer.to.slice(0, 12)}...
                     </p>
                     <p className="text-sm text-slate-500">
-                      {transfer.frequency} · next run {new Date(transfer.nextRunAt).toLocaleString()}
+                      {transfer.frequency} · next run{' '}
+                      {new Date(transfer.nextRunAt).toLocaleString()}
                     </p>
                   </div>
                   <div className="flex items-center gap-2">

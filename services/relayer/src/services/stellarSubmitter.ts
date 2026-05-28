@@ -23,11 +23,16 @@ export class StellarTransactionSubmitter implements TransactionSubmitterContract
 
   constructor(config: StellarSubmitterConfig, client?: StellarClient) {
     this.networkPassphrase = config.networkPassphrase ?? NETWORK_PASSPHRASES[config.network];
-    this.client = client ?? new StellarClient({ network: config.network, networkPassphrase: this.networkPassphrase });
+    this.client =
+      client ??
+      new StellarClient({ network: config.network, networkPassphrase: this.networkPassphrase });
   }
 
   async submitSignedTransaction(signedXdr: string): Promise<TransactionSubmissionResult> {
-    const transaction = TransactionBuilder.fromXDR(signedXdr, this.networkPassphrase) as Transaction;
+    const transaction = TransactionBuilder.fromXDR(
+      signedXdr,
+      this.networkPassphrase
+    ) as Transaction;
     const response = await this.client.submitTransaction(transaction);
 
     return {

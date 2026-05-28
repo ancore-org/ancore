@@ -287,7 +287,9 @@ describe('SecuritySettings', () => {
   });
 
   it('shows error when reveal attempted without password', async () => {
-    vi.mocked(revealVaultSecret).mockRejectedValueOnce(new VaultExportError('Enter your password.'));
+    vi.mocked(revealVaultSecret).mockRejectedValueOnce(
+      new VaultExportError('Enter your password.')
+    );
 
     render(<SecuritySettings {...defaultProps} />);
     await userEvent.click(screen.getByText('Export Private Key'));

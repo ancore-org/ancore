@@ -108,7 +108,10 @@ export class ScheduledTransferStore {
 
   updateAfterExecution(
     id: string,
-    patch: Pick<ScheduledTransfer, 'status' | 'nextRunAt' | 'lastExecutionAt' | 'consecutiveFailures'>
+    patch: Pick<
+      ScheduledTransfer,
+      'status' | 'nextRunAt' | 'lastExecutionAt' | 'consecutiveFailures'
+    >
   ): ScheduledTransfer | undefined {
     const transfer = this.transfers.get(id);
     if (!transfer) return undefined;
