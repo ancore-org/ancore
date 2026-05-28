@@ -11,8 +11,25 @@ import { createExecuteRelayHandler } from './handlers/executeRelay';
 import { createValidateRelayHandler } from './handlers/validateRelay';
 import { IdempotencyStore } from './store/idempotency';
 import { JobQueue } from './queue/JobQueue';
-import type { AuthServiceContract, SignatureServiceContract, TransactionSubmitterContract, RelayServiceOptions } from './types';
+import type {
+  AuthServiceContract,
+  SignatureServiceContract,
+  TransactionSubmitterContract,
+  RelayServiceOptions,
+} from './types';
 import { Ed25519SignatureService } from './services/ed25519SignatureService';
+import {
+  ScheduledTransferStore,
+  ScheduledTransferService,
+  SchedulerEngine,
+  createScheduledTransferSchema,
+  createScheduledTransferHandler,
+  createListScheduledTransfersHandler,
+  createGetScheduledTransferHandler,
+  createPauseScheduledTransferHandler,
+  createCancelScheduledTransferHandler,
+  createListExecutionsHandler,
+} from './scheduler';
 
 // ── Request schema ────────────────────────────────────────────────────────────
 
@@ -70,8 +87,7 @@ export function createApp(
   app.use(express.json());
 
   const useMockSubmission =
-    relayOptions?.useMockSubmission === true ||
-    process.env.RELAYER_USE_MOCK_SUBMISSION === 'true';
+    relayOptions?.useMockSubmission === true || process.env.RELAYER_USE_MOCK_SUBMISSION === 'true';
   const submitter =
     transactionSubmitter ?? (useMockSubmission ? undefined : createStellarSubmitterFromEnv());
 
@@ -95,13 +111,10 @@ export function createApp(
   });
 
   const jobQueue = new JobQueue();
-  const relayService = new RelayService(
-    signatureService,
-    jobQueue,
-    idempotencyStore,
-    submitter,
-    { useMockSubmission, ...relayOptions }
-  );
+  const relayService = new RelayService(signatureService, jobQueue, idempotencyStore, submitter, {
+    useMockSubmission,
+    ...relayOptions,
+  });
   const auth = createAuthMiddleware(authService);
   const validate = validateBody(relayRequestSchema);
   const idempotency = createIdempotencyMiddleware(idempotencyStore);
@@ -120,7 +133,7 @@ export function createApp(
       : 1_000,
   });
 
-  if (options.startScheduler !== false) {
+  if (relayOptions?.startScheduler !== false) {
     schedulerEngine.start();
   }
 

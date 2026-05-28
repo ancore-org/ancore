@@ -24,6 +24,7 @@ const EXPECTED_EXPORTS = [
   'deriveKeypairFromMnemonic',
   'signTransaction',
   'verifySignature',
+  'constantTimeEqual',
 ] as const;
 
 describe('@ancore/crypto smoke test', () => {
