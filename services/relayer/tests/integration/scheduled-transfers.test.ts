@@ -37,7 +37,7 @@ function makeApp(sigValid = true) {
   const signatureService: SignatureServiceContract = {
     verify: jest.fn().mockReturnValue(sigValid),
   };
-  return createApp(authService, signatureService, undefined, { startScheduler: false });
+  return createApp(authService, signatureService, undefined, undefined, { startScheduler: false });
 }
 
 describe('Scheduled transfers API', () => {
@@ -138,16 +138,20 @@ describe('Scheduled transfers API', () => {
 
   it('returns execution logs after a due transfer runs', async () => {
     const { ScheduledTransferStore } = await import('../../src/scheduler/ScheduledTransferStore');
-    const { ScheduledTransferService } = await import(
-      '../../src/scheduler/ScheduledTransferService'
-    );
+    const { ScheduledTransferService } =
+      await import('../../src/scheduler/ScheduledTransferService');
     const { RelayService } = await import('../../src/services/relayService');
 
     const store = new ScheduledTransferStore();
-    const relayService = new RelayService({ verify: () => true });
+    const relayService = new RelayService({ verify: () => true }, undefined, undefined, undefined, {
+      useMockSubmission: true,
+    });
     const service = new ScheduledTransferService(store, relayService);
 
-    const transfer = service.create(validScheduledTransferBody(new Date().toISOString()), 'test-caller');
+    const transfer = service.create(
+      validScheduledTransferBody(new Date().toISOString()),
+      'test-caller'
+    );
     await service.processDueTransfers(new Date());
 
     const executions = service.listExecutions(transfer.id, 'test-caller');
@@ -169,6 +173,7 @@ describe('Scheduled transfers API', () => {
     const otherCallerApp = createApp(
       { verifyToken: jest.fn().mockResolvedValue({ callerId: 'other-caller' }) },
       { verify: jest.fn().mockReturnValue(true) },
+      undefined,
       undefined,
       { startScheduler: false }
     );
