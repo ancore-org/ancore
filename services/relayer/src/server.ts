@@ -5,6 +5,7 @@ import { RelayService } from './services/relayService';
 import { createStellarSubmitterFromEnv } from './services/stellarSubmitter';
 import { createAuthMiddleware } from './middleware/auth';
 import { createIdempotencyMiddleware } from './middleware/idempotency';
+import { createPayloadGuardMiddleware } from './middleware/payloadGuard';
 import { validateBody } from './validation/middleware';
 import { createExecuteRelayHandler } from './handlers/executeRelay';
 import { createValidateRelayHandler } from './handlers/validateRelay';
@@ -61,6 +62,10 @@ export function createApp(
     }
     next();
   });
+
+  // Payload guard: reject oversized requests before body parsing to prevent
+  // resource abuse. Runs early in the stack, before express.json().
+  app.use(createPayloadGuardMiddleware());
 
   app.use(express.json());
 
