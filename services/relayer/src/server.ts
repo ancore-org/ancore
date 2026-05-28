@@ -11,6 +11,7 @@ import { createValidateRelayHandler } from './handlers/validateRelay';
 import { IdempotencyStore } from './store/idempotency';
 import { JobQueue } from './queue/JobQueue';
 import type { AuthServiceContract, SignatureServiceContract, TransactionSubmitterContract, RelayServiceOptions } from './types';
+import { Ed25519SignatureService } from './services/ed25519SignatureService';
 
 // ── Request schema ────────────────────────────────────────────────────────────
 
@@ -37,18 +38,13 @@ const stubAuthService: AuthServiceContract = {
   },
 };
 
-const stubSignatureService: SignatureServiceContract = {
-  verify(_publicKey: string, _payload: string, _signature: string): boolean {
-    // TODO: replace with real Ed25519 verification (e.g. @noble/ed25519)
-    return true;
-  },
-};
+const defaultSignatureService: SignatureServiceContract = new Ed25519SignatureService();
 
 // ── App factory (exported for testing) ───────────────────────────────────────
 
 export function createApp(
   authService: AuthServiceContract = stubAuthService,
-  signatureService: SignatureServiceContract = stubSignatureService,
+  signatureService: SignatureServiceContract = defaultSignatureService,
   idempotencyStore: IdempotencyStore = new IdempotencyStore(),
   transactionSubmitter?: TransactionSubmitterContract,
   relayOptions?: RelayServiceOptions

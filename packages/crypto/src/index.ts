@@ -53,3 +53,6 @@ export { deriveKeypairFromMnemonic } from './key-derivation';
 
 // Signing & Verification
 export { signTransaction, verifySignature } from './signing';
+
+// Constant-time comparison
+export { constantTimeEqual } from './compare';

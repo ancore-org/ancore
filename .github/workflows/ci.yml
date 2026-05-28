@@ -297,6 +297,49 @@ jobs:
           path: contracts/target/wasm32-unknown-unknown/release/*.wasm
           retention-days: 7
 
+  indexer:
+    name: Indexer
+    runs-on: ubuntu-latest
+    needs: quarantine-registry
+    if: |
+      github.event_name == 'push' ||
+      contains(github.event.pull_request.title, 'indexer') ||
+      startsWith(github.head_ref, 'feat/') ||
+      startsWith(github.head_ref, 'fix/') ||
+      true
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt, clippy
+
+      - name: Cache Cargo
+        uses: actions/cache@v3
+        with:
+          path: |
+            ~/.cargo/bin
+            ~/.cargo/registry/index
+            ~/.cargo/registry/cache
+            ~/.cargo/git/db
+            ${{ github.workspace }}/services/indexer/target
+          key: ${{ runner.os }}-indexer-cargo-${{ hashFiles('services/indexer/Cargo.lock', 'services/Cargo.toml') }}
+          restore-keys: |
+            ${{ runner.os }}-indexer-cargo-
+
+      - name: Check formatting
+        working-directory: ./services/indexer
+        run: cargo fmt --check
+
+      - name: Run clippy
+        working-directory: ./services/indexer
+        run: cargo clippy -- -D warnings
+
+      - name: Run tests
+        working-directory: ./services/indexer
+        run: cargo test
+
   security:
     name: Security Audit
     runs-on: ubuntu-latest
