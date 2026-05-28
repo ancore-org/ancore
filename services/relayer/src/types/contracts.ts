@@ -23,6 +23,8 @@ export interface TransactionSubmitterContract {
 export interface RelayServiceOptions {
   /** Dev-only: skip network submission and return a synthetic transaction id */
   useMockSubmission?: boolean;
+  /** Set to false to prevent the scheduler engine from starting (useful in tests). */
+  startScheduler?: boolean;
 }
 
 /** Core relay service contract */

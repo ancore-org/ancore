@@ -1,5 +1,3 @@
-import { Buffer } from 'node:buffer';
-import { TextEncoder } from 'node:util';
 import { Keypair, Transaction, FeeBumpTransaction } from '@stellar/stellar-sdk';
 import { decodeSignature } from './signature-format';
 
@@ -55,7 +53,7 @@ export async function verifySignature(
     const signatureBytes = decodeSignature(signature);
     const keypair = Keypair.fromPublicKey(publicKey);
 
-    return keypair.verify(Buffer.from(messageBytes), Buffer.from(signatureBytes));
+    return keypair.verify(messageBytes as unknown as Buffer, signatureBytes as unknown as Buffer);
   } catch {
     return false;
   }

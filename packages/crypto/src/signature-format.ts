@@ -1,5 +1,3 @@
-import { Buffer } from 'node:buffer';
-
 /**
  * Convert bytes to lowercase hex string with optional '0x' prefix
  * @param bytes - The bytes to convert
@@ -7,7 +5,7 @@ import { Buffer } from 'node:buffer';
  * @returns Hex string representation
  */
 export function toHex(bytes: Uint8Array, includePrefix = false): string {
-  const hex = Buffer.from(bytes).toString('hex');
+  const hex = Array.from(bytes, (b) => b.toString(16).padStart(2, '0')).join('');
   return includePrefix ? `0x${hex}` : hex;
 }
 
@@ -24,7 +22,11 @@ export function fromHex(hex: string): Uint8Array {
     throw new Error(`Invalid hex string: ${hex}`);
   }
 
-  return new Uint8Array(Buffer.from(cleaned, 'hex'));
+  const bytes = new Uint8Array(cleaned.length / 2);
+  for (let i = 0; i < bytes.length; i++) {
+    bytes[i] = parseInt(cleaned.slice(i * 2, i * 2 + 2), 16);
+  }
+  return bytes;
 }
 
 /**
@@ -33,7 +35,9 @@ export function fromHex(hex: string): Uint8Array {
  * @returns Base64 string representation
  */
 export function toBase64(bytes: Uint8Array): string {
-  return Buffer.from(bytes).toString('base64');
+  let binary = '';
+  for (const b of bytes) binary += String.fromCharCode(b);
+  return btoa(binary);
 }
 
 /**
@@ -49,7 +53,10 @@ export function fromBase64(b64: string): Uint8Array {
     throw new Error(`Invalid base64 string: ${b64}`);
   }
 
-  return new Uint8Array(Buffer.from(normalized, 'base64'));
+  const binary = atob(normalized);
+  const bytes = new Uint8Array(binary.length);
+  for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
+  return bytes;
 }
 
 /**

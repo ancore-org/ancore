@@ -1,6 +1,4 @@
 /* eslint-disable no-undef */
-import { webcrypto } from 'node:crypto';
-import { TextDecoder, TextEncoder } from 'node:util';
 import { toBase64, fromBase64 } from './signature-format';
 
 const PBKDF2_ITERATIONS = 100000;
@@ -59,7 +57,7 @@ async function deriveEncryptionKey(
   password: string,
   salt: Uint8Array,
   iterations: number
-): Promise<webcrypto.CryptoKey> {
+): Promise<CryptoKey> {
   const cryptoApi = getCrypto();
   const passwordKey = await cryptoApi.subtle.importKey(
     'raw',
