@@ -110,9 +110,70 @@ Health check. No authentication required.
 
 **HTTP status mapping:**
 
-- `400` — schema validation failure (`VALIDATION_ERROR`)
-- `401` — authentication failure (`UNAUTHORIZED`)
-- `422` — business-logic rejection (all other codes above)
+| HTTP status | Code(s)                                                                                               |
+| ----------- | ----------------------------------------------------------------------------------------------------- |
+| `400`       | `VALIDATION_ERROR` — request body failed schema validation                                            |
+| `401`       | `UNAUTHORIZED` — missing or invalid Bearer token                                                      |
+| `422`       | `INVALID_SIGNATURE`, `SESSION_KEY_EXPIRED`, `NONCE_REPLAY`, `GAS_LIMIT_EXCEEDED`, `SIMULATION_FAILED` |
+| `500`       | `INTERNAL_ERROR` — unexpected server-side error                                                       |
+
+**Client handling guide (TypeScript)**
+
+Use a discriminated switch over `error.code` to map relayer errors to user actions:
+
+```typescript
+interface RelayErrorBody {
+  success: false;
+  error: { code: string; message: string };
+}
+
+async function callRelay(request: RelayExecuteRequest): Promise<void> {
+  const res = await fetch(`${VITE_RELAYER_URL}/relay/execute`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+    body: JSON.stringify(request),
+  });
+
+  if (res.ok) return;
+
+  const body: RelayErrorBody = await res.json();
+
+  switch (body.error.code) {
+    case 'INVALID_SIGNATURE':
+      // Re-sign the payload with a fresh keypair or re-fetch the session key.
+      throw new Error('Signature verification failed — re-sign and retry.');
+
+    case 'SESSION_KEY_EXPIRED':
+      // Prompt the user to re-authenticate and obtain a new session key.
+      throw new Error('Session key expired — please re-authenticate.');
+
+    case 'NONCE_REPLAY':
+      // Increment and re-fetch the nonce; then retry the operation once.
+      throw new Error('Nonce already used — fetch a fresh nonce and retry.');
+
+    case 'GAS_LIMIT_EXCEEDED':
+      // Reduce operation complexity or split into smaller transactions.
+      throw new Error('Gas limit exceeded — simplify the transaction.');
+
+    case 'SIMULATION_FAILED':
+      // The contract rejected the simulated call — check inputs and contract state.
+      throw new Error('Transaction simulation failed — check your inputs.');
+
+    case 'UNAUTHORIZED':
+      // Re-authenticate and obtain a new Bearer token.
+      throw new Error('Not authorised — obtain a valid token and retry.');
+
+    case 'VALIDATION_ERROR':
+      // Programming error — fix the request shape at the call site.
+      throw new Error(`Invalid request: ${body.error.message}`);
+
+    default:
+      throw new Error(`Relayer error (${body.error.code}): ${body.error.message}`);
+  }
+}
+```
+
+> See [docs/integration-guide.md — Relayer error codes](../../docs/integration-guide.md#relayer-error-codes) for the cross-team handling contract.
 
 ---
 
