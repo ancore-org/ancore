@@ -11,6 +11,7 @@ import {
 import { Download, Clock, ChevronUp, ChevronDown } from 'lucide-react';
 import type { Transaction } from '../types/dashboard';
 import { useTableDensity } from '../contexts/TableDensityContext';
+import { formatTxDate } from '../lib/formatDate';
 
 interface TransactionListProps {
   transactions: Transaction[];
@@ -195,7 +196,7 @@ export const TransactionList: React.FC<TransactionListProps> = ({
                     {isOptimistic && <Clock className="w-4 h-4 text-amber-600" />}
                   </div>
                   <span className="text-sm text-muted-foreground">
-                    {tx.timestamp.toLocaleDateString()}
+                    {formatTxDate(tx.timestamp.toISOString())}
                   </span>
                 </div>
                 <div className="flex items-center gap-3">
