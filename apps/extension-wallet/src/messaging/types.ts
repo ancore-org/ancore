@@ -8,6 +8,7 @@
  */
 
 import type { WalletState } from '@ancore/types';
+import type { ServiceHealthResult } from '@/config/urls';
 
 /**
  * Registry of all messages exchanged between extension contexts.
@@ -39,6 +40,13 @@ export interface Messages {
   LOCK_WALLET: {
     request: Record<string, never>;
     response: { success: boolean };
+  };
+  CHECK_SERVICE_HEALTH: {
+    request: Record<string, never>;
+    response: {
+      relayer: ServiceHealthResult;
+      indexer: ServiceHealthResult;
+    };
   };
 }
 

@@ -6,6 +6,7 @@ import { createStellarSubmitterFromEnv } from './services/stellarSubmitter';
 import { createAuthMiddleware } from './middleware/auth';
 import { createIdempotencyMiddleware } from './middleware/idempotency';
 import { createPayloadGuardMiddleware } from './middleware/payloadGuard';
+import { createRequestLoggerMiddleware } from './middleware/requestLogger';
 import { validateBody } from './validation/middleware';
 import { createExecuteRelayHandler } from './handlers/executeRelay';
 import { createValidateRelayHandler } from './handlers/validateRelay';
@@ -83,6 +84,10 @@ export function createApp(
   // Payload guard: reject oversized requests before body parsing to prevent
   // resource abuse. Runs early in the stack, before express.json().
   app.use(createPayloadGuardMiddleware());
+
+  // Request logger: attaches req.log and emits start/complete structured logs.
+  // Registered after CORS and payload guard, before auth and body parsing.
+  app.use(createRequestLoggerMiddleware());
 
   app.use(express.json());
 
