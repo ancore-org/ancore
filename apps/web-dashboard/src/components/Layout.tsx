@@ -11,6 +11,7 @@ import { useAccountState } from '../hooks/useAccountState';
 const NAV_LINKS = [
   { to: '/', label: 'Dashboard', end: true },
   { to: '/transactions', label: 'Transactions' },
+  { to: '/split-bill', label: 'Split Bill' },
 ];
 
 const DensityToggle: React.FC = () => {
