@@ -1,6 +1,8 @@
 import { useState, useCallback } from 'react';
 import type { SessionKey } from '@ancore/types';
 import { SessionPermission } from '@ancore/types';
+import { AncoreClient, deriveContractId } from '@ancore/core-sdk';
+import { useExtensionAuth } from '@/router/AuthGuard';
 import { useSessionKeyStore } from '../stores/sessionKeys';
 
 export { SessionPermission };
@@ -30,7 +32,13 @@ function generateSessionPublicKey(): string {
   return key;
 }
 
+function createAccountClient(accountAddress: string) {
+  const accountContractId = deriveContractId(accountAddress);
+  return new AncoreClient({ accountContractId });
+}
+
 export function useSessionKeys(): UseSessionKeysReturn {
+  const { authState } = useExtensionAuth();
   const { keys, addKey, removeKey, updateKey } = useSessionKeyStore();
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -49,13 +57,16 @@ export function useSessionKeys(): UseSessionKeysReturn {
         label: input.label,
       };
 
-      // Optimistic: add immediately so UI responds at once
       addKey(newKey);
 
       try {
-        // TODO: await accountContract.addSessionKey(newKey, serverOptions);
+        const client = createAccountClient(authState.accountAddress);
+        client.addSessionKey({
+          publicKey: newKey.publicKey,
+          permissions: newKey.permissions,
+          expiresAt: newKey.expiresAt,
+        });
       } catch (err) {
-        // Rollback on contract/network failure
         removeKey(newKey.publicKey);
         const msg = err instanceof Error ? err.message : 'Failed to add session key';
         setError(msg);
@@ -64,7 +75,7 @@ export function useSessionKeys(): UseSessionKeysReturn {
         setIsLoading(false);
       }
     },
-    [addKey, removeKey]
+    [addKey, authState.accountAddress, removeKey]
   );
 
   const revokeSessionKey = useCallback(
@@ -73,14 +84,12 @@ export function useSessionKeys(): UseSessionKeysReturn {
       setError(null);
 
       const snapshot = keys.find((k: SessionKey) => k.publicKey === publicKey);
-
-      // Optimistic: remove immediately
       removeKey(publicKey);
 
       try {
-        // TODO: await accountContract.revokeSessionKey(publicKey, serverOptions);
+        const client = createAccountClient(authState.accountAddress);
+        client.revokeSessionKey({ publicKey });
       } catch (err) {
-        // Rollback
         if (snapshot) addKey(snapshot);
         const msg = err instanceof Error ? err.message : 'Failed to revoke session key';
         setError(msg);
@@ -89,7 +98,7 @@ export function useSessionKeys(): UseSessionKeysReturn {
         setIsLoading(false);
       }
     },
-    [keys, addKey, removeKey]
+    [addKey, authState.accountAddress, keys, removeKey]
   );
 
   const refreshSessionKey = useCallback(
@@ -98,14 +107,15 @@ export function useSessionKeys(): UseSessionKeysReturn {
       setError(null);
 
       const snapshot = keys.find((k: SessionKey) => k.publicKey === publicKey);
-
-      // Optimistic: update expiry immediately
       updateKey(publicKey, { expiresAt: newExpiresAt });
 
       try {
-        // TODO: await accountContract.refreshSessionKey(publicKey, newExpiresAt, serverOptions);
+        // Contract refresh semantics are not yet implemented in AccountContract.
+        // Persist local expiry updates optimistically and roll back on failure.
+        if (!snapshot) {
+          throw new Error('Session key not found');
+        }
       } catch (err) {
-        // Rollback
         if (snapshot) updateKey(publicKey, { expiresAt: snapshot.expiresAt });
         const msg = err instanceof Error ? err.message : 'Failed to refresh session key';
         setError(msg);

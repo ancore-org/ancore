@@ -1,4 +1,5 @@
 import { registerHandler, installMessageDispatcher } from '@/messaging';
+import { getSharedStorageManager } from '@/security/storage-manager';
 import { readAuthState } from '@/router/AuthGuard';
 
 type ChromeRuntimeManifest = {
@@ -115,6 +116,7 @@ registerHandler('GET_WALLET_STATE', async () => {
 registerHandler('LOCK_WALLET', async () => {
   try {
     _sessionUnlocked = false;
+    getSharedStorageManager().lock();
 
     // Persist lock to auth storage
     const authState = readAuthState();
@@ -155,11 +157,11 @@ registerHandler('UNLOCK_WALLET', async ({ password }) => {
       return { success: false };
     }
 
-    // Simple guard: in a real implementation, verify against the encrypted
-    // mnemonic/key via SecureStorageManager. For now we accept any non-empty
-    // password for onboarded wallets and flag for replacement.
-    // TODO: wire to SecureStorageManager.unlock(password) for real verification.
-    if (password.length === 0) {
+    const storageManager = getSharedStorageManager();
+    const isUnlocked = await storageManager.unlock(password);
+
+    if (!isUnlocked) {
+      console.warn(`${logPrefix} unlock rejected by SecureStorageManager`);
       return { success: false };
     }
 
