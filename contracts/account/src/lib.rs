@@ -461,8 +461,16 @@ impl AncoreAccount {
 
     /// Refresh the TTL of a session key
     pub fn refresh_session_key_ttl(env: Env, public_key: BytesN<32>) -> Result<(), ContractError> {
+        let owner = Self::get_owner(env.clone())?;
+        owner.require_auth();
+
         let mut session_key = Self::get_session_key(env.clone(), public_key.clone())
             .ok_or(ContractError::SessionKeyNotFound)?;
+
+        let current_timestamp = env.ledger().timestamp();
+        if session_key.expires_at <= current_timestamp {
+            return Err(ContractError::SessionKeyExpirationInPast);
+        }
 
         // Normalize once at refresh entry point to remove legacy ambiguity.
         let normalized_expiry = Self::normalize_expiry_timestamp(session_key.expires_at)?;
@@ -1964,7 +1972,7 @@ mod tests {
         env.mock_all_auths();
 
         let session_pk = BytesN::from_array(&env, &[30u8; 32]);
-        let expires_at = 10000u64;
+        let expires_at = env.ledger().timestamp() + 10000u64;
         client.add_session_key(&session_pk, &expires_at, &Vec::new(&env));
 
         client.refresh_session_key_ttl(&session_pk);
@@ -1984,6 +1992,51 @@ mod tests {
         let (pk, exp): (BytesN<32>, u64) = soroban_sdk::FromVal::from_val(&env, &data);
         assert_eq!(pk, session_pk);
         assert_eq!(exp, expires_at);
+
+        // Verify storage readback via get_session_key
+        let stored_key = client.get_session_key(&session_pk).unwrap();
+        assert_eq!(stored_key.expires_at, expires_at);
+    }
+
+    #[test]
+    fn test_refresh_session_key_ttl_unauthorized_caller_rejected() {
+        let env = Env::default();
+        let contract_id = env.register_contract(None, AncoreAccount);
+        let client = AncoreAccountClient::new(&env, &contract_id);
+
+        let owner = Address::generate(&env);
+        init(&env, &client, &owner);
+
+        // Don't mock auths, so the owner authorization will fail
+        let session_pk = BytesN::from_array(&env, &[31u8; 32]);
+        
+        let result = client.try_refresh_session_key_ttl(&session_pk);
+        assert!(result.is_err(), "unauthorized caller must be rejected");
+    }
+
+    #[test]
+    fn test_refresh_session_key_ttl_past_expires_at_rejected() {
+        let env = Env::default();
+        let contract_id = env.register_contract(None, AncoreAccount);
+        let client = AncoreAccountClient::new(&env, &contract_id);
+
+        let owner = Address::generate(&env);
+        init(&env, &client, &owner);
+        env.mock_all_auths();
+
+        let session_pk = BytesN::from_array(&env, &[32u8; 32]);
+        let expires_at = env.ledger().timestamp() + 1000u64;
+        client.add_session_key(&session_pk, &expires_at, &Vec::new(&env));
+
+        // Advance ledger time past expires_at
+        env.ledger().set_timestamp(expires_at + 1);
+
+        let result = client.try_refresh_session_key_ttl(&session_pk);
+        assert_eq!(
+            result,
+            Err(Ok(ContractError::SessionKeyExpirationInPast)),
+            "refreshing an expired session key must fail"
+        );
     }
 
     #[test]
