@@ -2,6 +2,8 @@
 
 _Last updated: 2026-04-26_
 
+> **Cross-reference:** See [Compliance Matrix](../release/compliance-matrix.md) for mapping to MVP gate and release checklist items.
+
 This checklist is the working artifact for internal pre-audit review of the extension wallet and shared SDK/contract stack.
 
 ## Scope

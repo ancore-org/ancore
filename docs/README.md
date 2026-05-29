@@ -52,3 +52,9 @@ Used during the MVP gate review to collect required artifacts.
 | [Features](user-guide/FEATURES.md) | Feature overview |
 | [FAQ](user-guide/FAQ.md) | Frequently asked questions |
 | [Troubleshooting](user-guide/TROUBLESHOOTING.md) | Common issues and fixes |
+
+## Troubleshooting
+
+| Document | Purpose |
+|----------|---------|
+| [Extension Build Troubleshooting](troubleshooting/extension-build.md) | Build failures, manifest errors, HMR issues, and fixes |

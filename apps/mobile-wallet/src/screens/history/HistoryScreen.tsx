@@ -1,14 +1,28 @@
 import { TransactionHistoryList } from '../../components/TransactionHistoryList';
+import { HistoryError } from '../../components/HistoryError';
 import { type TransactionHistoryAdapter } from './types';
 import { usePaginatedTransactionHistory } from './usePaginatedTransactionHistory';
 
 type Props = {
   adapter: TransactionHistoryAdapter;
   pageSize?: number;
+  isConfigured?: boolean;
 };
 
-export const HistoryScreen = ({ adapter, pageSize }: Props) => {
+export const HistoryScreen = ({ adapter, pageSize, isConfigured = true }: Props) => {
   const history = usePaginatedTransactionHistory({ adapter, pageSize });
+
+  // Show configuration error if adapter not configured
+  if (!isConfigured && history.isLoadingInitial) {
+    return (
+      <HistoryError
+        kind="configuration"
+        message="INDEXER_URL is not configured"
+        onRetry={history.retry}
+        isRetrying={history.isRefreshing}
+      />
+    );
+  }
 
   return (
     <TransactionHistoryList

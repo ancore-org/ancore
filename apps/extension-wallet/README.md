@@ -34,6 +34,8 @@ The build outputs to `dist/` with:
 - `background/service-worker.js` — background worker
 - `icons/` — extension icons (16, 32, 48, 128px)
 
+**Troubleshooting:** See [Extension Build Troubleshooting Guide](../../docs/troubleshooting/extension-build.md) for common build issues and fixes.
+
 ## Loading in Chrome
 
 1. Run `pnpm build`

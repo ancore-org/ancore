@@ -1,5 +1,7 @@
 # Release Checklist
 
+> **Cross-reference:** See [Compliance Matrix](compliance-matrix.md) for mapping to security audit and MVP gate items.
+
 This file is parsed by the `Release Gate` CI workflow.
 Items marked `BLOCKING` must be checked (`- [x]`) before the gate will pass.
 Items without `BLOCKING` are advisory and do not fail the gate.

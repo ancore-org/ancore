@@ -5,6 +5,8 @@
 > as `docs/release/checklist.md`). Record evidence artifact paths in the
 > **Evidence** column. Obtain sign-offs in the [Approvals](#approvals) section.
 >
+> **Cross-reference:** See [Compliance Matrix](compliance-matrix.md) for mapping to security audit and release checklist items.
+>
 > Reset all checkboxes to `[ ]` at the start of each release cycle.
 
 ---
