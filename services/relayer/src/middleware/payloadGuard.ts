@@ -1,5 +1,5 @@
 import { Request, Response, NextFunction, RequestHandler } from 'express';
-import { logger } from '../logging';
+import { rootLogger as logger } from '../logging';
 
 /**
  * Reason code emitted in logs when a request is rejected by the payload guard.
