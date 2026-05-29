@@ -35,6 +35,38 @@ export interface ButtonProps
   asChild?: boolean;
 }
 
+export interface StableButtonContentProps extends React.HTMLAttributes<HTMLSpanElement> {
+  isLoading: boolean;
+  loadingContent: React.ReactNode;
+  children: React.ReactNode;
+}
+
+const StableButtonContent = React.forwardRef<HTMLSpanElement, StableButtonContentProps>(
+  ({ isLoading, loadingContent, children, className, ...props }, ref) => (
+    <span className={cn('grid items-center justify-items-center', className)} ref={ref} {...props}>
+      <span
+        aria-hidden={isLoading}
+        className={cn(
+          'col-start-1 row-start-1 inline-flex items-center justify-center gap-2',
+          isLoading && 'invisible'
+        )}
+      >
+        {children}
+      </span>
+      <span
+        aria-hidden={!isLoading}
+        className={cn(
+          'col-start-1 row-start-1 inline-flex items-center justify-center gap-2',
+          !isLoading && 'invisible'
+        )}
+      >
+        {loadingContent}
+      </span>
+    </span>
+  )
+);
+StableButtonContent.displayName = 'StableButtonContent';
+
 const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(
   ({ className, variant, size, asChild = false, ...props }, ref) => {
     const Comp = asChild ? Slot : 'button';
@@ -45,4 +77,4 @@ const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(
 );
 Button.displayName = 'Button';
 
-export { Button, buttonVariants };
+export { Button, StableButtonContent, buttonVariants };

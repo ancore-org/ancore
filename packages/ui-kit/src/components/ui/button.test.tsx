@@ -1,6 +1,6 @@
 import { render, screen } from '@testing-library/react';
 import { describe, it, expect } from 'vitest';
-import { Button } from './button';
+import { Button, StableButtonContent } from './button';
 
 describe('Button', () => {
   it('renders with children text', () => {
@@ -38,5 +38,33 @@ describe('Button', () => {
 
     rerender(<Button size="lg">Large</Button>);
     expect(screen.getByText('Large')).toHaveClass('h-11');
+  });
+});
+
+describe('StableButtonContent', () => {
+  it('keeps both button states in the layout while hiding inactive content', () => {
+    const { container } = render(
+      <Button>
+        <StableButtonContent isLoading={false} loadingContent="Saving...">
+          Save changes
+        </StableButtonContent>
+      </Button>
+    );
+
+    expect(container.querySelector('[aria-hidden="false"]')).not.toHaveClass('invisible');
+    expect(container.querySelector('[aria-hidden="true"]')).toHaveClass('invisible');
+  });
+
+  it('shows loading content without removing the idle label from layout', () => {
+    const { container } = render(
+      <Button>
+        <StableButtonContent isLoading loadingContent="Saving...">
+          Save changes
+        </StableButtonContent>
+      </Button>
+    );
+
+    expect(container.querySelector('[aria-hidden="true"]')).toHaveClass('invisible');
+    expect(container.querySelector('[aria-hidden="false"]')).not.toHaveClass('invisible');
   });
 });
