@@ -21,6 +21,7 @@ export {
   SessionKeyExpiredError,
   InsufficientPermissionError,
   ContractInvocationError,
+  NotImplementedError,
   mapContractError,
   CONTRACT_ERROR_MESSAGES,
   CONTRACT_ERROR_CODES,

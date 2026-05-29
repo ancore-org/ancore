@@ -1,6 +1,7 @@
-import { Keypair, StrKey, Transaction } from '@stellar/stellar-sdk';
-import { randomBytes } from 'crypto';
+import { Keypair, StrKey } from '@stellar/stellar-sdk';
+import { randomBytes } from 'node:crypto';
 import { TransactionBuilder } from '../transaction-builder';
+import { NotImplementedError } from '../errors';
 
 describe('TransactionBuilder', () => {
   const source = Keypair.random().publicKey();
@@ -50,11 +51,26 @@ describe('TransactionBuilder', () => {
     expect(result).toEqual({ fee: '10000', operationCount: 0 });
   });
 
-  it('should build a transaction with operations', () => {
+  it('throws NotImplementedError when build() is called', () => {
     const builder = new TransactionBuilder(source, contractId);
     builder.revokeSessionKey('SKEY3');
-    const tx = builder.build();
-    expect(tx).toBeInstanceOf(Transaction);
-    expect(tx.operations.length).toBe(1);
+    expect(() => builder.build()).toThrow(NotImplementedError);
+  });
+
+  it('build() error message references the README Limitations section', () => {
+    const builder = new TransactionBuilder(source, contractId);
+    builder.addSessionKey('SKEY4', [1], Date.now() + 60000);
+    expect(() => builder.build()).toThrow(/README\.md#limitations/i);
+  });
+
+  it('build() error message names Soroban envelope construction', () => {
+    const builder = new TransactionBuilder(source, contractId);
+    builder.executeContract({ contractId: 'CID', method: 'foo', args: [] });
+    expect(() => builder.build()).toThrow(/Soroban envelope construction/i);
+  });
+
+  it('build() throws even with no operations queued', () => {
+    const builder = new TransactionBuilder(source, contractId);
+    expect(() => builder.build()).toThrow(NotImplementedError);
   });
 });

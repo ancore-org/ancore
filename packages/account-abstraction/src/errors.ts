@@ -102,6 +102,21 @@ export class InsufficientPermissionError extends AccountContractError {
 }
 
 /**
+ * Thrown when a code path is not yet implemented in the MVP.
+ * The error message includes a pointer to the README Limitations section.
+ */
+export class NotImplementedError extends AccountContractError {
+  constructor(feature: string) {
+    super(
+      `${feature} is not yet implemented. See packages/account-abstraction/README.md#limitations`,
+      'NOT_IMPLEMENTED'
+    );
+    this.name = 'NotImplementedError';
+    Object.setPrototypeOf(this, NotImplementedError.prototype);
+  }
+}
+
+/**
  * Thrown when contract invocation fails with an unexpected error (e.g. host/system).
  */
 export class ContractInvocationError extends AccountContractError {
