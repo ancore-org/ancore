@@ -1,4 +1,5 @@
 import { useMemo } from 'react';
+import { MerchantBadge } from '@ancore/ui-kit';
 import { useSearchParams } from 'react-router-dom';
 
 import {
@@ -202,6 +203,12 @@ export function TransactionTable({ onExportStatement, transactions }: Transactio
                   scope="col"
                   className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wide text-slate-500"
                 >
+                  Merchant
+                </th>
+                <th
+                  scope="col"
+                  className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wide text-slate-500"
+                >
                   Memo
                 </th>
               </tr>
@@ -209,7 +216,7 @@ export function TransactionTable({ onExportStatement, transactions }: Transactio
             <tbody className="divide-y divide-slate-200">
               {filteredTransactions.length === 0 ? (
                 <tr>
-                  <td colSpan={6} className="px-4 py-8 text-center text-sm text-slate-500">
+                  <td colSpan={7} className="px-4 py-8 text-center text-sm text-slate-500">
                     No transactions match the selected filters.
                   </td>
                 </tr>
@@ -229,6 +236,16 @@ export function TransactionTable({ onExportStatement, transactions }: Transactio
                       {transaction.status}
                     </td>
                     <td className="px-4 py-3 text-sm text-slate-700">{transaction.counterparty}</td>
+                    <td className="px-4 py-3 text-sm text-slate-700">
+                      {transaction.merchant ? (
+                        <MerchantBadge
+                          merchantName={transaction.merchant.name}
+                          status={transaction.merchant.verificationStatus}
+                        />
+                      ) : (
+                        <span className="text-slate-400">—</span>
+                      )}
+                    </td>
                     <td className="px-4 py-3 text-sm text-slate-700">{transaction.memo}</td>
                   </tr>
                 ))

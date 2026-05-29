@@ -21,6 +21,7 @@ const transactions: Transaction[] = [
     amount: 142.5,
     counterparty: 'Acme Treasury',
     memo: 'Invoice 1042',
+    merchant: { name: 'Acme Treasury', verificationStatus: 'verified' },
   },
   {
     id: 'tx-2',
@@ -92,6 +93,18 @@ describe('TransactionTable', () => {
     expect(window.location.search).toContain('date=30d');
     expect(window.location.search).toContain('type=payment');
     expect(window.location.search).toContain('status=completed');
+  });
+
+  it('shows merchant badge chips in the transaction list', () => {
+    render(
+      <BrowserRouter>
+        <TransactionTable transactions={transactions} />
+      </BrowserRouter>
+    );
+
+    expect(
+      screen.getByRole('status', { name: 'Acme Treasury merchant verification: Verified' })
+    ).toBeInTheDocument();
   });
 
   it('renders only the rows that match the active filters', async () => {

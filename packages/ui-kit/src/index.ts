@@ -48,6 +48,9 @@ export type { QRCodeProps } from './components/QRCode';
 export { Identicon } from './components/Identicon';
 export type { IdenticonProps } from './components/Identicon';
 
+export { MerchantBadge } from './components/MerchantBadge';
+export type { MerchantBadgeProps, MerchantBadgeStatus } from './components/MerchantBadge';
+
 // Form system
 export { Form, FormSubmit, FormError } from './components/Form/Form';
 export type { FormProps, FormSubmitProps, FormErrorProps } from './components/Form/Form';
