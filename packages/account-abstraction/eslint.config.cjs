@@ -71,7 +71,7 @@ module.exports = [
     languageOptions: {
       parser: tsparser,
       parserOptions,
-      globals: { ...globals.node, ...globals.jest },
+      globals: { ...globals.node, ...globals.jest, fail: 'readonly' },
     },
     rules: {
       '@typescript-eslint/no-explicit-any': 'off',
