@@ -1,5 +1,10 @@
+import { useState } from 'react';
+
 import { TransactionTable } from '../components/transactions/TransactionTable';
+import { StatementExportModal } from '../features/statements/StatementExportModal';
 import type { Transaction } from '../components/transactions/transaction-types';
+
+const STATEMENT_ACCOUNT_ID = 'GABC1234567890ABCDEFGHIJKLMNOPQRSTUVWXYZ1234567890';
 
 const DASHBOARD_TRANSACTIONS: Transaction[] = [
   {
@@ -50,5 +55,19 @@ const DASHBOARD_TRANSACTIONS: Transaction[] = [
 ];
 
 export function TransactionsPage() {
-  return <TransactionTable transactions={DASHBOARD_TRANSACTIONS} />;
+  const [isStatementExportOpen, setIsStatementExportOpen] = useState(false);
+
+  return (
+    <>
+      <TransactionTable
+        onExportStatement={() => setIsStatementExportOpen(true)}
+        transactions={DASHBOARD_TRANSACTIONS}
+      />
+      <StatementExportModal
+        accountId={STATEMENT_ACCOUNT_ID}
+        isOpen={isStatementExportOpen}
+        onClose={() => setIsStatementExportOpen(false)}
+      />
+    </>
+  );
 }
