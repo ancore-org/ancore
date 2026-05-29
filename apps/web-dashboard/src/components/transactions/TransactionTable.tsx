@@ -11,6 +11,7 @@ import type { Transaction, TransactionSortKey, TransactionTableState } from './t
 
 interface TransactionTableProps {
   transactions: Transaction[];
+  onExportStatement?: () => void;
 }
 
 const DATE_FILTER_LABELS: Record<TransactionTableState['date'], string> = {
@@ -57,7 +58,7 @@ function formatDate(value: string): string {
   }).format(new Date(value));
 }
 
-export function TransactionTable({ transactions }: TransactionTableProps) {
+export function TransactionTable({ onExportStatement, transactions }: TransactionTableProps) {
   const [searchParams, setSearchParams] = useSearchParams();
   const state = useMemo(() => parseTransactionTableState(searchParams), [searchParams]);
 
@@ -85,11 +86,22 @@ export function TransactionTable({ transactions }: TransactionTableProps) {
 
   return (
     <section className="space-y-6">
-      <header className="space-y-2">
-        <h1 className="text-2xl font-semibold">Transactions</h1>
-        <p className="text-sm text-slate-600">
-          Filter and sort transaction history without losing the current view.
-        </p>
+      <header className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+        <div className="space-y-2">
+          <h1 className="text-2xl font-semibold">Transactions</h1>
+          <p className="text-sm text-slate-600">
+            Filter and sort transaction history without losing the current view.
+          </p>
+        </div>
+        {onExportStatement ? (
+          <button
+            className="rounded-lg bg-slate-900 px-4 py-2 text-sm font-semibold text-white"
+            onClick={onExportStatement}
+            type="button"
+          >
+            Export statement
+          </button>
+        ) : null}
       </header>
 
       <div className="grid gap-4 rounded-xl border border-slate-200 bg-slate-50 p-4 md:grid-cols-3">
