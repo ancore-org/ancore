@@ -217,9 +217,7 @@ function ExportWarningView({
     } catch (revealError) {
       setSecret(null);
       setError(
-        revealError instanceof VaultExportError
-          ? revealError.message
-          : 'Unable to reveal secret.'
+        revealError instanceof VaultExportError ? revealError.message : 'Unable to reveal secret.'
       );
     } finally {
       setPassword('');
