@@ -3,7 +3,7 @@ import userEvent from '@testing-library/user-event';
 import { beforeEach, describe, expect, it } from 'vitest';
 import type { UnlockVerifier } from '../AuthGuard';
 import { AUTH_STORAGE_KEY, DEFAULT_AUTH_STATE } from '../AuthGuard';
-import { ExtensionRouterTestHarness } from '..';
+import { ExtensionRouterTestHarness, HistoryActivityList, filterHistoryEntries } from '..';
 
 function renderRouter(
   pathname: string,
@@ -155,5 +155,101 @@ describe('extension router', () => {
     await user.click(within(navBar).getByRole('link', { name: /receive/i }));
     expect(await screen.findByText(/on testnet/i)).toBeInTheDocument();
     expect(document.querySelector('[data-display-preference="compact"]')).toBeTruthy();
+  });
+});
+
+describe('extension transaction history filters', () => {
+  beforeEach(() => {
+    window.localStorage.clear();
+    document.title = 'Ancore Extension';
+  });
+
+  const unlockedAuthState = {
+    ...DEFAULT_AUTH_STATE,
+    hasOnboarded: true,
+    isUnlocked: true,
+  };
+
+  it('shows all transactions by default', () => {
+    renderRouter('/history', unlockedAuthState);
+
+    expect(screen.getByText('Received from Treasury')).toBeInTheDocument();
+    expect(screen.getByText('Sent to Merchant')).toBeInTheDocument();
+    expect(screen.getByText('Failed merchant payment')).toBeInTheDocument();
+  });
+
+  it('filters history to sent transactions', async () => {
+    const user = userEvent.setup();
+    renderRouter('/history', unlockedAuthState);
+
+    await user.click(screen.getByRole('button', { name: 'Sent' }));
+
+    expect(screen.getByText('Sent to Merchant')).toBeInTheDocument();
+    expect(screen.queryByText('Received from Treasury')).not.toBeInTheDocument();
+    expect(screen.queryByText('Failed merchant payment')).not.toBeInTheDocument();
+  });
+
+  it('filters history to received transactions', async () => {
+    const user = userEvent.setup();
+    renderRouter('/history', unlockedAuthState);
+
+    await user.click(screen.getByRole('button', { name: 'Received' }));
+
+    expect(screen.getByText('Received from Treasury')).toBeInTheDocument();
+    expect(screen.queryByText('Sent to Merchant')).not.toBeInTheDocument();
+    expect(screen.queryByText('Failed merchant payment')).not.toBeInTheDocument();
+  });
+
+  it('filters history to failed transactions', async () => {
+    const user = userEvent.setup();
+    renderRouter('/history', unlockedAuthState);
+
+    await user.click(screen.getByRole('button', { name: 'Failed' }));
+
+    expect(screen.getByText('Failed merchant payment')).toBeInTheDocument();
+    expect(screen.queryByText('Received from Treasury')).not.toBeInTheDocument();
+    expect(screen.queryByText('Sent to Merchant')).not.toBeInTheDocument();
+  });
+
+  it('stores the active chip in the URL and can return to all transactions', async () => {
+    const user = userEvent.setup();
+    renderRouter('/history', unlockedAuthState);
+
+    await user.click(screen.getByRole('button', { name: 'Sent' }));
+
+    expect(screen.getByRole('button', { name: 'Sent' })).toHaveAttribute('aria-pressed', 'true');
+
+    await user.click(screen.getByRole('button', { name: 'All' }));
+
+    expect(screen.getByRole('button', { name: 'All' })).toHaveAttribute('aria-pressed', 'true');
+    expect(screen.getByText('Received from Treasury')).toBeInTheDocument();
+    expect(screen.getByText('Sent to Merchant')).toBeInTheDocument();
+    expect(screen.getByText('Failed merchant payment')).toBeInTheDocument();
+  });
+
+  it('shows an empty message when an active chip has no matching rows', () => {
+    const filtered = filterHistoryEntries(
+      [
+        {
+          id: 'sent-only',
+          label: 'Sent only',
+          amount: '-1 XLM',
+          date: 'Today',
+          kind: 'sent',
+          status: 'confirmed',
+        },
+      ],
+      'received'
+    );
+
+    render(
+      <HistoryActivityList
+        activeFilter="received"
+        entries={filtered}
+        onFilterChange={() => undefined}
+      />
+    );
+
+    expect(screen.getByText('No transactions match this filter.')).toBeInTheDocument();
   });
 });

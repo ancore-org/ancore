@@ -9,6 +9,7 @@ import {
   Routes,
   useLocation,
   useNavigate,
+  useSearchParams,
 } from 'react-router-dom';
 import {
   ArrowLeft,
@@ -430,20 +431,119 @@ function ReceiveScreen() {
   );
 }
 
-function HistoryScreen() {
-  const entries = [
-    { id: '1', label: 'Received from Treasury', amount: '+320 XLM', date: 'Today' },
-    { id: '2', label: 'Sent to Merchant', amount: '-48 XLM', date: 'Yesterday' },
-    { id: '3', label: 'Session key refresh', amount: 'Security event', date: 'Mar 23' },
-  ];
+export type HistoryFilter = 'all' | 'sent' | 'received' | 'failed';
 
+export type HistoryEntry = {
+  id: string;
+  label: string;
+  amount: string;
+  date: string;
+  kind: Exclude<HistoryFilter, 'all'>;
+  status: 'confirmed' | 'failed';
+};
+
+const HISTORY_FILTERS: Array<{ value: HistoryFilter; label: string }> = [
+  { value: 'all', label: 'All' },
+  { value: 'sent', label: 'Sent' },
+  { value: 'received', label: 'Received' },
+  { value: 'failed', label: 'Failed' },
+];
+
+const HISTORY_ENTRIES: HistoryEntry[] = [
+  {
+    id: '1',
+    label: 'Received from Treasury',
+    amount: '+320 XLM',
+    date: 'Today',
+    kind: 'received',
+    status: 'confirmed',
+  },
+  {
+    id: '2',
+    label: 'Sent to Merchant',
+    amount: '-48 XLM',
+    date: 'Yesterday',
+    kind: 'sent',
+    status: 'confirmed',
+  },
+  {
+    id: '3',
+    label: 'Failed merchant payment',
+    amount: '-12 XLM',
+    date: 'Mar 23',
+    kind: 'failed',
+    status: 'failed',
+  },
+];
+
+function isHistoryFilter(value: string | null): value is HistoryFilter {
+  return value === 'all' || value === 'sent' || value === 'received' || value === 'failed';
+}
+
+export function filterHistoryEntries(entries: HistoryEntry[], filter: HistoryFilter) {
+  return entries.filter((entry) => {
+    if (filter === 'all') {
+      return true;
+    }
+    return entry.kind === filter;
+  });
+}
+
+function useHistoryFilter() {
+  const [searchParams, setSearchParams] = useSearchParams();
+  const filterParam = searchParams.get('filter');
+  const filter: HistoryFilter = isHistoryFilter(filterParam) ? filterParam : 'all';
+
+  const setFilter = (nextFilter: HistoryFilter) => {
+    const nextParams = new URLSearchParams(searchParams);
+    if (nextFilter === 'all') {
+      nextParams.delete('filter');
+    } else {
+      nextParams.set('filter', nextFilter);
+    }
+    setSearchParams(nextParams, { replace: true });
+  };
+
+  return { filter, setFilter };
+}
+
+export function HistoryActivityList({
+  activeFilter,
+  entries,
+  onFilterChange,
+}: {
+  activeFilter: HistoryFilter;
+  entries: HistoryEntry[];
+  onFilterChange: (filter: HistoryFilter) => void;
+}) {
   return (
-    <PageScaffold
-      eyebrow="Activity"
-      title="History"
-      description="A route-backed transaction feed with room for richer filtering later."
-    >
-      <Card title="Recent activity">
+    <Card title="Recent activity">
+      <div className="mb-4 flex flex-wrap gap-2" role="group" aria-label="Transaction filters">
+        {HISTORY_FILTERS.map((option) => {
+          const isActive = option.value === activeFilter;
+          return (
+            <button
+              key={option.value}
+              aria-pressed={isActive}
+              className={`rounded-full border px-3 py-1.5 text-xs font-semibold transition ${
+                isActive
+                  ? 'border-primary bg-primary text-primary-foreground shadow-sm'
+                  : 'border-border bg-background text-muted-foreground hover:bg-accent hover:text-foreground'
+              }`}
+              onClick={() => onFilterChange(option.value)}
+              type="button"
+            >
+              {option.label}
+            </button>
+          );
+        })}
+      </div>
+      {entries.length === 0 ? (
+        <div className="rounded-xl border border-dashed border-border px-4 py-6 text-center">
+          <p className="text-sm font-medium text-foreground">No transactions match this filter.</p>
+          <p className="mt-1 text-xs text-muted-foreground">Try a different activity chip.</p>
+        </div>
+      ) : (
         <div className="space-y-3">
           {entries.map((entry) => (
             <div
@@ -452,13 +552,30 @@ function HistoryScreen() {
             >
               <div>
                 <p className="text-sm font-medium text-foreground">{entry.label}</p>
-                <p className="text-xs text-muted-foreground">{entry.date}</p>
+                <p className="text-xs text-muted-foreground">
+                  {entry.date} • {entry.status}
+                </p>
               </div>
               <span className="text-sm font-semibold text-foreground">{entry.amount}</span>
             </div>
           ))}
         </div>
-      </Card>
+      )}
+    </Card>
+  );
+}
+
+function HistoryScreen() {
+  const { filter, setFilter } = useHistoryFilter();
+  const entries = React.useMemo(() => filterHistoryEntries(HISTORY_ENTRIES, filter), [filter]);
+
+  return (
+    <PageScaffold
+      eyebrow="Activity"
+      title="History"
+      description="Filter recent transaction activity by sent, received, or failed status."
+    >
+      <HistoryActivityList activeFilter={filter} entries={entries} onFilterChange={setFilter} />
     </PageScaffold>
   );
 }

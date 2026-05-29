@@ -2,6 +2,8 @@ import { useState } from 'react';
 
 import { TransactionTable } from '../components/transactions/TransactionTable';
 import { StatementExportModal } from '../features/statements/StatementExportModal';
+import { PaymentDetail } from '../features/payments';
+import { mapMerchantMetadata } from '../components/merchant/merchant-metadata';
 import type { Transaction } from '../components/transactions/transaction-types';
 
 const STATEMENT_ACCOUNT_ID = 'GABC1234567890ABCDEFGHIJKLMNOPQRSTUVWXYZ1234567890';
@@ -15,6 +17,10 @@ const DASHBOARD_TRANSACTIONS: Transaction[] = [
     amount: 142.5,
     counterparty: 'Acme Treasury',
     memo: 'Invoice 1042',
+    merchant: mapMerchantMetadata({
+      merchant_name: 'Acme Treasury',
+      merchant_verification_status: 'verified',
+    }),
   },
   {
     id: 'tx-2',
@@ -42,6 +48,9 @@ const DASHBOARD_TRANSACTIONS: Transaction[] = [
     amount: 12.75,
     counterparty: 'Merchant POS',
     memo: 'Failed charge',
+    merchant: mapMerchantMetadata({
+      merchant: { name: 'Merchant POS', verificationStatus: 'unverified' },
+    }),
   },
   {
     id: 'tx-5',
@@ -59,10 +68,13 @@ export function TransactionsPage() {
 
   return (
     <>
-      <TransactionTable
-        onExportStatement={() => setIsStatementExportOpen(true)}
-        transactions={DASHBOARD_TRANSACTIONS}
-      />
+      <div className="space-y-6">
+        <PaymentDetail transaction={DASHBOARD_TRANSACTIONS[0]} />
+        <TransactionTable
+          onExportStatement={() => setIsStatementExportOpen(true)}
+          transactions={DASHBOARD_TRANSACTIONS}
+        />
+      </div>
       <StatementExportModal
         accountId={STATEMENT_ACCOUNT_ID}
         isOpen={isStatementExportOpen}
