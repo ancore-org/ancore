@@ -157,20 +157,32 @@ export class StellarClient {
     return Math.max(this.rpcServers.length, maxRetries + 1);
   }
 
-  private getErrorStatusCode(error: Error): number | undefined {
+  private getErrorStatusCode(error: unknown): number | undefined {
     if (error instanceof NetworkError) {
       return error.statusCode;
     }
 
-    if ('statusCode' in error && typeof error.statusCode === 'number') {
+    if (
+      error &&
+      typeof error === 'object' &&
+      'statusCode' in error &&
+      typeof error.statusCode === 'number'
+    ) {
       return error.statusCode;
     }
 
-    if ('status' in error && typeof error.status === 'number') {
+    if (
+      error &&
+      typeof error === 'object' &&
+      'status' in error &&
+      typeof error.status === 'number'
+    ) {
       return error.status;
     }
 
     if (
+      error &&
+      typeof error === 'object' &&
       'response' in error &&
       error.response &&
       typeof error.response === 'object' &&
@@ -183,18 +195,89 @@ export class StellarClient {
     return undefined;
   }
 
-  private isRetryableRpcError(error: Error): boolean {
-    if (error instanceof StellarError && !(error instanceof NetworkError)) {
-      return false;
+  private isRetryableStatusCode(statusCode: number): boolean {
+    return statusCode === 429 || statusCode >= 500;
+  }
+
+  private isRetryableNetworkError(error: Error): boolean {
+    if (error instanceof NetworkError && error.retryable !== undefined) {
+      return error.retryable;
     }
 
     const statusCode = this.getErrorStatusCode(error);
 
     if (statusCode !== undefined) {
-      return statusCode === 429 || statusCode >= 500;
+      return this.isRetryableStatusCode(statusCode);
     }
 
     return true;
+  }
+
+  private createHorizonNetworkError(message: string, error: unknown): NetworkError {
+    const statusCode = this.getErrorStatusCode(error);
+    const retryable = statusCode === undefined ? true : this.isRetryableStatusCode(statusCode);
+    const rateLimitMessage = statusCode === 429 ? `${message}: rate limited by Horizon` : message;
+
+    return new NetworkError(rateLimitMessage, {
+      cause: error instanceof Error ? error : undefined,
+      statusCode,
+      retryable,
+    });
+  }
+
+  private isRateLimitedNetworkError(error: Error): boolean {
+    return error instanceof NetworkError && error.statusCode === 429;
+  }
+
+  private isRetryableHorizonError(error: Error): boolean {
+    if (error instanceof StellarError && !(error instanceof NetworkError)) {
+      return false;
+    }
+
+    return this.isRetryableNetworkError(error);
+  }
+
+  private getHorizonResponseData(error: unknown): unknown {
+    if (
+      error &&
+      typeof error === 'object' &&
+      'response' in error &&
+      error.response &&
+      typeof error.response === 'object' &&
+      'data' in error.response
+    ) {
+      return error.response.data;
+    }
+
+    return undefined;
+  }
+
+  private getTransactionResultCode(error: unknown): string | undefined {
+    const data = this.getHorizonResponseData(error);
+
+    if (!data || typeof data !== 'object' || !('extras' in data)) {
+      return undefined;
+    }
+
+    const { extras } = data;
+    if (!extras || typeof extras !== 'object' || !('result_codes' in extras)) {
+      return undefined;
+    }
+
+    const { result_codes: resultCodes } = extras;
+    if (!resultCodes || typeof resultCodes !== 'object' || !('transaction' in resultCodes)) {
+      return undefined;
+    }
+
+    return typeof resultCodes.transaction === 'string' ? resultCodes.transaction : undefined;
+  }
+
+  private isRetryableRpcError(error: Error): boolean {
+    if (error instanceof StellarError && !(error instanceof NetworkError)) {
+      return false;
+    }
+
+    return this.isRetryableNetworkError(error);
   }
 
   private async executeRpcWithFailover<T>(
@@ -268,22 +351,27 @@ export class StellarClient {
             const account = await this.horizonServer.loadAccount(publicKey);
             return account;
           } catch (error) {
-            if (error instanceof Error && error.message.includes('Not Found')) {
+            const statusCode = this.getErrorStatusCode(error);
+            if (
+              statusCode === 404 ||
+              (error instanceof Error && error.message.includes('Not Found'))
+            ) {
               throw new AccountNotFoundError(publicKey);
             }
-            throw new NetworkError('Failed to load account', {
-              cause: error instanceof Error ? error : undefined,
-            });
+            throw this.createHorizonNetworkError('Failed to load account', error);
           }
         },
         {
           ...this.retryOptions,
-          isRetryable: (error) => !(error instanceof AccountNotFoundError),
+          isRetryable: (error) => this.isRetryableHorizonError(error),
         }
       );
     } catch (error: unknown) {
       // If retry exhausted, throw the last error if it's one of our custom errors
       if (error instanceof RetryExhaustedError && error.lastError) {
+        if (this.isRateLimitedNetworkError(error.lastError)) {
+          throw error;
+        }
         if (
           error.lastError instanceof AccountNotFoundError ||
           error.lastError instanceof NetworkError
@@ -321,26 +409,30 @@ export class StellarClient {
   ): Promise<AccountActivityPage<Horizon.HorizonApi.OperationResponseType>> {
     const { cursor = null, limit = 20, order = 'desc' } = request;
 
-    return withRetry(async () => {
-      try {
-        const builder = this.horizonServer
-          .operations()
-          .forAccount(publicKey)
-          .limit(limit)
-          .order(order);
+    return withRetry(
+      async () => {
+        try {
+          const builder = this.horizonServer
+            .operations()
+            .forAccount(publicKey)
+            .limit(limit)
+            .order(order);
 
-        const page = cursor ? await builder.cursor(cursor).call() : await builder.call();
-        // Cast via unknown to avoid overlap errors between Horizon response types
-        const records = page.records as unknown as Horizon.HorizonApi.OperationResponseType[];
-        const nextCursor = this.getNextCursor(records);
+          const page = cursor ? await builder.cursor(cursor).call() : await builder.call();
+          // Cast via unknown to avoid overlap errors between Horizon response types
+          const records = page.records as unknown as Horizon.HorizonApi.OperationResponseType[];
+          const nextCursor = this.getNextCursor(records);
 
-        return { records, nextCursor };
-      } catch (error) {
-        throw new NetworkError('Failed to fetch account activity page', {
-          cause: error instanceof Error ? error : undefined,
-        });
+          return { records, nextCursor };
+        } catch (error) {
+          throw this.createHorizonNetworkError('Failed to fetch account activity page', error);
+        }
+      },
+      {
+        ...this.retryOptions,
+        isRetryable: (error) => this.isRetryableHorizonError(error),
       }
-    }, this.retryOptions);
+    );
   }
 
   /**
@@ -439,33 +531,31 @@ export class StellarClient {
     transaction: Transaction
   ): Promise<Horizon.HorizonApi.SubmitTransactionResponse> {
     try {
-      return await withRetry(async () => {
-        try {
-          const response = await this.horizonServer.submitTransaction(transaction);
-          return response;
-        } catch (error) {
-          if (
-            error &&
-            typeof error === 'object' &&
-            'response' in error &&
-            error.response &&
-            typeof error.response === 'object' &&
-            'data' in error.response
-          ) {
-            const data = error.response.data as {
-              extras?: { result_codes?: { transaction?: string } };
-            };
-            throw new TransactionError('Transaction submission failed', {
-              resultCode: data?.extras?.result_codes?.transaction,
-            });
+      return await withRetry(
+        async () => {
+          try {
+            const response = await this.horizonServer.submitTransaction(transaction);
+            return response;
+          } catch (error) {
+            const resultCode = this.getTransactionResultCode(error);
+            if (resultCode) {
+              throw new TransactionError('Transaction submission failed', {
+                resultCode,
+              });
+            }
+            throw this.createHorizonNetworkError('Failed to submit transaction', error);
           }
-          throw new NetworkError('Failed to submit transaction', {
-            cause: error instanceof Error ? error : undefined,
-          });
+        },
+        {
+          ...this.retryOptions,
+          isRetryable: (error) => this.isRetryableHorizonError(error),
         }
-      }, this.retryOptions);
+      );
     } catch (error: unknown) {
       if (error instanceof RetryExhaustedError && error.lastError) {
+        if (this.isRateLimitedNetworkError(error.lastError)) {
+          throw error;
+        }
         if (
           error.lastError instanceof TransactionError ||
           error.lastError instanceof NetworkError

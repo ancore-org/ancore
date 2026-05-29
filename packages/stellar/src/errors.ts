@@ -19,12 +19,17 @@ export class StellarError extends Error {
 export class NetworkError extends StellarError {
   public readonly cause?: Error;
   public readonly statusCode?: number;
+  public readonly retryable?: boolean;
 
-  constructor(message: string, options?: { cause?: Error; statusCode?: number }) {
+  constructor(
+    message: string,
+    options?: { cause?: Error; statusCode?: number; retryable?: boolean }
+  ) {
     super(message);
     this.name = 'NetworkError';
     this.cause = options?.cause;
     this.statusCode = options?.statusCode;
+    this.retryable = options?.retryable;
   }
 }
 
