@@ -1,4 +1,5 @@
 import { Request, Response, NextFunction, RequestHandler } from 'express';
+import { logger } from '../logging';
 
 /**
  * Reason code emitted in logs when a request is rejected by the payload guard.
@@ -72,14 +73,16 @@ export function createPayloadGuardMiddleware(options?: PayloadGuardOptions): Req
       const contentLength = parseInt(contentLengthHeader, 10);
 
       if (!isNaN(contentLength) && contentLength > maxBytes) {
-        console.warn({
-          reason: PAYLOAD_TOO_LARGE_REASON,
-          contentLength,
-          maxBytes,
-          path: req.path,
-          method: req.method,
-          message: `Request payload of ${contentLength} bytes exceeds limit of ${maxBytes} bytes`,
-        });
+        logger.warn(
+          {
+            reason: PAYLOAD_TOO_LARGE_REASON,
+            contentLength,
+            maxBytes,
+            path: req.path,
+            method: req.method,
+          },
+          `Request payload of ${contentLength} bytes exceeds limit of ${maxBytes} bytes`
+        );
 
         res.status(413).json({
           error: PAYLOAD_TOO_LARGE_REASON,
