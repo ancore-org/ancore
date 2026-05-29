@@ -61,7 +61,7 @@ export function SendScreen({ balance, assetDecimals, service, pollIntervalMs }: 
   const handleReview = async () => {
     const success = await send.goToReview(form);
     if (success) {
-      await addRecipient({ address: form.to });
+      await addRecipient({ address: send.tx?.to ?? form.to });
     }
   };
 
@@ -110,8 +110,8 @@ export function SendScreen({ balance, assetDecimals, service, pollIntervalMs }: 
       <CardContent className="space-y-6 pt-8 px-6 pb-8">
         <div className="space-y-6">
           <AddressInput
-            label="Recipient Address"
-            placeholder="G..."
+            label="Recipient"
+            placeholder="@username or G..."
             value={form.to}
             error={send.errors.to}
             className="group"

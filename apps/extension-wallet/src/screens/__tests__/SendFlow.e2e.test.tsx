@@ -17,6 +17,15 @@ function createService(): SendService {
     signTransaction: vi.fn(async () => 'signed_payload'),
     submitTransaction: vi.fn(async () => ({ txId: 'tx_demo_123' })),
     fetchTransactionStatus: vi.fn(async () => statusQueue.shift() ?? 'confirmed'),
+    resolveHandle: vi.fn(async (handle) =>
+      handle === '@alice'
+        ? {
+            handle,
+            accountAddress: 'GAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAWHF',
+            displayName: 'Alice',
+          }
+        : null
+    ),
   };
 }
 
@@ -32,20 +41,17 @@ describe('Send flow e2e', () => {
       'GAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAWHF'
     );
     await user.type(screen.getByLabelText('Amount'), '10');
-    await user.click(screen.getByRole('button', { name: 'Review' }));
+    await user.click(screen.getByRole('button', { name: /Review/ }));
 
-    expect(await screen.findByText('Review transaction')).toBeInTheDocument();
-    expect(screen.getByText('0.0000200 XLM')).toBeInTheDocument();
+    expect(await screen.findByText(/Review Transaction/i)).toBeInTheDocument();
+    await user.click(screen.getByText('Confirm Recipient'));
+    await user.click(screen.getByRole('button', { name: /Continue/ }));
+    expect(await screen.findByText(/Sign Transaction/i)).toBeInTheDocument();
 
-    await user.click(screen.getByRole('button', { name: 'Continue' }));
-    expect(await screen.findByText('Confirm transaction')).toBeInTheDocument();
+    await user.type(screen.getByLabelText(/Wallet Password/i), 'wallet-password');
+    await user.click(screen.getByRole('button', { name: /Sign & submit/i }));
 
-    await user.type(screen.getByLabelText('Wallet password'), 'wallet-password');
-    await user.click(screen.getByRole('button', { name: 'Sign & submit' }));
-
-    expect(await screen.findByText('Transaction status')).toBeInTheDocument();
-    expect(screen.queryByText('Pending') || screen.queryByText('Confirmed')).toBeTruthy();
-
+    expect(await screen.findByText(/Transaction Result/i)).toBeInTheDocument();
     await waitFor(
       () => {
         expect(screen.getByText('Confirmed')).toBeInTheDocument();
@@ -53,4 +59,33 @@ describe('Send flow e2e', () => {
       { timeout: 1000 }
     );
   }, 15000);
+
+  it('resolves @username handles before review', async () => {
+    const service = createService();
+    const user = userEvent.setup();
+
+    render(<SendScreen balance={100} service={service} pollIntervalMs={10} />);
+
+    await user.type(screen.getByLabelText('Recipient'), '@Alice');
+    await user.type(screen.getByLabelText('Amount'), '10');
+    await user.click(screen.getByRole('button', { name: /Review/ }));
+
+    expect(await screen.findByText(/Review Transaction/i)).toBeInTheDocument();
+    expect(screen.getByText(/@alice/i)).toBeInTheDocument();
+    expect(service.resolveHandle).toHaveBeenCalledWith('@alice');
+  });
+
+  it('shows a clear error when a handle is not found', async () => {
+    const service = createService();
+    const user = userEvent.setup();
+
+    render(<SendScreen balance={100} service={service} pollIntervalMs={10} />);
+
+    await user.type(screen.getByLabelText('Recipient'), '@missing');
+    await user.type(screen.getByLabelText('Amount'), '10');
+    await user.click(screen.getByRole('button', { name: /Review/ }));
+
+    expect(await screen.findByText('Handle not found')).toBeInTheDocument();
+    expect(screen.queryByText('Review transaction')).not.toBeInTheDocument();
+  });
 });

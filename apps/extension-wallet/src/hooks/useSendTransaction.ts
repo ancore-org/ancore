@@ -1,6 +1,12 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { amountSchema, isStellarAddress, validateAmountPrecision } from '@ancore/ui-kit';
-import type { ScheduledTransfer } from '@ancore/types';
+import {
+  isUsernameHandle,
+  normalizeUsernameHandle,
+  type ResolvedHandle,
+  type ScheduledTransfer,
+  type UsernameHandle,
+} from '@ancore/types';
 import { mapRpcStatus, isTerminalStatus } from '@/utils/transaction-status';
 import { validateTransferNote, truncateTransferNote } from '@/utils/note-validation';
 import type { ScheduleConfig, TransferTiming } from '@/screens/Send/ScheduleControls';
@@ -12,6 +18,7 @@ import {
   toIsoStartAt,
   type SchedulerClient,
 } from '@/services/scheduler-client';
+import { resolveHandle as defaultResolveHandle } from '@/services/handle-resolver';
 
 export type SendStep = 'form' | 'review' | 'confirm' | 'status' | 'scheduled';
 export type TxStatus = 'idle' | 'pending' | 'confirmed' | 'failed';
@@ -34,11 +41,14 @@ export interface SendTransactionDraft extends SendFormValues {
   fee: FeeEstimate;
   total: string;
   truncatedNote?: string;
+  recipientInput?: string;
+  resolvedHandle?: ResolvedHandle;
 }
 
 export interface SendService {
   estimateFee: (input: SendFormValues) => Promise<FeeEstimate>;
   authenticatePassword: (password: string) => Promise<boolean>;
+  resolveHandle?: (handle: UsernameHandle) => Promise<ResolvedHandle | null>;
   signTransaction: (tx: SendTransactionDraft) => Promise<string>;
   submitTransaction: (signedPayload: string) => Promise<{ txId: string }>;
   fetchTransactionStatus: (txId: string) => Promise<TxStatus>;
@@ -60,6 +70,7 @@ export interface UseSendTransactionOptions {
 
 export interface ValidationErrors {
   to?: string;
+  handle?: string;
   amount?: string;
   note?: string;
   password?: string;
@@ -68,6 +79,12 @@ export interface ValidationErrors {
 
 const DEFAULT_BALANCE = 250;
 const DEFAULT_POLL_MS = 1000;
+
+const HANDLE_NOT_FOUND_MESSAGE = 'Handle not found';
+
+function isHandleInput(value: string): boolean {
+  return value.trim().startsWith('@');
+}
 
 function createDefaultService(
   schedulerClient: SchedulerClient,
@@ -84,6 +101,7 @@ function createDefaultService(
       `signed:${tx.to}:${tx.amount}:${Date.now()}`,
     submitTransaction: async () => ({ txId: `tx_${Date.now()}` }),
     fetchTransactionStatus: async () => 'confirmed',
+    resolveHandle: defaultResolveHandle,
     createScheduledTransfer: async (tx, schedule) =>
       schedulerClient.createScheduledTransfer({
         accountAddress,
@@ -101,11 +119,17 @@ function createDefaultService(
 }
 
 export function validateRecipientAddress(value: string): string | undefined {
-  if (!value.trim()) {
-    return 'Recipient address is required';
+  const trimmed = value.trim();
+
+  if (!trimmed) {
+    return 'Recipient address or @username is required';
   }
 
-  if (!isStellarAddress(value.trim())) {
+  if (isHandleInput(trimmed)) {
+    return isUsernameHandle(trimmed) ? undefined : 'Enter a valid @username handle';
+  }
+
+  if (!isStellarAddress(trimmed)) {
     return 'Invalid Stellar address';
   }
 
@@ -178,6 +202,7 @@ export function useSendTransaction(options: UseSendTransactionOptions = {}) {
     (values: SendFormValues): boolean => {
       const nextErrors: ValidationErrors = {
         to: validateRecipientAddress(values.to),
+        handle: undefined,
         amount: validateAmount(values.amount, balance, assetDecimals),
         note: values.note ? validateTransferNote(values.note) : undefined,
       };
@@ -210,12 +235,41 @@ export function useSendTransaction(options: UseSendTransactionOptions = {}) {
       setErrors((current) => ({ ...current, simulation: undefined }));
 
       try {
-        const estimatedFee = await service.estimateFee(values);
+        const recipientInput = values.to.trim();
+        let resolvedHandle: ResolvedHandle | undefined;
+        let resolvedValues = { ...values, to: recipientInput };
+
+        if (isHandleInput(recipientInput)) {
+          const resolver = service.resolveHandle ?? defaultResolveHandle;
+          const handle = normalizeUsernameHandle(recipientInput);
+          const resolved = await resolver(handle);
+
+          if (!resolved) {
+            setErrors((current) => ({
+              ...current,
+              to: HANDLE_NOT_FOUND_MESSAGE,
+              handle: HANDLE_NOT_FOUND_MESSAGE,
+            }));
+            return false;
+          }
+
+          resolvedHandle = resolved;
+          resolvedValues = { ...values, to: resolved.accountAddress };
+        }
+
+        const estimatedFee = await service.estimateFee(resolvedValues);
         const total = (Number(values.amount) + Number(estimatedFee.totalFee)).toFixed(7);
         const truncatedNote = values.note ? truncateTransferNote(values.note) : undefined;
 
         setFee(estimatedFee);
-        setTx({ ...values, fee: estimatedFee, total, truncatedNote });
+        setTx({
+          ...resolvedValues,
+          fee: estimatedFee,
+          total,
+          truncatedNote,
+          recipientInput,
+          resolvedHandle,
+        });
         setStep('review');
         return true;
       } catch (error) {
