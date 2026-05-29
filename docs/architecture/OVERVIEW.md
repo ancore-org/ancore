@@ -36,6 +36,48 @@ This document provides a high-level overview of the Ancore system architecture.
                     Stellar Network
 ```
 
+## Repository Module Map
+
+The main architecture modules are organized as a monorepo. This tree intentionally lists only the top-level product, package, contract, service, and documentation modules that contributors are expected to navigate directly.
+
+<!-- repo-structure-check:start -->
+
+```
+ancore/
+├── apps/                     # User-facing applications
+│   ├── extension-wallet/     # Browser extension wallet
+│   ├── mobile-wallet/        # React Native mobile app
+│   └── web-dashboard/        # Web-based account management
+│
+├── packages/                 # Public SDKs and libraries
+│   ├── core-sdk/             # Main SDK for developers
+│   ├── account-abstraction/  # Account abstraction primitives
+│   ├── stellar/              # Stellar/Soroban utilities
+│   ├── crypto/               # Cryptographic utilities
+│   ├── ui-kit/               # Shared UI components
+│   └── types/                # Shared TypeScript types
+│
+├── contracts/                # Soroban smart contracts
+│   ├── account/              # Core account contract
+│   ├── validation-modules/   # Planned pluggable validation module scaffolds
+│   ├── invoice/              # Planned invoice contract scaffolds
+│   └── upgrade/              # Planned upgrade contract scaffolds
+│
+├── services/                 # Optional infrastructure
+│   ├── relayer/              # Transaction relay service
+│   ├── indexer/              # Blockchain indexer
+│   └── ai-agent/             # Planned AI orchestration service scaffold
+│
+└── docs/                     # Documentation
+    ├── architecture/         # System architecture
+    ├── security/             # Security model & audits
+    └── user-guide/           # End-user guides
+```
+
+<!-- repo-structure-check:end -->
+
+Run `pnpm docs:check-structure` before merging README or architecture changes that add, rename, or remove entries in this tree. Keep this block and the README repository tree in sync; if the check should cover a different set of docs, update `scripts/check-docs-repo-structure.mjs` and the CI workflow in the same change.
+
 ## Financial OS Positioning
 
 Ancore is designed as a financial operating system on top of Stellar:
@@ -185,7 +227,6 @@ Optional relayer network for:
 
 ---
 
-> Note: Additional contract modules (validation, invoice, etc.) remain planned
-> roadmap items and are not part of the current repository layout.
+> Note: Planned contract and service scaffolds are intentionally present in the repository layout so contributors can preserve the architecture direction without implying production completeness.
 
 **Last Updated**: April 2026

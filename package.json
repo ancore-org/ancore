@@ -29,7 +29,8 @@
     "indexer:lint-migrations": "node services/indexer/scripts/lint-migrations.mjs",
     "audit:security": "node tools/security-audit.js",
     "verify": "pnpm lint && pnpm typecheck && pnpm test",
-    "prepare": "husky"
+    "prepare": "husky",
+    "docs:check-structure": "node scripts/check-docs-repo-structure.mjs"
   },
   "devDependencies": {
     "@testing-library/jest-dom": "^6.9.1",
