@@ -289,6 +289,19 @@ jobs:
         working-directory: ./contracts
         run: cargo test
 
+      - name: Check WASM Size Regression
+        run: node scripts/check-wasm-size.js
+
+      - name: Upload WASM size reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: wasm-size-reports
+          path: |
+            wasm-size-report.json
+            wasm-size-report.md
+          retention-days: 30
+
       - name: Upload contract build logs on failure
         if: failure()
         uses: actions/upload-artifact@v4

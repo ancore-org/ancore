@@ -127,6 +127,17 @@ pnpm contracts:build
 pnpm contracts:test
 ```
 
+### Updating WASM Size Budgets
+
+WASM contract sizes are monitored in CI to prevent regression. The budget for each contract is defined in `contracts/budgets/wasm-budgets.json`. 
+
+If your changes intentionally increase the contract size beyond the current budget:
+1. Ensure your contract builds locally: `pnpm contracts:build`
+2. Check the new size of the optimized `.wasm` files in `contracts/target/wasm32-unknown-unknown/release/`.
+3. You can run the local size check with: `node scripts/check-wasm-size.js`
+4. Update `contracts/budgets/wasm-budgets.json` with the new size budget, and commit the changes.
+
+
 ## Contributing
 
 We welcome contributions! Please see our [Contributing Guide](CONTRIBUTING.md) for details.
