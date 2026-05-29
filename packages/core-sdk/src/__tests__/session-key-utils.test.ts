@@ -1,5 +1,11 @@
 import { SessionPermission } from '@ancore/types';
-import { formatPermissions, permissionToLabel, permissionsToLabels } from '../session-key-utils';
+import {
+  formatPermissions,
+  permissionToLabel,
+  permissionsToLabels,
+  isSessionKeyActive,
+  getSessionKeyInactiveReason,
+} from '../session-key-utils';
 
 describe('session-key-utils', () => {
   describe('permissionToLabel', () => {
@@ -115,6 +121,81 @@ describe('session-key-utils', () => {
 
     test('handles duplicate permissions', () => {
       expect(formatPermissions([0, 0, 1])).toBe('Send Payment, Send Payment, Manage Data');
+    });
+  });
+
+  // -------------------------------------------------------------------------
+  // isSessionKeyActive
+  // -------------------------------------------------------------------------
+
+  describe('isSessionKeyActive', () => {
+    const NOW_MS = 1_700_000_000_000; // fixed reference time
+    const NOW_SECONDS = NOW_MS / 1000;
+
+    test('returns true for a key that expires in the future', () => {
+      const key = { expiresAt: NOW_SECONDS + 3600, publicKey: 'GTEST' };
+      expect(isSessionKeyActive(key, { nowMs: NOW_MS })).toBe(true);
+    });
+
+    test('returns false for a key that has already expired', () => {
+      const key = { expiresAt: NOW_SECONDS - 1, publicKey: 'GTEST' };
+      expect(isSessionKeyActive(key, { nowMs: NOW_MS })).toBe(false);
+    });
+
+    test('returns false for a key that expires exactly now', () => {
+      const key = { expiresAt: NOW_SECONDS, publicKey: 'GTEST' };
+      expect(isSessionKeyActive(key, { nowMs: NOW_MS })).toBe(false);
+    });
+
+    test('returns false for a revoked key (expiresAt === 0)', () => {
+      const key = { expiresAt: 0, publicKey: 'GTEST' };
+      expect(isSessionKeyActive(key, { nowMs: NOW_MS })).toBe(false);
+    });
+
+    test('uses Date.now() when nowMs is not provided', () => {
+      const futureKey = { expiresAt: Date.now() / 1000 + 9999 };
+      expect(isSessionKeyActive(futureKey)).toBe(true);
+
+      const pastKey = { expiresAt: Date.now() / 1000 - 1 };
+      expect(isSessionKeyActive(pastKey)).toBe(false);
+    });
+
+    test('works without a publicKey field', () => {
+      expect(isSessionKeyActive({ expiresAt: NOW_SECONDS + 100 }, { nowMs: NOW_MS })).toBe(true);
+    });
+  });
+
+  // -------------------------------------------------------------------------
+  // getSessionKeyInactiveReason
+  // -------------------------------------------------------------------------
+
+  describe('getSessionKeyInactiveReason', () => {
+    const NOW_MS = 1_700_000_000_000;
+    const NOW_SECONDS = NOW_MS / 1000;
+
+    test('returns null for an active key', () => {
+      const key = { expiresAt: NOW_SECONDS + 3600 };
+      expect(getSessionKeyInactiveReason(key, { nowMs: NOW_MS })).toBeNull();
+    });
+
+    test('returns EXPIRED for a key past its expiry', () => {
+      const key = { expiresAt: NOW_SECONDS - 1 };
+      expect(getSessionKeyInactiveReason(key, { nowMs: NOW_MS })).toBe('EXPIRED');
+    });
+
+    test('returns EXPIRED for a key that expires exactly now', () => {
+      const key = { expiresAt: NOW_SECONDS };
+      expect(getSessionKeyInactiveReason(key, { nowMs: NOW_MS })).toBe('EXPIRED');
+    });
+
+    test('returns REVOKED for a key with expiresAt === 0', () => {
+      const key = { expiresAt: 0 };
+      expect(getSessionKeyInactiveReason(key, { nowMs: NOW_MS })).toBe('REVOKED');
+    });
+
+    test('uses Date.now() when nowMs is not provided', () => {
+      const futureKey = { expiresAt: Date.now() / 1000 + 9999 };
+      expect(getSessionKeyInactiveReason(futureKey)).toBeNull();
     });
   });
 });

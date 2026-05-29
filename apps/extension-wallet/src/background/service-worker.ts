@@ -1,6 +1,14 @@
 import { registerHandler, installMessageDispatcher } from '@/messaging';
 import { getSharedStorageManager } from '@/security/storage-manager';
 import { readAuthState } from '@/router/AuthGuard';
+import {
+  probeAllServiceHealth,
+  setCachedHealth,
+  resolveRelayerUrl,
+  resolveIndexerUrl,
+  validateServiceUrls,
+  type ServiceUrlConfig,
+} from '@/config/urls';
 
 type ChromeRuntimeManifest = {
   name: string;
@@ -48,7 +56,62 @@ runtime?.onInstalled?.addListener((details: ChromeInstalledDetails) => {
 
 runtime?.onStartup?.addListener(() => {
   console.info(`${logPrefix} startup`);
+  runServiceHealthProbes().catch((err) => {
+    console.warn(`${logPrefix} health probe failed on startup`, err);
+  });
 });
+
+// ---------------------------------------------------------------------------
+// Service URL health probing
+// ---------------------------------------------------------------------------
+
+/**
+ * Resolves the active service URLs from storage (or falls back to defaults),
+ * validates their format, then probes /health on each service.
+ * Results are cached in the config/urls module so the popup can read them.
+ */
+async function runServiceHealthProbes(): Promise<void> {
+  // Read persisted environment preference (defaults to 'production')
+  let environment = 'production';
+  try {
+    const raw = await getChromeStorage('ancore_dashboard_settings');
+    if (raw && typeof raw === 'string') {
+      const parsed = JSON.parse(raw) as Record<string, unknown>;
+      if (typeof parsed['environment'] === 'string') {
+        environment = parsed['environment'];
+      }
+    }
+  } catch {
+    // Ignore storage errors — fall back to production
+  }
+
+  const config: ServiceUrlConfig = {
+    relayerUrl: resolveRelayerUrl(environment),
+    indexerUrl: resolveIndexerUrl(environment),
+  };
+
+  // Synchronous format check first
+  const formatErrors = validateServiceUrls(config);
+  if (formatErrors.length > 0) {
+    console.warn(`${logPrefix} invalid service URLs`, formatErrors);
+    return;
+  }
+
+  console.info(`${logPrefix} probing service health`, { environment });
+  const results = await probeAllServiceHealth(config);
+
+  for (const result of results) {
+    setCachedHealth(result);
+    if (result.status !== 'ok') {
+      console.warn(`${logPrefix} service health degraded`, result);
+    } else {
+      console.info(`${logPrefix} service health ok`, {
+        service: result.service,
+        latencyMs: result.latencyMs,
+      });
+    }
+  }
+}
 
 // ---------------------------------------------------------------------------
 // In-memory session state (backing store cleared on lock)
@@ -181,6 +244,28 @@ registerHandler('UNLOCK_WALLET', async ({ password }) => {
     console.error(`${logPrefix} unlock failed`, err);
     _sessionUnlocked = false;
     return { success: false };
+  }
+});
+
+/**
+ * CHECK_SERVICE_HEALTH — triggers a fresh health probe and returns results.
+ *
+ * Called by the popup when the user opens Settings or when a send is blocked.
+ */
+registerHandler('CHECK_SERVICE_HEALTH', async () => {
+  try {
+    await runServiceHealthProbes();
+    const { getCachedHealth } = await import('@/config/urls');
+    return {
+      relayer: getCachedHealth('relayer'),
+      indexer: getCachedHealth('indexer'),
+    };
+  } catch (err) {
+    console.error(`${logPrefix} CHECK_SERVICE_HEALTH failed`, err);
+    return {
+      relayer: { service: 'relayer' as const, status: 'unreachable' as const },
+      indexer: { service: 'indexer' as const, status: 'unreachable' as const },
+    };
   }
 });
 

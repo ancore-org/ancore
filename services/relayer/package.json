@@ -6,7 +6,8 @@
   "scripts": {
     "build": "tsc --project tsconfig.json",
     "test": "jest --coverage",
-    "lint": "eslint src/"
+    "lint": "eslint src/",
+    "check:log-redaction": "node scripts/check-log-redaction.js"
   },
   "keywords": ["ancore", "relayer", "stellar", "soroban"],
   "license": "Apache-2.0",

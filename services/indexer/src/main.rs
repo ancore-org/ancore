@@ -17,6 +17,7 @@ mod repositories;
 use api::account_activity;
 use api::health;
 use api::metrics;
+use api::statements;
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
@@ -88,6 +89,10 @@ async fn main() -> anyhow::Result<()> {
         .route(
             "/api/v1/accounts/:account_id/activity/types",
             get(account_activity::list_types_handler),
+        )
+        .route(
+            "/api/v1/accounts/:account_id/statements/rows",
+            get(statements::rows_handler),
         )
         .route("/health", get(health::health_handler))
         .route("/metrics", get(metrics::metrics_handler))
