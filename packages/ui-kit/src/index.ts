@@ -6,8 +6,8 @@
 export const UI_KIT_VERSION = '0.1.0';
 
 // Core shadcn/ui components
-export { Button, buttonVariants } from './components/ui/button';
-export type { ButtonProps } from './components/ui/button';
+export { Button, StableButtonContent, buttonVariants } from './components/ui/button';
+export type { ButtonProps, StableButtonContentProps } from './components/ui/button';
 
 export { Input } from './components/ui/input';
 export type { InputProps } from './components/ui/input';

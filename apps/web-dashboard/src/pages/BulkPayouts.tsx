@@ -1,6 +1,14 @@
 import { useMemo, useState, type ChangeEvent } from 'react';
-import { AlertCircle, CheckCircle2, Play, Upload } from 'lucide-react';
-import { Badge, Button, Card, CardContent, CardHeader, CardTitle } from '@ancore/ui-kit';
+import { AlertCircle, CheckCircle2, Loader2, Play, Upload } from 'lucide-react';
+import {
+  Badge,
+  Button,
+  Card,
+  CardContent,
+  CardHeader,
+  CardTitle,
+  StableButtonContent,
+} from '@ancore/ui-kit';
 import { buildDefaultRelayPayload, resolveRelayerBaseUrl } from '../services/scheduler-client';
 import {
   createRelayerPayoutSubmitter,
@@ -166,8 +174,18 @@ export function BulkPayoutsPage() {
           onClick={() => void executeBatch()}
           type="button"
         >
-          <Play className="h-4 w-4" />
-          {isExecuting ? 'Executing...' : 'Execute payout batch'}
+          <StableButtonContent
+            isLoading={isExecuting}
+            loadingContent={
+              <>
+                <Loader2 className="h-4 w-4 animate-spin" />
+                Executing...
+              </>
+            }
+          >
+            <Play className="h-4 w-4" />
+            Execute payout batch
+          </StableButtonContent>
         </Button>
       </div>
 
