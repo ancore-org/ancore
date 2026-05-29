@@ -47,6 +47,19 @@ export function ReviewScreen({
               Recipient Address
             </span>
           </div>
+          {(transaction.resolvedHandle || transaction.recipientInput?.startsWith('@')) && (
+            <div className="rounded-2xl border border-cyan-400/20 bg-cyan-400/5 p-3 text-xs text-cyan-100">
+              <span className="font-black uppercase tracking-widest text-[10px] text-cyan-300">
+                Resolved handle
+              </span>
+              <div className="mt-1 font-semibold">
+                {transaction.resolvedHandle?.handle ?? transaction.recipientInput}
+                {transaction.resolvedHandle?.displayName
+                  ? ` · ${transaction.resolvedHandle.displayName}`
+                  : ''}
+              </div>
+            </div>
+          )}
           <div className="bg-white/5 border border-white/10 rounded-2xl p-4 break-all font-mono text-[11px] text-cyan-300 leading-relaxed shadow-inner group transition-colors hover:border-cyan-400/30">
             {transaction.to}
           </div>
@@ -160,7 +173,7 @@ export function ReviewScreen({
               Confirm Recipient
             </span>
             <span className="text-[10px] text-slate-400 leading-relaxed block font-medium">
-              I have verified the address above and confirm it is correct.
+              I have verified the resolved recipient above and confirm it is correct.
               <span className="text-amber-400/80"> Payments are irreversible.</span>
             </span>
           </div>

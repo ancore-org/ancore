@@ -238,6 +238,9 @@ importers:
 
   apps/web-dashboard:
     dependencies:
+      '@ancore/types':
+        specifier: workspace:*
+        version: link:../../packages/types
       '@ancore/ui-kit':
         specifier: workspace:*
         version: link:../../packages/ui-kit

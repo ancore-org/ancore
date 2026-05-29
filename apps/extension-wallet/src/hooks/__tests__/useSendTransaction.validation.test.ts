@@ -3,13 +3,15 @@ import { validateAmount, validateRecipientAddress } from '@/hooks/useSendTransac
 
 describe('useSendTransaction validation', () => {
   it('rejects invalid recipient addresses', () => {
-    expect(validateRecipientAddress('')).toBe('Recipient address is required');
+    expect(validateRecipientAddress('')).toBe('Recipient address or @username is required');
     expect(validateRecipientAddress('G123')).toBe('Invalid Stellar address');
   });
 
-  it('accepts a valid stellar address', () => {
+  it('accepts a valid stellar address or @username handle', () => {
     const valid = 'GAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAWHF';
     expect(validateRecipientAddress(valid)).toBeUndefined();
+    expect(validateRecipientAddress('@alice')).toBeUndefined();
+    expect(validateRecipientAddress('@')).toBe('Enter a valid @username handle');
   });
 
   it('rejects invalid amounts', () => {
