@@ -180,6 +180,13 @@ importers:
 
   apps/mobile-wallet:
     dependencies:
+'@ancore/core-sdk':
+  specifier: workspace:*
+  version: link:../../packages/core-sdk
+
+'@ancore/types':
+  specifier: workspace:*
+  version: link:../../packages/types
       react:
         specifier: ^18.3.1
         version: 18.3.1
@@ -195,13 +202,15 @@ importers:
         version: 29.5.14
       '@types/node':
         specifier: ^25.5.0
-        version: 25.9.1
-      '@types/react':
-        specifier: ^18.3.0
-        version: 18.3.29
-      '@types/react-dom':
-        specifier: ^18.3.0
-        version: 18.3.7(@types/react@18.3.29)
+version: 25.9.1
+
+'@types/react':
+  specifier: ^18.3.0
+  version: 18.3.29
+
+'@types/react-dom':
+  specifier: ^18.3.0
+  version: 18.3.7(@types/react@18.3.29)
       '@typescript-eslint/eslint-plugin':
         specifier: ^8.0.0
         version: 8.60.0(@typescript-eslint/parser@8.60.0(eslint@9.39.4(jiti@1.21.7))(typescript@5.9.3))(eslint@9.39.4(jiti@1.21.7))(typescript@5.9.3)

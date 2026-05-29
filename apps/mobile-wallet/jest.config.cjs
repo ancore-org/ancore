@@ -9,7 +9,7 @@ module.exports = {
   },
   setupFilesAfterEnv: ['<rootDir>/../../packages/jest.setup.ts'],
   collectCoverage: true,
-  collectCoverageFrom: ['src/**/*.ts', '!src/**/__tests__/**', '!src/index.ts'],
+  collectCoverageFrom: ['src/**/*.ts', '!src/**/__tests__/**', '!src/index.ts', '!src/test/**'],
   coverageDirectory: 'coverage',
   testMatch: ['**/__tests__/**/*.test.ts'],
   testPathIgnorePatterns: ['/node_modules/'],

@@ -1,0 +1,12 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "INSERT INTO ingest_checkpoints (stream, last_ledger_seq, updated_at) VALUES ($1, $2, NOW()) ON CONFLICT (stream) DO UPDATE SET last_ledger_seq = EXCLUDED.last_ledger_seq, updated_at = EXCLUDED.updated_at",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": ["Text", "Int8"]
+    },
+    "nullable": []
+  },
+  "hash": "c2a47b9d6e1f0a3b4c5d6e7f8a9b0c1d"
+}

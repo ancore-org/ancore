@@ -61,3 +61,11 @@ export {
   formatPermissionLabels,
   formatPermissions,
 } from './permission-formatter';
+
+export {
+  NonceDriftKind,
+  NONCE_DRIFT_RETRY_GUIDANCE,
+  isValidNonce,
+  detectNonceDrift,
+} from './nonce-drift';
+export type { NonceDriftResult, NonceDriftOptions } from './nonce-drift';

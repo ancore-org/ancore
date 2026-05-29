@@ -1,1 +1,6 @@
-export { OnboardingNavigator, OnboardingNavigatorTestHarness } from './onboarding';
+export * from './MobileWalletShell';
+
+export {
+  OnboardingNavigator,
+  OnboardingNavigatorTestHarness,
+} from './onboarding';

@@ -3,3 +3,5 @@
  * Delegates to the shared Vitest setup (jest-dom, cleanup, localStorage shim).
  */
 export * from '../../../../packages/vitest.setup';
+
+// Reserved for mobile wallet test environment setup.
