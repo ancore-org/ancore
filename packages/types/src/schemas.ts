@@ -6,7 +6,12 @@ export { SmartAccountSchema, AccountMetadataSchema } from './smart-account';
 export { SessionKeySchema } from './session-key';
 export { UserOperationSchema, TransactionResultSchema } from './user-operation';
 export { WalletStateSchema } from './wallet';
-export { ContactSchema, ContactPayloadSchema, stellarAddressSchema, contactAliasSchema } from './contacts';
+export {
+  ContactSchema,
+  ContactPayloadSchema,
+  stellarAddressSchema,
+  contactAliasSchema,
+} from './contacts';
 export {
   createScheduledTransferSchema,
   relayPayloadSchema,

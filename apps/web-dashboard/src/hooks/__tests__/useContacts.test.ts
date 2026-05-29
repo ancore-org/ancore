@@ -59,7 +59,9 @@ describe('isValidStellarAddress', () => {
   });
 
   it('rejects addresses not starting with G', () => {
-    expect(isValidStellarAddress('BAAZI4TCR3TY5OJHCTJC2A4QSY6CJWJH5IAJTGKIN2ER7LBNVKOCCWNA')).toBe(false);
+    expect(isValidStellarAddress('BAAZI4TCR3TY5OJHCTJC2A4QSY6CJWJH5IAJTGKIN2ER7LBNVKOCCWNA')).toBe(
+      false
+    );
   });
 
   it('rejects short addresses', () => {
@@ -192,7 +194,10 @@ describe('updateContact', () => {
 
 describe('removeContact', () => {
   it('removes a contact by id', () => {
-    const existing = [makeContact({ id: '1' }), makeContact({ id: '2', alias: 'Bob', address: ADDR_B })];
+    const existing = [
+      makeContact({ id: '1' }),
+      makeContact({ id: '2', alias: 'Bob', address: ADDR_B }),
+    ];
     const updated = removeContact(existing, '1');
     expect(updated).toHaveLength(1);
     expect(updated[0].id).toBe('2');

@@ -46,8 +46,7 @@ export enum NonceDriftKind {
 
 /** Retry guidance associated with each drift kind. */
 export const NONCE_DRIFT_RETRY_GUIDANCE: Record<NonceDriftKind, string> = {
-  [NonceDriftKind.ExactMatch]:
-    'Nonces match — proceed with submission.',
+  [NonceDriftKind.ExactMatch]: 'Nonces match — proceed with submission.',
   [NonceDriftKind.ObservedAhead]:
     'Transaction may have already been processed. Verify on-chain before retrying.',
   [NonceDriftKind.ObservedBehind]:
@@ -119,9 +118,7 @@ export function detectNonceDrift(
   options?: NonceDriftOptions
 ): NonceDriftResult {
   const threshold =
-    options?.excessiveDriftThreshold !== undefined
-      ? options.excessiveDriftThreshold
-      : 10;
+    options?.excessiveDriftThreshold !== undefined ? options.excessiveDriftThreshold : 10;
 
   // Validate inputs first.
   if (!isValidNonce(expected) || !isValidNonce(observed)) {

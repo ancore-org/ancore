@@ -165,9 +165,7 @@ describe('detectNonceDrift — InvalidNonceState', () => {
 
   it('sets the correct retry guidance for InvalidNonceState', () => {
     const result = detectNonceDrift(-1, 5);
-    expect(result.retryGuidance).toBe(
-      NONCE_DRIFT_RETRY_GUIDANCE[NonceDriftKind.InvalidNonceState]
-    );
+    expect(result.retryGuidance).toBe(NONCE_DRIFT_RETRY_GUIDANCE[NonceDriftKind.InvalidNonceState]);
   });
 });
 
