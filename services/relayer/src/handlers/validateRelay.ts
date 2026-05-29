@@ -5,6 +5,9 @@ import { redactSessionKey } from '../logging';
 
 /**
  * Factory that returns the POST /relay/validate handler bound to a service instance.
+ *
+ * All log entries redact sensitive fields (sessionKey, signature) before writing
+ * to the log stream. See `src/logging/redact.ts` for the redaction policy.
  */
 export function createValidateRelayHandler(relayService: RelayServiceContract) {
   return async (req: Request, res: Response): Promise<void> => {

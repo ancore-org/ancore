@@ -364,3 +364,121 @@ jobs:
       - name: Run security audit
         run: pnpm audit --audit-level=moderate
         continue-on-error: true
+
+  # ── Issue #660: Relayer log-redaction CI guard ────────────────────────────
+  relayer-security:
+    name: Relayer — Log Redaction Check
+    runs-on: ubuntu-latest
+    needs: quarantine-registry
+    if: |
+      github.event_name == 'push' ||
+      contains(github.event.pull_request.changed_files, 'services/relayer') ||
+      true
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v2
+        with:
+          version: 9
+
+      - name: Install relayer dependencies
+        run: pnpm install --frozen-lockfile
+        working-directory: services/relayer
+
+      - name: Run log-redaction grep check
+        # Fails CI (exit 1) if any log call site passes a raw sensitive field
+        # without going through a redact*() helper. See:
+        # services/relayer/scripts/check-log-redaction.js
+        run: node scripts/check-log-redaction.js
+        working-directory: services/relayer
+
+      - name: Run relayer tests (includes redaction unit tests)
+        run: pnpm test
+        working-directory: services/relayer
+
+  # ── Issue #650: ai-agent Docker image build + smoke test ─────────────────
+  ai-agent-docker:
+    name: AI Agent — Docker Build & Smoke Test
+    runs-on: ubuntu-latest
+    needs: quarantine-registry
+    if: |
+      github.event_name == 'push' ||
+      contains(github.event.pull_request.changed_files, 'services/ai-agent') ||
+      true
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Build ai-agent Docker image
+        uses: docker/build-push-action@v5
+        with:
+          context: services/ai-agent
+          file: services/ai-agent/Dockerfile
+          push: false
+          load: true
+          tags: ancore/ai-agent:ci
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      - name: Run container smoke test
+        run: |
+          # Start the container in detached mode
+          docker run -d \
+            --name ai-agent-smoke \
+            -p 3001:3001 \
+            -e NODE_ENV=production \
+            ancore/ai-agent:ci
+
+          # Wait for the healthcheck to pass (up to 30 s)
+          echo "Waiting for container to become healthy..."
+          for i in $(seq 1 15); do
+            STATUS=$(docker inspect --format='{{.State.Health.Status}}' ai-agent-smoke 2>/dev/null || echo "starting")
+            echo "  attempt $i: $STATUS"
+            if [ "$STATUS" = "healthy" ]; then
+              echo "Container is healthy."
+              break
+            fi
+            sleep 2
+          done
+
+          # Verify /health returns HTTP 200
+          HTTP_CODE=$(curl -s -o /dev/null -w "%{http_code}" http://localhost:3001/health)
+          echo "HTTP status from /health: $HTTP_CODE"
+          if [ "$HTTP_CODE" != "200" ]; then
+            echo "Smoke test FAILED: expected 200, got $HTTP_CODE"
+            docker logs ai-agent-smoke
+            exit 1
+          fi
+
+          # Verify the response body contains status: ok
+          BODY=$(curl -s http://localhost:3001/health)
+          echo "Response body: $BODY"
+          echo "$BODY" | grep -q '"status":"ok"' || (echo "Smoke test FAILED: missing status:ok in response" && exit 1)
+
+          echo "Smoke test PASSED."
+
+      - name: Dump container logs on failure
+        if: failure()
+        run: docker logs ai-agent-smoke || true
+
+      - name: Stop and remove smoke container
+        if: always()
+        run: docker rm -f ai-agent-smoke || true
+
+      - name: Verify container runs as non-root
+        run: |
+          USER_ID=$(docker run --rm --entrypoint id ancore/ai-agent:ci -u)
+          echo "Container user ID: $USER_ID"
+          if [ "$USER_ID" = "0" ]; then
+            echo "FAIL: container is running as root (uid 0)"
+            exit 1
+          fi
+          echo "PASS: container runs as non-root user (uid $USER_ID)"
