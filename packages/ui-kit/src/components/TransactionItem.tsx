@@ -32,7 +32,10 @@ const TYPE_ICONS: Record<string, React.ReactNode> = {
   withdrawal: <FiTrendingDown className="h-4 w-4" aria-hidden="true" />,
 };
 
-export interface TransactionItemProps extends React.HTMLAttributes<HTMLButtonElement> {
+export interface TransactionItemProps extends Omit<
+  React.HTMLAttributes<HTMLButtonElement>,
+  'onClick'
+> {
   transaction: TransactionRecord;
   onClick?: (transaction: TransactionRecord) => void;
 }

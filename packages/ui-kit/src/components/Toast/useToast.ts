@@ -1,7 +1,7 @@
 import { useContext } from 'react';
 import { NotificationContext } from './NotificationProvider';
 
-export { type ToastItem, type ToastVariant } from './NotificationProvider';
+export { type Toast as ToastItem, type ToastVariant } from './NotificationProvider';
 export { useToast };
 
 function useToast() {
