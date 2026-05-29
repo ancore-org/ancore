@@ -29,3 +29,7 @@ export { toCanonicalError as toCanonicalStellarError } from './errors';
 // Retry utilities
 export { withRetry, calculateDelay } from './retry';
 export type { RetryOptions } from './retry';
+
+// Fee stats
+export { fetchFeeStats, FALLBACK_FEE_STATS } from './fee-stats';
+export type { FeeStats, FeeStatsOptions } from './fee-stats';
