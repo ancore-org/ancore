@@ -6,13 +6,14 @@
 export const STELLAR_VERSION = '0.1.0';
 
 // Client
-export { StellarClient } from './client';
+export { StellarClient, createStellarClient } from './client';
 export type {
   AccountActivityPage,
   AccountActivityPageRequest,
   AssetMetadata,
   AssetMetadataCacheMetrics,
   Balance,
+  NetworkId,
   StellarClientConfig,
 } from './client';
 

@@ -38,6 +38,10 @@ interface ChromeMock {
       get: ReturnType<typeof vi.fn>;
       set: ReturnType<typeof vi.fn>;
     };
+    session: {
+      get: ReturnType<typeof vi.fn>;
+      set: ReturnType<typeof vi.fn>;
+    };
   };
 }
 
@@ -47,6 +51,7 @@ interface ChromeMock {
 
 function buildChromeMock(): ChromeMock {
   let capturedListener: OnMessageListener | null = null;
+  const sessionStore: Record<string, unknown> = {};
 
   const mock: ChromeMock = {
     runtime: {
@@ -67,6 +72,15 @@ function buildChromeMock(): ChromeMock {
       local: {
         get: vi.fn((_key: string, cb: (r: Record<string, unknown>) => void) => cb({})),
         set: vi.fn((_items: Record<string, unknown>, cb?: () => void) => cb?.()),
+      },
+      session: {
+        get: vi.fn((key: string, cb: (r: Record<string, unknown>) => void) =>
+          cb({ [key]: sessionStore[key] })
+        ),
+        set: vi.fn((items: Record<string, unknown>, cb?: () => void) => {
+          Object.assign(sessionStore, items);
+          cb?.();
+        }),
       },
     },
   };
@@ -109,11 +123,22 @@ function makeAuthState(overrides: Partial<AuthState> = {}): AuthState {
   };
 }
 
-async function loadServiceWorker(authState: AuthState) {
+async function loadServiceWorker(
+  authState: AuthState,
+  options: { unlockReturns?: boolean } = {}
+) {
   vi.doMock('@/router/AuthGuard', () => ({
     readAuthState: vi.fn(() => authState),
     DEFAULT_AUTH_STATE: makeAuthState(),
     AUTH_STORAGE_KEY: 'ancore_extension_auth',
+  }));
+
+  vi.doMock('@/security/storage-manager', () => ({
+    getSharedStorageManager: vi.fn(() => ({
+      unlock: vi.fn(async () => options.unlockReturns ?? true),
+      lock: vi.fn(),
+    })),
+    resetSharedStorageManagerForTests: vi.fn(),
   }));
 
   vi.doMock('@/messaging', async () => {
@@ -349,5 +374,138 @@ describe('UNLOCK_WALLET', () => {
 
     expect((resp.payload as any).success).toBe(false);
     _resetHandlers();
+  });
+
+  describe('rate limiting', () => {
+    beforeEach(() => {
+      vi.useFakeTimers();
+    });
+
+    afterEach(() => {
+      vi.useRealTimers();
+    });
+
+    it('returns retryAfterMs after repeated failed password attempts', async () => {
+      const { _resetHandlers } = await loadServiceWorker(makeAuthState({ hasOnboarded: true }), {
+        unlockReturns: false,
+      });
+
+      for (let i = 0; i < 5; i += 1) {
+        await dispatch(chromeMock, 'UNLOCK_WALLET', { password: 'wrong-password' });
+      }
+
+      const resp = await dispatch(chromeMock, 'UNLOCK_WALLET', { password: 'wrong-password' });
+
+      expect((resp.payload as any).success).toBe(false);
+      expect((resp.payload as any).retryAfterMs).toBeGreaterThan(0);
+      expect((resp.payload as any).message).toContain('Try again in');
+      _resetHandlers();
+    });
+
+    it('rejects unlock attempts during lockout without verifying password', async () => {
+      const unlock = vi.fn(async () => false);
+      vi.doMock('@/security/storage-manager', () => ({
+        getSharedStorageManager: vi.fn(() => ({
+          unlock,
+          lock: vi.fn(),
+        })),
+        resetSharedStorageManagerForTests: vi.fn(),
+      }));
+      vi.doMock('@/router/AuthGuard', () => ({
+        readAuthState: vi.fn(() => makeAuthState({ hasOnboarded: true })),
+        DEFAULT_AUTH_STATE: makeAuthState(),
+        AUTH_STORAGE_KEY: 'ancore_extension_auth',
+      }));
+      vi.doMock('@/messaging', async () => {
+        const actual = await vi.importActual<typeof import('@/messaging')>('@/messaging');
+        return actual;
+      });
+      await import('../service-worker');
+      const { _resetHandlers } = await import('@/messaging/handler');
+
+      for (let i = 0; i < 5; i += 1) {
+        await dispatch(chromeMock, 'UNLOCK_WALLET', { password: 'wrong-password' });
+      }
+      unlock.mockClear();
+
+      const resp = await dispatch(chromeMock, 'UNLOCK_WALLET', { password: 'wrong-password' });
+
+      expect((resp.payload as any).retryAfterMs).toBeGreaterThan(0);
+      expect(unlock).not.toHaveBeenCalled();
+      _resetHandlers();
+    });
+
+    it('resets the failure counter after a successful unlock', async () => {
+      let unlockResult = false;
+      const unlock = vi.fn(async () => unlockResult);
+      vi.doMock('@/security/storage-manager', () => ({
+        getSharedStorageManager: vi.fn(() => ({
+          unlock,
+          lock: vi.fn(),
+        })),
+        resetSharedStorageManagerForTests: vi.fn(),
+      }));
+      vi.doMock('@/router/AuthGuard', () => ({
+        readAuthState: vi.fn(() => makeAuthState({ hasOnboarded: true })),
+        DEFAULT_AUTH_STATE: makeAuthState(),
+        AUTH_STORAGE_KEY: 'ancore_extension_auth',
+      }));
+      vi.doMock('@/messaging', async () => {
+        const actual = await vi.importActual<typeof import('@/messaging')>('@/messaging');
+        return actual;
+      });
+      await import('../service-worker');
+      const { _resetHandlers } = await import('@/messaging/handler');
+
+      for (let i = 0; i < 3; i += 1) {
+        await dispatch(chromeMock, 'UNLOCK_WALLET', { password: 'wrong-password' });
+      }
+
+      unlockResult = true;
+      const successResp = await dispatch(chromeMock, 'UNLOCK_WALLET', { password: 'correct-password' });
+      expect((successResp.payload as any).success).toBe(true);
+
+      unlockResult = false;
+      for (let i = 0; i < 4; i += 1) {
+        await dispatch(chromeMock, 'UNLOCK_WALLET', { password: 'wrong-password' });
+      }
+      const resp = await dispatch(chromeMock, 'UNLOCK_WALLET', { password: 'wrong-password' });
+      expect((resp.payload as any).retryAfterMs).toBeUndefined();
+      _resetHandlers();
+    });
+
+    it('allows unlock again after lockout expires', async () => {
+      let unlockResult = false;
+      const unlock = vi.fn(async () => unlockResult);
+      vi.doMock('@/security/storage-manager', () => ({
+        getSharedStorageManager: vi.fn(() => ({
+          unlock,
+          lock: vi.fn(),
+        })),
+        resetSharedStorageManagerForTests: vi.fn(),
+      }));
+      vi.doMock('@/router/AuthGuard', () => ({
+        readAuthState: vi.fn(() => makeAuthState({ hasOnboarded: true })),
+        DEFAULT_AUTH_STATE: makeAuthState(),
+        AUTH_STORAGE_KEY: 'ancore_extension_auth',
+      }));
+      vi.doMock('@/messaging', async () => {
+        const actual = await vi.importActual<typeof import('@/messaging')>('@/messaging');
+        return actual;
+      });
+      await import('../service-worker');
+      const { _resetHandlers } = await import('@/messaging/handler');
+
+      for (let i = 0; i < 5; i += 1) {
+        await dispatch(chromeMock, 'UNLOCK_WALLET', { password: 'wrong-password' });
+      }
+
+      vi.advanceTimersByTime(61_000);
+      unlockResult = true;
+
+      const resp = await dispatch(chromeMock, 'UNLOCK_WALLET', { password: 'correct-password' });
+      expect((resp.payload as any).success).toBe(true);
+      _resetHandlers();
+    });
   });
 });

@@ -18,7 +18,44 @@ pub struct Checkpoint {
     pub last_ledger_seq: u32,
 }
 
-// ── Repository ────────────────────────────────────────────────────────────────
+// ── Repository trait ──────────────────────────────────────────────────────────
+
+/// Trait for durable checkpoint persistence.
+#[async_trait::async_trait]
+pub trait CheckpointStore: Send + Sync {
+    /// Load the current checkpoint for `stream`, returning `None` on first run.
+    async fn load(&self, stream: &str) -> anyhow::Result<Option<Checkpoint>>;
+
+    /// Persist (upsert) a checkpoint.
+    async fn save(&self, checkpoint: &Checkpoint) -> anyhow::Result<()>;
+}
+
+// ── Postgres implementation ───────────────────────────────────────────────────
+
+/// Durable checkpoint store backed by PostgreSQL.
+#[derive(Debug, Clone)]
+pub struct PostgresCheckpointStore {
+    pool: PgPool,
+}
+
+impl PostgresCheckpointStore {
+    pub fn new(pool: PgPool) -> Self {
+        Self { pool }
+    }
+}
+
+#[async_trait::async_trait]
+impl CheckpointStore for PostgresCheckpointStore {
+    async fn load(&self, stream: &str) -> anyhow::Result<Option<Checkpoint>> {
+        load(&self.pool, stream).await
+    }
+
+    async fn save(&self, checkpoint: &Checkpoint) -> anyhow::Result<()> {
+        save(&self.pool, checkpoint).await
+    }
+}
+
+// ── Repository helpers ──────────────────────────────────────────────────────────
 
 /// Load the current checkpoint for `stream`, returning `None` if no checkpoint
 /// exists yet (i.e. first run).
@@ -60,20 +97,38 @@ pub async fn save(db: &PgPool, checkpoint: &Checkpoint) -> anyhow::Result<()> {
 /// A simple in-memory checkpoint store for unit testing without a real DB.
 #[derive(Debug, Default)]
 pub struct MemoryCheckpointStore {
-    inner: std::collections::HashMap<String, u32>,
+    inner: std::sync::Mutex<std::collections::HashMap<String, u32>>,
 }
 
 impl MemoryCheckpointStore {
-    pub fn load(&self, stream: &str) -> Option<Checkpoint> {
-        self.inner.get(stream).map(|&seq| Checkpoint {
-            stream: stream.to_owned(),
-            last_ledger_seq: seq,
-        })
+    pub fn load_sync(&self, stream: &str) -> Option<Checkpoint> {
+        self.inner
+            .lock()
+            .expect("memory checkpoint store lock poisoned")
+            .get(stream)
+            .map(|&seq| Checkpoint {
+                stream: stream.to_owned(),
+                last_ledger_seq: seq,
+            })
     }
 
-    pub fn save(&mut self, checkpoint: &Checkpoint) {
+    pub fn save_sync(&self, checkpoint: &Checkpoint) {
         self.inner
+            .lock()
+            .expect("memory checkpoint store lock poisoned")
             .insert(checkpoint.stream.clone(), checkpoint.last_ledger_seq);
+    }
+}
+
+#[async_trait::async_trait]
+impl CheckpointStore for MemoryCheckpointStore {
+    async fn load(&self, stream: &str) -> anyhow::Result<Option<Checkpoint>> {
+        Ok(self.load_sync(stream))
+    }
+
+    async fn save(&self, checkpoint: &Checkpoint) -> anyhow::Result<()> {
+        self.save_sync(checkpoint);
+        Ok(())
     }
 }
 
@@ -86,36 +141,156 @@ mod tests {
     #[test]
     fn memory_store_returns_none_on_first_run() {
         let store = MemoryCheckpointStore::default();
-        assert!(store.load("main").is_none());
+        assert!(store.load_sync("main").is_none());
     }
 
     #[test]
     fn memory_store_roundtrip() {
-        let mut store = MemoryCheckpointStore::default();
+        let store = MemoryCheckpointStore::default();
         let cp = Checkpoint {
             stream: "main".into(),
             last_ledger_seq: 42,
         };
-        store.save(&cp);
-        let loaded = store.load("main").unwrap();
+        store.save_sync(&cp);
+        let loaded = store.load_sync("main").unwrap();
         assert_eq!(loaded.last_ledger_seq, 42);
     }
 
     #[test]
     fn memory_store_upserts() {
-        let mut store = MemoryCheckpointStore::default();
-        store.save(&Checkpoint { stream: "main".into(), last_ledger_seq: 10 });
-        store.save(&Checkpoint { stream: "main".into(), last_ledger_seq: 20 });
-        assert_eq!(store.load("main").unwrap().last_ledger_seq, 20);
+        let store = MemoryCheckpointStore::default();
+        store.save_sync(&Checkpoint { stream: "main".into(), last_ledger_seq: 10 });
+        store.save_sync(&Checkpoint { stream: "main".into(), last_ledger_seq: 20 });
+        assert_eq!(store.load_sync("main").unwrap().last_ledger_seq, 20);
     }
 
     #[test]
     fn memory_store_independent_streams() {
-        let mut store = MemoryCheckpointStore::default();
-        store.save(&Checkpoint { stream: "a".into(), last_ledger_seq: 1 });
-        store.save(&Checkpoint { stream: "b".into(), last_ledger_seq: 99 });
-        assert_eq!(store.load("a").unwrap().last_ledger_seq, 1);
-        assert_eq!(store.load("b").unwrap().last_ledger_seq, 99);
+        let store = MemoryCheckpointStore::default();
+        store.save_sync(&Checkpoint { stream: "a".into(), last_ledger_seq: 1 });
+        store.save_sync(&Checkpoint { stream: "b".into(), last_ledger_seq: 99 });
+        assert_eq!(store.load_sync("a").unwrap().last_ledger_seq, 1);
+        assert_eq!(store.load_sync("b").unwrap().last_ledger_seq, 99);
+    }
+
+    #[tokio::test]
+    async fn memory_store_trait_roundtrip() {
+        let store = MemoryCheckpointStore::default();
+        let cp = Checkpoint {
+            stream: "main".into(),
+            last_ledger_seq: 7,
+        };
+        store.save(&cp).await.unwrap();
+        let loaded = store.load("main").await.unwrap().unwrap();
+        assert_eq!(loaded, cp);
+    }
+
+    mod postgres_integration {
+        use super::*;
+        use crate::ingest::sink::MemorySink;
+        use crate::ingest::source::VecSource;
+        use crate::ingest::worker::{IngestWorker, WorkerConfig};
+        use crate::schema::canonical::RawEvent;
+        use chrono::Utc;
+
+        async fn setup_test_db() -> PgPool {
+            dotenvy::dotenv().ok();
+
+            let database_url = std::env::var("TEST_DATABASE_URL").unwrap_or_else(|_| {
+                "postgresql://postgres:postgres@localhost:5432/ancore_test".to_string()
+            });
+
+            let pool = PgPool::connect(&database_url)
+                .await
+                .expect("Failed to connect to test database");
+
+            sqlx::query(
+                "CREATE TABLE IF NOT EXISTS ingest_checkpoints ( \
+                    stream VARCHAR(64) PRIMARY KEY, \
+                    last_ledger_seq BIGINT NOT NULL, \
+                    updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW() \
+                )",
+            )
+            .execute(&pool)
+            .await
+            .expect("Failed to ensure ingest_checkpoints table exists");
+
+            sqlx::query("TRUNCATE TABLE ingest_checkpoints")
+                .execute(&pool)
+                .await
+                .expect("Failed to truncate ingest_checkpoints");
+
+            pool
+        }
+
+        fn raw_event(ledger_seq: u32) -> RawEvent {
+            RawEvent {
+                ledger_seq,
+                ledger_close_time: Utc::now(),
+                tx_hash: format!("{:0>64}", ledger_seq),
+                contract_id: "GAAZI4TCR3TY5OJHCTJC2A4QSY6CJWJH5IAJTGKIN2ER7LBNVKOCCWN".into(),
+                topics: vec!["transfer".into()],
+                data: String::new(),
+            }
+        }
+
+        #[tokio::test]
+        #[ignore] // Requires test database
+        async fn postgres_checkpoint_survives_restart() {
+            let pool = setup_test_db().await;
+            let store = PostgresCheckpointStore::new(pool.clone());
+
+            store
+                .save(&Checkpoint {
+                    stream: "main".into(),
+                    last_ledger_seq: 42,
+                })
+                .await
+                .unwrap();
+
+            let restarted = PostgresCheckpointStore::new(pool);
+            let loaded = restarted.load("main").await.unwrap().unwrap();
+            assert_eq!(loaded.last_ledger_seq, 42);
+        }
+
+        #[tokio::test]
+        #[ignore] // Requires test database
+        async fn postgres_checkpoint_replay_does_not_duplicate_events() {
+            let pool = setup_test_db().await;
+            let store = PostgresCheckpointStore::new(pool.clone());
+
+            let source1 = VecSource::new(vec![
+                raw_event(1),
+                raw_event(2),
+                raw_event(3),
+            ]);
+            let sink1 = MemorySink::default();
+            let mut worker = IngestWorker::with_checkpoint_store(
+                WorkerConfig::default(),
+                source1,
+                sink1,
+                store.clone(),
+            );
+            worker.run_once().await.unwrap();
+
+            let source2 = VecSource::new(vec![
+                raw_event(2),
+                raw_event(3),
+                raw_event(4),
+            ]);
+            let sink2 = MemorySink::default();
+            let mut worker2 = IngestWorker::with_checkpoint_store(
+                WorkerConfig::default(),
+                source2,
+                sink2,
+                PostgresCheckpointStore::new(pool),
+            );
+
+            let stats = worker2.run_once().await.unwrap();
+            assert_eq!(stats.skipped, 2);
+            assert_eq!(stats.normalised, 1);
+            assert_eq!(worker2.current_checkpoint().await.unwrap().last_ledger_seq, 4);
+        }
     }
 
     // ── Serialization tests ───────────────────────────────────────────────────
@@ -279,7 +454,7 @@ mod tests {
 
             assert_eq!(stats.skipped, 2, "ledgers 3 and 5 must be skipped");
             assert_eq!(stats.normalised, 1, "only ledger 6 must be processed");
-            assert_eq!(worker.current_checkpoint().unwrap().last_ledger_seq, 6);
+            assert_eq!(worker.current_checkpoint().await.unwrap().last_ledger_seq, 6);
         }
 
         #[tokio::test]
@@ -313,7 +488,7 @@ mod tests {
 
             worker.run_once().await.unwrap();
 
-            assert_eq!(worker.current_checkpoint().unwrap().last_ledger_seq, 100);
+            assert_eq!(worker.current_checkpoint().await.unwrap().last_ledger_seq, 100);
         }
     }
 }

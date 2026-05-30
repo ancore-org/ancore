@@ -16,7 +16,7 @@ export interface Signature {
   v: number;
 }
 
-export type Network = 'testnet' | 'mainnet' | 'local';
+export type Network = 'testnet' | 'mainnet' | 'futurenet' | 'local';
 
 export interface NetworkConfig {
   network: Network;

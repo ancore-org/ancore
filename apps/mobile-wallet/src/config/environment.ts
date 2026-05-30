@@ -22,7 +22,7 @@ export class MobileWalletEnvironmentError extends Error {
 }
 
 const isNetwork = (network: string): network is Network => {
-  return network === 'testnet' || network === 'mainnet' || network === 'local';
+  return network === 'testnet' || network === 'mainnet' || network === 'futurenet' || network === 'local';
 };
 
 const defaultRpcUrlFor = (network: Network): string | undefined => {

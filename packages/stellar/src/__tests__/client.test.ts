@@ -3,7 +3,7 @@
  */
 
 import type { Horizon, Transaction } from '@stellar/stellar-sdk';
-import { StellarClient } from '../client';
+import { StellarClient, createStellarClient } from '../client';
 import {
   AccountNotFoundError,
   NetworkError,
@@ -254,6 +254,44 @@ describe('StellarClient', () => {
       expect(client.getNetwork()).toBe('local');
       expect(client.getNetworkPassphrase()).toBe('Standalone Network ; February 2017');
       expect(client.getRpcUrls()).toEqual(['http://localhost:8000/soroban/rpc']);
+    });
+
+    it('should create a client with futurenet network defaults', () => {
+      const client = new StellarClient({ network: 'futurenet' });
+
+      expect(client.getNetwork()).toBe('futurenet');
+      expect(client.getNetworkPassphrase()).toBe('Test SDF Future Network ; October 2022');
+      expect(client.getRpcUrls()).toEqual(['https://rpc-futurenet.stellar.org']);
+    });
+
+    it('should throw for unsupported network values', () => {
+      expect(() => new StellarClient({ network: 'invalid' as any })).toThrow(NetworkError);
+    });
+  });
+
+  describe('createStellarClient', () => {
+    it('should return a configured client for testnet', () => {
+      const client = createStellarClient('testnet');
+
+      expect(client.getNetwork()).toBe('testnet');
+      expect(client.getNetworkPassphrase()).toBe('Test SDF Network ; September 2015');
+    });
+
+    it('should return a configured client for mainnet', () => {
+      const client = createStellarClient('mainnet');
+
+      expect(client.getNetwork()).toBe('mainnet');
+    });
+
+    it('should return a configured client for futurenet', () => {
+      const client = createStellarClient('futurenet');
+
+      expect(client.getNetwork()).toBe('futurenet');
+      expect(client.getRpcUrls()).toEqual(['https://rpc-futurenet.stellar.org']);
+    });
+
+    it('should throw for invalid network', () => {
+      expect(() => createStellarClient('invalid' as any)).toThrow(NetworkError);
     });
   });
 

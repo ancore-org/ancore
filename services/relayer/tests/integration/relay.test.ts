@@ -164,6 +164,13 @@ describe('POST /relay/validate', () => {
     expect(res.status).toBe(400);
     expect(res.body.error).toBe('VALIDATION_ERROR');
   });
+
+  it('401 when Authorization header is missing', async () => {
+    await request(makeApp(true, undefined, undefined, { useMockSubmission: true }))
+      .post('/relay/validate')
+      .send(validBody)
+      .expect(401);
+  });
 });
 
 describe('GET /relay/status', () => {

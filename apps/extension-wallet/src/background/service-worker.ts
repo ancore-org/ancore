@@ -2,6 +2,13 @@ import { registerHandler, installMessageDispatcher } from '@/messaging';
 import { getSharedStorageManager } from '@/security/storage-manager';
 import { readAuthState } from '@/router/AuthGuard';
 import {
+  checkUnlockRateLimit,
+  clearUnlockAttemptState,
+  loadUnlockAttemptState,
+  recordUnlockFailure,
+  saveUnlockAttemptState,
+} from '@/background/unlock-rate-limit';
+import {
   probeAllServiceHealth,
   setCachedHealth,
   resolveRelayerUrl,
@@ -31,6 +38,10 @@ declare const chrome: {
   };
   storage: {
     local: {
+      get(key: string, callback: (result: Record<string, unknown>) => void): void;
+      set(items: Record<string, unknown>, callback?: () => void): void;
+    };
+    session: {
       get(key: string, callback: (result: Record<string, unknown>) => void): void;
       set(items: Record<string, unknown>, callback?: () => void): void;
     };
@@ -212,6 +223,17 @@ registerHandler('UNLOCK_WALLET', async ({ password }) => {
       return { success: false };
     }
 
+    const attemptState = await loadUnlockAttemptState();
+    const rateLimit = checkUnlockRateLimit(attemptState);
+    if (rateLimit.locked) {
+      console.warn(`${logPrefix} unlock throttled`, { retryAfterMs: rateLimit.retryAfterMs });
+      return {
+        success: false,
+        retryAfterMs: rateLimit.retryAfterMs,
+        message: rateLimit.message,
+      };
+    }
+
     // Read persisted auth state
     const authState = readAuthState();
 
@@ -225,9 +247,20 @@ registerHandler('UNLOCK_WALLET', async ({ password }) => {
 
     if (!isUnlocked) {
       console.warn(`${logPrefix} unlock rejected by SecureStorageManager`);
+      const nextState = recordUnlockFailure(attemptState);
+      await saveUnlockAttemptState(nextState);
+      const lockout = checkUnlockRateLimit(nextState);
+      if (lockout.locked) {
+        return {
+          success: false,
+          retryAfterMs: lockout.retryAfterMs,
+          message: lockout.message,
+        };
+      }
       return { success: false };
     }
 
+    await clearUnlockAttemptState();
     _sessionUnlocked = true;
 
     await setChromeStorage(

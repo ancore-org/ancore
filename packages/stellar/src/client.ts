@@ -14,6 +14,9 @@ import {
 } from './errors';
 import { withRetry, resolveRetryOptions, type RetryOptions, type RetryPresetName } from './retry';
 
+/** Supported Stellar network identifiers for client factory creation. */
+export type NetworkId = Network;
+
 const NETWORK_CONFIG: Record<
   Network,
   { rpcUrl: string; horizonUrl: string; networkPassphrase: string }
@@ -28,12 +31,33 @@ const NETWORK_CONFIG: Record<
     horizonUrl: 'https://horizon.stellar.org',
     networkPassphrase: 'Public Global Stellar Network ; September 2015',
   },
+  futurenet: {
+    rpcUrl: 'https://rpc-futurenet.stellar.org',
+    horizonUrl: 'https://horizon-futurenet.stellar.org',
+    networkPassphrase: 'Test SDF Future Network ; October 2022',
+  },
   local: {
     rpcUrl: 'http://localhost:8000/soroban/rpc',
     horizonUrl: 'http://localhost:8000',
     networkPassphrase: 'Standalone Network ; February 2017',
   },
 };
+
+/**
+ * Create a StellarClient configured for the given network.
+ *
+ * @throws {NetworkError} when the network is not supported
+ */
+export function createStellarClient(
+  network: NetworkId,
+  config?: Omit<StellarClientConfig, 'network'>
+): StellarClient {
+  if (!(network in NETWORK_CONFIG)) {
+    throw new NetworkError(`Unsupported network: ${network}`);
+  }
+
+  return new StellarClient({ network, ...config });
+}
 
 const FRIENDBOT_URL = 'https://friendbot.stellar.org';
 const DEFAULT_ASSET_METADATA_CACHE_TTL_MS = 5 * 60 * 1000;
@@ -109,6 +133,10 @@ export class StellarClient {
 
   constructor(config: StellarClientConfig) {
     this.network = config.network;
+
+    if (!(config.network in NETWORK_CONFIG)) {
+      throw new NetworkError(`Unsupported network: ${config.network}`);
+    }
 
     const networkConfig = NETWORK_CONFIG[config.network];
     this.rpcUrls = this.resolveRpcUrls(config, networkConfig.rpcUrl);

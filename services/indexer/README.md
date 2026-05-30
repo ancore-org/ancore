@@ -98,6 +98,20 @@ CREATE TABLE account_activity (
 - `(account_id, ledger_seq DESC)` - Ledger-range queries
 - `(tx_hash)` - Transaction hash lookups
 
+### ingest_checkpoints table
+
+Stores the last successfully processed ledger sequence per ingestion stream so the worker can resume after restarts without duplicating events.
+
+```sql
+CREATE TABLE ingest_checkpoints (
+    stream          VARCHAR(64)  PRIMARY KEY,
+    last_ledger_seq BIGINT       NOT NULL,
+    updated_at      TIMESTAMPTZ  NOT NULL DEFAULT NOW()
+);
+```
+
+The indexer loads this cursor on startup and the ingest worker advances it only after a batch is durably persisted.
+
 ## Offline Build (no DATABASE\_URL required)
 
 `services/indexer` supports `cargo check` / `cargo build` without a live database connection. This is achieved via **SQLx offline mode**.
@@ -163,6 +177,7 @@ DB_QUERY_TIMEOUT_SEC=30 # Optional, defaults to 30
 ```bash
 # Apply migrations
 psql $DATABASE_URL -f migrations/001_create_account_activity_table.sql
+psql $DATABASE_URL -f migrations/002_create_ingest_checkpoints_table.sql
 ```
 
 ### Linting Migrations
@@ -241,6 +256,7 @@ Integration tests require a test database:
 # Set up test database
 createdb ancore_test
 psql ancore_test -f migrations/001_create_account_activity_table.sql
+psql ancore_test -f migrations/002_create_ingest_checkpoints_table.sql
 
 # Run integration tests
 cargo test --test account_activity_api_test

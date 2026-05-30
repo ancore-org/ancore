@@ -35,7 +35,7 @@ export interface Messages {
   };
   UNLOCK_WALLET: {
     request: { password: string };
-    response: { success: boolean };
+    response: { success: boolean; retryAfterMs?: number; message?: string };
   };
   LOCK_WALLET: {
     request: Record<string, never>;

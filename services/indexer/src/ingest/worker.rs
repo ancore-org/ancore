@@ -9,7 +9,7 @@ use anyhow::Context;
 use tracing::{debug, info, warn};
 
 use crate::schema::canonical::{normalise, CanonicalEvent, RawEvent};
-use super::checkpoint::{Checkpoint, MemoryCheckpointStore};
+use super::checkpoint::{Checkpoint, CheckpointStore, MemoryCheckpointStore};
 use super::sink::EventSink;
 use super::source::EventSource;
 
@@ -47,14 +47,14 @@ pub struct BatchStats {
 ///
 /// Designed to be testable without a real database: the checkpoint store,
 /// event source, and event sink are all injected as trait objects.
-pub struct IngestWorker<Src, Snk> {
+pub struct IngestWorker<Src, Snk, Cp = MemoryCheckpointStore> {
     config: WorkerConfig,
-    checkpoint: MemoryCheckpointStore,
+    checkpoint: Cp,
     source: Src,
     sink: Snk,
 }
 
-impl<Src, Snk> IngestWorker<Src, Snk>
+impl<Src, Snk> IngestWorker<Src, Snk, MemoryCheckpointStore>
 where
     Src: EventSource,
     Snk: EventSink,
@@ -70,8 +70,48 @@ where
 
     /// Seed the worker with an existing checkpoint (e.g. loaded from DB on startup).
     pub fn with_checkpoint(mut self, cp: Checkpoint) -> Self {
-        self.checkpoint.save(&cp);
+        self.checkpoint.save_sync(&cp);
         self
+    }
+}
+
+impl<Src, Snk, Cp> IngestWorker<Src, Snk, Cp>
+where
+    Src: EventSource,
+    Snk: EventSink,
+    Cp: CheckpointStore,
+{
+    pub fn with_checkpoint_store(
+        config: WorkerConfig,
+        source: Src,
+        sink: Snk,
+        checkpoint: Cp,
+    ) -> Self {
+        Self {
+            config,
+            checkpoint,
+            source,
+            sink,
+        }
+    }
+
+    /// Load an existing checkpoint from the store and seed the worker.
+    pub async fn bootstrap_from_store(mut self) -> anyhow::Result<Self> {
+        if let Some(cp) = self
+            .checkpoint
+            .load(&self.config.stream)
+            .await
+            .context("load checkpoint on startup")?
+        {
+            self.checkpoint.save(&cp).await?;
+        }
+        Ok(self)
+    }
+
+    /// Seed the worker with an existing checkpoint value.
+    pub async fn with_checkpoint(mut self, cp: Checkpoint) -> anyhow::Result<Self> {
+        self.checkpoint.save(&cp).await?;
+        Ok(self)
     }
 
     /// Process one batch of events.
@@ -81,6 +121,8 @@ where
         let last_seq = self
             .checkpoint
             .load(&self.config.stream)
+            .await
+            .context("load checkpoint")?
             .map(|c| c.last_ledger_seq)
             .unwrap_or(0);
 
@@ -136,10 +178,13 @@ where
             stats.persisted = canonical.len();
 
             // Advance checkpoint only after successful persist
-            self.checkpoint.save(&Checkpoint {
-                stream: self.config.stream.clone(),
-                last_ledger_seq: max_ledger,
-            });
+            self.checkpoint
+                .save(&Checkpoint {
+                    stream: self.config.stream.clone(),
+                    last_ledger_seq: max_ledger,
+                })
+                .await
+                .context("save checkpoint")?;
 
             info!(
                 stream = %self.config.stream,
@@ -153,8 +198,12 @@ where
     }
 
     /// Current checkpoint (for inspection / testing).
-    pub fn current_checkpoint(&self) -> Option<Checkpoint> {
-        self.checkpoint.load(&self.config.stream)
+    pub async fn current_checkpoint(&self) -> Option<Checkpoint> {
+        self.checkpoint
+            .load(&self.config.stream)
+            .await
+            .ok()
+            .flatten()
     }
 }
 
@@ -180,7 +229,7 @@ mod tests {
 
     #[tokio::test]
     async fn processes_events_and_advances_checkpoint() {
-        let source = VecSource::new(vec![raw(1, "transfer"), raw(2, "execute")]);
+        let source = VecSource::new(vec![raw(1, "transfer"), raw(2, "transfer")]);
         let sink = MemorySink::default();
         let mut worker = IngestWorker::new(WorkerConfig::default(), source, sink);
 
@@ -190,7 +239,7 @@ mod tests {
         assert_eq!(stats.normalised, 2);
         assert_eq!(stats.persisted, 2);
         assert_eq!(stats.skipped, 0);
-        assert_eq!(worker.current_checkpoint().unwrap().last_ledger_seq, 2);
+        assert_eq!(worker.current_checkpoint().await.unwrap().last_ledger_seq, 2);
     }
 
     #[tokio::test]
@@ -206,7 +255,7 @@ mod tests {
         assert_eq!(stats.fetched, 2);
         assert_eq!(stats.skipped, 1);   // ledger 3 skipped
         assert_eq!(stats.normalised, 1); // ledger 5 processed
-        assert_eq!(worker.current_checkpoint().unwrap().last_ledger_seq, 5);
+        assert_eq!(worker.current_checkpoint().await.unwrap().last_ledger_seq, 5);
     }
 
     #[tokio::test]
@@ -217,7 +266,7 @@ mod tests {
         let mut worker = IngestWorker::new(WorkerConfig::default(), source1, sink);
         worker.run_once().await.unwrap();
 
-        let cp = worker.current_checkpoint().unwrap();
+        let cp = worker.current_checkpoint().await.unwrap();
         assert_eq!(cp.last_ledger_seq, 3);
 
         // Simulate restart: new worker seeded with saved checkpoint
@@ -231,7 +280,7 @@ mod tests {
         // Ledgers 2 and 3 are behind the checkpoint — only 4 should be processed
         assert_eq!(stats.skipped, 2);
         assert_eq!(stats.normalised, 1);
-        assert_eq!(worker2.current_checkpoint().unwrap().last_ledger_seq, 4);
+        assert_eq!(worker2.current_checkpoint().await.unwrap().last_ledger_seq, 4);
     }
 
     #[tokio::test]
@@ -244,7 +293,7 @@ mod tests {
 
         assert_eq!(stats.fetched, 0);
         assert_eq!(stats.persisted, 0);
-        assert!(worker.current_checkpoint().is_none());
+        assert!(worker.current_checkpoint().await.is_none());
     }
 
     #[tokio::test]
@@ -262,7 +311,7 @@ mod tests {
         assert_eq!(stats.errors, 1);
         assert_eq!(stats.normalised, 1);
         // Checkpoint advances to the highest successfully processed ledger
-        assert_eq!(worker.current_checkpoint().unwrap().last_ledger_seq, 11);
+        assert_eq!(worker.current_checkpoint().await.unwrap().last_ledger_seq, 11);
     }
 
     #[tokio::test]
@@ -276,6 +325,6 @@ mod tests {
         worker.run_once().await.unwrap();
 
         // Checkpoint must not regress
-        assert_eq!(worker.current_checkpoint().unwrap().last_ledger_seq, 5);
+        assert_eq!(worker.current_checkpoint().await.unwrap().last_ledger_seq, 5);
     }
 }
