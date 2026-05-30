@@ -265,7 +265,9 @@ describe('StellarClient', () => {
     });
 
     it('should throw for unsupported network values', () => {
-      expect(() => new StellarClient({ network: 'invalid' as any })).toThrow(NetworkError);
+      expect(() => new StellarClient({ network: 'invalid' as unknown as 'testnet' })).toThrow(
+        NetworkError
+      );
     });
   });
 
@@ -291,7 +293,7 @@ describe('StellarClient', () => {
     });
 
     it('should throw for invalid network', () => {
-      expect(() => createStellarClient('invalid' as any)).toThrow(NetworkError);
+      expect(() => createStellarClient('invalid' as unknown as 'testnet')).toThrow(NetworkError);
     });
   });
 

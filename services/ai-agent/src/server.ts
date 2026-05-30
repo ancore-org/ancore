@@ -29,6 +29,26 @@ export function createApp(): Express {
     });
   });
 
+  // ── Draft Intent endpoint ──────────────────────────────────────────────────
+  app.post('/agent/draft-intent', (req: Request, res: Response) => {
+    const { prompt, accountId } = req.body;
+    if (!prompt || !accountId) {
+      return res.status(400).json({ error: 'Invalid request' });
+    }
+    const isInvoice = prompt.toLowerCase().includes('invoice');
+    return res.status(200).json({
+      status: 'draft',
+      requiresConfirmation: true,
+      summary: isInvoice ? 'Drafted invoice intent' : 'Drafted payment intent',
+      intent: {
+        type: isInvoice ? 'invoice' : 'payment',
+        destination: 'G123',
+        amount: '10',
+        asset: 'XLM',
+      },
+    });
+  });
+
   // ── Intent validation ──────────────────────────────────────────────────────
   // Validates intent payloads against Zod schemas.
   // No LLM or external service call — purely structural validation.
