@@ -23,6 +23,7 @@
     "@ancore/types": "workspace:*",
     "@ancore/crypto": "workspace:*",
     "@ancore/stellar": "workspace:*",
+    "@ancore/test-fixtures": "workspace:*",
     "@stellar/stellar-sdk": "^13.3.0"
   },
   "devDependencies": {

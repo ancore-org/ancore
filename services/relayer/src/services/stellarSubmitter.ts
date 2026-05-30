@@ -6,6 +6,7 @@ import type { TransactionSubmitterContract, TransactionSubmissionResult } from '
 const NETWORK_PASSPHRASES: Record<Network, string> = {
   testnet: 'Test SDF Network ; September 2015',
   mainnet: 'Public Global Stellar Network ; September 2015',
+  futurenet: 'Test SDF Future Network ; October 2022',
   local: 'Standalone Network ; February 2017',
 };
 

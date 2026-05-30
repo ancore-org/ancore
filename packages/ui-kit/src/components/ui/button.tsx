@@ -30,16 +30,36 @@ const buttonVariants = cva(
   }
 );
 
+import { Loader2 } from 'lucide-react';
+
 export interface ButtonProps
   extends React.ButtonHTMLAttributes<HTMLButtonElement>, VariantProps<typeof buttonVariants> {
   asChild?: boolean;
+  loading?: boolean;
 }
 
 const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(
-  ({ className, variant, size, asChild = false, ...props }, ref) => {
+  (
+    { className, variant, size, asChild = false, loading = false, disabled, children, ...props },
+    ref
+  ) => {
     const Comp = asChild ? Slot : 'button';
     return (
-      <Comp className={cn(buttonVariants({ variant, size, className }))} ref={ref} {...props} />
+      <Comp
+        className={cn(buttonVariants({ variant, size, className }))}
+        ref={ref}
+        disabled={disabled || loading}
+        aria-busy={loading ? 'true' : undefined}
+        {...props}
+      >
+        {loading && (
+          <Loader2
+            className="animate-spin motion-reduce:animate-none"
+            data-testid="button-spinner"
+          />
+        )}
+        {children}
+      </Comp>
     );
   }
 );

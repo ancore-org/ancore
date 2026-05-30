@@ -225,39 +225,150 @@ The Core SDK acts as the orchestration layer that wires together:
 
 ### AncoreClient
 
-The main client class that provides the unified API.
+The main client class for managing smart account actions, primarily session keys.
 
 #### Constructor
 
 ```typescript
-new AncoreClient(config: AncoreClientConfig)
+new AncoreClient(options: AncoreClientOptions)
 ```
+
+- `options.accountContractId`: The C... contract ID of the deployed Ancore account contract.
 
 #### Methods
 
-- `createAccount(options?)`: Create a new smart account
-- `importAccount(options)`: Import an existing account
-- `getBalances(publicKey)`: Get account balances
-- `accountExists(publicKey)`: Check if account exists
-- `addSessionKey(account, options)`: Add a session key
-- `revokeSessionKey(account, publicKey)`: Revoke a session key
-- `getSessionKey(account, publicKey)`: Query a session key
-- `executeWithSessionKey(account, sessionKey, operations)`: Execute operations
-- `getNetwork()`: Get current network
-- `getNetworkPassphrase()`: Get network passphrase
-- `isNetworkHealthy()`: Check network health
-- `verifySignature(message, signature, publicKey)`: Verify a signature
+- `addSessionKey(params: AddSessionKeyParams): InvocationArgs`
+  Generates invocation arguments to add a session key to the smart account.
+- `revokeSessionKey(params: RevokeSessionKeyParams): InvocationArgs`
+  Generates invocation arguments to revoke a session key from the smart account.
 
-### Error Types
+---
 
-The SDK provides comprehensive error types for different failure scenarios:
+### Exported Modules & Functions
 
-- `AncoreClientError`: General client errors
-- `WalletCreationError`: Account creation/import failures
-- `SessionKeyError`: Session key operation failures
-- `TransactionError`: Transaction execution failures
-- `SimulationFailedError`: Soroban simulation failures
-- `BuilderValidationError`: Transaction builder validation errors
+All other core functionalities are exported as standalone, modular functions, classes, and types:
+
+#### Wallet Management
+
+- `createWallet(options: CreateWalletOptions): Promise<WalletMaterial>`
+- `importWallet(options: ImportWalletOptions): Promise<WalletMaterial>`
+- `restoreWallet(options: RestoreWalletOptions): Promise<WalletMaterial>`
+- `deriveContractId(ownerPublicKey: string, salt: string): string`
+
+#### Session Key Helpers
+
+- `addSessionKey` (standalone)
+- `revokeSessionKey` (standalone)
+- `permissionToLabel`
+- `permissionsToLabels`
+- `formatPermissions`
+- `isSessionKeyActive`
+- `getSessionKeyInactiveReason`
+
+#### Payments & Requests
+
+- `sendPayment(params: SendPaymentParams, deps: SendPaymentDeps): Promise<any>`
+- `parsePaymentRequest(urlOrString: string): PaymentRequest`
+- `normalizeAmount(amount: string, options?: NormalizationOptions): string`
+- `formatFiatAmount(amount: number, options?: FiatFormatOptions): string`
+
+#### Transaction Builder
+
+- `AccountTransactionBuilder`
+
+#### Scheduled Transfers & Relayer
+
+- `HttpSchedulerClient`
+- `createSchedulerClient`
+- `getSchedulerClient`
+- `resetSchedulerClientForTests`
+- `resolveRelayerBaseUrl`
+- `buildDefaultRelayPayload`
+- `toIsoStartAt`
+- `defaultScheduleStartAt`
+- `SCHEDULE_FREQUENCY_OPTIONS`
+- `DEMO_ACCOUNT_ADDRESS`
+
+#### Session Key Execution
+
+- `mapExecuteWithSessionKeyError`
+
+#### Smart Contract Parameter Encoding Helpers
+
+- `toScAddress`
+- `toScOperationsVec`
+- `toScPermissionsVec`
+- `toScU32`
+- `toScU64`
+
+#### Secure Storage & Encryption
+
+- `SecureStorageManager`
+- `saveSessionKeys`
+- `getSessionKeys`
+- `deriveKey`
+- `encrypt`
+- `decrypt`
+- `exportBackup`
+- `importBackup`
+- `ChromeStorageAdapter`
+- `BrowserStorageAdapter`
+- `LocalStorageAdapter`
+- `createStorageAdapter`
+
+#### Error Types
+
+- `AncoreSdkError`
+- `BuilderValidationError`
+- `SessionKeyExecutionError`
+- `SessionKeyExecutionValidationError`
+- `SessionKeyManagementError`
+- `SimulationExpiredError`
+- `SimulationFailedError`
+- `TransactionSubmissionError`
+- `PaymentRequestValidationError`
+- `InvalidAmountError`
+- `StorageError`
+- `normalizeError`
+
+#### Retry Presets
+
+- `LOW_LATENCY`
+- `RELIABLE`
+- `AGGRESSIVE`
+- `RETRY_PRESETS`
+- `getRetryPreset`
+
+#### Other Constants and Utilities
+
+- `SDK_VERSION`
+
+#### Supporting Types, Interfaces, & Constants
+
+- `IsSessionKeyActiveOptions`
+- `PaymentSigner`
+- `AccountTransactionBuilderOptions`
+- `ErrorCategory`
+- `NormalizedError`
+- `RetryPresetName`
+- `SchedulerClientOptions`
+- `ExecuteWithSessionKeyParams`
+- `ExecuteWithSessionKeyResult`
+- `SessionKeyExecutionLayer`
+- `SessionKeyExecutionRequest`
+- `SessionKeySignerInputs`
+- `SecureStorageManagerOptions`
+- `SESSION_KEYS_STORAGE_KEY`
+- `SaveSessionKeysDeps`
+- `GetSessionKeysDeps`
+- `AccountData`
+- `EncryptedPayload`
+- `RecentRecipient`
+- `RecentRecipientsData`
+- `SessionKeysData`
+- `EncryptionPayload`
+- `BackupPayload`
+- `StorageErrorCode`
 
 ## Development
 

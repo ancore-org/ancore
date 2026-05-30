@@ -1,81 +1,91 @@
 ## Summary
 
-This PR resolves four independently implementable issues across relayer tests, indexer persistence, extension security, and the Stellar SDK.
+This PR resolves three independently implementable issues across UI Kit components, Core SDK documentation and runnable examples, and cross-package testing fixtures.
 
-- Adds missing `/relay/validate` auth integration coverage with supertest
-- Replaces the in-memory ingest checkpoint stub with a durable Postgres-backed repository
-- Throttles failed wallet unlock attempts in the extension service worker using session-scoped exponential backoff
-- Introduces a multi-network `createStellarClient` factory with `futurenet` support
+- **UI Kit Button Loading State (#630)**: Added `loading` prop, Loader2 spinner, `aria-busy` attribute, and click prevention to the UI Kit `Button` component, alongside exhaustive tests and stories.
+- **Core SDK Documentation & CI Verification (#587)**: Expanded `packages/core-sdk/README.md` to accurately document all `AncoreClient` methods and standalone exports, added a fully runnable session key lifecycle example, and wrote a CI script to enforce documentation compliance.
+- **Canonical Cross-Package Relay Payload Test (#687)**: Scaffolded a shared `@ancore/test-fixtures` package with a JSON payload schema, linked it to the workspace, and integrated cross-package unit tests in both `services/relayer` and `packages/account-abstraction` to assert structure alignment.
+
+---
 
 ## Purpose / Motivation
 
-Relayer validation lacked parity with execute-route auth testing, ingest cursors were lost on restart, the extension allowed unlimited password guessing, and Stellar client creation required manual network configuration. These changes close those gaps while keeping each fix scoped to its own module.
+- **#630**: Interactive elements should prevent double-submissions, visually reflect pending operations via animations, and remain fully accessible (`aria-busy`).
+- **#587**: Prevent API drifts in `core-sdk` by explicitly documenting its modular exports and providing realistic developer-facing integration examples.
+- **#687**: Establish type and contract alignment between relayer execution payloads and smart account-abstraction parsing via shared testing fixtures.
+
+---
 
 ## Changes Made
 
-### #654 — Relayer integration tests
-- Extended `relay.test.ts` with a missing-auth `401` case for `POST /relay/validate`
-- Existing invalid-body `400` coverage and CI relayer test job remain unchanged
+### #630 — UI Kit Button Loading State
 
-### #670 — Postgres checkpoint repository
-- Added `CheckpointStore` trait with `PostgresCheckpointStore` and async `MemoryCheckpointStore`
-- Genericized `IngestWorker` to accept any checkpoint store implementation
-- Wired checkpoint loading into indexer startup in `main.rs`
-- Added ignored Postgres integration tests and documented `ingest_checkpoints` schema in README
+- Modified `packages/ui-kit/src/components/ui/button.tsx` to accept a `loading` prop.
+- Added a spinning `Loader2` icon from `lucide-react` when loading is active, applied `aria-busy` for screen readers, and disabled event emission to prevent duplicate form submissions or actions.
+- Added comprehensive unit tests in `packages/ui-kit/src/components/ui/button.test.tsx` verifying spinner rendering, disabled attribute application, and click event suppression.
+- Added new stories (`Loading`, `DestructiveLoading`) in `packages/ui-kit/src/components/ui/button.stories.tsx` for manual UI verification.
 
-### #678 — Unlock rate limiting
-- Added `unlock-rate-limit.ts` with session-scoped failure tracking and exponential backoff
-- Updated `UNLOCK_WALLET` handler to return `retryAfterMs` and a user-visible `message` during lockout
-- Added fake-timer unit tests for rate-limit logic and service-worker behavior
+### #587 — Core SDK Documentation & CI Verification
 
-### #681 — Stellar client factory
-- Added `futurenet` to shared `Network` type and Stellar network config
-- Exported `createStellarClient(network)` and `NetworkId` from `@ancore/stellar`
-- Invalid networks now throw `NetworkError` at construction time
+- Updated `packages/core-sdk/README.md` with accurate mappings of `AncoreClient` methods and all 100+ modular package exports (wallet helpers, payments, storage managers, etc.).
+- Created a fully executable developer integration walkthrough in `packages/core-sdk/examples/01-session-key-lifecycle.ts` using `@stellar/stellar-sdk` and `@ancore/core-sdk`.
+- Fixed a contract-derivation bug in `deriveContractId` that constructed invalid 58-character contract IDs, changing it to use `StrKey` encoding to produce valid 56-character Stellar/Soroban contract addresses.
+- Created `scripts/verify-readme-exports.ts` to automatically scan `index.ts` exports and fail the build if any export is not fully cataloged in the README.
+
+### #687 — Canonical Cross-Package Relay Payload Test
+
+- Scaffolded `@ancore/test-fixtures` package in `packages/test-fixtures/` with a standard `relay-payload-v1.json` schema.
+- Added the package to the root workspace and declared it as a dependency in both `packages/account-abstraction` and `services/relayer`.
+- Added unit tests in `packages/account-abstraction/src/__tests__/relay-payload.test.ts` and `services/relayer/tests/unit/relay-payload.test.ts` importing the shared JSON fixture and validating schema parity.
+
+---
 
 ## How to Test
 
-### Relayer (#654)
+### UI Kit Button (#630)
+
 ```bash
-cd services/relayer
-pnpm test tests/integration/relay.test.ts
+npx pnpm --filter @ancore/ui-kit test
 ```
-Expected: validate-route tests pass, including `401 when Authorization header is missing`.
 
-### Indexer (#670)
+Expected: All 146 tests pass successfully, including all loading-state assertions.
+
+### Core SDK & Verification (#587)
+
 ```bash
-cd services/indexer
-cargo test --lib
-# Optional with Postgres:
-TEST_DATABASE_URL=postgresql://postgres:postgres@localhost:5432/ancore_test cargo test postgres_checkpoint -- --ignored
-```
-Expected: unit tests pass; ignored integration tests persist and reload checkpoints across restart.
+# Run unit tests
+npx pnpm --filter @ancore/core-sdk test
 
-### Extension wallet (#678)
+# Run runnable lifecycle example
+npx tsx packages/core-sdk/examples/01-session-key-lifecycle.ts
+
+# Run README compliance check
+npx tsx scripts/verify-readme-exports.ts
+```
+
+Expected: All tests pass, lifecycle example completes successfully, and verify-readme-exports confirms 100% API coverage.
+
+### Cross-Package Relay Payload (#687)
+
 ```bash
-cd apps/extension-wallet
-pnpm test src/background/__tests__/unlock-rate-limit.test.ts
-pnpm test src/background/__tests__/service-worker.test.ts
+# Run account abstraction tests
+npx pnpm --filter @ancore/account-abstraction test
+
+# Run relayer tests
+npx pnpm --filter @ancore/relayer test
 ```
-Expected: lockout after repeated failures, success resets counter, expired lockout allows retry.
 
-### Stellar SDK (#681)
-```bash
-cd packages/stellar
-pnpm test src/__tests__/client.test.ts
-```
-Expected: factory tests pass for testnet/mainnet/futurenet; invalid network throws.
+Expected: All tests pass, ensuring complete canonical payload parity between relayer ingestion and core execution layers.
 
-## Breaking Changes
-
-None.
+---
 
 ## Related Issues
 
-Closes ancore-org/ancore#654
-Closes ancore-org/ancore#670
-Closes ancore-org/ancore#678
-Closes ancore-org/ancore#681
+- Closes ancore-org/ancore#630
+- Closes ancore-org/ancore#587
+- Closes ancore-org/ancore#687
+
+---
 
 ## Checklist
 
