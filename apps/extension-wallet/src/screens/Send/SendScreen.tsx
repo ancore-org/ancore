@@ -71,6 +71,7 @@ export function SendScreen({ balance, assetDecimals, service, pollIntervalMs }: 
         transaction={send.tx}
         timing={send.timing}
         schedule={send.schedule}
+        simulation={send.simulation}
         onBack={() => send.setStep('form')}
         onConfirm={send.requestConfirm}
       />

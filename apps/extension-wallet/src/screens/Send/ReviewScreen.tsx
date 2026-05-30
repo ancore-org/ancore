@@ -4,11 +4,14 @@ import type { SendTransactionDraft } from '@/hooks/useSendTransaction';
 import { TransferNotePreview } from '@/components/TransferNotePreview';
 import { ShieldCheck, ArrowRight, Wallet, Globe, Info, CalendarClock } from 'lucide-react';
 import type { ScheduleConfig, TransferTiming } from '@/screens/Send/ScheduleControls';
+import { SimulationPreview, type SimulationState } from './SimulationPreview';
 
 interface ReviewScreenProps {
   transaction: SendTransactionDraft;
   timing?: TransferTiming;
   schedule?: ScheduleConfig;
+  /** Simulation state — when provided, shows the preview panel above the fee summary. */
+  simulation?: SimulationState;
   onBack: () => void;
   onConfirm: () => void;
 }
@@ -24,6 +27,7 @@ export function ReviewScreen({
   transaction,
   timing,
   schedule,
+  simulation,
   onBack,
   onConfirm,
 }: ReviewScreenProps) {
@@ -139,6 +143,9 @@ export function ReviewScreen({
           </div>
         </div>
 
+        {/* Simulation Preview */}
+        {simulation && <SimulationPreview simulation={simulation} />}
+
         {/* Explicit Confirmation Step */}
         <div
           className={cn(
@@ -191,7 +198,7 @@ export function ReviewScreen({
           </Button>
           <Button
             type="button"
-            disabled={!isConfirmed}
+            disabled={!isConfirmed || simulation?.status === 'loading' || simulation?.status === 'error'}
             className="flex-[2] bg-cyan-400 text-slate-950 font-black uppercase tracking-widest rounded-2xl h-12 shadow-[0_10px_20px_rgba(34,211,238,0.2)] hover:bg-cyan-300 disabled:opacity-50 disabled:grayscale transition-all flex items-center justify-center gap-2 text-[10px]"
             onClick={onConfirm}
           >

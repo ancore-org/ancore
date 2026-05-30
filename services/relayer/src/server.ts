@@ -7,6 +7,8 @@ import { createAuthMiddleware } from './middleware/auth';
 import { createIdempotencyMiddleware } from './middleware/idempotency';
 import { createPayloadGuardMiddleware } from './middleware/payloadGuard';
 import { createRequestLoggerMiddleware } from './middleware/requestLogger';
+import { createMetricsCollectorMiddleware } from './middleware/metricsCollector';
+import { renderPrometheusMetrics } from './metrics';
 import { validateBody } from './validation/middleware';
 import { createExecuteRelayHandler } from './handlers/executeRelay';
 import { createValidateRelayHandler } from './handlers/validateRelay';
@@ -89,6 +91,10 @@ export function createApp(
   // Registered after CORS and payload guard, before auth and body parsing.
   app.use(createRequestLoggerMiddleware());
 
+  // Metrics collector: records /relay/* latency histogram and error counter.
+  // Registered after request logger so req.startTime is already set.
+  app.use(createMetricsCollectorMiddleware());
+
   app.use(express.json());
 
   const useMockSubmission =
@@ -147,6 +153,10 @@ export function createApp(
   app.post('/relay/execute', auth, relayLimiter, validate, idempotency, executeHandler);
   app.post('/relay/validate', auth, relayLimiter, validate, validateHandler);
   app.get('/relay/status', statusLimiter, (_req, res) => res.json(relayService.health()));
+  app.get('/metrics', (_req, res) => {
+    res.set('Content-Type', 'text/plain; version=0.0.4; charset=utf-8');
+    res.send(renderPrometheusMetrics());
+  });
 
   app.post(
     '/api/v1/scheduled-transfers',

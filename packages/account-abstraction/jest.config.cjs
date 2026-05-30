@@ -30,5 +30,7 @@ module.exports = {
     },
   },
   testMatch: ['**/__tests__/**/*.test.ts'],
-  testPathIgnorePatterns: ['/node_modules/', 'integration\\.test\\.ts$'],
+  // Only exclude integration tests that require live network access (execute.integration).
+  // revoke-session-key.integration.test.ts uses mocks and runs in CI.
+  testPathIgnorePatterns: ['/node_modules/', 'execute\\.integration\\.test\\.ts$'],
 };
