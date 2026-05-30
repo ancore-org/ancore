@@ -63,6 +63,19 @@ export {
 } from './permission-formatter';
 
 export {
+  ALL_SESSION_PERMISSIONS,
+  PERM_BITS,
+  PERMISSION_EXECUTE,
+  bitmaskToContractVec,
+  bitmaskToPermissions,
+  contractVecToPermissions,
+  hasPermission,
+  permissionsToBitmask,
+  permissionsToContractVec,
+  togglePermission,
+} from './permissions';
+
+export {
   NonceDriftKind,
   NONCE_DRIFT_RETRY_GUIDANCE,
   isValidNonce,
