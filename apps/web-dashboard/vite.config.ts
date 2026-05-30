@@ -3,13 +3,11 @@ import react from '@vitejs/plugin-react';
 import path from 'path';
 
 // https://vitejs.dev/config/
+// All VITE_* variables are declared in .env.example and validated at runtime
+// by src/lib/env.ts (zod). Vite exposes them to the browser automatically
+// — no manual `define` entries are required.
 export default defineConfig({
   plugins: [react()],
-  define: {
-    'import.meta.env.VITE_RELAYER_URL': JSON.stringify(
-      process.env.VITE_RELAYER_URL ?? 'http://localhost:3000'
-    ),
-  },
   resolve: {
     alias: {
       '@': path.resolve(__dirname, './src'),

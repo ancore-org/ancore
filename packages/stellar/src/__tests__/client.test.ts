@@ -11,6 +11,7 @@ import {
   TransactionError,
 } from '../errors';
 import * as retryModule from '../retry';
+import type { RetryOptions } from '../retry';
 
 type MockRpcServer = {
   getHealth: jest.Mock<Promise<unknown>, []>;
@@ -180,6 +181,23 @@ describe('StellarClient', () => {
       expect(client.getNetworkPassphrase()).toBe(customPassphrase);
     });
 
+    it('should use the wallet retry preset by default', () => {
+      const client = new StellarClient({ network: 'testnet' });
+      const retryOptions = (client as unknown as { retryOptions: RetryOptions }).retryOptions;
+
+      expect(retryOptions).toEqual(retryModule.resolveRetryOptions('wallet'));
+    });
+
+    it('should allow selecting the indexer retry preset', () => {
+      const client = new StellarClient({
+        network: 'testnet',
+        retryPreset: 'indexer',
+      });
+      const retryOptions = (client as unknown as { retryOptions: RetryOptions }).retryOptions;
+
+      expect(retryOptions).toEqual(retryModule.resolveRetryOptions('indexer'));
+    });
+
     it('should allow custom retry options', () => {
       const client = new StellarClient({
         network: 'testnet',
@@ -188,8 +206,28 @@ describe('StellarClient', () => {
           baseDelayMs: 500,
         },
       });
+      const retryOptions = (client as unknown as { retryOptions: RetryOptions }).retryOptions;
 
-      expect(client.getNetwork()).toBe('testnet');
+      expect(retryOptions).toEqual({
+        maxRetries: 5,
+        baseDelayMs: 500,
+        exponential: true,
+      });
+    });
+
+    it('should merge custom retry options over the selected preset', () => {
+      const client = new StellarClient({
+        network: 'testnet',
+        retryPreset: 'indexer',
+        retryOptions: { baseDelayMs: 100 },
+      });
+      const retryOptions = (client as unknown as { retryOptions: RetryOptions }).retryOptions;
+
+      expect(retryOptions).toEqual({
+        maxRetries: 4,
+        baseDelayMs: 100,
+        exponential: true,
+      });
     });
 
     it('should allow custom asset metadata cache TTL', async () => {
@@ -388,6 +426,53 @@ describe('StellarClient', () => {
       expect(horizon.loadAccount).toHaveBeenCalledTimes(2);
     });
 
+    it('should retry Horizon 429 responses and eventually succeed', async () => {
+      const client = new StellarClient({
+        network: 'testnet',
+        retryOptions: { maxRetries: 1, baseDelayMs: 0 },
+      });
+      const horizon = getHorizonMock(client);
+      const rateLimitError = Object.assign(new Error('Rate limited'), {
+        response: { status: 429 },
+      });
+      horizon.loadAccount
+        .mockRejectedValueOnce(rateLimitError)
+        .mockResolvedValueOnce(mockAccountResponse);
+
+      await expect(client.getAccount('GABC123')).resolves.toEqual(mockAccountResponse);
+      expect(horizon.loadAccount).toHaveBeenCalledTimes(2);
+    });
+
+    it('should not retry permanent Horizon 400 responses', async () => {
+      const client = new StellarClient({
+        network: 'testnet',
+        retryOptions: { maxRetries: 2, baseDelayMs: 0 },
+      });
+      const horizon = getHorizonMock(client);
+      const badRequestError = Object.assign(new Error('Bad request'), {
+        response: { status: 400 },
+      });
+      horizon.loadAccount.mockRejectedValue(badRequestError);
+
+      await expect(client.getAccount('GABC123')).rejects.toThrow(NetworkError);
+      expect(horizon.loadAccount).toHaveBeenCalledTimes(1);
+    });
+
+    it('should surface RetryExhaustedError after persistent Horizon 429 responses', async () => {
+      const client = new StellarClient({
+        network: 'testnet',
+        retryOptions: { maxRetries: 1, baseDelayMs: 0 },
+      });
+      const horizon = getHorizonMock(client);
+      const rateLimitError = Object.assign(new Error('Rate limited'), {
+        response: { status: 429 },
+      });
+      horizon.loadAccount.mockRejectedValue(rateLimitError);
+
+      await expect(client.getAccount('GABC123')).rejects.toThrow(RetryExhaustedError);
+      expect(horizon.loadAccount).toHaveBeenCalledTimes(2);
+    });
+
     it('should unwrap RetryExhaustedError to the last NetworkError', async () => {
       const client = new StellarClient({
         network: 'testnet',
@@ -461,6 +546,26 @@ describe('StellarClient', () => {
       const horizon = getHorizonMock(client);
       horizon.submitTransaction
         .mockRejectedValueOnce(new Error('timeout'))
+        .mockResolvedValueOnce(mockSubmitResponse);
+
+      await expect(client.submitTransaction(mockTransaction)).resolves.toEqual(mockSubmitResponse);
+      expect(horizon.submitTransaction).toHaveBeenCalledTimes(2);
+    });
+
+    it('should retry Horizon 429 submission responses and eventually succeed', async () => {
+      const client = new StellarClient({
+        network: 'testnet',
+        retryOptions: { maxRetries: 1, baseDelayMs: 0 },
+      });
+      const horizon = getHorizonMock(client);
+      const rateLimitError = Object.assign(new Error('Rate limited'), {
+        response: {
+          status: 429,
+          data: { title: 'Rate Limit Exceeded' },
+        },
+      });
+      horizon.submitTransaction
+        .mockRejectedValueOnce(rateLimitError)
         .mockResolvedValueOnce(mockSubmitResponse);
 
       await expect(client.submitTransaction(mockTransaction)).resolves.toEqual(mockSubmitResponse);

@@ -1,11 +1,5 @@
-import {
-  Account,
-  Contract,
-  nativeToScVal,
-  Transaction,
-  TransactionBuilder as StellarTransactionBuilder,
-  xdr,
-} from '@stellar/stellar-sdk';
+import { Contract, nativeToScVal, Transaction, xdr } from '@stellar/stellar-sdk';
+import { NotImplementedError } from './errors';
 
 export type TransactionBuilderOptions = {
   fee?: string;
@@ -106,21 +100,9 @@ export class TransactionBuilder {
   }
 
   build(): Transaction {
-    if (this.ops.length === 0) {
-      throw new Error('TransactionBuilder requires at least one operation before building.');
-    }
-
-    const account = new Account(this.source, '0');
-    const transactionBuilder = new StellarTransactionBuilder(account, {
-      fee: this.fee,
-      networkPassphrase: this.networkPassphrase,
-    }).setTimeout(this.timeoutSeconds);
-
-    for (const op of this.ops) {
-      transactionBuilder.addOperation(this.buildOperation(op));
-    }
-
-    return transactionBuilder.build();
+    throw new NotImplementedError(
+      'Soroban envelope construction — call simulate() against a real Soroban RPC node first'
+    );
   }
 
   private buildOperation(op: BuilderOp): xdr.Operation {
@@ -143,7 +125,11 @@ export class TransactionBuilder {
     return contract.call('revoke_session_key', nativeToScVal(op.sessionKey));
   }
 
-  private assertSessionKeyParams(sessionKey: string, permissions: number[], expiresAt: number): void {
+  private assertSessionKeyParams(
+    sessionKey: string,
+    permissions: number[],
+    expiresAt: number
+  ): void {
     if (!sessionKey || typeof sessionKey !== 'string') {
       throw new TypeError('Session key must be a non-empty string.');
     }

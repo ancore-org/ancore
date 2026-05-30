@@ -272,6 +272,38 @@ make validate-env
 
 This runs the validation script and reports the status of all configured services.
 
+## Docker Compose Smoke Test
+
+After running `docker-compose up`, use the smoke test script to verify all services are healthy:
+
+```bash
+bash scripts/dev/smoke-stack.sh
+```
+
+This script:
+- Waits for services to become healthy (30-second timeout)
+- Checks Indexer health endpoint (http://localhost:8080/health)
+- Checks Relayer status endpoint (http://localhost:3000/relay/status)
+- Exits with code 0 when all services are healthy
+- Exits with code 1 if timeout is reached or services fail health checks
+
+**Usage with Docker Compose:**
+
+```bash
+# Start services
+docker-compose up -d
+
+# Run smoke test to verify health
+bash scripts/dev/smoke-stack.sh
+
+# Check logs if services are not healthy
+docker-compose logs
+```
+
+**CI Integration:**
+
+The smoke test can be integrated into CI pipelines as an optional job to verify docker-compose stack health after deployment.
+
 ## Next Steps
 
 - [Read Extension Wallet guide](../../apps/extension-wallet/README.md)
@@ -285,3 +317,4 @@ This runs the validation script and reports the status of all configured service
 - [#620](https://github.com/ancore-org/ancore/issues/620) - Mobile wallet dev setup
 - [#666](https://github.com/ancore-org/ancore/issues/666) - Makefile targets
 - [#669](https://github.com/ancore-org/ancore/issues/669) - Full-stack .env setup
+- [#683](https://github.com/ancore-org/ancore/issues/683) - Docker Compose smoke test script

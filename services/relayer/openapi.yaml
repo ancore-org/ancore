@@ -1,0 +1,560 @@
+openapi: 3.1.0
+info:
+  title: Ancore Relayer Service API
+  description: |
+    HTTP API for the Ancore relayer service, which handles transaction relay execution
+    and validation for the Ancore account contract system.
+
+    ## Authentication
+    All endpoints (except `/relay/status`) require Bearer token authentication via the
+    `Authorization` header.
+
+    ## Idempotency
+    POST endpoints support optional idempotency via the `idempotency-key` header to
+    prevent duplicate processing of identical requests within the TTL window.
+
+    ## Rate Limiting
+    - `/relay/execute` and `/relay/validate`: 50 requests per 15 minutes per IP/caller
+    - `/relay/status`: 200 requests per 15 minutes per IP
+
+    ## Example: Execute a relay transaction
+    ```bash
+    curl -X POST https://api.ancore.com/relay/execute \
+      -H "Authorization: Bearer YOUR_TOKEN" \
+      -H "Content-Type: application/json" \
+      -H "idempotency-key: unique-request-id" \
+      -d '{
+        "sessionKey": "a".repeat(64),
+        "operation": "relay_execute",
+        "parameters": {},
+        "signature": "b".repeat(128),
+        "nonce": 1
+      }'
+    ```
+
+    ## Example: Validate a relay transaction
+    ```bash
+    curl -X POST https://api.ancore.com/relay/validate \
+      -H "Authorization: Bearer YOUR_TOKEN" \
+      -H "Content-Type: application/json" \
+      -d '{
+        "sessionKey": "a".repeat(64),
+        "operation": "relay_execute",
+        "parameters": {},
+        "signature": "b".repeat(128),
+        "nonce": 1
+      }'
+    ```
+  version: 1.0.0
+  contact:
+    name: Ancore Team
+    url: https://github.com/ancore-org/ancore
+
+servers:
+  - url: https://api.ancore.com
+    description: Production server
+  - url: https://staging-api.ancore.com
+    description: Staging server
+  - url: http://localhost:3000
+    description: Local development server
+
+tags:
+  - name: relay
+    description: Relay transaction operations
+  - name: health
+    description: Service health and status
+
+paths:
+  /relay/execute:
+    post:
+      tags:
+        - relay
+      summary: Execute a relay transaction
+      description: |
+        Submit a signed transaction for relay submission to the Ancore account contract.
+        The transaction will be validated, simulated, and submitted to the network.
+
+        Requires Bearer token authentication. Supports idempotency via the
+        `idempotency-key` header to prevent duplicate processing.
+      operationId: executeRelay
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: idempotency-key
+          in: header
+          description: Unique key for idempotent request processing
+          required: false
+          schema:
+            type: string
+            example: "550e8400-e29b-41d4-a716-446655440000"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RelayExecuteRequest'
+            examples:
+              relayExecute:
+                summary: Execute a relay transaction
+                value:
+                  sessionKey: "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+                  operation: "relay_execute"
+                  parameters:
+                    accountAddress: "GBBM6BKZPEBWYY3A3YR4IK7T7XZM5JC5K7NYGR7KDCXYBCJVPQYV5YAA"
+                    to: "GD7OEZ2NYNQXK7FLTLQZZCNY2DZV5C7M3F4TNZBAYEBQKVU5RQV6SRQQ"
+                    functionName: "transfer"
+                    args: ["base64_encoded_xdr"]
+                  signature: "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+                  nonce: 1
+      responses:
+        '200':
+          description: Transaction executed successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RelayExecuteResponse'
+              examples:
+                success:
+                  summary: Successful execution
+                  value:
+                    success: true
+                    transactionId: "8a7b6c5d4e3f2a1b0c9d8e7f6a5b4c3d2e1f0a9b8c7d6e5f4a3b2c1d0e9f8a7b"
+                    gasUsed: 21000
+        '400':
+          description: Request validation failed
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ValidationErrorResponse'
+              examples:
+                validationError:
+                  summary: Schema validation failed
+                  value:
+                    error: "VALIDATION_ERROR"
+                    message: "Request validation failed"
+                    details:
+                      - field: "sessionKey"
+                        message: "Must be a 64-char hex-encoded Ed25519 public key"
+        '401':
+          description: Authentication failed
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              examples:
+                authError:
+                  summary: Missing or invalid token
+                  value:
+                    error: "UNAUTHORIZED"
+                    message: "Missing or invalid Authorization header"
+        '422':
+          description: Transaction processing failed
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RelayExecuteResponse'
+              examples:
+                processingError:
+                  summary: Signature validation failed
+                  value:
+                    success: false
+                    error:
+                      code: "INVALID_SIGNATURE"
+                      message: "Signature verification failed"
+                    gasUsed: 0
+
+  /relay/validate:
+    post:
+      tags:
+        - relay
+      summary: Validate a relay transaction
+      description: |
+        Validate a relay payload without executing it. This endpoint checks signature
+        validity, parameter structure, and other pre-execution validation rules.
+
+        Requires Bearer token authentication.
+      operationId: validateRelay
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RelayValidateRequest'
+            examples:
+              relayValidate:
+                summary: Validate a relay transaction
+                value:
+                  sessionKey: "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+                  operation: "relay_execute"
+                  parameters:
+                    accountAddress: "GBBM6BKZPEBWYY3A3YR4IK7T7XZM5JC5K7NYGR7KDCXYBCJVPQYV5YAA"
+                    to: "GD7OEZ2NYNQXK7FLTLQZZCNY2DZV5C7M3F4TNZBAYEBQKVU5RQV6SRQQ"
+                    functionName: "transfer"
+                    args: ["base64_encoded_xdr"]
+                  signature: "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+                  nonce: 1
+      responses:
+        '200':
+          description: Validation result
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ValidationResult'
+              examples:
+                valid:
+                  summary: Transaction is valid
+                  value:
+                    valid: true
+                invalid:
+                  summary: Transaction validation failed
+                  value:
+                    valid: false
+                    error:
+                      code: "INVALID_SIGNATURE"
+                      message: "Signature verification failed"
+        '400':
+          description: Request validation failed
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ValidationErrorResponse'
+              examples:
+                validationError:
+                  summary: Schema validation failed
+                  value:
+                    error: "VALIDATION_ERROR"
+                    message: "Request validation failed"
+                    details:
+                      - field: "signature"
+                        message: "Must be a 128-char hex-encoded Ed25519 signature"
+        '401':
+          description: Authentication failed
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              examples:
+                authError:
+                  summary: Missing or invalid token
+                  value:
+                    error: "UNAUTHORIZED"
+                    message: "Missing or invalid Authorization header"
+        '422':
+          description: Transaction validation failed
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ValidationResult'
+              examples:
+                invalidTransaction:
+                  summary: Transaction validation failed
+                  value:
+                    valid: false
+                    error:
+                      code: "INVALID_SIGNATURE"
+                      message: "Signature verification failed"
+
+  /relay/status:
+    get:
+      tags:
+        - health
+      summary: Get service health status
+      description: |
+        Returns the current health status of the relayer service and its dependencies.
+        No authentication required.
+      operationId: getHealthStatus
+      responses:
+        '200':
+          description: Service health status
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HealthResponse'
+              examples:
+                healthy:
+                  summary: Service is healthy
+                  value:
+                    status: "ok"
+                    uptime: 3600
+                    timestamp: "2026-05-30T00:00:00.000Z"
+                    dependencies:
+                      queue:
+                        status: "ok"
+                        latencyMs: 5
+                      rpc:
+                        status: "ok"
+                        latencyMs: 25
+                      storage:
+                        status: "ok"
+                        latencyMs: 2
+                degraded:
+                  summary: Service is degraded
+                  value:
+                    status: "degraded"
+                    uptime: 3600
+                    timestamp: "2026-05-30T00:00:00.000Z"
+                    dependencies:
+                      queue:
+                        status: "degraded"
+                        message: "High queue depth"
+                        latencyMs: 150
+                      rpc:
+                        status: "ok"
+                        latencyMs: 30
+                      storage:
+                        status: "ok"
+                        latencyMs: 3
+
+components:
+  securitySchemes:
+    BearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: Bearer token authentication for API access
+
+  schemas:
+    RelayExecuteRequest:
+      type: object
+      required:
+        - sessionKey
+        - operation
+        - parameters
+        - signature
+        - nonce
+      properties:
+        sessionKey:
+          type: string
+          pattern: '^[0-9a-fA-F]{64}$'
+          minLength: 64
+          maxLength: 64
+          description: Hex-encoded Ed25519 session public key (64 characters)
+          example: "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+        operation:
+          type: string
+          enum: ['relay_execute', 'add_session_key', 'revoke_session_key']
+          description: Type of operation to execute
+          example: "relay_execute"
+        parameters:
+          type: object
+          additionalProperties: true
+          description: Operation-specific parameters
+          example:
+            accountAddress: "GBBM6BKZPEBWYY3A3YR4IK7T7XZM5JC5K7NYGR7KDCXYBCJVPQYV5YAA"
+            to: "GD7OEZ2NYNQXK7FLTLQZZCNY2DZV5C7M3F4TNZBAYEBQKVU5RQV6SRQQ"
+            functionName: "transfer"
+            args: ["base64_encoded_xdr"]
+        signature:
+          type: string
+          pattern: '^[0-9a-fA-F]{128}$'
+          minLength: 128
+          maxLength: 128
+          description: Hex-encoded Ed25519 signature over canonical payload (128 characters)
+          example: "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+        nonce:
+          type: integer
+          minimum: 0
+          description: Replay-protection nonce (non-negative integer)
+          example: 1
+
+    RelayValidateRequest:
+      type: object
+      required:
+        - sessionKey
+        - operation
+        - parameters
+        - signature
+        - nonce
+      properties:
+        sessionKey:
+          type: string
+          pattern: '^[0-9a-fA-F]{64}$'
+          minLength: 64
+          maxLength: 64
+          description: Hex-encoded Ed25519 session public key (64 characters)
+          example: "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+        operation:
+          type: string
+          enum: ['relay_execute', 'add_session_key', 'revoke_session_key']
+          description: Type of operation to validate
+          example: "relay_execute"
+        parameters:
+          type: object
+          additionalProperties: true
+          description: Operation-specific parameters
+          example:
+            accountAddress: "GBBM6BKZPEBWYY3A3YR4IK7T7XZM5JC5K7NYGR7KDCXYBCJVPQYV5YAA"
+            to: "GD7OEZ2NYNQXK7FLTLQZZCNY2DZV5C7M3F4TNZBAYEBQKVU5RQV6SRQQ"
+            functionName: "transfer"
+            args: ["base64_encoded_xdr"]
+        signature:
+          type: string
+          pattern: '^[0-9a-fA-F]{128}$'
+          minLength: 128
+          maxLength: 128
+          description: Hex-encoded Ed25519 signature over canonical payload (128 characters)
+          example: "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+        nonce:
+          type: integer
+          minimum: 0
+          description: Replay-protection nonce (non-negative integer)
+          example: 1
+
+    RelayExecuteResponse:
+      type: object
+      required:
+        - success
+        - gasUsed
+      properties:
+        success:
+          type: boolean
+          description: Whether the transaction was executed successfully
+          example: true
+        transactionId:
+          type: string
+          pattern: '^[0-9A-F]{64}$'
+          description: Transaction ID (hex-encoded, 64 characters). Present only on success.
+          example: "8a7b6c5d4e3f2a1b0c9d8e7f6a5b4c3d2e1f0a9b8c7d6e5f4a3b2c1d0e9f8a7b"
+        error:
+          $ref: '#/components/schemas/RelayError'
+        gasUsed:
+          type: integer
+          minimum: 0
+          description: Gas consumed by the transaction
+          example: 21000
+
+    ValidationResult:
+      type: object
+      required:
+        - valid
+      properties:
+        valid:
+          type: boolean
+          description: Whether the relay payload is valid
+          example: true
+        error:
+          $ref: '#/components/schemas/RelayError'
+
+    HealthResponse:
+      type: object
+      required:
+        - status
+        - uptime
+        - timestamp
+      properties:
+        status:
+          type: string
+          enum: ['ok', 'degraded']
+          description: Overall service health status
+          example: "ok"
+        uptime:
+          type: number
+          description: Service uptime in seconds
+          example: 3600
+        timestamp:
+          type: string
+          format: date-time
+          description: ISO 8601 timestamp of the status check
+          example: "2026-05-30T00:00:00.000Z"
+        dependencies:
+          type: object
+          description: Status of service dependencies
+          properties:
+            queue:
+              $ref: '#/components/schemas/DependencyStatus'
+            rpc:
+              $ref: '#/components/schemas/DependencyStatus'
+            storage:
+              $ref: '#/components/schemas/DependencyStatus'
+
+    DependencyStatus:
+      type: object
+      required:
+        - status
+      properties:
+        status:
+          type: string
+          enum: ['ok', 'degraded']
+          description: Dependency health status
+          example: "ok"
+        message:
+          type: string
+          description: Optional status message
+          example: "High queue depth"
+        latencyMs:
+          type: number
+          description: Latency in milliseconds
+          example: 5
+
+    RelayError:
+      type: object
+      required:
+        - code
+        - message
+      properties:
+        code:
+          type: string
+          enum:
+            - INVALID_SIGNATURE
+            - SESSION_KEY_EXPIRED
+            - NONCE_REPLAY
+            - GAS_LIMIT_EXCEEDED
+            - SIMULATION_FAILED
+            - UNAUTHORIZED
+            - INTERNAL_ERROR
+          description: Machine-readable error code
+          example: "INVALID_SIGNATURE"
+        message:
+          type: string
+          description: Human-readable error message
+          example: "Signature verification failed"
+
+    ValidationErrorResponse:
+      type: object
+      required:
+        - error
+        - message
+        - details
+      properties:
+        error:
+          type: string
+          enum: ['VALIDATION_ERROR']
+          description: Error type
+          example: "VALIDATION_ERROR"
+        message:
+          type: string
+          description: General error message
+          example: "Request validation failed"
+        details:
+          type: array
+          items:
+            type: object
+            required:
+              - field
+              - message
+            properties:
+              field:
+                type: string
+                description: Field path that failed validation
+                example: "sessionKey"
+              message:
+                type: string
+                description: Validation error message
+                example: "Must be a 64-char hex-encoded Ed25519 public key"
+
+    ErrorResponse:
+      type: object
+      required:
+        - error
+        - message
+      properties:
+        error:
+          type: string
+          description: Error type
+          example: "UNAUTHORIZED"
+        message:
+          type: string
+          description: Error message
+          example: "Missing or invalid Authorization header"

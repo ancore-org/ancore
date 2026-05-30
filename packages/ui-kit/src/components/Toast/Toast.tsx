@@ -1,4 +1,3 @@
-import * as React from 'react';
 import { cva, type VariantProps } from 'class-variance-authority';
 import { CheckCircle, XCircle, Info, AlertTriangle, X } from 'lucide-react';
 import { cn } from '@/lib/utils';

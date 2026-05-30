@@ -2,7 +2,13 @@
  * Tests for retry logic
  */
 
-import { withRetry, calculateDelay } from '../retry';
+import {
+  withRetry,
+  calculateDelay,
+  RETRY_PRESETS,
+  resolveRetryOptions,
+  retryOptionsFromPreset,
+} from '../retry';
 import {
   RetryExhaustedError,
   NetworkError,
@@ -531,6 +537,84 @@ describe('retry', () => {
           expect(exhaustedError.lastError).toBeInstanceOf(NetworkError);
           expect((exhaustedError.lastError as NetworkError).statusCode).toBe(502);
         }
+      });
+    });
+  });
+
+  describe('RETRY_PRESETS', () => {
+    it('should expose wallet and indexer presets', () => {
+      expect(RETRY_PRESETS.wallet).toEqual({ maxAttempts: 3, baseDelayMs: 200 });
+      expect(RETRY_PRESETS.indexer).toEqual({ maxAttempts: 5, baseDelayMs: 500 });
+    });
+
+    it('should convert presets into retry options', () => {
+      expect(retryOptionsFromPreset(RETRY_PRESETS.wallet)).toEqual({
+        maxRetries: 2,
+        baseDelayMs: 200,
+        exponential: true,
+      });
+      expect(retryOptionsFromPreset(RETRY_PRESETS.indexer)).toEqual({
+        maxRetries: 4,
+        baseDelayMs: 500,
+        exponential: true,
+      });
+    });
+
+    it('should merge preset defaults with overrides', () => {
+      expect(resolveRetryOptions('wallet', { maxRetries: 1 })).toEqual({
+        maxRetries: 1,
+        baseDelayMs: 200,
+        exponential: true,
+      });
+    });
+
+    describe('429 handling with mocked fetch', () => {
+      const originalFetch = global.fetch;
+
+      beforeEach(() => {
+        global.fetch = jest.fn();
+      });
+
+      afterEach(() => {
+        global.fetch = originalFetch;
+      });
+
+      const fetchHorizonAccount = async () => {
+        const response = await fetch('https://horizon-testnet.stellar.org/accounts/GABC123');
+        if (!response.ok) {
+          throw new NetworkError('Horizon request failed', { statusCode: response.status });
+        }
+        return response.json();
+      };
+
+      it('should retry on 429 and succeed using the wallet preset', async () => {
+        (global.fetch as jest.Mock)
+          .mockResolvedValueOnce({ ok: false, status: 429 })
+          .mockResolvedValueOnce({
+            ok: true,
+            json: () => Promise.resolve({ id: 'GABC123' }),
+          });
+
+        const result = await withRetry(fetchHorizonAccount, {
+          ...retryOptionsFromPreset(RETRY_PRESETS.wallet),
+          baseDelayMs: 0,
+        });
+
+        expect(result).toEqual({ id: 'GABC123' });
+        expect(global.fetch).toHaveBeenCalledTimes(2);
+      });
+
+      it('should throw RetryExhaustedError when 429 persists through wallet preset', async () => {
+        (global.fetch as jest.Mock).mockResolvedValue({ ok: false, status: 429 });
+
+        await expect(
+          withRetry(fetchHorizonAccount, {
+            ...retryOptionsFromPreset(RETRY_PRESETS.wallet),
+            baseDelayMs: 0,
+          })
+        ).rejects.toBeInstanceOf(RetryExhaustedError);
+
+        expect(global.fetch).toHaveBeenCalledTimes(RETRY_PRESETS.wallet.maxAttempts);
       });
     });
   });

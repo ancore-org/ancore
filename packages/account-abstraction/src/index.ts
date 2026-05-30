@@ -21,6 +21,7 @@ export {
   SessionKeyExpiredError,
   InsufficientPermissionError,
   ContractInvocationError,
+  NotImplementedError,
   mapContractError,
   CONTRACT_ERROR_MESSAGES,
   CONTRACT_ERROR_CODES,
@@ -61,6 +62,19 @@ export {
   formatPermissionLabels,
   formatPermissions,
 } from './permission-formatter';
+
+export {
+  ALL_SESSION_PERMISSIONS,
+  PERM_BITS,
+  PERMISSION_EXECUTE,
+  bitmaskToContractVec,
+  bitmaskToPermissions,
+  contractVecToPermissions,
+  hasPermission,
+  permissionsToBitmask,
+  permissionsToContractVec,
+  togglePermission,
+} from './permissions';
 
 export {
   NonceDriftKind,

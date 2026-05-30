@@ -5,8 +5,7 @@
     "jsx": "react-jsx",
     "outDir": "./dist",
     "rootDir": "./src",
-    "composite": true,
-    "tsBuildInfoFile": "./dist/.tsbuildinfo",
+    "incremental": false,
     "baseUrl": ".",
     "paths": {
       "@/*": ["./src/*"]

@@ -27,8 +27,14 @@ export {
 export { toCanonicalError as toCanonicalStellarError } from './errors';
 
 // Retry utilities
-export { withRetry, calculateDelay } from './retry';
-export type { RetryOptions } from './retry';
+export {
+  withRetry,
+  calculateDelay,
+  RETRY_PRESETS,
+  retryOptionsFromPreset,
+  resolveRetryOptions,
+} from './retry';
+export type { RetryOptions, RetryPresetConfig, RetryPresetName } from './retry';
 
 // Fee stats
 export { fetchFeeStats, FALLBACK_FEE_STATS } from './fee-stats';

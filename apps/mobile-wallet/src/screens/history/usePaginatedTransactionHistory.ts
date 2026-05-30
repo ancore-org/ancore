@@ -48,8 +48,8 @@ const mergeUniqueTransactions = (
 export const usePaginatedTransactionHistory = ({
   adapter,
   pageSize = DEFAULT_PAGE_SIZE,
-  _maxRetries = DEFAULT_MAX_RETRIES,
-  _initialBackoffMs = DEFAULT_INITIAL_BACKOFF_MS,
+  maxRetries: _maxRetries = DEFAULT_MAX_RETRIES,
+  initialBackoffMs: _initialBackoffMs = DEFAULT_INITIAL_BACKOFF_MS,
 }: Options) => {
   const [state, setState] = useState<State>({
     items: [],

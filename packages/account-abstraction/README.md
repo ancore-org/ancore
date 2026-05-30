@@ -315,6 +315,45 @@ function processEventNotification(event: xdr.ContractEvent) {
 }
 ```
 
+## Limitations
+
+### `TransactionBuilder.build()` — Soroban envelope construction not implemented
+
+`TransactionBuilder` can queue operations (session-key add/revoke, contract execute) but calling
+`.build()` always throws `NotImplementedError`. Full Soroban transaction assembly requires:
+
+1. Simulating the transaction against a live Soroban RPC node to obtain resource fees and a
+   ledger footprint.
+2. Attaching the simulation result to the transaction envelope.
+3. Collecting and signing Soroban authorization entries.
+
+These steps depend on the real-network infrastructure tracked in **issue #397**. Until that work
+lands, consumers must build Soroban transactions directly via the Stellar SDK's
+`TransactionBuilder` and `SorobanRpc.Server.prepareTransaction()`.
+
+```typescript
+// ✗ Not yet supported — always throws NotImplementedError
+const tx = new TransactionBuilder(source, contractId).addSessionKey(...).build();
+
+// ✓ Use the Stellar SDK directly until #397 is resolved
+const server = new SorobanRpc.Server(rpcUrl);
+const account = await server.getAccount(sourcePublicKey);
+const tx = new StellarTransactionBuilder(account, { fee, networkPassphrase })
+  .addOperation(contract.call('add_session_key', ...))
+  .setTimeout(180)
+  .build();
+const prepared = await server.prepareTransaction(tx);
+```
+
+If you call `.build()` today you will receive:
+
+```
+NotImplementedError: Soroban envelope construction — call simulate() against a real Soroban RPC node first
+  is not yet implemented. See packages/account-abstraction/README.md#limitations
+```
+
+---
+
 ## Testing
 
 ```bash

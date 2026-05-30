@@ -37,3 +37,4 @@ export * from './payment-request';
 export * from './contacts';
 export * from './scheduled-transfer';
 export * from './statement';
+export * from './handle-resolution';

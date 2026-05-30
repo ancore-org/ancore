@@ -117,6 +117,12 @@ class TelemetryEmitter {
     });
   }
 
+  emitAddressCopied(): void {
+    this.emit({
+      type: TelemetryEventType.ADDRESS_COPIED,
+    });
+  }
+
   getEvents(): AnyTelemetryEvent[] {
     return [...this.events];
   }
