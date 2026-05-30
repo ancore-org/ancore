@@ -24,5 +24,8 @@
     "service_worker": "background/service-worker.js",
     "type": "module"
   },
+  "content_security_policy": {
+    "extension_pages": "script-src 'self'; object-src 'none'; connect-src 'self' https://*.stellar.org https://relayer.ancore.io https://relayer-staging.ancore.io https://indexer.ancore.io https://indexer-staging.ancore.io; img-src 'self' data:; style-src 'self' 'unsafe-inline'; default-src 'none'"
+  },
   "permissions": ["storage"]
 }
