@@ -19,6 +19,7 @@ update workflow. It is the companion to the reference docs:
 | [`sdk-wrappers.md`](./sdk-wrappers.md) | SDK wrapper methods and error hierarchy |
 | [`examples/session-key-execute.md`](./examples/session-key-execute.md) | Session-key execute flow |
 | [`examples/send-payment.md`](./examples/send-payment.md) | Payment flow |
+| [`architecture/OVERVIEW.md#send-flow`](./architecture/OVERVIEW.md#send-flow) | End-to-end send sequence (extension → SDK → relayer → contract → Horizon) |
 
 ---
 
@@ -240,6 +241,7 @@ hardcode a contract ID; read it from environment configuration.
 ## Related
 
 - [Architecture overview](./architecture/OVERVIEW.md)
+- [Send flow sequence diagram](./architecture/OVERVIEW.md#send-flow) — extension wallet payment through SDK, relayer, account contract, and Horizon
 - [Security model](./security/THREAT_MODEL.md)
 - [Contributing guide](../CONTRIBUTING.md)
 - [RFC process](../RFC.md)
