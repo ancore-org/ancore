@@ -11,6 +11,7 @@ import {
 } from '@ancore/ui-kit';
 import { ArrowLeft, Printer } from 'lucide-react';
 import { PaymentQRCode } from '@/components/PaymentQRCode';
+import { useCopyWithFeedback } from '@/hooks/useCopyWithFeedback';
 import type { StellarNetwork } from '@/utils/explorer-links';
 
 export interface ReceiveScreenAccount {
@@ -63,6 +64,8 @@ export function ReceiveScreen({
   onBack,
   className,
 }: ReceiveScreenProps) {
+  const { copy, copied } = useCopyWithFeedback();
+
   const handlePrint = React.useCallback(() => {
     window.print();
   }, []);
@@ -108,7 +111,14 @@ export function ReceiveScreen({
               {account.name}
             </p>
           )}
-          <AddressDisplay address={account.publicKey} copyable truncate={8} label="Your address" />
+          <AddressDisplay
+            address={account.publicKey}
+            copyable
+            truncate={8}
+            label="Your address"
+            onCopy={() => void copy(account.publicKey)}
+            copied={copied}
+          />
         </div>
 
         {/* Print button */}

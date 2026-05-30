@@ -12,6 +12,7 @@ export enum TelemetryEventType {
   EXECUTE_FAILURE = 'wallet_execute_failure',
   TRANSACTION_INITIATED = 'wallet_tx_initiated',
   TRANSACTION_COMPLETED = 'wallet_tx_completed',
+  ADDRESS_COPIED = 'address_copied',
 }
 
 export interface TelemetryEvent {
@@ -57,10 +58,15 @@ export interface TransactionCompletedEvent extends TelemetryEvent {
   duration: number;
 }
 
+export interface AddressCopiedEvent extends TelemetryEvent {
+  type: TelemetryEventType.ADDRESS_COPIED;
+}
+
 export type AnyTelemetryEvent =
   | LockFailureEvent
   | AuthFailureEvent
   | SendFailureEvent
   | ExecuteFailureEvent
   | TransactionInitiatedEvent
-  | TransactionCompletedEvent;
+  | TransactionCompletedEvent
+  | AddressCopiedEvent;
