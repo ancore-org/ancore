@@ -12,7 +12,7 @@ import {
   TransactionError,
   RetryExhaustedError,
 } from './errors';
-import { withRetry, type RetryOptions } from './retry';
+import { withRetry, resolveRetryOptions, type RetryOptions, type RetryPresetName } from './retry';
 
 const NETWORK_CONFIG: Record<
   Network,
@@ -57,7 +57,9 @@ export interface AssetMetadataCacheMetrics {
 }
 
 export interface StellarClientConfig extends NetworkConfig {
-  /** Custom retry options for network requests */
+  /** Retry preset tuned for wallet (conservative) or indexer (aggressive) call sites */
+  retryPreset?: RetryPresetName;
+  /** Custom retry options merged over the selected preset */
   retryOptions?: RetryOptions;
   /** Time in milliseconds to cache resolved asset metadata. Set to 0 to disable caching. */
   assetMetadataCacheTtlMs?: number;
@@ -115,11 +117,7 @@ export class StellarClient {
 
     this.rpcServers = this.rpcUrls.map((rpcUrl) => new StellarRpc.Server(rpcUrl));
     this.horizonServer = new Horizon.Server(horizonUrl);
-    this.retryOptions = config.retryOptions ?? {
-      maxRetries: 3,
-      baseDelayMs: 1000,
-      exponential: true,
-    };
+    this.retryOptions = resolveRetryOptions(config.retryPreset ?? 'wallet', config.retryOptions);
     this.assetMetadataCacheTtlMs =
       config.assetMetadataCacheTtlMs ?? DEFAULT_ASSET_METADATA_CACHE_TTL_MS;
   }

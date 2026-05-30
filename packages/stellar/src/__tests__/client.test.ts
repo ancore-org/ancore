@@ -11,6 +11,7 @@ import {
   TransactionError,
 } from '../errors';
 import * as retryModule from '../retry';
+import type { RetryOptions } from '../retry';
 
 type MockRpcServer = {
   getHealth: jest.Mock<Promise<unknown>, []>;
@@ -180,6 +181,23 @@ describe('StellarClient', () => {
       expect(client.getNetworkPassphrase()).toBe(customPassphrase);
     });
 
+    it('should use the wallet retry preset by default', () => {
+      const client = new StellarClient({ network: 'testnet' });
+      const retryOptions = (client as unknown as { retryOptions: RetryOptions }).retryOptions;
+
+      expect(retryOptions).toEqual(retryModule.resolveRetryOptions('wallet'));
+    });
+
+    it('should allow selecting the indexer retry preset', () => {
+      const client = new StellarClient({
+        network: 'testnet',
+        retryPreset: 'indexer',
+      });
+      const retryOptions = (client as unknown as { retryOptions: RetryOptions }).retryOptions;
+
+      expect(retryOptions).toEqual(retryModule.resolveRetryOptions('indexer'));
+    });
+
     it('should allow custom retry options', () => {
       const client = new StellarClient({
         network: 'testnet',
@@ -188,8 +206,28 @@ describe('StellarClient', () => {
           baseDelayMs: 500,
         },
       });
+      const retryOptions = (client as unknown as { retryOptions: RetryOptions }).retryOptions;
 
-      expect(client.getNetwork()).toBe('testnet');
+      expect(retryOptions).toEqual({
+        maxRetries: 5,
+        baseDelayMs: 500,
+        exponential: true,
+      });
+    });
+
+    it('should merge custom retry options over the selected preset', () => {
+      const client = new StellarClient({
+        network: 'testnet',
+        retryPreset: 'indexer',
+        retryOptions: { baseDelayMs: 100 },
+      });
+      const retryOptions = (client as unknown as { retryOptions: RetryOptions }).retryOptions;
+
+      expect(retryOptions).toEqual({
+        maxRetries: 4,
+        baseDelayMs: 100,
+        exponential: true,
+      });
     });
 
     it('should allow custom asset metadata cache TTL', async () => {
