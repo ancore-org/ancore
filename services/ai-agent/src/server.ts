@@ -16,6 +16,9 @@ export function createApp(): Express {
 
   app.use(express.json());
 
+  const { requestLogger } = require('./middleware/request-logger');
+  app.use(requestLogger);
+
   // ── Health endpoint ────────────────────────────────────────────────────────
   // Used by the Docker HEALTHCHECK and load-balancer probes.
   // Returns HTTP 200 while the process is running.

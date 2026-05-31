@@ -103,6 +103,32 @@ pnpm --filter @ancore/ai-agent dev
 
 ---
 
+## Logging
+
+All requests are logged as structured JSON objects to `stdout` by a request logger middleware.
+
+### Privacy and Redaction
+
+To prevent PII and prompt leaks, the logging system automatically redacts sensitive fields like `prompt` and `freeText` from all log output, even when `NODE_ENV` is not production. If you run the service with debug logging enabled, the full request bodies will still never expose user prompts.
+
+**Example log entry:**
+
+```json
+{
+  "level": "info",
+  "timestamp": "2026-05-31T14:00:00.000Z",
+  "message": "request_complete",
+  "route": "/agent/draft-intent",
+  "method": "POST",
+  "statusCode": 200,
+  "durationMs": 42,
+  "accountId": "123",
+  "intentType": "payment"
+}
+```
+
+---
+
 ## Docker Design
 
 The Dockerfile uses a **three-stage multi-stage build**:
