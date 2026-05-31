@@ -18,6 +18,18 @@ const ACTIVITY_EVENTS: (keyof WindowEventMap)[] = [
   'click',
 ];
 
+/**
+ * Convert a configured auto-lock timeout in minutes into the millisecond
+ * value expected by {@link InactivityDetector}.
+ *
+ * `0` (and any non-positive value) is preserved as `0`, matching the
+ * detector's "never lock" sentinel.
+ */
+export function minutesToInactivityMs(minutes: number): number {
+  if (!Number.isFinite(minutes) || minutes <= 0) return 0;
+  return Math.floor(minutes * 60 * 1000);
+}
+
 export class InactivityDetector {
   private timer: ReturnType<typeof setTimeout> | null = null;
   private readonly onInactive: () => void;

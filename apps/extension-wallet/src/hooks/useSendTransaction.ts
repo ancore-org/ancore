@@ -19,6 +19,7 @@ import {
   type SchedulerClient,
 } from '@/services/scheduler-client';
 import { resolveHandle as defaultResolveHandle } from '@/services/handle-resolver';
+import type { SimulationState } from '@/screens/Send/SimulationPreview';
 
 export type SendStep = 'form' | 'review' | 'confirm' | 'status' | 'scheduled';
 export type TxStatus = 'idle' | 'pending' | 'confirmed' | 'failed';
@@ -45,6 +46,11 @@ export interface SendTransactionDraft extends SendFormValues {
   resolvedHandle?: ResolvedHandle;
 }
 
+export interface SimulationResult {
+  simulatedFee: string;
+  outcome: string;
+}
+
 export interface SendService {
   estimateFee: (input: SendFormValues) => Promise<FeeEstimate>;
   authenticatePassword: (password: string) => Promise<boolean>;
@@ -52,6 +58,7 @@ export interface SendService {
   signTransaction: (tx: SendTransactionDraft) => Promise<string>;
   submitTransaction: (signedPayload: string) => Promise<{ txId: string }>;
   fetchTransactionStatus: (txId: string) => Promise<TxStatus>;
+  simulateTransaction?: (tx: SendTransactionDraft) => Promise<SimulationResult>;
   createScheduledTransfer?: (
     tx: SendTransactionDraft,
     schedule: ScheduleConfig
@@ -187,6 +194,7 @@ export function useSendTransaction(options: UseSendTransactionOptions = {}) {
   const [schedule, setSchedule] = useState<ScheduleConfig | undefined>();
   const [errors, setErrors] = useState<ValidationErrors>({});
   const [submitting, setSubmitting] = useState(false);
+  const [simulation, setSimulation] = useState<SimulationState | undefined>();
 
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
@@ -271,6 +279,36 @@ export function useSendTransaction(options: UseSendTransactionOptions = {}) {
           resolvedHandle,
         });
         setStep('review');
+
+        // Run simulation in the background after entering review
+        if (service.simulateTransaction) {
+          const draft: SendTransactionDraft = {
+            ...resolvedValues,
+            fee: estimatedFee,
+            total,
+            truncatedNote,
+            recipientInput,
+            resolvedHandle,
+          };
+          setSimulation({ status: 'loading' });
+          service
+            .simulateTransaction(draft)
+            .then((result) => {
+              setSimulation({
+                status: 'success',
+                simulatedFee: result.simulatedFee,
+                outcome: result.outcome,
+              });
+            })
+            .catch((err: unknown) => {
+              const message =
+                err instanceof Error ? err.message : 'Simulation failed';
+              setSimulation({ status: 'error', message });
+            });
+        } else {
+          setSimulation(undefined);
+        }
+
         return true;
       } catch (error) {
         console.error('Simulation failed:', error);
@@ -375,6 +413,7 @@ export function useSendTransaction(options: UseSendTransactionOptions = {}) {
     schedule,
     errors,
     submitting,
+    simulation,
     setStep,
     setErrors,
     goToReview,

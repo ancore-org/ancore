@@ -12,6 +12,7 @@ import type {
   HealthResponse,
   DependencyStatus,
 } from '../types';
+import { mapSimulationError } from './mapSimulationError';
 import { mapSubmissionError } from './mapSubmissionError';
 
 const MOCK_GAS_USED = 21_000;
@@ -115,7 +116,7 @@ export class RelayService implements RelayServiceContract {
     } catch (error) {
       return {
         success: false,
-        error: mapSubmissionError(error),
+        error: mapSimulationError(error) ?? mapSubmissionError(error),
         gasUsed: 0,
       };
     }

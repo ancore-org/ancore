@@ -39,6 +39,10 @@ export function createExecuteRelayHandler(relayService: RelayServiceContract) {
         },
         'relay_execute_failed'
       );
+      // Expose typed error code to the metrics middleware for relay_errors_total
+      if (response.error?.code) {
+        res.locals.relayErrorCode = response.error.code;
+      }
     }
 
     res.status(response.success ? 200 : 422).json(response);
