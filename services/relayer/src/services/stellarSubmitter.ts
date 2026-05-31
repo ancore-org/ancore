@@ -7,6 +7,7 @@ const NETWORK_PASSPHRASES: Record<Network, string> = {
   testnet: 'Test SDF Network ; September 2015',
   mainnet: 'Public Global Stellar Network ; September 2015',
   local: 'Standalone Network ; February 2017',
+  futurenet: 'Test SDF Future Network ; October 2022',
 };
 
 export interface StellarSubmitterConfig {
@@ -49,7 +50,7 @@ export class StellarTransactionSubmitter implements TransactionSubmitterContract
 }
 
 export function resolveStellarNetwork(value: string | undefined): Network {
-  if (value === 'mainnet' || value === 'local' || value === 'testnet') {
+  if (value === 'mainnet' || value === 'local' || value === 'testnet' || value === 'futurenet') {
     return value;
   }
   return 'testnet';
