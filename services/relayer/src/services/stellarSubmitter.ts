@@ -50,7 +50,7 @@ export class StellarTransactionSubmitter implements TransactionSubmitterContract
 }
 
 export function resolveStellarNetwork(value: string | undefined): Network {
-  if (value === 'mainnet' || value === 'local' || value === 'testnet') {
+  if (value === 'mainnet' || value === 'local' || value === 'testnet' || value === 'futurenet') {
     return value;
   }
   return 'testnet';
