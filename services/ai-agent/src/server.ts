@@ -40,5 +40,25 @@ export function createApp(): Express {
     return res.status(200).json({ valid: true, intent: parsed.data });
   });
 
+  // ── Draft intent endpoint ───────────────────────────────────────────────────
+  // Creates a draft intent from natural language prompt.
+  // Returns payment or invoice intent based on prompt content.
+  app.post('/agent/draft-intent', (req: Request, res: Response) => {
+    const { prompt, accountId } = req.body;
+
+    if (!prompt || !accountId) {
+      return res.status(400).json({ error: 'Invalid request' });
+    }
+
+    const isInvoice = typeof prompt === 'string' && prompt.toLowerCase().includes('invoice');
+
+    return res.status(200).json({
+      status: 'draft',
+      requiresConfirmation: true,
+      intent: { type: isInvoice ? 'invoice' : 'payment' },
+      summary: `Draft ${isInvoice ? 'invoice' : 'payment'} intent created`,
+    });
+  });
+
   return app;
 }
