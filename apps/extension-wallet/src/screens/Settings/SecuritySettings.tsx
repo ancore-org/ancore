@@ -4,6 +4,7 @@ import { Button, Input } from '@ancore/ui-kit';
 import {
   VaultExportError,
   revealVaultSecret,
+  verifyVaultPassword,
   type VaultExportKind,
 } from '../../security/vault-export';
 import { useTransferPolicy } from '../../hooks/useTransferPolicy';
@@ -18,6 +19,14 @@ type SecurityView =
   | 'export-mnemonic'
   | 'transfer-limits'
   | 'active-sessions';
+
+type SensitiveToggle = {
+  label: string;
+  description: string;
+  currentValue: boolean;
+  nextValue: boolean;
+  onConfirm: (value: boolean) => void;
+} | null;
 
 interface SecuritySettingsProps {
   autoLockTimeout: number;
@@ -521,6 +530,7 @@ export function SecuritySettings({
   onBack,
 }: SecuritySettingsProps) {
   const [view, setView] = React.useState<SecurityView>('menu');
+  const [sensitiveToggle, setSensitiveToggle] = React.useState<SensitiveToggle>(null);
 
   const titles: Record<SecurityView, string> = {
     menu: 'Security',
@@ -537,6 +547,16 @@ export function SecuritySettings({
     else setView('menu');
   }
 
+  function handleSensitiveToggleRequest(nextValue: boolean) {
+    setSensitiveToggle({
+      label: 'Require password for exports',
+      description: 'Re-enter your password to change this sensitive setting.',
+      currentValue: requirePasswordForSensitiveActions,
+      nextValue,
+      onConfirm: onRequirePasswordForSensitiveActionsChange,
+    });
+  }
+
   return (
     <div className="flex flex-col min-h-screen bg-background">
       <ScreenHeader title={titles[view]} onBack={handleBack} />
@@ -546,7 +566,7 @@ export function SecuritySettings({
           autoLockTimeout={autoLockTimeout}
           onNavigate={setView}
           requirePasswordForSensitiveActions={requirePasswordForSensitiveActions}
-          onRequirePasswordForSensitiveActionsChange={onRequirePasswordForSensitiveActionsChange}
+          onRequirePasswordForSensitiveActionsChange={handleSensitiveToggleRequest}
         />
       )}
       {view === 'change-password' && <ChangePasswordView onDone={() => setView('menu')} />}
@@ -579,6 +599,100 @@ export function SecuritySettings({
         />
       )}
       {view === 'active-sessions' && <ActiveSessionsView onDone={() => setView('menu')} />}
+      {sensitiveToggle && (
+        <SensitiveSettingConfirmDialog
+          label={sensitiveToggle.label}
+          description={sensitiveToggle.description}
+          nextValue={sensitiveToggle.nextValue}
+          onCancel={() => setSensitiveToggle(null)}
+          onConfirm={(value) => {
+            sensitiveToggle.onConfirm(value);
+            setSensitiveToggle(null);
+          }}
+        />
+      )}
+    </div>
+  );
+}
+
+function SensitiveSettingConfirmDialog({
+  label,
+  description,
+  nextValue,
+  onCancel,
+  onConfirm,
+}: {
+  label: string;
+  description: string;
+  nextValue: boolean;
+  onCancel: () => void;
+  onConfirm: (value: boolean) => void;
+}) {
+  const [password, setPassword] = React.useState('');
+  const [error, setError] = React.useState('');
+  const [isSubmitting, setIsSubmitting] = React.useState(false);
+
+  async function handleSubmit(e: React.FormEvent) {
+    e.preventDefault();
+    setError('');
+
+    if (!password) {
+      setError('Enter your password.');
+      return;
+    }
+
+    setIsSubmitting(true);
+    try {
+      const verified = await verifyVaultPassword(password);
+      if (!verified) {
+        setError('Incorrect password.');
+        return;
+      }
+
+      onConfirm(nextValue);
+      setPassword('');
+    } catch {
+      setError('Unable to verify password.');
+    } finally {
+      setIsSubmitting(false);
+    }
+  }
+
+  return (
+    <div className="absolute inset-0 z-10 flex items-end bg-background/80 backdrop-blur-sm sm:items-center sm:justify-center">
+      <div className="w-full rounded-t-2xl border border-border bg-card p-4 sm:max-w-md sm:rounded-2xl">
+        <form onSubmit={handleSubmit} className="flex flex-col gap-4">
+          <div className="flex items-start gap-3 rounded-xl border border-destructive/20 bg-destructive/5 p-3">
+            <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-destructive" />
+            <div>
+              <p className="text-sm font-semibold">{label}</p>
+              <p className="mt-1 text-xs text-muted-foreground">{description}</p>
+            </div>
+          </div>
+          <div className="space-y-1">
+            <label className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
+              Confirm Password
+            </label>
+            <Input
+              type="password"
+              placeholder="Enter password to continue"
+              value={password}
+              onChange={(event: React.ChangeEvent<HTMLInputElement>) =>
+                setPassword(event.target.value)
+              }
+            />
+          </div>
+          {error && <p className="text-xs text-destructive">{error}</p>}
+          <div className="flex gap-2">
+            <Button type="button" variant="outline" className="flex-1" onClick={onCancel}>
+              Cancel
+            </Button>
+            <Button type="submit" className="flex-1" disabled={isSubmitting}>
+              {isSubmitting ? 'Verifying…' : 'Confirm'}
+            </Button>
+          </div>
+        </form>
+      </div>
     </div>
   );
 }

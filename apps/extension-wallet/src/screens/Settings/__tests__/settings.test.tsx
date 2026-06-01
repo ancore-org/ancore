@@ -15,7 +15,11 @@ import { SettingsScreen } from '../SettingsScreen';
 import { NetworkSettings } from '../NetworkSettings';
 import { SecuritySettings } from '../SecuritySettings';
 import { AboutScreen } from '../AboutScreen';
-import { revealVaultSecret, VaultExportError } from '../../../security/vault-export';
+import {
+  revealVaultSecret,
+  verifyVaultPassword,
+  VaultExportError,
+} from '../../../security/vault-export';
 import { SettingsGroup, SettingItem } from '../../../components/SettingsGroup';
 
 vi.mock('../../../security/vault-export', () => ({
@@ -28,6 +32,7 @@ vi.mock('../../../security/vault-export', () => ({
   revealVaultSecret: vi.fn(async ({ kind }: { kind: 'privateKey' | 'mnemonic' }) =>
     kind === 'privateKey' ? 'STESTPRIVATEKEY' : 'word '.repeat(12).trim()
   ),
+  verifyVaultPassword: vi.fn(async () => true),
 }));
 
 function renderSettingsScreen() {
@@ -191,6 +196,7 @@ describe('SecuritySettings', () => {
     vi.mocked(revealVaultSecret).mockImplementation(async ({ kind }) =>
       kind === 'privateKey' ? 'STESTPRIVATEKEY' : 'word '.repeat(12).trim()
     );
+    vi.mocked(verifyVaultPassword).mockResolvedValue(true);
   });
 
   it('renders security menu items', () => {
@@ -251,7 +257,37 @@ describe('SecuritySettings', () => {
       />
     );
     await userEvent.click(screen.getByText('Require password for exports'));
+    expect(
+      screen.getByText(/re-enter your password to change this sensitive setting/i)
+    ).toBeInTheDocument();
+
+    await userEvent.type(screen.getByPlaceholderText(/enter password to continue/i), 'mypassword');
+    await userEvent.click(screen.getByRole('button', { name: /confirm/i }));
+
+    expect(verifyVaultPassword).toHaveBeenCalledWith('mypassword');
     expect(onRequirePasswordForSensitiveActionsChange).toHaveBeenCalledWith(false);
+  });
+
+  it('shows error when sensitive toggle password is wrong', async () => {
+    vi.mocked(verifyVaultPassword).mockResolvedValueOnce(false);
+
+    const onRequirePasswordForSensitiveActionsChange = vi.fn();
+    render(
+      <SecuritySettings
+        {...defaultProps}
+        onRequirePasswordForSensitiveActionsChange={onRequirePasswordForSensitiveActionsChange}
+      />
+    );
+
+    await userEvent.click(screen.getByText('Require password for exports'));
+    await userEvent.type(
+      screen.getByPlaceholderText(/enter password to continue/i),
+      'wrong-password'
+    );
+    await userEvent.click(screen.getByRole('button', { name: /confirm/i }));
+
+    expect(screen.getByText('Incorrect password.')).toBeInTheDocument();
+    expect(onRequirePasswordForSensitiveActionsChange).not.toHaveBeenCalled();
   });
 
   it('shows export mnemonic warning', async () => {
