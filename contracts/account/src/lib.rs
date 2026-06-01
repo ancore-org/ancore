@@ -1300,8 +1300,7 @@ mod test {
     #[test]
     fn test_permission_execute_constant_value() {
         assert_eq!(
-            PERMISSION_EXECUTE,
-            1u32,
+            PERMISSION_EXECUTE, 1u32,
             "PERMISSION_EXECUTE value changed — update permission bit tables in \
              contracts/account/README.md and docs/contract-methods.md"
         );
