@@ -68,12 +68,18 @@ async function seedVaultAccount(
     privateKey: string;
     mnemonic?: string;
     encryptedMnemonic?: Awaited<ReturnType<typeof encryptSecretKey>>;
-  }
+  },
+  options: {
+    lockAfterSave?: boolean;
+  } = {}
 ): Promise<SecureStorageManager> {
+  const { lockAfterSave = true } = options;
   const manager = new SecureStorageManager(storage);
   await manager.unlock(PASSWORD);
   await manager.saveAccount(account);
-  manager.lock();
+  if (lockAfterSave) {
+    manager.lock();
+  }
   return manager;
 }
 
@@ -107,12 +113,14 @@ describe('vault-export', () => {
   });
 
   it('reveals a stored mnemonic when secure storage is already unlocked', async () => {
-    const manager = await seedVaultAccount(storage, {
-      privateKey: PRIVATE_KEY,
-      mnemonic: MNEMONIC,
-    });
-
-    await manager.unlock(PASSWORD);
+    const manager = await seedVaultAccount(
+      storage,
+      {
+        privateKey: PRIVATE_KEY,
+        mnemonic: MNEMONIC,
+      },
+      { lockAfterSave: false }
+    );
 
     await expect(
       revealVaultSecret({
