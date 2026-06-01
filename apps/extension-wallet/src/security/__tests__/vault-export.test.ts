@@ -1,7 +1,7 @@
 import { webcrypto } from 'node:crypto';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { encryptSecretKey } from '@ancore/crypto';
-import { SecureStorageManager, createStorageAdapter, type StorageAdapter } from '@ancore/core-sdk';
+import { SecureStorageManager, type StorageAdapter } from '@ancore/core-sdk';
 
 import {
   VaultExportError,
@@ -82,7 +82,7 @@ describe('vault-export', () => {
 
   beforeEach(() => {
     localStorage.clear();
-    storage = createStorageAdapter() as MockStorageAdapter;
+    storage = new MockStorageAdapter();
     resetVaultStorageManagerForTests();
   });
 
