@@ -34,6 +34,17 @@ import {
   createCancelScheduledTransferHandler,
   createListExecutionsHandler,
 } from './scheduler';
+import { createAdminAuthMiddleware } from './middleware/adminAuth';
+import {
+  FxStore,
+  FxService,
+  createListRatesHandler,
+  createQuoteHandler,
+  createConvertHandler,
+  createListHistoryHandler,
+  createUpsertRateHandler,
+  createDeactivateRateHandler,
+} from './fx';
 
 // ── Request schema ────────────────────────────────────────────────────────────
 
@@ -163,6 +174,21 @@ export function createApp(
 
   const validateScheduledTransfer = validateBody(createScheduledTransferSchema);
 
+  // ── FX ──────────────────────────────────────────────────────────────────────
+
+  const fxStore = new FxStore();
+  const fxService = new FxService(fxStore);
+  const adminAuth = createAdminAuthMiddleware();
+
+  const fxRatesHandler = createListRatesHandler(fxService);
+  const fxQuoteHandler = createQuoteHandler(fxService);
+  const fxConvertHandler = createConvertHandler(fxService);
+  const fxHistoryHandler = createListHistoryHandler(fxService);
+  const fxUpsertRateHandler = createUpsertRateHandler(fxService);
+  const fxDeactivateRateHandler = createDeactivateRateHandler(fxService);
+
+  // ── Routes ──────────────────────────────────────────────────────────────────
+
   app.post('/relay/execute', auth, relayLimiter, validate, idempotency, executeHandler);
   app.post('/relay/validate', auth, relayLimiter, validate, validateHandler);
   app.get('/relay/status', statusLimiter, (_req, res) => res.json(relayService.health()));
@@ -202,6 +228,21 @@ export function createApp(
     auth,
     createListExecutionsHandler(scheduledTransferService)
   );
+
+  // ── FX: Public ──────────────────────────────────────────────────────────────
+
+  app.get('/api/v1/fx/rates', fxRatesHandler);
+  app.post('/api/v1/fx/quote', fxQuoteHandler);
+
+  // ── FX: Authenticated ───────────────────────────────────────────────────────
+
+  app.post('/api/v1/fx/convert', auth, fxConvertHandler);
+  app.get('/api/v1/fx/history', auth, fxHistoryHandler);
+
+  // ── FX: Admin ───────────────────────────────────────────────────────────────
+
+  app.post('/api/v1/admin/fx/rates', adminAuth, fxUpsertRateHandler);
+  app.delete('/api/v1/admin/fx/rates/:id', adminAuth, fxDeactivateRateHandler);
 
   return app;
 }
