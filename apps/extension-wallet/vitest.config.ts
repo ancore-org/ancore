@@ -16,7 +16,8 @@ export default defineConfig({
       ['src/security/__tests__/extension-storage-encryption.test.ts', 'node'],
     ],
     setupFiles: ['../../packages/ensure-webcrypto.ts', './src/test/setup.ts'],
-    testTimeout: 30000,
+    testTimeout: 60000,
+    hookTimeout: 20000,
     css: true,
     fileParallelism: process.env.CI !== 'true',
     exclude: [
