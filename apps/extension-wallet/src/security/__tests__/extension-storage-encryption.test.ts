@@ -66,8 +66,9 @@ describe('Extension storage encryption audit', () => {
 
   beforeEach(async () => {
     mockStorage = createMockChromeStorage();
-    ({ ChromeStorageAdapter } = await import('@ancore/core-sdk'));
-    ({ SecureStorageManager } = await import('@ancore/core-sdk'));
+    const sdk = await import('@ancore/core-sdk');
+    ChromeStorageAdapter = sdk.ChromeStorageAdapter;
+    SecureStorageManager = sdk.SecureStorageManager;
   });
 
   it('never stores plaintext secrets in chrome.storage.local', async () => {

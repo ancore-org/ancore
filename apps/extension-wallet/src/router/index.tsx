@@ -11,7 +11,7 @@ import {
   useNavigate,
   useSearchParams,
 } from 'react-router-dom';
-import { ArrowLeft, Copy, Lock, PlusCircle } from 'lucide-react';
+import { ArrowLeft, Lock, PlusCircle } from 'lucide-react';
 import { NotificationProvider } from '@ancore/ui-kit';
 import {
   AuthGuard,
@@ -22,6 +22,7 @@ import {
 } from './AuthGuard';
 import { OnboardingFlow } from '../screens/Onboarding/OnboardingFlow';
 import { NavBar } from '../components/Navigation/NavBar';
+import { ReceiveScreen as ReceiveScreenComponent } from '../screens/ReceiveScreen';
 import { SettingsScreen } from '../screens/Settings/SettingsScreen';
 import { SendScreen as SendFlowScreen } from '../screens/Send/SendScreen';
 import { ScheduledTransfersScreen } from '../screens/ScheduledTransfers/ScheduledTransfersScreen';
@@ -355,37 +356,17 @@ function ScheduledTransfersRoute() {
 
 function ReceiveScreen() {
   const network = useDashboardSettingsStore((state) => state.network);
+  const { authState } = useExtensionAuth();
 
   return (
-    <PageScaffold
-      eyebrow="Payments"
-      title="Receive"
-      description="Expose the wallet address and handoff to copy or QR actions."
-    >
-      <Card
-        title="Receive funds"
-        description={`Share this demo address with another wallet on ${network}.`}
-      >
-        <div className="rounded-xl border border-dashed border-border bg-background px-4 py-4 text-sm text-muted-foreground">
-          GCFX...WALLET
-        </div>
-        <div className="mt-4 flex gap-3">
-          <button
-            className="inline-flex flex-1 items-center justify-center rounded-xl border border-border px-4 py-3 text-sm font-semibold transition hover:bg-accent"
-            type="button"
-          >
-            <Copy className="mr-2 h-4 w-4" />
-            Copy address
-          </button>
-          <button
-            className="inline-flex flex-1 items-center justify-center rounded-xl border border-border px-4 py-3 text-sm font-semibold transition hover:bg-accent"
-            type="button"
-          >
-            Show QR
-          </button>
-        </div>
-      </Card>
-    </PageScaffold>
+    <ReceiveScreenComponent
+      smartAccountId={authState.smartAccountId}
+      ownerPublicKey={
+        authState.accountAddress !== 'GCFX...WALLET' ? authState.accountAddress : null
+      }
+      network={network}
+      onBack={() => window.history.back()}
+    />
   );
 }
 

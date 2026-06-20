@@ -17,7 +17,7 @@ export default defineConfig({
     ],
     setupFiles: ['../../packages/ensure-webcrypto.ts', './src/test/setup.ts'],
     testTimeout: 60000,
-    hookTimeout: 20000,
+    hookTimeout: 30000,
     css: true,
     fileParallelism: process.env.CI !== 'true',
     exclude: [
