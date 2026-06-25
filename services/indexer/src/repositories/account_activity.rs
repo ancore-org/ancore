@@ -19,11 +19,80 @@ pub struct ActivityRecord {
     pub activity_type: String,
     pub amount: Option<String>,
     pub asset: Option<String>,
+    /// Alphabetic asset code: "XLM" for native, or the credit-asset code (e.g. "USDC").
+    pub asset_code: Option<String>,
+    /// Issuing account address; NULL for native XLM.
+    pub asset_issuer: Option<String>,
     pub counterparty: Option<String>,
     pub tx_hash: String,
     pub ledger_seq: i64,
     pub created_at: DateTime<Utc>,
     pub metadata: Option<serde_json::Value>,
+}
+
+/// Split a raw asset string into `(asset_code, asset_issuer)`.
+///
+/// | Input            | asset_code | asset_issuer  |
+/// |------------------|------------|---------------|
+/// | `"native"`       | `"XLM"`    | `None`        |
+/// | `"USDC:GABC..."` | `"USDC"`   | `Some("GABC...")`|
+/// | `None`           | `None`     | `None`        |
+pub fn normalize_asset(asset: Option<&str>) -> (Option<String>, Option<String>) {
+    match asset {
+        None => (None, None),
+        Some("native") => (Some("XLM".to_string()), None),
+        Some(s) => {
+            if let Some((code, issuer)) = s.split_once(':') {
+                (Some(code.to_string()), Some(issuer.to_string()))
+            } else {
+                (Some(s.to_string()), None)
+            }
+        }
+    }
+}
+
+/// Parameters for inserting a new activity record.
+#[derive(Debug, Clone)]
+pub struct InsertActivity {
+    pub account_id: String,
+    pub activity_type: String,
+    pub amount: Option<String>,
+    pub asset: Option<String>,
+    pub counterparty: Option<String>,
+    pub tx_hash: String,
+    pub ledger_seq: i64,
+    pub created_at: DateTime<Utc>,
+    pub metadata: Option<serde_json::Value>,
+}
+
+/// Insert a single activity record, deriving `asset_code`/`asset_issuer`
+/// from the raw `asset` string via [`normalize_asset`].
+pub async fn insert_activity(db: &PgPool, params: &InsertActivity) -> Result<Uuid> {
+    let (asset_code, asset_issuer) = normalize_asset(params.asset.as_deref());
+
+    let id = Uuid::new_v4();
+    sqlx::query(
+        "INSERT INTO account_activity \
+         (id, account_id, activity_type, amount, asset, asset_code, asset_issuer, \
+          counterparty, tx_hash, ledger_seq, created_at, metadata) \
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)",
+    )
+    .bind(id)
+    .bind(&params.account_id)
+    .bind(&params.activity_type)
+    .bind(&params.amount)
+    .bind(&params.asset)
+    .bind(&asset_code)
+    .bind(&asset_issuer)
+    .bind(&params.counterparty)
+    .bind(&params.tx_hash)
+    .bind(params.ledger_seq)
+    .bind(params.created_at)
+    .bind(&params.metadata)
+    .execute(db)
+    .await?;
+
+    Ok(id)
 }
 
 /// Filter options for activity queries
@@ -122,7 +191,7 @@ pub async fn get_account_activity(
 
     // Build query dynamically using QueryBuilder
     let mut query = sqlx::query_builder::QueryBuilder::new(
-        "SELECT id, account_id, activity_type, amount, asset, counterparty, tx_hash, ledger_seq, created_at, metadata FROM account_activity WHERE account_id = ",
+        "SELECT id, account_id, activity_type, amount, asset, asset_code, asset_issuer, counterparty, tx_hash, ledger_seq, created_at, metadata FROM account_activity WHERE account_id = ",
     );
     query.push_bind(account_id);
 
@@ -194,37 +263,25 @@ pub async fn get_account_activity(
     let has_next_page = rows.len() > effective_limit as usize;
 
     // Remove extra item if present
+    let map_row = |row: &sqlx::postgres::PgRow| ActivityRecord {
+        id: row.get("id"),
+        account_id: row.get("account_id"),
+        activity_type: row.get("activity_type"),
+        amount: row.get("amount"),
+        asset: row.get("asset"),
+        asset_code: row.get("asset_code"),
+        asset_issuer: row.get("asset_issuer"),
+        counterparty: row.get("counterparty"),
+        tx_hash: row.get("tx_hash"),
+        ledger_seq: row.get("ledger_seq"),
+        created_at: row.get("created_at"),
+        metadata: row.get("metadata"),
+    };
+
     let items: Vec<ActivityRecord> = if has_next_page {
-        rows[..effective_limit as usize]
-            .iter()
-            .map(|row| ActivityRecord {
-                id: row.get("id"),
-                account_id: row.get("account_id"),
-                activity_type: row.get("activity_type"),
-                amount: row.get("amount"),
-                asset: row.get("asset"),
-                counterparty: row.get("counterparty"),
-                tx_hash: row.get("tx_hash"),
-                ledger_seq: row.get("ledger_seq"),
-                created_at: row.get("created_at"),
-                metadata: row.get("metadata"),
-            })
-            .collect()
+        rows[..effective_limit as usize].iter().map(map_row).collect()
     } else {
-        rows.iter()
-            .map(|row| ActivityRecord {
-                id: row.get("id"),
-                account_id: row.get("account_id"),
-                activity_type: row.get("activity_type"),
-                amount: row.get("amount"),
-                asset: row.get("asset"),
-                counterparty: row.get("counterparty"),
-                tx_hash: row.get("tx_hash"),
-                ledger_seq: row.get("ledger_seq"),
-                created_at: row.get("created_at"),
-                metadata: row.get("metadata"),
-            })
-            .collect()
+        rows.iter().map(map_row).collect()
     };
 
     // Generate cursors
@@ -263,8 +320,8 @@ pub async fn get_activity_by_id(
     activity_id: &Uuid,
 ) -> Result<Option<ActivityRecord>> {
     let row = sqlx::query(
-        "SELECT id, account_id, activity_type, amount, asset, counterparty, tx_hash, ledger_seq, created_at, metadata 
-         FROM account_activity 
+        "SELECT id, account_id, activity_type, amount, asset, asset_code, asset_issuer, counterparty, tx_hash, ledger_seq, created_at, metadata
+         FROM account_activity
          WHERE id = $1 AND account_id = $2",
     )
     .bind(activity_id)
@@ -278,6 +335,8 @@ pub async fn get_activity_by_id(
         activity_type: r.get("activity_type"),
         amount: r.get("amount"),
         asset: r.get("asset"),
+        asset_code: r.get("asset_code"),
+        asset_issuer: r.get("asset_issuer"),
         counterparty: r.get("counterparty"),
         tx_hash: r.get("tx_hash"),
         ledger_seq: r.get("ledger_seq"),
@@ -308,6 +367,41 @@ pub async fn get_activity_types(db: &PgPool, account_id: &str) -> Result<Vec<Str
 mod tests {
     use super::*;
     use chrono::TimeZone;
+
+    // ── normalize_asset ───────────────────────────────────────────────────────
+
+    #[test]
+    fn normalize_asset_none_returns_none_pair() {
+        assert_eq!(normalize_asset(None), (None, None));
+    }
+
+    #[test]
+    fn normalize_asset_native_returns_xlm_no_issuer() {
+        assert_eq!(
+            normalize_asset(Some("native")),
+            (Some("XLM".to_string()), None)
+        );
+    }
+
+    #[test]
+    fn normalize_asset_credit_splits_code_and_issuer() {
+        let issuer = "GAAZI4TCR3TY5OJHCTJC2A4QSY6CJWJH5IAJTGKIN2ER7LBNVKOCCWN";
+        let asset = format!("USDC:{issuer}");
+        assert_eq!(
+            normalize_asset(Some(&asset)),
+            (Some("USDC".to_string()), Some(issuer.to_string()))
+        );
+    }
+
+    #[test]
+    fn normalize_asset_bare_code_no_issuer() {
+        assert_eq!(
+            normalize_asset(Some("XLM")),
+            (Some("XLM".to_string()), None)
+        );
+    }
+
+    // ── cursor encoding ───────────────────────────────────────────────────────
 
     #[test]
     fn test_encode_decode_cursor_roundtrip() {

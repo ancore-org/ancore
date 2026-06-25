@@ -300,9 +300,7 @@ impl AncoreAccount {
         let next_nonce = current_nonce
             .checked_add(1)
             .ok_or(ContractError::ArithmeticOverflow)?;
-        env.storage()
-            .instance()
-            .set(&DataKey::Nonce, &next_nonce);
+        env.storage().instance().set(&DataKey::Nonce, &next_nonce);
 
         // Extend instance TTL to keep contract alive
         env.storage()
@@ -555,9 +553,7 @@ impl AncoreAccount {
         let ledgers_to_live = if expires_at_secs > current_timestamp {
             // Using 4 seconds-per-ledger + 1 day buffer to guarantee it outlives expiry
             let diff_seconds = expires_at_secs.saturating_sub(current_timestamp);
-            let calculated_ledgers = (diff_seconds / 4)
-                .try_into()
-                .unwrap_or(u32::MAX);
+            let calculated_ledgers = (diff_seconds / 4).try_into().unwrap_or(u32::MAX);
             calculated_ledgers.saturating_add(DAY_IN_LEDGERS)
         } else {
             DAY_IN_LEDGERS // 1 day default buffer

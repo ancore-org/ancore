@@ -38,7 +38,7 @@ export type LoggedRequest = Request & {
 export function createRequestLoggerMiddleware(): RequestHandler {
   return (req: Request, res: Response, next: NextFunction): void => {
     const loggedReq = req as LoggedRequest;
-    const requestId = (req.headers['x-request-id'] as string | undefined) ?? generateRequestId();
+    const requestId = (req as any).requestId ?? (req.headers['x-request-id'] as string | undefined) ?? generateRequestId();
 
     loggedReq.startTime = Date.now();
 

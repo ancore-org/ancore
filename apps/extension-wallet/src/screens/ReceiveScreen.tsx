@@ -11,6 +11,7 @@ import {
 } from '@ancore/ui-kit';
 import { ArrowLeft, Download } from 'lucide-react';
 import { PaymentQRCode } from '@/components/PaymentQRCode';
+import downloadQrPng from '@/utils/export-qr';
 import { useCopyWithFeedback } from '@/hooks/useCopyWithFeedback';
 import type { Network } from '@ancore/types';
 
@@ -88,11 +89,18 @@ export function ReceiveScreen({
   const { copy: copyPublicKey, copied: publicKeyCopied } = useCopyWithFeedback();
   const qrRef = React.useRef<SVGSVGElement>(null);
 
-  const handleDownload = React.useCallback(() => {
-    if (qrRef.current && smartAccountId) {
-      downloadSvgAsPng(qrRef.current, `ancore-receive-${smartAccountId.slice(0, 8)}.png`);
+  const handleDownload = React.useCallback(async () => {
+    if (!smartAccountId) return;
+    try {
+      await downloadQrPng(paymentUri, {
+        filename: `ancore-receive-${smartAccountId.slice(0, 8)}.png`,
+        scale: 3,
+      });
+    } catch (err) {
+      // Fallback to previous SVG -> PNG method if QR lib unavailable
+      if (qrRef.current) downloadSvgAsPng(qrRef.current, `ancore-receive-${smartAccountId.slice(0, 8)}.png`);
     }
-  }, [smartAccountId]);
+  }, [smartAccountId, paymentUri]);
 
   if (!smartAccountId) {
     return (

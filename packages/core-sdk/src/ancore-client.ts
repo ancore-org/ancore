@@ -3,6 +3,13 @@ import { AccountContract, type InvocationArgs } from '@ancore/account-abstractio
 import { addSessionKey, type AddSessionKeyParams, type SessionKeyWriter } from './add-session-key';
 import { BuilderValidationError } from './errors';
 import {
+  refreshSessionKeyTtl,
+  type RefreshSessionKeyTtlOptions,
+  type RefreshSessionKeyTtlParams,
+  type RefreshSessionKeyTtlResult,
+  type SessionKeyTtlRefresher,
+} from './refresh-session-key-ttl';
+import {
   revokeSessionKey,
   type RevokeSessionKeyParams,
   type SessionKeyRevoker,
@@ -13,7 +20,7 @@ export interface AncoreClientOptions {
 }
 
 export class AncoreClient {
-  private readonly accountContract: SessionKeyWriter & SessionKeyRevoker;
+  private readonly accountContract: SessionKeyWriter & SessionKeyRevoker & SessionKeyTtlRefresher;
 
   constructor(options: AncoreClientOptions) {
     if (!options.accountContractId) {
@@ -31,5 +38,14 @@ export class AncoreClient {
 
   revokeSessionKey(params: RevokeSessionKeyParams): InvocationArgs {
     return revokeSessionKey(this.accountContract, params);
+  }
+
+  refreshSessionKeyTtl(
+    params: RefreshSessionKeyTtlParams,
+    options?: RefreshSessionKeyTtlOptions
+  ): InvocationArgs | Promise<RefreshSessionKeyTtlResult> {
+    return options
+      ? refreshSessionKeyTtl(this.accountContract, params, options)
+      : refreshSessionKeyTtl(this.accountContract, params);
   }
 }

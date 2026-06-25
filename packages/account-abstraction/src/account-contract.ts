@@ -149,6 +149,17 @@ export class AccountContract {
   }
 
   /**
+   * Build invocation for refresh_session_key_ttl(public_key).
+   * Extends Soroban persistent storage TTL; does not change logical expires_at.
+   */
+  refreshSessionKeyTtl(publicKey: string | Uint8Array): InvocationArgs {
+    return {
+      method: 'refresh_session_key_ttl',
+      args: [publicKeyToBytes32ScVal(publicKey)],
+    };
+  }
+
+  /**
    * Build invocation for get_session_key(public_key).
    * Use getSessionKey() with options.server to run the read and decode the result.
    */

@@ -1,7 +1,15 @@
-import { NetworkError, TransactionError } from '@ancore/stellar';
+import { NetworkError, SimulationFailedError, TransactionError } from '@ancore/stellar';
 import { mapSubmissionError } from '../../src/services/mapSubmissionError';
 
 describe('mapSubmissionError', () => {
+  it('maps simulation errors to SIMULATION_FAILED', () => {
+    const error = new SimulationFailedError('contract revert');
+    expect(mapSubmissionError(error)).toEqual({
+      code: 'SIMULATION_FAILED',
+      message: 'contract revert',
+    });
+  });
+
   it('maps fee-related transaction errors to GAS_LIMIT_EXCEEDED', () => {
     const error = new TransactionError('Insufficient fee', { resultCode: 'tx_insufficient_fee' });
     expect(mapSubmissionError(error)).toEqual({

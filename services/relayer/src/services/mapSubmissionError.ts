@@ -1,10 +1,17 @@
-import { NetworkError, TransactionError } from '@ancore/stellar';
+import { NetworkError, SimulationFailedError, TransactionError } from '@ancore/stellar';
 import type { RelayError } from '../types';
 
 /**
  * Map Stellar network / submission errors to typed relay error responses.
  */
 export function mapSubmissionError(error: unknown): RelayError {
+  if (error instanceof SimulationFailedError) {
+    return {
+      code: 'SIMULATION_FAILED',
+      message: error.message,
+    };
+  }
+
   if (error instanceof TransactionError) {
     const code = error.resultCode?.toLowerCase() ?? '';
 

@@ -8,13 +8,17 @@ import { createAuthMiddleware } from './middleware/auth';
 import { createIdempotencyMiddleware } from './middleware/idempotency';
 import { createPayloadGuardMiddleware } from './middleware/payloadGuard';
 import { createRequestLoggerMiddleware } from './middleware/requestLogger';
+import { createRequestIdMiddleware } from './middleware/requestId';
 import { createMetricsCollectorMiddleware } from './middleware/metricsCollector';
 import { renderPrometheusMetrics } from './metrics';
 import { validateBody } from './validation/middleware';
 import { createExecuteRelayHandler } from './handlers/executeRelay';
 import { createValidateRelayHandler } from './handlers/validateRelay';
+import { createHealthHandler } from './routes/health';
 import { IdempotencyStore } from './store/idempotency';
+import { NonceStore } from './store/nonceStore';
 import { JobQueue } from './queue/JobQueue';
+import { createBearerAuthService } from './services/bearerAuthService';
 import type {
   AuthServiceContract,
   SignatureServiceContract,
@@ -78,12 +82,16 @@ function parseAllowedOrigins(): string[] | string {
 }
 
 export function createApp(
-  authService: AuthServiceContract = stubAuthService,
+  authService?: AuthServiceContract,
   signatureService: SignatureServiceContract = defaultSignatureService,
   idempotencyStore: IdempotencyStore = new IdempotencyStore(),
   transactionSubmitter?: TransactionSubmitterContract,
-  relayOptions?: RelayServiceOptions
+  relayOptions?: RelayServiceOptions,
+  nonceStore: NonceStore = new NonceStore()
 ): Express {
+  const authSecret = process.env.RELAYER_AUTH_SECRET;
+  const resolvedAuthService =
+    authService ?? (authSecret ? createBearerAuthService(authSecret) : stubAuthService);
   const app = express();
 
   const corsOrigins = parseAllowedOrigins();
@@ -99,6 +107,9 @@ export function createApp(
   // Payload guard: reject oversized requests before body parsing to prevent
   // resource abuse. Runs early in the stack, before express.json().
   app.use(createPayloadGuardMiddleware());
+
+  // Request ID middleware: validate or generate X-Request-Id, attach to req
+  app.use(createRequestIdMiddleware());
 
   // Request logger: attaches req.log and emits start/complete structured logs.
   // Registered after CORS and payload guard, before auth and body parsing.
@@ -135,16 +146,24 @@ export function createApp(
   });
 
   const jobQueue = new JobQueue();
-  const relayService = new RelayService(signatureService, jobQueue, idempotencyStore, submitter, {
-    useMockSubmission,
-    ...relayOptions,
-  });
-  const auth = createAuthMiddleware(authService);
+  const relayService = new RelayService(
+    signatureService,
+    jobQueue,
+    idempotencyStore,
+    submitter,
+    {
+      useMockSubmission,
+      ...relayOptions,
+    },
+    nonceStore
+  );
+  const auth = createAuthMiddleware(resolvedAuthService);
   const validate = validateBody(relayRequestSchema);
   const idempotency = createIdempotencyMiddleware(idempotencyStore);
 
   const executeHandler = createExecuteRelayHandler(relayService);
   const validateHandler = createValidateRelayHandler(relayService);
+  const healthHandler = createHealthHandler(relayService);
 
   const scheduledTransferStore = new ScheduledTransferStore();
   const scheduledTransferService = new ScheduledTransferService(
@@ -166,6 +185,7 @@ export function createApp(
   app.post('/relay/execute', auth, relayLimiter, validate, idempotency, executeHandler);
   app.post('/relay/validate', auth, relayLimiter, validate, validateHandler);
   app.get('/relay/status', statusLimiter, (_req, res) => res.json(relayService.health()));
+  app.get('/health', healthHandler);
   app.get('/metrics', (_req, res) => {
     res.set('Content-Type', 'text/plain; version=0.0.4; charset=utf-8');
     res.send(renderPrometheusMetrics());

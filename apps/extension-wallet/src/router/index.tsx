@@ -28,6 +28,7 @@ import { ReceiveScreen as ReceiveScreenComponent } from '../screens/ReceiveScree
 import { SettingsScreen } from '../screens/Settings/SettingsScreen';
 import { SendScreen as SendFlowScreen } from '../screens/Send/SendScreen';
 import { ScheduledTransfersScreen } from '../screens/ScheduledTransfers/ScheduledTransfersScreen';
+import { SessionKeysScreen } from '../screens/SessionKeys/SessionKeysScreen';
 import { useDashboardSettingsStore } from '../state/dashboard-settings';
 import { useTelemetrySettingsSync } from '../hooks/useTelemetrySettingsSync';
 import { EmptyTransactions } from '../components/EmptyTransactions';
@@ -757,37 +758,6 @@ function HistoryScreen() {
           )}
         </>
       )}
-    </PageScaffold>
-  );
-}
-
-function SessionKeysScreen() {
-  return (
-    <PageScaffold
-      backTo="/settings"
-      eyebrow="Security"
-      title="Session Keys"
-      description="Manage temporary signing permissions without leaving the extension flow."
-    >
-      <Card
-        title="Active keys"
-        description="Session keys can be rotated or revoked without affecting the primary wallet."
-      >
-        <div className="space-y-3">
-          <div className="rounded-xl border border-border px-4 py-3">
-            <p className="text-sm font-medium text-foreground">Trading bot</p>
-            <p className="mt-1 text-xs text-muted-foreground">Valid for 12 more hours</p>
-          </div>
-          <div className="rounded-xl border border-border px-4 py-3">
-            <p className="text-sm font-medium text-foreground">Automation script</p>
-            <p className="mt-1 text-xs text-muted-foreground">Read-only access, expires tomorrow</p>
-          </div>
-        </div>
-      </Card>
-      <PrimaryButton>
-        <PlusCircle className="mr-2 h-4 w-4" />
-        Add session key
-      </PrimaryButton>
     </PageScaffold>
   );
 }

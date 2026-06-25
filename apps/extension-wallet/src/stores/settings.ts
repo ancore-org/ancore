@@ -7,6 +7,7 @@
 import { create } from 'zustand';
 import { persist, createJSONStorage } from 'zustand/middleware';
 import { extensionStorage } from './_storage';
+import { validateHorizonUrl, isValidHorizonUrl } from '@ancore/stellar';
 
 export type NetworkMode = 'mainnet' | 'testnet' | 'futurenet';
 export type ThemePreference = 'light' | 'dark' | 'system';
@@ -22,6 +23,7 @@ export interface NotificationPreferences {
 
 export interface SettingsState {
   network: NetworkMode;
+  horizonUrl: string;
   theme: ThemePreference;
   autoLockMinutes: number;
   requirePasswordForSensitiveActions: boolean;
@@ -39,9 +41,24 @@ export interface SettingsState {
   setDailyTransferLimit: (amount: number) => void;
   setTransferStepUpThreshold: (amount: number) => void;
   setEnableLockShortcut: (value: boolean) => void;
-  setTelemetryOptIn: (value: boolean) => void;
+  /**
+   * Override the Horizon URL for the currently selected network.
+   * Validates the URL against the active network profile before applying.
+   * Throws HorizonUrlValidationError if the URL is invalid for the network.
+   */
+  setHorizonUrl: (url: string) => void;
   reset: () => void;
 }
+
+/**
+ * Horizon URL defaults for each network.
+ * These are coupled with network selection to ensure service URLs stay in sync.
+ */
+const NETWORK_HORIZON_URLS: Record<NetworkMode, string> = {
+  mainnet: 'https://horizon.stellar.org',
+  testnet: 'https://horizon-testnet.stellar.org',
+  futurenet: 'https://horizon-futurenet.stellar.org',
+};
 
 /**
  * Defaults used when keys are missing from persisted state.
@@ -51,6 +68,7 @@ export interface SettingsState {
  */
 export const DEFAULTS = {
   network: 'testnet' as NetworkMode,
+  horizonUrl: NETWORK_HORIZON_URLS.testnet,
   theme: 'dark' as ThemePreference,
   autoLockMinutes: 15,
   requirePasswordForSensitiveActions: true,
@@ -78,7 +96,18 @@ export const useSettingsStore = create<SettingsState>()(
     (set) => ({
       ...DEFAULTS,
 
-      setNetwork: (network) => set({ network }),
+      setNetwork: (network) =>
+        set(() => ({
+          network,
+          horizonUrl: NETWORK_HORIZON_URLS[network],
+        })),
+      setHorizonUrl: (url) =>
+        set((state) => {
+          // Validate against the current network profile before persisting.
+          // Throws HorizonUrlValidationError if the URL is invalid.
+          validateHorizonUrl(url, state.network as 'mainnet' | 'testnet' | 'futurenet' | 'local');
+          return { horizonUrl: url };
+        }),
       setTheme: (theme) =>
         set(() => {
           applyTheme(theme);
@@ -106,6 +135,7 @@ export const useSettingsStore = create<SettingsState>()(
       storage: createJSONStorage(() => extensionStorage),
       partialize: (state) => ({
         network: state.network,
+        horizonUrl: state.horizonUrl,
         theme: state.theme,
         autoLockMinutes: state.autoLockMinutes,
         requirePasswordForSensitiveActions: state.requirePasswordForSensitiveActions,
@@ -122,14 +152,28 @@ export const useSettingsStore = create<SettingsState>()(
         const autoLockMinutes = persisted.autoLockMinutes;
         const dailyTransferLimit = persisted.dailyTransferLimit;
         const transferStepUpThreshold = persisted.transferStepUpThreshold;
+        const horizonUrl = persisted.horizonUrl;
+
+        // Validate network and derive horizon URL if missing or invalid
+        const validNetwork =
+          network === 'mainnet' || network === 'testnet' || network === 'futurenet'
+            ? network
+            : DEFAULTS.network;
+
+        // If horizonUrl is missing, invalid, or fails URL validation for the network, derive from network
+        const candidateUrl =
+          horizonUrl && typeof horizonUrl === 'string' && horizonUrl.length > 0
+            ? horizonUrl
+            : NETWORK_HORIZON_URLS[validNetwork];
+        const validHorizonUrl = isValidHorizonUrl(candidateUrl, validNetwork)
+          ? candidateUrl
+          : NETWORK_HORIZON_URLS[validNetwork];
 
         return {
           ...currentState,
           ...persisted,
-          network:
-            network === 'mainnet' || network === 'testnet' || network === 'futurenet'
-              ? network
-              : DEFAULTS.network,
+          network: validNetwork,
+          horizonUrl: validHorizonUrl,
           theme:
             theme === 'light' || theme === 'dark' || theme === 'system' ? theme : DEFAULTS.theme,
           autoLockMinutes:

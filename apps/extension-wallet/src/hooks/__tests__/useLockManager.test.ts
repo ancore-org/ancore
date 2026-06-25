@@ -8,10 +8,12 @@ const destroySpy = vi.fn();
 const lockSpy = vi.fn();
 
 vi.mock('@ancore/core-sdk', () => ({
+  ChromeStorageAdapter: class {},
   SecureStorageManager: class {
     async unlock() {}
     lock() {}
   },
+  ChromeStorageAdapter: class {},
   createStorageAdapter: () => ({}),
 }));
 

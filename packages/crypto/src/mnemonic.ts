@@ -68,6 +68,26 @@ export function generateMnemonic(): string {
 }
 
 /**
+ * Error thrown when mnemonic strength validation fails.
+ * Provides specific error codes for different failure modes.
+ */
+export class MnemonicValidationError extends Error {
+  public readonly code: 'INVALID_LENGTH' | 'UNKNOWN_WORDS' | 'INVALID_CHECKSUM' | 'INVALID_TYPE';
+  public readonly details?: string;
+
+  constructor(
+    code: 'INVALID_LENGTH' | 'UNKNOWN_WORDS' | 'INVALID_CHECKSUM' | 'INVALID_TYPE',
+    message: string,
+    details?: string
+  ) {
+    super(message);
+    this.name = 'MnemonicValidationError';
+    this.code = code;
+    this.details = details;
+  }
+}
+
+/**
  * Validates a given mnemonic phrase.
  * Ensures the phrase is a valid BIP39 12-word mnemonic using the English
  * wordlist only.
@@ -102,4 +122,77 @@ export function validateMnemonic(mnemonic: string): boolean {
 
   // Validate against BIP39 English wordlist and checksum
   return bip39.validateMnemonic(normalizedMnemonic);
+}
+
+/**
+ * Validates mnemonic strength and throws descriptive errors for invalid mnemonics.
+ * This is the preferred validation method for wallet import flows where clear
+ * error messages are needed.
+ *
+ * Validates:
+ * - Input type (must be non-empty string)
+ * - Word count (must be 12 or 24 words)
+ * - Wordlist (must be English BIP39 only)
+ * - Checksum (must pass BIP39 validation)
+ *
+ * @param mnemonic - The mnemonic phrase to validate
+ * @throws {MnemonicValidationError} With specific error code and message
+ *
+ * @example
+ * ```typescript
+ * try {
+ *   validateMnemonicStrength(userInput);
+ *   // Proceed with import
+ * } catch (err) {
+ *   if (err instanceof MnemonicValidationError) {
+ *     // Display err.message to user based on err.code
+ *   }
+ * }
+ * ```
+ */
+export function validateMnemonicStrength(mnemonic: string): void {
+  if (!mnemonic || typeof mnemonic !== 'string') {
+    throw new MnemonicValidationError('INVALID_TYPE', 'Mnemonic must be a non-empty string');
+  }
+
+  const trimmed = mnemonic.trim();
+  if (trimmed.length === 0) {
+    throw new MnemonicValidationError('INVALID_TYPE', 'Mnemonic must not be empty');
+  }
+
+  const words = trimmed.split(/\s+/);
+
+  // Validate word count (support both 12 and 24 word mnemonics)
+  if (words.length !== 12 && words.length !== 24) {
+    throw new MnemonicValidationError(
+      'INVALID_LENGTH',
+      `Mnemonic must be 12 or 24 words, got ${words.length}`,
+      `Expected: 12 or 24 words, Actual: ${words.length}`
+    );
+  }
+
+  const normalizedMnemonic = words.join(' ');
+
+  // Check for unknown words (non-English BIP39)
+  try {
+    assertEnglishMnemonic(normalizedMnemonic);
+  } catch (err) {
+    if (err instanceof UnsupportedMnemonicLanguageError) {
+      throw new MnemonicValidationError(
+        'UNKNOWN_WORDS',
+        `Mnemonic contains unsupported words: ${err.unsupportedWords.join(', ')}`,
+        `Unsupported words: ${err.unsupportedWords.join(', ')}`
+      );
+    }
+    throw err;
+  }
+
+  // Validate BIP39 checksum
+  if (!bip39.validateMnemonic(normalizedMnemonic)) {
+    throw new MnemonicValidationError(
+      'INVALID_CHECKSUM',
+      'Mnemonic checksum validation failed. Please check for typos.',
+      'The mnemonic does not pass BIP39 checksum validation'
+    );
+  }
 }
