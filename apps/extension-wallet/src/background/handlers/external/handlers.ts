@@ -41,6 +41,9 @@ export async function handleRequestAccess(
   // Enqueue for approval (in production, this would open a popup)
   enqueueApproval(ctx.requestId, origin, MethodName.REQUEST_ACCESS, params);
 
+  // Open approval UX before the MVP auto-approval path.
+  void openApprovalWindow(ctx.requestId, 'grant-access');
+
   // For MVP, auto-approve (in production, wait for user approval)
   await addToAllowlist(network, smartAccountId, origin);
 
@@ -156,6 +159,9 @@ export async function handleSignAuthEntry(
 
   // Enqueue for approval
   enqueueApproval(requestId, origin, MethodName.SIGN_AUTH_ENTRY, params);
+
+  // Open approval window (side panel on Chrome 116+, popup fallback)
+  void openApprovalWindow(requestId, 'sign-auth-entry');
 
   // For MVP, return a mock signed auth entry
   return {
