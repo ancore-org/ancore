@@ -1,6 +1,6 @@
 /**
  * Minimal ambient declaration for the subset of `react-native` used by
- * {@link MobileSecureVault}.
+ * {@link MobileSecureVault} and WalletConnect deep link handling.
  */
 declare module 'react-native' {
   export type AppStateEvent = 'change' | 'focus' | 'blur';
@@ -15,4 +15,18 @@ declare module 'react-native' {
   }
 
   export const AppState: AppStateStatic;
+
+  export interface LinkingUrlEvent {
+    url: string;
+  }
+
+  export interface LinkingStatic {
+    getInitialURL(): Promise<string | null>;
+    addEventListener(
+      type: 'url',
+      handler: (event: LinkingUrlEvent) => void
+    ): { remove: () => void };
+  }
+
+  export const Linking: LinkingStatic;
 }

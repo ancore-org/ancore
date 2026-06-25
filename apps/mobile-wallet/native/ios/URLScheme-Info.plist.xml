@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<!--
+  Merge into the host app Info.plist to register the ancore:// URL scheme.
+
+  Add the CFBundleURLTypes entry below inside the top-level <dict> of Info.plist.
+-->
+<plist version="1.0">
+  <dict>
+    <key>CFBundleURLTypes</key>
+    <array>
+      <dict>
+        <key>CFBundleURLName</key>
+        <string>org.ancore.wallet</string>
+        <key>CFBundleURLSchemes</key>
+        <array>
+          <string>ancore</string>
+        </array>
+      </dict>
+    </array>
+  </dict>
+</plist>
