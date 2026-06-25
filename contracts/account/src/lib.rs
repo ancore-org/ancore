@@ -122,6 +122,7 @@ pub enum DataKey {
     Nonce,
     SessionKey(BytesN<32>),
     Version,
+    ValidationModules,
 }
 
 /// Caller authorization path for [`AncoreAccount::execute`].
@@ -323,6 +324,26 @@ impl AncoreAccount {
             (to.clone(), function.clone(), current_nonce),
         );
 
+        // Call each registered validation module before executing the operation.
+        // Modules expose `validate(to, function, args) -> Result<(), u32>`.
+        // Any module returning an error aborts execution with InsufficientPermission.
+        let modules: Vec<Address> = env
+            .storage()
+            .instance()
+            .get(&DataKey::ValidationModules)
+            .unwrap_or_else(|| Vec::new(&env));
+
+        let validate_fn = Symbol::new(&env, "validate");
+        for module in modules.iter() {
+            let mut module_args: Vec<Val> = Vec::new(&env);
+            module_args.push_back(to.clone().to_val());
+            module_args.push_back(function.clone().to_val());
+            for arg in args.iter() {
+                module_args.push_back(arg);
+            }
+            let _: Val = env.invoke_contract(&module, &validate_fn, module_args);
+        }
+
         let result: Val = env.invoke_contract(&to, &function, args);
 
         Ok(result)
@@ -453,6 +474,71 @@ impl AncoreAccount {
             .extend_ttl(INSTANCE_BUMP_THRESHOLD, INSTANCE_BUMP_AMOUNT);
 
         Ok(())
+    }
+
+    /// Register a validation module (owner only).
+    ///
+    /// The module must expose a `validate` function with signature
+    /// `fn validate(to: Address, function: Symbol, args: Vec<Val>) -> Result<(), u32>`.
+    /// It is called before each `execute()` invocation.
+    pub fn register_module(env: Env, module: Address) -> Result<(), ContractError> {
+        let owner = Self::get_owner(env.clone())?;
+        owner.require_auth();
+
+        let mut modules: Vec<Address> = env
+            .storage()
+            .instance()
+            .get(&DataKey::ValidationModules)
+            .unwrap_or_else(|| Vec::new(&env));
+
+        if !modules.contains(&module) {
+            modules.push_back(module);
+        }
+
+        env.storage()
+            .instance()
+            .set(&DataKey::ValidationModules, &modules);
+        env.storage()
+            .instance()
+            .extend_ttl(INSTANCE_BUMP_THRESHOLD, INSTANCE_BUMP_AMOUNT);
+
+        Ok(())
+    }
+
+    /// Unregister a validation module (owner only).
+    pub fn unregister_module(env: Env, module: Address) -> Result<(), ContractError> {
+        let owner = Self::get_owner(env.clone())?;
+        owner.require_auth();
+
+        let modules: Vec<Address> = env
+            .storage()
+            .instance()
+            .get(&DataKey::ValidationModules)
+            .unwrap_or_else(|| Vec::new(&env));
+
+        let mut updated = Vec::new(&env);
+        for m in modules.iter() {
+            if m != module {
+                updated.push_back(m);
+            }
+        }
+
+        env.storage()
+            .instance()
+            .set(&DataKey::ValidationModules, &updated);
+        env.storage()
+            .instance()
+            .extend_ttl(INSTANCE_BUMP_THRESHOLD, INSTANCE_BUMP_AMOUNT);
+
+        Ok(())
+    }
+
+    /// Return the list of registered validation modules.
+    pub fn get_modules(env: Env) -> Vec<Address> {
+        env.storage()
+            .instance()
+            .get(&DataKey::ValidationModules)
+            .unwrap_or_else(|| Vec::new(&env))
     }
 
     /// Upgrade the contract's WASM logic
@@ -1525,5 +1611,61 @@ mod test {
         client.set_allowed_contracts(&session_pk, &None);
         let key = client.get_session_key(&session_pk).unwrap();
         assert!(key.allowed_contracts.is_none());
+    }
+
+    #[test]
+    fn test_register_and_get_modules() {
+        let env = Env::default();
+        let contract_id = env.register_contract(None, AncoreAccount);
+        let client = AncoreAccountClient::new(&env, &contract_id);
+
+        let owner = Address::generate(&env);
+        init(&env, &client, &owner);
+        env.mock_all_auths();
+
+        assert_eq!(client.get_modules().len(), 0);
+
+        let module_addr = Address::generate(&env);
+        client.register_module(&module_addr);
+
+        let modules = client.get_modules();
+        assert_eq!(modules.len(), 1);
+        assert_eq!(modules.get_unchecked(0), module_addr);
+    }
+
+    #[test]
+    fn test_register_module_idempotent() {
+        let env = Env::default();
+        let contract_id = env.register_contract(None, AncoreAccount);
+        let client = AncoreAccountClient::new(&env, &contract_id);
+
+        let owner = Address::generate(&env);
+        init(&env, &client, &owner);
+        env.mock_all_auths();
+
+        let module_addr = Address::generate(&env);
+        client.register_module(&module_addr);
+        client.register_module(&module_addr);
+
+        // Registering twice should not duplicate
+        assert_eq!(client.get_modules().len(), 1);
+    }
+
+    #[test]
+    fn test_unregister_module() {
+        let env = Env::default();
+        let contract_id = env.register_contract(None, AncoreAccount);
+        let client = AncoreAccountClient::new(&env, &contract_id);
+
+        let owner = Address::generate(&env);
+        init(&env, &client, &owner);
+        env.mock_all_auths();
+
+        let module_addr = Address::generate(&env);
+        client.register_module(&module_addr);
+        assert_eq!(client.get_modules().len(), 1);
+
+        client.unregister_module(&module_addr);
+        assert_eq!(client.get_modules().len(), 0);
     }
 }
