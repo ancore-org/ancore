@@ -4,12 +4,14 @@ import type { Network } from '@ancore/types';
 
 export type DashboardEnvironment = 'production' | 'staging';
 export type DisplayPreference = 'comfortable' | 'compact';
+export type ApprovalUxPreference = 'sidePanel' | 'popup';
 
 export interface DashboardSettingsState {
   network: Network;
   environment: DashboardEnvironment;
   displayPreference: DisplayPreference;
   autoLockTimeout: number;
+  approvalUx: ApprovalUxPreference;
   setNetwork: (network: Network) => void;
   setEnvironment: (environment: DashboardEnvironment) => void;
   setDisplayPreference: (displayPreference: DisplayPreference) => void;
@@ -21,6 +23,7 @@ export interface DashboardSettingsSnapshot {
   environment: DashboardEnvironment;
   displayPreference: DisplayPreference;
   autoLockTimeout: number;
+  approvalUx: ApprovalUxPreference;
 }
 
 export const DEFAULT_DASHBOARD_SETTINGS: DashboardSettingsSnapshot = {
@@ -28,6 +31,7 @@ export const DEFAULT_DASHBOARD_SETTINGS: DashboardSettingsSnapshot = {
   environment: 'production',
   displayPreference: 'comfortable',
   autoLockTimeout: 5,
+  approvalUx: 'sidePanel',
 };
 
 export const DASHBOARD_SETTINGS_STORAGE_KEY = 'ancore_dashboard_settings';
@@ -49,6 +53,7 @@ export const useDashboardSettingsStore = create<DashboardSettingsState>()(
         environment: state.environment,
         displayPreference: state.displayPreference,
         autoLockTimeout: state.autoLockTimeout,
+        approvalUx: state.approvalUx,
       }),
     }
   )

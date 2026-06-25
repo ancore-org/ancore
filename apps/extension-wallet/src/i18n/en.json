@@ -33,6 +33,12 @@
       "compact": "Compact",
       "value": "{{density}} • {{theme}}"
     },
+    "approvals": {
+      "label": "Approval UX",
+      "description": "Choose how dApp signing prompts open",
+      "sidePanel": "Side panel",
+      "popup": "Popup"
+    },
     "theme": {
       "light": "Light",
       "dark": "Dark",
