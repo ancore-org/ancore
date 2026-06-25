@@ -12,7 +12,33 @@ import {
   resolveRequest,
   rejectRequest,
   clearResponseCallbacks,
+  getSessionEntry,
 } from '../response-queue';
+
+// ── chrome.storage.session mock ───────────────────────────────────────────────
+
+const sessionStore: Record<string, unknown> = {};
+const mockSession = {
+  set: vi.fn((data: Record<string, unknown>, _cb?: () => void) => {
+    Object.assign(sessionStore, data);
+  }),
+  get: vi.fn((key: string, cb: (result: Record<string, unknown>) => void) => {
+    cb({ [key]: sessionStore[key] });
+  }),
+  remove: vi.fn((key: string) => {
+    delete sessionStore[key];
+  }),
+};
+
+// Re-set globalThis.chrome in beforeEach because vitest.setup.ts deletes it
+// before every test to prevent leakage between files.
+beforeEach(() => {
+  (globalThis as any).chrome = { storage: { session: mockSession } };
+  Object.keys(sessionStore).forEach((k) => delete sessionStore[k]);
+  mockSession.set.mockClear();
+  mockSession.get.mockClear();
+  mockSession.remove.mockClear();
+});
 
 describe('response queue', () => {
   beforeEach(() => {
@@ -234,6 +260,57 @@ describe('response queue', () => {
         resolveRequest('123', { result: 'test' });
         resolveRequest('456', { result: 'test' });
       });
+    });
+  });
+
+  // ── Session storage (chrome.storage.session) ────────────────────────────────
+
+  describe('session storage', () => {
+    it('enqueueApproval writes pending status to session storage', () => {
+      enqueueApproval('req-1', 'https://dapp.example', 'signTransaction', {});
+
+      expect(mockSession.set).toHaveBeenCalledWith(
+        expect.objectContaining({
+          'req-1': expect.objectContaining({ requestId: 'req-1', status: 'pending' }),
+        })
+      );
+    });
+
+    it('resolveRequest updates session entry to resolved', async () => {
+      registerResponseCallbacks(
+        'req-2',
+        () => {},
+        () => {}
+      );
+      resolveRequest('req-2', { signedXdr: 'abc' });
+
+      const entry = await getSessionEntry('req-2');
+      expect(entry).toEqual(
+        expect.objectContaining({
+          requestId: 'req-2',
+          status: 'resolved',
+          result: { signedXdr: 'abc' },
+        })
+      );
+    });
+
+    it('rejectRequest updates session entry to rejected with error message', async () => {
+      registerResponseCallbacks(
+        'req-3',
+        () => {},
+        () => {}
+      );
+      rejectRequest('req-3', new Error('user rejected'));
+
+      const entry = await getSessionEntry('req-3');
+      expect(entry).toEqual(
+        expect.objectContaining({ requestId: 'req-3', status: 'rejected', error: 'user rejected' })
+      );
+    });
+
+    it('getSessionEntry returns null for unknown requestId', async () => {
+      const entry = await getSessionEntry('no-such-id');
+      expect(entry).toBeNull();
     });
   });
 });
