@@ -8,6 +8,7 @@ export interface AuthState {
   isUnlocked: boolean;
   walletName: string;
   accountAddress: string;
+  smartAccountId?: string;
 }
 
 export const DEFAULT_AUTH_STATE: AuthState = {
@@ -20,7 +21,7 @@ export const DEFAULT_AUTH_STATE: AuthState = {
 interface AuthContextValue {
   authState: AuthState;
   unlockError: string | null;
-  completeOnboarding: (walletName: string) => void;
+  completeOnboarding: (walletName: string, publicKey?: string, smartAccountId?: string) => void;
   unlockWallet: (password: string) => Promise<boolean>;
   lockWallet: () => void;
   resetWallet: () => void;
@@ -85,13 +86,14 @@ export function ExtensionAuthProvider({
     () => ({
       authState,
       unlockError,
-      completeOnboarding: (walletName: string) => {
+      completeOnboarding: (walletName: string, publicKey?: string, smartAccountId?: string) => {
         setUnlockError(null);
         setAuthState({
           hasOnboarded: true,
           isUnlocked: true,
           walletName: walletName.trim() || DEFAULT_AUTH_STATE.walletName,
-          accountAddress: DEFAULT_AUTH_STATE.accountAddress,
+          accountAddress: publicKey ?? DEFAULT_AUTH_STATE.accountAddress,
+          ...(smartAccountId ? { smartAccountId } : {}),
         });
       },
       unlockWallet: async (password: string) => {
@@ -156,7 +158,7 @@ export function AuthGuard() {
   const location = useLocation();
 
   if (!authState.hasOnboarded) {
-    return <Navigate replace state={{ from: location.pathname }} to="/welcome" />;
+    return <Navigate replace state={{ from: location.pathname }} to="/onboarding" />;
   }
 
   if (!authState.isUnlocked) {
@@ -171,7 +173,7 @@ export function PublicOnlyGuard({
   mode,
 }: {
   children: React.ReactElement;
-  mode: 'welcome' | 'create-account' | 'unlock';
+  mode: 'welcome' | 'onboarding' | 'unlock';
 }) {
   const { authState } = useExtensionAuth();
 

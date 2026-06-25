@@ -126,6 +126,7 @@ export function convertToUSD(xlmAmount: number, rate: number = 0.12): number {
 
 /**
  * Utility function to format USD value
+ * @deprecated Use `formatFiatAmount` from `@ancore/core-sdk` instead.
  */
 export function formatUSD(amount: number): string {
   return new Intl.NumberFormat('en-US', {

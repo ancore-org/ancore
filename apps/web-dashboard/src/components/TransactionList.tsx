@@ -1,17 +1,88 @@
-import React, { useState } from 'react';
-import { Card, CardContent, CardHeader, CardTitle, Badge, Button } from '@ancore/ui-kit';
-import { Download } from 'lucide-react';
+import React, { useState, useMemo } from 'react';
+import {
+  Card,
+  CardContent,
+  CardHeader,
+  CardTitle,
+  Badge,
+  Button,
+  EmptyState,
+} from '@ancore/ui-kit';
+import { Download, Clock, ChevronUp, ChevronDown } from 'lucide-react';
 import type { Transaction } from '../types/dashboard';
+import { useTableDensity } from '../contexts/TableDensityContext';
+import { formatTxDate } from '../lib/formatDate';
 
 interface TransactionListProps {
   transactions: Transaction[];
   pageSize?: number;
+  optimisticTransaction?: Transaction | null;
 }
 
-export const TransactionList: React.FC<TransactionListProps> = ({ transactions, pageSize = 5 }) => {
+type SortField = 'date' | 'amount' | 'status';
+type SortDirection = 'asc' | 'desc';
+
+export const TransactionList: React.FC<TransactionListProps> = ({
+  transactions,
+  pageSize = 5,
+  optimisticTransaction = null,
+}) => {
+  const { density } = useTableDensity();
   const [page, setPage] = useState(0);
-  const total = Math.ceil(transactions.length / pageSize);
-  const visible = transactions.slice(page * pageSize, (page + 1) * pageSize);
+  const [sortField, setSortField] = useState<SortField>('date');
+  const [sortDirection, setSortDirection] = useState<SortDirection>('desc');
+
+  // Combine optimistic and confirmed transactions
+  const allTransactions = optimisticTransaction
+    ? [optimisticTransaction, ...transactions]
+    : transactions;
+
+  // Sort transactions
+  const sortedTransactions = useMemo(() => {
+    const sorted = [...allTransactions];
+    sorted.sort((a, b) => {
+      let comparison = 0;
+
+      switch (sortField) {
+        case 'date':
+          comparison = a.timestamp.getTime() - b.timestamp.getTime();
+          break;
+        case 'amount':
+          comparison = a.amount - b.amount;
+          break;
+        case 'status':
+          comparison = a.status.localeCompare(b.status);
+          break;
+      }
+
+      return sortDirection === 'asc' ? comparison : -comparison;
+    });
+
+    // Keep optimistic transaction at the top regardless of sort
+    if (optimisticTransaction) {
+      const optimisticIndex = sorted.findIndex(
+        (tx: Transaction) => tx.id === optimisticTransaction.id
+      );
+      if (optimisticIndex > 0) {
+        const [optimistic] = sorted.splice(optimisticIndex, 1);
+        sorted.unshift(optimistic);
+      }
+    }
+
+    return sorted;
+  }, [allTransactions, sortField, sortDirection, optimisticTransaction]);
+
+  const total = Math.ceil(sortedTransactions.length / pageSize);
+  const visible = sortedTransactions.slice(page * pageSize, (page + 1) * pageSize);
+
+  const handleSort = (field: SortField) => {
+    if (sortField === field) {
+      setSortDirection((prev: SortDirection) => (prev === 'asc' ? 'desc' : 'asc'));
+    } else {
+      setSortField(field);
+      setSortDirection('desc');
+    }
+  };
 
   const handleExportCSV = () => {
     if (transactions.length === 0) return;
@@ -40,6 +111,47 @@ export const TransactionList: React.FC<TransactionListProps> = ({ transactions, 
     window.URL.revokeObjectURL(url);
   };
 
+  const getStatusBadgeVariant = (status: 'confirmed' | 'pending', isOptimistic: boolean) => {
+    if (isOptimistic && status === 'pending') {
+      return 'secondary';
+    }
+    return status === 'confirmed' ? 'default' : 'secondary';
+  };
+
+  const getStatusDisplay = (status: 'confirmed' | 'pending', isOptimistic: boolean) => {
+    if (isOptimistic && status === 'pending') {
+      return 'pending (optimistic)';
+    }
+    return status;
+  };
+
+  const densityPadding = density === 'compact' ? 'py-1' : 'py-2';
+
+  const SortHeader: React.FC<{ field: SortField; label: string }> = ({
+    field,
+    label,
+  }: {
+    field: SortField;
+    label: string;
+  }) => (
+    <Button
+      variant="ghost"
+      size="sm"
+      className="h-auto p-1 font-normal"
+      onClick={() => handleSort(field)}
+    >
+      <span className="flex items-center gap-1">
+        {label}
+        {sortField === field &&
+          (sortDirection === 'asc' ? (
+            <ChevronUp className="w-3 h-3" />
+          ) : (
+            <ChevronDown className="w-3 h-3" />
+          ))}
+      </span>
+    </Button>
+  );
+
   return (
     <Card>
       <CardHeader className="flex flex-row items-center justify-between">
@@ -54,39 +166,58 @@ export const TransactionList: React.FC<TransactionListProps> = ({ transactions, 
           Export CSV
         </Button>
       </CardHeader>
-      <CardContent className="space-y-2">
-        {visible.length === 0 ? (
-          <p className="text-sm text-muted-foreground">No transactions found.</p>
-        ) : (
-          visible.map((tx) => (
-            <div
-              key={tx.id}
-              className="flex items-center justify-between py-2 border-b last:border-0"
-            >
-              <div className="flex items-center gap-3">
-                <Badge variant={tx.type === 'receive' ? 'default' : 'secondary'}>{tx.type}</Badge>
-                <span className="text-sm text-muted-foreground">
-                  {tx.timestamp.toLocaleDateString()}
-                </span>
-              </div>
-              <div className="flex items-center gap-3">
-                <span className="font-medium">
-                  {tx.type === 'send' ? '-' : '+'}
-                  {tx.amount} XLM
-                </span>
-                <Badge variant={tx.status === 'confirmed' ? 'default' : 'secondary'}>
-                  {tx.status}
-                </Badge>
-              </div>
+      <CardContent className={density === 'compact' ? 'space-y-1' : 'space-y-2'}>
+        {allTransactions.length > 0 && (
+          <div className="flex items-center justify-between px-2 pb-2 border-b">
+            <div className="flex items-center gap-2">
+              <SortHeader field="date" label="Date" />
+              <SortHeader field="amount" label="Amount" />
+              <SortHeader field="status" label="Status" />
             </div>
-          ))
+          </div>
+        )}
+        {visible.length === 0 ? (
+          <EmptyState title="No transactions found." />
+        ) : (
+          visible.map((tx: Transaction, index: number) => {
+            const isOptimistic = tx.id === optimisticTransaction?.id;
+            const rowClassName = isOptimistic ? 'bg-amber-50 border-l-2 border-amber-500 pl-2' : '';
+
+            return (
+              <div
+                key={`${tx.id}-${index}`}
+                className={`flex items-center justify-between ${densityPadding} border-b last:border-0 ${rowClassName}`}
+              >
+                <div className="flex items-center gap-3">
+                  <div className="flex items-center gap-2">
+                    <Badge variant={tx.type === 'receive' ? 'default' : 'secondary'}>
+                      {tx.type}
+                    </Badge>
+                    {isOptimistic && <Clock className="w-4 h-4 text-amber-600" />}
+                  </div>
+                  <span className="text-sm text-muted-foreground">
+                    {formatTxDate(tx.timestamp.toISOString())}
+                  </span>
+                </div>
+                <div className="flex items-center gap-3">
+                  <span className="font-medium">
+                    {tx.type === 'send' ? '-' : '+'}
+                    {tx.amount} XLM
+                  </span>
+                  <Badge variant={getStatusBadgeVariant(tx.status, isOptimistic)}>
+                    {getStatusDisplay(tx.status, isOptimistic)}
+                  </Badge>
+                </div>
+              </div>
+            );
+          })
         )}
         {total > 1 && (
           <div className="flex justify-between items-center pt-2">
             <Button
               variant="outline"
               size="sm"
-              onClick={() => setPage((p) => p - 1)}
+              onClick={() => setPage((p: number) => p - 1)}
               disabled={page === 0}
             >
               Previous
@@ -97,7 +228,7 @@ export const TransactionList: React.FC<TransactionListProps> = ({ transactions, 
             <Button
               variant="outline"
               size="sm"
-              onClick={() => setPage((p) => p + 1)}
+              onClick={() => setPage((p: number) => p + 1)}
               disabled={page >= total - 1}
             >
               Next

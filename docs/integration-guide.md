@@ -19,6 +19,8 @@ update workflow. It is the companion to the reference docs:
 | [`sdk-wrappers.md`](./sdk-wrappers.md) | SDK wrapper methods and error hierarchy |
 | [`examples/session-key-execute.md`](./examples/session-key-execute.md) | Session-key execute flow |
 | [`examples/send-payment.md`](./examples/send-payment.md) | Payment flow |
+| [`architecture/OVERVIEW.md#send-flow`](./architecture/OVERVIEW.md#send-flow) | End-to-end send sequence (extension → SDK → relayer → contract → Horizon) |
+| [`services/relayer/README.md`](../services/relayer/README.md) | Relayer API, error codes, and client handling guide |
 
 ---
 
@@ -133,6 +135,68 @@ async function executeWithRetry(params, contract, readOptions) {
 
 ---
 
+## Relayer error codes
+
+When a client calls the relayer (`POST /relay/execute` or `POST /relay/validate`), business-logic
+failures are returned as a `422` response with a typed `error.code`. Clients **must** handle all
+codes explicitly — do not swallow or re-throw a bare `Error` without mapping it.
+
+> Full error-handling pseudocode is in [`services/relayer/README.md — Client handling guide`](../services/relayer/README.md#error-codes).
+> This section complements issue #573 (relayer OpenAPI alignment).
+
+### Error code table
+
+| Code | HTTP status | Client action |
+|---|---|---|
+| `INVALID_SIGNATURE` | 422 | Re-sign the payload with the correct session key and retry |
+| `SESSION_KEY_EXPIRED` | 422 | Prompt the user to re-authenticate; obtain a new session key |
+| `NONCE_REPLAY` | 422 | Fetch a fresh nonce from the contract and retry once |
+| `GAS_LIMIT_EXCEEDED` | 422 | Reduce operation complexity or split into smaller transactions |
+| `SIMULATION_FAILED` | 422 | Check contract inputs and account state; do not auto-retry |
+| `UNAUTHORIZED` | 401 | Re-authenticate and obtain a new Bearer token |
+| `VALIDATION_ERROR` | 400 | Fix the request shape at the call site (programming error) |
+| `INTERNAL_ERROR` | 500 | Log and surface a generic retry message; do not expose internals |
+
+### Handling contract
+
+```typescript
+switch (relayError.code) {
+  case 'INVALID_SIGNATURE':
+    await resignAndRetry(request);
+    break;
+  case 'SESSION_KEY_EXPIRED':
+    promptReAuthentication();
+    break;
+  case 'NONCE_REPLAY':
+    await retryWithFreshNonce(request);
+    break;
+  case 'GAS_LIMIT_EXCEEDED':
+  case 'SIMULATION_FAILED':
+    showUserError('Transaction cannot be submitted. Check your inputs.');
+    break;
+  case 'UNAUTHORIZED':
+    redirectToLogin();
+    break;
+  case 'VALIDATION_ERROR':
+    // Programming error — fix the call site, not a user-facing issue.
+    throw relayError;
+  default:
+    showUserError('Something went wrong. Please try again.');
+}
+```
+
+### Cross-check script
+
+To verify that the codes documented here stay in sync with the relayer's TypeScript enum, run:
+
+```bash
+grep -r "RelayErrorCode\|error\.code" services/relayer/src/types --include="*.ts"
+```
+
+All codes listed in `RelayErrorCode` (in `services/relayer/src/types/`) must appear in the table above.
+
+---
+
 ## Session key lifecycle
 
 ```
@@ -240,6 +304,7 @@ hardcode a contract ID; read it from environment configuration.
 ## Related
 
 - [Architecture overview](./architecture/OVERVIEW.md)
+- [Send flow sequence diagram](./architecture/OVERVIEW.md#send-flow) — extension wallet payment through SDK, relayer, account contract, and Horizon
 - [Security model](./security/THREAT_MODEL.md)
 - [Contributing guide](../CONTRIBUTING.md)
 - [RFC process](../RFC.md)

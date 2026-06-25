@@ -57,9 +57,9 @@ export const SendTransaction: Story = {
         </Form>
 
         {submitted && (
-          <div className="rounded-md border border-green-500 bg-green-50 p-3 text-sm">
-            <p className="font-semibold text-green-700">Submitted!</p>
-            <pre className="mt-1 text-xs text-green-600 break-all whitespace-pre-wrap">
+          <div className="rounded-md border border-success/25 bg-success/10 p-3 text-sm">
+            <p className="font-semibold text-success">Submitted!</p>
+            <pre className="mt-1 text-xs text-muted-foreground break-all whitespace-pre-wrap">
               {JSON.stringify(submitted, null, 2)}
             </pre>
           </div>

@@ -57,11 +57,36 @@ test.describe('Extension release-candidate smoke @smoke', () => {
     await seedWallet('onboarded-unlocked');
     await navigateTo(page, '/session-keys');
 
-    await expect(page.getByText('Active keys')).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'Session Keys' })).toBeVisible();
+    await expect(page.getByText('Active Keys')).toBeVisible();
     await expect(page.getByRole('button', { name: /Add session key/i })).toBeVisible();
 
     await clearWallet();
     await navigateTo(page, '/session-keys');
     await expect(page).not.toHaveURL(/\/session-keys$/);
+  });
+
+  test('settings screen renders i18n copy without layout regression @smoke', async ({
+    page,
+    seedWallet,
+    freezeTime,
+  }) => {
+    await freezeTime('2026-01-15T10:00:00.000Z');
+    await seedWallet('onboarded-unlocked');
+    await navigateTo(page, '/settings');
+
+    await expect(page).toHaveURL(/\/settings/);
+    await expect(page.getByRole('heading', { name: 'Settings' })).toBeVisible();
+    await expect(page.getByText('Manage your wallet preferences')).toBeVisible();
+    await expect(page.getByText('About Ancore')).toBeVisible();
+    await expect(page.getByText('Notifications (Demo)')).toBeVisible();
+
+    // Visual baseline for local regression; CI validates rendered i18n copy via assertions above.
+    if (!process.env.CI) {
+      await expect(page.locator('.bg-gradient-to-br.from-primary')).toHaveScreenshot(
+        'settings-header.png',
+        { maxDiffPixelRatio: 0.02 }
+      );
+    }
   });
 });

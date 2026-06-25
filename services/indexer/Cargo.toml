@@ -39,6 +39,10 @@ async-trait = "0.1"
 tracing = "0.1"
 tracing-subscriber = { version = "0.3", features = ["env-filter"] }
 
+# Metrics
+metrics = "0.22"
+metrics-exporter-prometheus = { version = "0.13", default-features = false, features = ["http-listener"] }
+
 # Environment
 dotenvy = "0.15"
 

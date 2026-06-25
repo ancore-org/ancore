@@ -1,4 +1,5 @@
-import { test as base, type Page } from '@playwright/test';
+import { test as base, chromium, type Page, type BrowserContext } from '@playwright/test';
+import path from 'path';
 
 const AUTH_KEY = 'ancore_extension_auth';
 
@@ -29,6 +30,10 @@ export interface ExtensionFixtures {
   seedWallet: (state: WalletState) => Promise<void>;
   clearWallet: () => Promise<void>;
   freezeTime: (isoDate: string) => Promise<void>;
+  // Extension-loader fixtures for real-artifact tests
+  extensionContext: BrowserContext;
+  extensionId: string;
+  extensionUrl: (path: string) => string;
 }
 
 export const test = base.extend<ExtensionFixtures>({
@@ -61,6 +66,50 @@ export const test = base.extend<ExtensionFixtures>({
         };
       }, fixedTime);
     });
+  },
+
+  // Launches Chromium with the built dist/ loaded as an unpacked extension.
+  // Prerequisites: run `pnpm build` before the suite.
+  // eslint-disable-next-line no-empty-pattern
+  extensionContext: async ({}, use) => {
+    const distPath = path.resolve(__dirname, '../../dist');
+    const context = await chromium.launchPersistentContext('', {
+      headless: false,
+      args: [
+        `--disable-extensions-except=${distPath}`,
+        `--load-extension=${distPath}`,
+        '--no-sandbox',
+        '--disable-setuid-sandbox',
+      ],
+    });
+    await use(context);
+    await context.close();
+  },
+
+  extensionId: async ({ extensionContext }, use) => {
+    let extensionId = '';
+    for (let attempts = 0; attempts < 10; attempts++) {
+      const worker = extensionContext
+        .serviceWorkers()
+        .find((w) => w.url().startsWith('chrome-extension://'));
+      if (worker) {
+        extensionId = new URL(worker.url()).hostname;
+        break;
+      }
+      await new Promise((r) => setTimeout(r, 500));
+    }
+    if (!extensionId) {
+      throw new Error(
+        'Could not detect extension ID. Make sure the extension is built (`pnpm build`).'
+      );
+    }
+    await use(extensionId);
+  },
+
+  extensionUrl: async ({ extensionId }, use) => {
+    await use(
+      (pagePath: string) => `chrome-extension://${extensionId}/${pagePath.replace(/^\//, '')}`
+    );
   },
 });
 

@@ -9,17 +9,9 @@ import {
   Routes,
   useLocation,
   useNavigate,
+  useSearchParams,
 } from 'react-router-dom';
-import {
-  ArrowLeft,
-  ArrowRight,
-  Copy,
-  Lock,
-  PlusCircle,
-  ShieldCheck,
-  Sparkles,
-  Wallet,
-} from 'lucide-react';
+import { ArrowLeft, Lock, PlusCircle } from 'lucide-react';
 import { NotificationProvider } from '@ancore/ui-kit';
 import {
   AuthGuard,
@@ -28,22 +20,37 @@ import {
   UnlockVerifier,
   useExtensionAuth,
 } from './AuthGuard';
+import { OnboardingFlow } from '../screens/Onboarding/OnboardingFlow';
+import { DeployTestScreen } from '../screens/Onboarding/DeployTestScreen';
+import { SignTransactionApprovalScreen } from '../screens/SignTransactionApprovalScreen';
 import { NavBar } from '../components/Navigation/NavBar';
+import { ReceiveScreen as ReceiveScreenComponent } from '../screens/ReceiveScreen';
 import { SettingsScreen } from '../screens/Settings/SettingsScreen';
+import { SendScreen as SendFlowScreen } from '../screens/Send/SendScreen';
+import { ScheduledTransfersScreen } from '../screens/ScheduledTransfers/ScheduledTransfersScreen';
+import { SessionKeysScreen } from '../screens/SessionKeys/SessionKeysScreen';
 import { useDashboardSettingsStore } from '../state/dashboard-settings';
+import { EmptyTransactions } from '../components/EmptyTransactions';
+import { ErrorBoundary } from '../components/ErrorBoundary/ErrorBoundary';
+import { useAccountStore } from '../stores/account';
+import { resolveIndexerUrl } from '../config/urls';
+import { createIndexerActivityAdapter } from '../adapters/indexerActivityAdapter';
+import type { IndexerActivityRecord } from '../adapters/indexerActivityAdapter';
 
 const APP_TITLE = 'Ancore Extension';
 
 const pageTitles: Record<string, string> = {
   '/unlock': 'Unlock Wallet',
   '/welcome': 'Welcome',
-  '/create-account': 'Create Account',
+  '/onboarding': 'Create Wallet',
   '/home': 'Home',
   '/send': 'Send',
+  '/scheduled': 'Scheduled Transfers',
   '/receive': 'Receive',
   '/history': 'History',
   '/settings': 'Settings',
   '/session-keys': 'Session Keys',
+  '/sign-transaction': 'Sign Transaction',
 };
 
 function getPageTitle(pathname: string): string {
@@ -77,7 +84,7 @@ function RootRedirect() {
   const { authState } = useExtensionAuth();
 
   if (!authState.hasOnboarded) {
-    return <Navigate replace to="/welcome" />;
+    return <Navigate replace to="/onboarding" />;
   }
 
   return <Navigate replace to={authState.isUnlocked ? '/home' : '/unlock'} />;
@@ -188,41 +195,8 @@ function SecondaryLink({ to, children }: { to: string; children: React.ReactNode
   );
 }
 
-function WelcomeScreen() {
-  return (
-    <PageScaffold
-      eyebrow="Extension setup"
-      title="Meet your Ancore wallet"
-      description="Create a fresh account flow for first-time users, or jump back into an existing wallet."
-    >
-      <Card
-        title="What this flow covers"
-        description="Secure setup, protected routes, and a navigation shell built for the popup experience."
-      >
-        <div className="grid gap-3 text-sm text-muted-foreground">
-          <div className="flex items-center gap-3">
-            <Sparkles className="h-4 w-4 text-primary" />
-            <span>First-time setup and unlock states stay separate.</span>
-          </div>
-          <div className="flex items-center gap-3">
-            <ShieldCheck className="h-4 w-4 text-primary" />
-            <span>Protected screens redirect automatically when the wallet is locked.</span>
-          </div>
-          <div className="flex items-center gap-3">
-            <Wallet className="h-4 w-4 text-primary" />
-            <span>Navigation works across dashboard, send, receive, history, and settings.</span>
-          </div>
-        </div>
-      </Card>
-      <div className="space-y-3">
-        <SecondaryLink to="/unlock">I already have a wallet</SecondaryLink>
-        <SecondaryLink to="/create-account">Create a wallet</SecondaryLink>
-      </div>
-    </PageScaffold>
-  );
-}
-
-function CreateAccountScreen() {
+// Demo CreateAccountScreen preserved only for local development with VITE_DEMO_ROUTER=true
+function DemoCreateAccountScreen() {
   const navigate = useNavigate();
   const { completeOnboarding } = useExtensionAuth();
   const [walletName, setWalletName] = React.useState('My Ancore Wallet');
@@ -236,9 +210,9 @@ function CreateAccountScreen() {
   return (
     <PageScaffold
       backTo="/welcome"
-      eyebrow="New wallet"
-      title="Create account"
-      description="This placeholder flow establishes a session so the protected routes can be exercised end to end."
+      eyebrow="Demo only"
+      title="Create account (demo)"
+      description="This demo path is only available in development with VITE_DEMO_ROUTER=true."
     >
       <Card title="Wallet profile" description="Pick a name for the local demo wallet session.">
         <form className="space-y-4" onSubmit={handleCreate}>
@@ -251,10 +225,7 @@ function CreateAccountScreen() {
               value={walletName}
             />
           </label>
-          <PrimaryButton type="submit">
-            Create wallet
-            <ArrowRight className="ml-2 h-4 w-4" />
-          </PrimaryButton>
+          <PrimaryButton type="submit">Create wallet (demo)</PrimaryButton>
         </form>
       </Card>
     </PageScaffold>
@@ -358,91 +329,334 @@ function HomeScreen() {
       </Card>
       <div className="grid grid-cols-2 gap-3">
         <SecondaryLink to="/send">Send funds</SecondaryLink>
+        <SecondaryLink to="/scheduled">Scheduled transfers</SecondaryLink>
         <SecondaryLink to="/receive">Receive funds</SecondaryLink>
         <SecondaryLink to="/history">View history</SecondaryLink>
         <SecondaryLink to="/session-keys">Session keys</SecondaryLink>
       </div>
+      {import.meta.env.DEV && (
+        <button
+          className="mt-4 w-full rounded-xl border border-dashed border-yellow-500/50 px-4 py-3 text-sm font-semibold text-yellow-600 transition hover:bg-yellow-500/10"
+          onClick={() => chrome.runtime.sendMessage({ type: 'DEV_OPEN_APPROVAL' })}
+          type="button"
+        >
+          Test side panel sign
+        </button>
+      )}
     </PageScaffold>
   );
 }
 
-function SendScreen() {
+function SendScreenRoute() {
   return (
     <PageScaffold
       eyebrow="Payments"
       title="Send"
-      description="Draft a payment flow and keep users inside the authenticated part of the popup."
+      description="Send now or schedule a one-time or recurring transfer."
     >
-      <Card
-        title="New transaction"
-        description="This screen is wired into routing and ready for the real send form."
-      >
-        <div className="space-y-3">
-          <input
-            className="w-full rounded-xl border border-border bg-background px-3 py-3 text-sm outline-none transition focus:border-primary"
-            placeholder="Recipient address"
-          />
-          <input
-            className="w-full rounded-xl border border-border bg-background px-3 py-3 text-sm outline-none transition focus:border-primary"
-            placeholder="Amount"
-          />
-          <PrimaryButton>Review transaction</PrimaryButton>
-        </div>
-      </Card>
+      <SendFlowScreen />
+    </PageScaffold>
+  );
+}
+
+function ScheduledTransfersRoute() {
+  return (
+    <PageScaffold
+      eyebrow="Payments"
+      title="Scheduled Transfers"
+      description="Pause, cancel, and review execution outcomes for scheduled jobs."
+    >
+      <ScheduledTransfersScreen />
     </PageScaffold>
   );
 }
 
 function ReceiveScreen() {
   const network = useDashboardSettingsStore((state) => state.network);
+  const { authState } = useExtensionAuth();
 
   return (
-    <PageScaffold
-      eyebrow="Payments"
-      title="Receive"
-      description="Expose the wallet address and handoff to copy or QR actions."
-    >
-      <Card
-        title="Receive funds"
-        description={`Share this demo address with another wallet on ${network}.`}
-      >
-        <div className="rounded-xl border border-dashed border-border bg-background px-4 py-4 text-sm text-muted-foreground">
-          GCFX...WALLET
-        </div>
-        <div className="mt-4 flex gap-3">
-          <button
-            className="inline-flex flex-1 items-center justify-center rounded-xl border border-border px-4 py-3 text-sm font-semibold transition hover:bg-accent"
-            type="button"
-          >
-            <Copy className="mr-2 h-4 w-4" />
-            Copy address
-          </button>
-          <button
-            className="inline-flex flex-1 items-center justify-center rounded-xl border border-border px-4 py-3 text-sm font-semibold transition hover:bg-accent"
-            type="button"
-          >
-            Show QR
-          </button>
-        </div>
-      </Card>
-    </PageScaffold>
+    <ReceiveScreenComponent
+      smartAccountId={authState.smartAccountId}
+      ownerPublicKey={
+        authState.accountAddress !== 'GCFX...WALLET' ? authState.accountAddress : null
+      }
+      network={network}
+      onBack={() => window.history.back()}
+    />
   );
 }
 
-function HistoryScreen() {
-  const entries = [
-    { id: '1', label: 'Received from Treasury', amount: '+320 XLM', date: 'Today' },
-    { id: '2', label: 'Sent to Merchant', amount: '-48 XLM', date: 'Yesterday' },
-    { id: '3', label: 'Session key refresh', amount: 'Security event', date: 'Mar 23' },
-  ];
+export type HistoryFilter = 'all' | 'sent' | 'received' | 'failed';
 
+export type HistoryEntry = {
+  id: string;
+  label: string;
+  amount: string;
+  date: string;
+  kind: Exclude<HistoryFilter, 'all'>;
+  status: 'confirmed' | 'failed';
+};
+
+const HISTORY_FILTERS: Array<{ value: HistoryFilter; label: string }> = [
+  { value: 'all', label: 'All' },
+  { value: 'sent', label: 'Sent' },
+  { value: 'received', label: 'Received' },
+  { value: 'failed', label: 'Failed' },
+];
+
+// ---------------------------------------------------------------------------
+// Indexer data → HistoryEntry mapping helpers
+// ---------------------------------------------------------------------------
+
+function shortenAddress(address: string): string {
+  if (address.length <= 12) return address;
+  return `${address.slice(0, 6)}…${address.slice(-4)}`;
+}
+
+function humanizeActivityType(activityType: string): string {
+  switch (activityType) {
+    case 'payment':
+      return 'Payment';
+    case 'transfer':
+      return 'Transfer';
+    case 'contract_invocation':
+      return 'Contract interaction';
+    case 'contract_call':
+      return 'Contract call';
+    case 'smart_account_execute':
+      return 'Smart account execute';
+    case 'liquidity_pool':
+      return 'Liquidity pool';
+    default:
+      return activityType.replace(/_/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase());
+  }
+}
+
+function formatActivityDate(isoString: string): string {
+  const date = new Date(isoString);
+  if (isNaN(date.getTime())) return isoString;
+
+  const now = new Date();
+  const startOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  const startOfDate = new Date(date.getFullYear(), date.getMonth(), date.getDate());
+  const diffDays = Math.round(
+    (startOfToday.getTime() - startOfDate.getTime()) / (1000 * 60 * 60 * 24)
+  );
+
+  if (diffDays === 0) return 'Today';
+  if (diffDays === 1) return 'Yesterday';
+  if (diffDays < 7) return `${diffDays}d ago`;
+
+  return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+}
+
+function mapActivityToEntry(activity: IndexerActivityRecord, accountId: string): HistoryEntry {
+  const isIncoming = activity.activity_type === 'payment' && activity.counterparty !== accountId;
+  const isPayment = activity.activity_type === 'payment';
+
+  const kind: HistoryEntry['kind'] = isIncoming ? 'received' : 'sent';
+  const sign = isIncoming ? '+' : '-';
+  const asset = activity.asset ?? 'XLM';
+  const amount = activity.amount ?? '0';
+
+  let label: string;
+  if (isIncoming && activity.counterparty) {
+    label = `Received from ${shortenAddress(activity.counterparty)}`;
+  } else if (isPayment && activity.counterparty) {
+    label = `Sent to ${shortenAddress(activity.counterparty)}`;
+  } else if (isIncoming) {
+    label = 'Received';
+  } else {
+    label = humanizeActivityType(activity.activity_type);
+  }
+
+  return {
+    id: activity.id,
+    label,
+    amount: `${sign}${amount} ${asset}`,
+    date: formatActivityDate(activity.created_at),
+    kind,
+    status: 'confirmed',
+  };
+}
+
+// ---------------------------------------------------------------------------
+// Hook: paginated transaction history from the indexer
+// ---------------------------------------------------------------------------
+
+function useTransactionHistory() {
+  const { filter, setFilter } = useHistoryFilter();
+  const environment = useDashboardSettingsStore((s) => s.environment);
+  const { accounts, activeAccountId } = useAccountStore();
+
+  const smartAccountId = React.useMemo(() => {
+    if (!activeAccountId && accounts.length === 0) return null;
+    const active = accounts.find((a) => a.id === activeAccountId) ?? accounts[0];
+    return active?.contractId ?? null;
+  }, [accounts, activeAccountId]);
+
+  const indexerUrl = React.useMemo(() => {
+    if (!smartAccountId) return null;
+    return resolveIndexerUrl(environment);
+  }, [smartAccountId, environment]);
+
+  const adapter = React.useMemo(() => {
+    if (!smartAccountId || !indexerUrl) return null;
+    return createIndexerActivityAdapter(indexerUrl, smartAccountId);
+  }, [smartAccountId, indexerUrl]);
+
+  const [rawItems, setRawItems] = React.useState<IndexerActivityRecord[]>([]);
+  const [nextCursor, setNextCursor] = React.useState<string | null>(null);
+  const [initialLoading, setInitialLoading] = React.useState(true);
+  const [loadingMore, setLoadingMore] = React.useState(false);
+  const [error, setError] = React.useState<Error | null>(null);
+
+  React.useEffect(() => {
+    if (!adapter) {
+      setRawItems([]);
+      setNextCursor(null);
+      setInitialLoading(false);
+      return;
+    }
+
+    let cancelled = false;
+    setInitialLoading(true);
+    setError(null);
+
+    adapter
+      .fetchTransactionPage({ cursor: null, pageSize: 20 })
+      .then((page) => {
+        if (!cancelled) {
+          setRawItems(page.transactions);
+          setNextCursor(page.nextCursor);
+          setInitialLoading(false);
+        }
+      })
+      .catch((err) => {
+        if (!cancelled) {
+          setError(err instanceof Error ? err : new Error(String(err)));
+          setInitialLoading(false);
+        }
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [adapter]);
+
+  const loadMore = React.useCallback(async () => {
+    if (!adapter || !nextCursor || loadingMore) return;
+
+    setLoadingMore(true);
+    try {
+      const page = await adapter.fetchTransactionPage({
+        cursor: nextCursor,
+        pageSize: 20,
+      });
+      setRawItems((prev) => [...prev, ...page.transactions]);
+      setNextCursor(page.nextCursor);
+    } catch (err) {
+      setError(err instanceof Error ? err : new Error(String(err)));
+    } finally {
+      setLoadingMore(false);
+    }
+  }, [adapter, nextCursor, loadingMore]);
+
+  const hasMore = nextCursor !== null;
+
+  const entries = React.useMemo(() => {
+    if (!smartAccountId) return [];
+    return filterHistoryEntries(
+      rawItems.map((r) => mapActivityToEntry(r, smartAccountId)),
+      filter
+    );
+  }, [rawItems, filter, smartAccountId]);
+
+  return {
+    entries,
+    isLoading: initialLoading,
+    isLoadingMore: loadingMore,
+    error,
+    hasMore,
+    loadMore,
+    activeFilter: filter,
+    setFilter,
+    smartAccountId,
+  };
+}
+
+function isHistoryFilter(value: string | null): value is HistoryFilter {
+  return value === 'all' || value === 'sent' || value === 'received' || value === 'failed';
+}
+
+export function filterHistoryEntries(entries: HistoryEntry[], filter: HistoryFilter) {
+  return entries.filter((entry) => {
+    if (filter === 'all') {
+      return true;
+    }
+    return entry.kind === filter;
+  });
+}
+
+function useHistoryFilter() {
+  const [searchParams, setSearchParams] = useSearchParams();
+  const filterParam = searchParams.get('filter');
+  const filter: HistoryFilter = isHistoryFilter(filterParam) ? filterParam : 'all';
+
+  const setFilter = (nextFilter: HistoryFilter) => {
+    const nextParams = new URLSearchParams(searchParams);
+    if (nextFilter === 'all') {
+      nextParams.delete('filter');
+    } else {
+      nextParams.set('filter', nextFilter);
+    }
+    setSearchParams(nextParams, { replace: true });
+  };
+
+  return { filter, setFilter };
+}
+
+export function HistoryActivityList({
+  activeFilter,
+  entries,
+  onFilterChange,
+  onReceive,
+}: {
+  activeFilter: HistoryFilter;
+  entries: HistoryEntry[];
+  onFilterChange: (filter: HistoryFilter) => void;
+  onReceive?: () => void;
+}) {
   return (
-    <PageScaffold
-      eyebrow="Activity"
-      title="History"
-      description="A route-backed transaction feed with room for richer filtering later."
-    >
-      <Card title="Recent activity">
+    <Card title="Recent activity">
+      <div className="mb-4 flex flex-wrap gap-2" role="group" aria-label="Transaction filters">
+        {HISTORY_FILTERS.map((option) => {
+          const isActive = option.value === activeFilter;
+          return (
+            <button
+              key={option.value}
+              aria-pressed={isActive}
+              className={`rounded-full border px-3 py-1.5 text-xs font-semibold transition ${
+                isActive
+                  ? 'border-primary bg-primary text-primary-foreground shadow-sm'
+                  : 'border-border bg-background text-muted-foreground hover:bg-accent hover:text-foreground'
+              }`}
+              onClick={() => onFilterChange(option.value)}
+              type="button"
+            >
+              {option.label}
+            </button>
+          );
+        })}
+      </div>
+      {entries.length === 0 ? (
+        <EmptyTransactions
+          variant={activeFilter}
+          onReceive={onReceive}
+          onResetFilter={() => onFilterChange('all')}
+        />
+      ) : (
         <div className="space-y-3">
           {entries.map((entry) => (
             <div
@@ -451,44 +665,98 @@ function HistoryScreen() {
             >
               <div>
                 <p className="text-sm font-medium text-foreground">{entry.label}</p>
-                <p className="text-xs text-muted-foreground">{entry.date}</p>
+                <p className="text-xs text-muted-foreground">
+                  {entry.date} • {entry.status}
+                </p>
               </div>
               <span className="text-sm font-semibold text-foreground">{entry.amount}</span>
             </div>
           ))}
         </div>
-      </Card>
-    </PageScaffold>
+      )}
+    </Card>
   );
 }
 
-function SessionKeysScreen() {
+function HistoryScreen() {
+  const {
+    entries,
+    isLoading,
+    isLoadingMore,
+    error,
+    hasMore,
+    loadMore,
+    activeFilter,
+    setFilter,
+    smartAccountId,
+  } = useTransactionHistory();
+
+  if (!smartAccountId) {
+    return (
+      <PageScaffold
+        eyebrow="Activity"
+        title="History"
+        description="Filter recent transaction activity by sent, received, or failed status."
+      >
+        <EmptyTransactions
+          variant="all"
+          message="No account configured"
+          description="Set up a smart account to view transaction history."
+        />
+      </PageScaffold>
+    );
+  }
+
+  if (error && entries.length === 0) {
+    return (
+      <PageScaffold
+        eyebrow="Activity"
+        title="History"
+        description="Filter recent transaction activity by sent, received, or failed status."
+      >
+        <Card title="Unable to load history">
+          <p className="text-sm text-muted-foreground">
+            {error.message || 'Could not load transaction history.'}
+          </p>
+          <PrimaryButton className="mt-3" onClick={() => window.location.reload()}>
+            Retry
+          </PrimaryButton>
+        </Card>
+      </PageScaffold>
+    );
+  }
+
   return (
     <PageScaffold
-      backTo="/settings"
-      eyebrow="Security"
-      title="Session Keys"
-      description="Manage temporary signing permissions without leaving the extension flow."
+      eyebrow="Activity"
+      title="History"
+      description="Filter recent transaction activity by sent, received, or failed status."
     >
-      <Card
-        title="Active keys"
-        description="Session keys can be rotated or revoked without affecting the primary wallet."
-      >
-        <div className="space-y-3">
-          <div className="rounded-xl border border-border px-4 py-3">
-            <p className="text-sm font-medium text-foreground">Trading bot</p>
-            <p className="mt-1 text-xs text-muted-foreground">Valid for 12 more hours</p>
+      {isLoading ? (
+        <Card title="Recent activity">
+          <div className="flex items-center justify-center py-12">
+            <div className="h-6 w-6 animate-spin rounded-full border-2 border-primary border-t-transparent" />
           </div>
-          <div className="rounded-xl border border-border px-4 py-3">
-            <p className="text-sm font-medium text-foreground">Automation script</p>
-            <p className="mt-1 text-xs text-muted-foreground">Read-only access, expires tomorrow</p>
-          </div>
-        </div>
-      </Card>
-      <PrimaryButton>
-        <PlusCircle className="mr-2 h-4 w-4" />
-        Add session key
-      </PrimaryButton>
+        </Card>
+      ) : (
+        <>
+          <HistoryActivityList
+            activeFilter={activeFilter}
+            entries={entries}
+            onFilterChange={setFilter}
+          />
+          {hasMore && (
+            <button
+              type="button"
+              className="mt-2 inline-flex w-full items-center justify-center rounded-xl border border-border px-4 py-3 text-sm font-semibold text-foreground transition hover:bg-accent disabled:opacity-50"
+              disabled={isLoadingMore}
+              onClick={loadMore}
+            >
+              {isLoadingMore ? 'Loading…' : 'Load more'}
+            </button>
+          )}
+        </>
+      )}
     </PageScaffold>
   );
 }
@@ -496,7 +764,7 @@ function SessionKeysScreen() {
 function NotFoundScreen() {
   const { authState } = useExtensionAuth();
   const fallbackPath = !authState.hasOnboarded
-    ? '/welcome'
+    ? '/onboarding'
     : authState.isUnlocked
       ? '/home'
       : '/unlock';
@@ -516,47 +784,63 @@ function NotFoundScreen() {
 }
 
 export function ExtensionRouterContent() {
+  const navigate = useNavigate();
+
   return (
     <PopupFrame>
       <TitleSync />
-      <Routes>
-        <Route element={<RootRedirect />} path="/" />
-        <Route
-          element={
-            <PublicOnlyGuard mode="welcome">
-              <WelcomeScreen />
-            </PublicOnlyGuard>
-          }
-          path="/welcome"
-        />
-        <Route
-          element={
-            <PublicOnlyGuard mode="create-account">
-              <CreateAccountScreen />
-            </PublicOnlyGuard>
-          }
-          path="/create-account"
-        />
-        <Route
-          element={
-            <PublicOnlyGuard mode="unlock">
-              <UnlockScreen />
-            </PublicOnlyGuard>
-          }
-          path="/unlock"
-        />
-        <Route element={<AuthGuard />}>
-          <Route element={<ProtectedLayout />}>
-            <Route element={<HomeScreen />} path="/home" />
-            <Route element={<SendScreen />} path="/send" />
-            <Route element={<ReceiveScreen />} path="/receive" />
-            <Route element={<HistoryScreen />} path="/history" />
-            <Route element={<SettingsScreen />} path="/settings" />
-            <Route element={<SessionKeysScreen />} path="/session-keys" />
+      <ErrorBoundary
+        onGoHome={() => navigate('/home', { replace: true })}
+        onGoToSettings={() => navigate('/settings', { replace: true })}
+      >
+        <Routes>
+          <Route element={<RootRedirect />} path="/" />
+          {/* /welcome redirects into the real onboarding flow */}
+          <Route path="/welcome" element={<Navigate replace to="/onboarding" />} />
+          <Route
+            element={
+              <PublicOnlyGuard mode="onboarding">
+                <OnboardingFlow />
+              </PublicOnlyGuard>
+            }
+            path="/onboarding/*"
+          />
+          {/* Demo create-account path — dev only */}
+          {import.meta.env.DEV && (
+            <Route
+              element={
+                <PublicOnlyGuard mode="onboarding">
+                  <DemoCreateAccountScreen />
+                </PublicOnlyGuard>
+              }
+              path="/create-account"
+            />
+          )}
+          {/* Smart-account deploy harness (#768) — dev only, excluded from prod build */}
+          {import.meta.env.DEV && <Route element={<DeployTestScreen />} path="/deploy-test" />}
+          <Route
+            element={
+              <PublicOnlyGuard mode="unlock">
+                <UnlockScreen />
+              </PublicOnlyGuard>
+            }
+            path="/unlock"
+          />
+          <Route element={<AuthGuard />}>
+            <Route element={<ProtectedLayout />}>
+              <Route element={<HomeScreen />} path="/home" />
+              <Route element={<SendScreenRoute />} path="/send" />
+              <Route element={<ScheduledTransfersRoute />} path="/scheduled" />
+              <Route element={<ReceiveScreen />} path="/receive" />
+              <Route element={<HistoryScreen />} path="/history" />
+              <Route element={<SettingsScreen />} path="/settings" />
+              <Route element={<SessionKeysScreen />} path="/session-keys" />
+            </Route>
           </Route>
-        </Route>
-        <Route element={<NotFoundScreen />} path="*" />
-      </Routes>
+          <Route element={<SignTransactionApprovalScreen />} path="/sign-transaction" />
+          <Route element={<NotFoundScreen />} path="*" />
+        </Routes>
+      </ErrorBoundary>
     </PopupFrame>
   );
 }

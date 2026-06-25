@@ -1,6 +1,6 @@
-# Invoice Contracts (Planned Scaffold)
+# Invoice Contracts
 
-This directory is intentionally reserved for invoice and request-to-pay contracts.
+Invoice and request-to-pay contract for business finance workflows.
 
 ## Why this exists
 
@@ -8,14 +8,16 @@ This directory is intentionally reserved for invoice and request-to-pay contract
 - Separate invoice/payment-request logic from the core account contract.
 - Allow gradual rollout of invoice primitives and settlement hooks.
 
-## Planned capabilities
+## Capabilities
 
 - Create invoice
-- Invoice status lifecycle (open/paid/expired/cancelled)
+- Invoice status lifecycle (draft/open/paid/expired/cancelled)
 - Optional due dates and references
 - On-chain receipt hash anchoring for auditability
 
 ## Current status
 
-- Scaffold only (no production contract implementation yet)
+- MVP contract implementation in `src/lib.rs`
+- TypeScript types in `packages/types/src/invoice.ts`
+- UI components in `apps/web-dashboard/src/features/invoices/`
 - Business feature work tracked via roadmap/issues

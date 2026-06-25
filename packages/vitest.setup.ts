@@ -10,11 +10,31 @@
  */
 
 import '@testing-library/jest-dom';
-import { afterEach } from 'vitest';
+import { afterEach, beforeEach } from 'vitest';
 import { cleanup } from '@testing-library/react';
+import { ensureWebCrypto } from './ensure-webcrypto';
+
+function ensureBinaryCodec(): void {
+  globalThis.btoa = (value: string) => Buffer.from(value, 'binary').toString('base64');
+  globalThis.atob = (value: string) => Buffer.from(value, 'base64').toString('binary');
+}
+
+ensureWebCrypto();
+ensureBinaryCodec();
 
 afterEach(() => {
   cleanup();
+});
+
+beforeEach(() => {
+  // jsdom can replace crypto after setupFiles; re-apply before every test.
+  ensureWebCrypto();
+  ensureBinaryCodec();
+
+  // Prevent extension API mocks from leaking between test files in CI.
+  delete (globalThis as { chrome?: unknown }).chrome;
+  delete (globalThis as { browser?: unknown }).browser;
+  globalThis.localStorage?.clear?.();
 });
 
 // ── Deterministic localStorage ────────────────────────────────────────────────

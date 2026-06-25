@@ -7,6 +7,12 @@ export interface EncryptedPayload {
   data: string;
 }
 
+export interface PlatformStorageAdapter {
+  get(key: string): Promise<string | null>;
+  set(key: string, value: string): Promise<void>;
+  delete(key: string): Promise<void>;
+}
+
 export interface StorageAdapter {
   get<T = unknown>(key: string): Promise<T | null>;
   set(key: string, value: unknown): Promise<void>;
@@ -21,4 +27,13 @@ export interface AccountData {
 export interface SessionKeysData {
   keys: Record<string, string>;
   [key: string]: unknown;
+}
+export interface RecentRecipient {
+  address: string;
+  name?: string;
+  timestamp: number;
+}
+
+export interface RecentRecipientsData {
+  recipients: RecentRecipient[];
 }

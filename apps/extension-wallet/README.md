@@ -2,6 +2,8 @@
 
 Browser extension wallet for the Ancore account abstraction layer on Stellar.
 
+**Agent / contributor guide:** [AGENTS.md](./AGENTS.md) (modeled on [Freighter AGENTS.md](https://github.com/stellar/freighter/blob/master/AGENTS.md)).
+
 ## Architecture
 
 ```
@@ -33,6 +35,8 @@ The build outputs to `dist/` with:
 - `popup/index.html` — popup entry
 - `background/service-worker.js` — background worker
 - `icons/` — extension icons (16, 32, 48, 128px)
+
+**Troubleshooting:** See [Extension Build Troubleshooting Guide](../../docs/troubleshooting/extension-build.md) for common build issues and fixes.
 
 ## Loading in Chrome
 

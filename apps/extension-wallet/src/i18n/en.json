@@ -1,0 +1,83 @@
+{
+  "settings": {
+    "title": "Settings",
+    "subtitle": "Manage your wallet preferences",
+    "account": {
+      "name": "My Ancore Wallet",
+      "address": "GBXXX...YYYY"
+    },
+    "groups": {
+      "network": "Network",
+      "display": "Display",
+      "security": "Security",
+      "about": "About",
+      "notificationsDemo": "Notifications (Demo)"
+    },
+    "network": {
+      "label": "Network",
+      "currentlyOn": "Currently on {{network}}",
+      "testnet": "Testnet",
+      "mainnet": "Mainnet",
+      "local": "Local"
+    },
+    "environment": {
+      "label": "Environment",
+      "usingEndpoints": "Using {{environment}} endpoints",
+      "production": "Production",
+      "staging": "Staging"
+    },
+    "display": {
+      "label": "Density",
+      "description": "Control spacing across dashboard pages",
+      "comfortable": "Comfortable",
+      "compact": "Compact",
+      "value": "{{density}} • {{theme}}"
+    },
+    "theme": {
+      "light": "Light",
+      "dark": "Dark",
+      "system": "System"
+    },
+    "security": {
+      "changePassword": {
+        "label": "Change Password",
+        "description": "Update your wallet password"
+      },
+      "autoLock": {
+        "label": "Auto-lock Timeout",
+        "description": "Lock wallet after inactivity",
+        "never": "Never",
+        "minutes": "{{count}} min"
+      },
+      "exportPrivateKey": {
+        "label": "Export Private Key",
+        "description": "Reveal your raw private key"
+      },
+      "exportRecoveryPhrase": {
+        "label": "Export Recovery Phrase",
+        "description": "Reveal your 12-word mnemonic"
+      }
+    },
+    "about": {
+      "label": "About Ancore",
+      "description": "Version, links & support"
+    },
+    "toastDemo": {
+      "success": {
+        "label": "Success Toast",
+        "description": "Payment sent successfully",
+        "message": "Payment sent successfully!"
+      },
+      "error": {
+        "label": "Error Toast",
+        "description": "Simulate a transaction error",
+        "message": "Transaction failed. Please retry."
+      },
+      "info": {
+        "label": "Info Toast",
+        "description": "Address copied to clipboard",
+        "message": "Address copied to clipboard"
+      }
+    }
+  }
+}

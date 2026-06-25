@@ -2,7 +2,7 @@
   "name": "@ancore/mobile-wallet",
   "version": "0.1.0",
   "private": true,
-  "description": "Mobile wallet security and storage primitives for Ancore",
+  "description": "Mobile wallet MVP shell and security primitives for Ancore",
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
   "exports": {
@@ -17,13 +17,22 @@
     "dev": "tsc -p ./tsconfig.json --watch",
     "test": "jest --config ./jest.config.cjs --coverage --runInBand",
     "lint": "eslint src/",
-    "clean": "rm -rf dist coverage"
+    "clean": "rm -rf dist coverage",
+    "test:ci": "pnpm run build && pnpm run test"
   },
   "dependencies": {
+    "@ancore/core-sdk": "workspace:*",
+    "@ancore/crypto": "workspace:*",
+    "@ancore/types": "workspace:*",
+    "@ancore/types": "workspace:*",
+    "@reown/walletkit": "^1.5.5",
+    "@walletconnect/types": "^2.23.9",
+    "@walletconnect/utils": "^2.23.9",
     "react": "^18.3.1"
   },
   "devDependencies": {
     "@eslint/js": "^9.0.0",
+    "@testing-library/react": "^14.3.1",
     "@types/jest": "^29.5.0",
     "@types/node": "^25.5.0",
     "@types/react": "^18.3.0",
@@ -31,7 +40,9 @@
     "@typescript-eslint/eslint-plugin": "^8.0.0",
     "@typescript-eslint/parser": "^8.0.0",
     "eslint": "^9.0.0",
-    "jest": "^30.2.0",
+    "eslint-plugin-react-hooks": "5.0.0",
+    "jest": "^29.7.0",
+    "jest-environment-jsdom": "^30.3.0",
     "ts-jest": "^29.4.0",
     "tsup": "^8.0.0",
     "typescript": "^5.6.0"

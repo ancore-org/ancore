@@ -226,14 +226,20 @@ mod tests {
     fn normalise_rejects_empty_tx_hash() {
         let mut raw = make_raw(vec!["transfer"]);
         raw.tx_hash = String::new();
-        assert!(matches!(normalise(raw), Err(NormaliseError::MissingField("tx_hash"))));
+        assert!(matches!(
+            normalise(raw),
+            Err(NormaliseError::MissingField("tx_hash"))
+        ));
     }
 
     #[test]
     fn normalise_rejects_empty_contract_id() {
         let mut raw = make_raw(vec!["transfer"]);
         raw.contract_id = String::new();
-        assert!(matches!(normalise(raw), Err(NormaliseError::MissingField("contract_id"))));
+        assert!(matches!(
+            normalise(raw),
+            Err(NormaliseError::MissingField("contract_id"))
+        ));
     }
 
     #[test]

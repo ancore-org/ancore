@@ -1,6 +1,6 @@
-export interface SecureStoreAdapter {
-  get<T>(key: string): Promise<T | null>;
-  set<T>(key: string, value: T): Promise<void>;
+import type { PlatformStorageAdapter } from '@ancore/core-sdk';
+
+export interface SecureStoreAdapter extends PlatformStorageAdapter {
   remove(key: string): Promise<void>;
   clear(): Promise<void>;
 }
@@ -32,5 +32,5 @@ export interface AccountSecretPayload {
 
 export interface PersistedAccountRecord {
   metadata: AccountMetadata;
-  encryptedSecret: EncryptedPayload;
+  secret: AccountSecretPayload;
 }

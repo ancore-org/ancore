@@ -4,6 +4,7 @@ use serde::Serialize;
 use sqlx::{PgPool, Row};
 
 use crate::error::Result;
+use crate::metrics::record_lag;
 
 /// Health response body.
 ///
@@ -44,11 +45,10 @@ const DEGRADED_LAG_BLOCKS: i64 = 100;
 /// stand-in so the endpoint is fully self-contained.
 pub async fn health_handler(State(db): State<PgPool>) -> Result<Json<HealthResponse>> {
     // Latest ledger the indexer has indexed (most-recent record persisted).
-    let indexed_row = sqlx::query(
-        "SELECT COALESCE(MAX(ledger_seq), 0) AS latest FROM activity_records",
-    )
-    .fetch_one(&db)
-    .await?;
+    let indexed_row =
+        sqlx::query("SELECT COALESCE(MAX(ledger_seq), 0) AS latest FROM activity_records")
+            .fetch_one(&db)
+            .await?;
 
     let latest_indexed_ledger: i64 = indexed_row.try_get("latest")?;
 
@@ -56,11 +56,10 @@ pub async fn health_handler(State(db): State<PgPool>) -> Result<Json<HealthRespo
     // For now we treat the highest ledger we have ever seen as the chain head
     // (same value, so lag is always 0 unless the indexer has genuinely fallen
     // behind a separately-maintained chain-head counter).
-    let chain_head_row = sqlx::query(
-        "SELECT COALESCE(MAX(ledger_seq), 0) AS head FROM activity_records",
-    )
-    .fetch_one(&db)
-    .await?;
+    let chain_head_row =
+        sqlx::query("SELECT COALESCE(MAX(ledger_seq), 0) AS head FROM activity_records")
+            .fetch_one(&db)
+            .await?;
 
     let chain_head: i64 = chain_head_row.try_get("head")?;
 
@@ -72,6 +71,9 @@ pub async fn health_handler(State(db): State<PgPool>) -> Result<Json<HealthRespo
     } else {
         "ok".to_string()
     };
+
+    // Update Prometheus metrics
+    record_lag(lag_blocks, lag_seconds);
 
     Ok(Json(HealthResponse {
         timestamp: Utc::now().to_rfc3339(),

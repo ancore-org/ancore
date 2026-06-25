@@ -21,10 +21,12 @@ export {
   SessionKeyExpiredError,
   InsufficientPermissionError,
   ContractInvocationError,
+  NotImplementedError,
   mapContractError,
   CONTRACT_ERROR_MESSAGES,
   CONTRACT_ERROR_CODES,
 } from './errors';
+export { toCanonicalError as toCanonicalAccountError } from './errors';
 
 export {
   addressToScVal,
@@ -54,3 +56,38 @@ export {
   scValToOptionalSessionKey,
   sessionKeyToScVal,
 } from './xdr-utils';
+
+export {
+  formatPermissionLabel,
+  formatPermissionLabels,
+  formatPermissions,
+} from './permission-formatter';
+
+export {
+  ALL_SESSION_PERMISSIONS,
+  PERM_BITS,
+  PERMISSION_EXECUTE,
+  bitmaskToContractVec,
+  bitmaskToPermissions,
+  contractVecToPermissions,
+  hasPermission,
+  permissionsToBitmask,
+  permissionsToContractVec,
+  togglePermission,
+} from './permissions';
+
+export {
+  NonceDriftKind,
+  NONCE_DRIFT_RETRY_GUIDANCE,
+  isValidNonce,
+  detectNonceDrift,
+} from './nonce-drift';
+export type { NonceDriftResult, NonceDriftOptions } from './nonce-drift';
+
+export { TransactionBuilder } from './transaction-builder';
+export type {
+  TransactionBuilderOptions,
+  ContractExecuteParams,
+  SimulationResult,
+  RefreshSessionKeyTtlParams,
+} from './transaction-builder';

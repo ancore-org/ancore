@@ -6,16 +6,23 @@
   "scripts": {
     "build": "tsc --project tsconfig.json",
     "test": "jest --coverage",
-    "lint": "eslint src/"
+    "lint": "eslint src/",
+    "check:log-redaction": "node scripts/check-log-redaction.js"
   },
   "keywords": ["ancore", "relayer", "stellar", "soroban"],
   "license": "Apache-2.0",
   "dependencies": {
+    "@ancore/stellar": "workspace:*",
+    "@ancore/types": "workspace:*",
+    "@ancore/test-fixtures": "workspace:*",
+    "@stellar/stellar-sdk": "^13.3.0",
+    "cors": "^2.8.5",
     "express": "^4.18.2",
     "express-rate-limit": "^7.1.5",
     "zod": "^3.22.4"
   },
   "devDependencies": {
+    "@types/cors": "^2.8.17",
     "@types/express": "^4.17.21",
     "@types/jest": "^29.5.0",
     "@types/node": "^20.0.0",

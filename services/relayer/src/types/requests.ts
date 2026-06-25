@@ -5,6 +5,8 @@
  * operation-level abstractions used by handlers and the service layer.
  */
 
+import type { TransferPolicy } from '@ancore/types';
+
 export type OperationType = 'relay_execute' | 'add_session_key' | 'revoke_session_key';
 
 /**
@@ -20,6 +22,12 @@ export interface RelayExecuteRequest {
   signature: string;
   /** Replay-protection nonce (non-negative integer) */
   nonce: number;
+  /** Optional transfer policy for enforcing daily limits */
+  transferPolicy?: {
+    policy: TransferPolicy;
+    amount: number;
+    todayTotal: number;
+  };
 }
 
 /**

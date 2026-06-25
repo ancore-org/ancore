@@ -5,6 +5,7 @@
 
 import type { SessionKey } from '@ancore/types';
 import { Address, nativeToScVal, scValToNative, StrKey, xdr } from '@stellar/stellar-sdk';
+import { assertValidEd25519PublicKey } from '@ancore/core-sdk';
 
 const BYTES_N_32_LENGTH = 32;
 
@@ -50,11 +51,8 @@ export function addressToScVal(address: string): xdr.ScVal {
 export function publicKeyToBytes32ScVal(publicKey: string | Uint8Array): xdr.ScVal {
   let bytes: Uint8Array;
   if (typeof publicKey === 'string') {
-    if (!StrKey.isValidEd25519PublicKey(publicKey)) {
-      throw new TypeError(
-        `Invalid Ed25519 public key: expected G... format, got ${publicKey.slice(0, 8)}...`
-      );
-    }
+    // Use centralized validation which throws `StrKeyValidationError` on failure
+    assertValidEd25519PublicKey(publicKey);
     const buf = StrKey.decodeEd25519PublicKey(publicKey);
     bytes = new Uint8Array(buf);
   } else {

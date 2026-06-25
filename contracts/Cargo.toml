@@ -3,7 +3,7 @@ resolver = "2"
 
 members = [
     "account",
-    # Additional contracts can be added here as they are developed
+    "validation-modules",
 ]
 
 [workspace.package]

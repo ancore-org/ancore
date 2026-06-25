@@ -17,7 +17,7 @@ permissions:
 
 concurrency:
   group: release-gate-${{ github.ref }}
-  cancel-in-progress: false   # never cancel an in-flight release gate
+  cancel-in-progress: false # never cancel an in-flight release gate
 
 # ─────────────────────────────────────────────────────────────────────────────
 # GATE 1 — TypeScript build & tests
@@ -56,9 +56,9 @@ jobs:
         if: always()
         run: echo "status=${{ job.status }}" >> "$GITHUB_OUTPUT"
 
-# ─────────────────────────────────────────────────────────────────────────────
-# GATE 2 — Rust contracts build, lint & tests
-# ─────────────────────────────────────────────────────────────────────────────
+  # ─────────────────────────────────────────────────────────────────────────────
+  # GATE 2 — Rust contracts build, lint & tests
+  # ─────────────────────────────────────────────────────────────────────────────
   gate-contracts:
     name: '[Gate 2] Contracts Build & Tests'
     runs-on: ubuntu-latest
@@ -110,9 +110,9 @@ jobs:
         if: always()
         run: echo "status=${{ job.status }}" >> "$GITHUB_OUTPUT"
 
-# ─────────────────────────────────────────────────────────────────────────────
-# GATE 3 — Security audit (npm + cargo)
-# ─────────────────────────────────────────────────────────────────────────────
+  # ─────────────────────────────────────────────────────────────────────────────
+  # GATE 3 — Security audit (npm + cargo)
+  # ─────────────────────────────────────────────────────────────────────────────
   gate-security:
     name: '[Gate 3] Security Audit'
     runs-on: ubuntu-latest
@@ -149,9 +149,9 @@ jobs:
         if: always()
         run: echo "status=${{ job.status }}" >> "$GITHUB_OUTPUT"
 
-# ─────────────────────────────────────────────────────────────────────────────
-# GATE 4 — Observability config validation
-# ─────────────────────────────────────────────────────────────────────────────
+  # ─────────────────────────────────────────────────────────────────────────────
+  # GATE 4 — Observability config validation
+  # ─────────────────────────────────────────────────────────────────────────────
   gate-observability:
     name: '[Gate 4] Observability Configs'
     runs-on: ubuntu-latest
@@ -190,9 +190,9 @@ jobs:
         if: always()
         run: echo "status=${{ job.status }}" >> "$GITHUB_OUTPUT"
 
-# ─────────────────────────────────────────────────────────────────────────────
-# GATE 5 — Release doc completeness
-# ─────────────────────────────────────────────────────────────────────────────
+  # ─────────────────────────────────────────────────────────────────────────────
+  # GATE 5 — Release doc completeness
+  # ─────────────────────────────────────────────────────────────────────────────
   gate-release-docs:
     name: '[Gate 5] Release Docs'
     runs-on: ubuntu-latest
@@ -250,9 +250,9 @@ jobs:
         if: always()
         run: echo "status=${{ job.status }}" >> "$GITHUB_OUTPUT"
 
-# ─────────────────────────────────────────────────────────────────────────────
-# GATE 6 — Extension E2E smoke suite
-# ─────────────────────────────────────────────────────────────────────────────
+  # ─────────────────────────────────────────────────────────────────────────────
+  # GATE 6 — Extension E2E smoke suite
+  # ─────────────────────────────────────────────────────────────────────────────
   gate-extension-e2e-smoke:
     name: '[Gate 6] Extension E2E Smoke'
     runs-on: ubuntu-latest
@@ -287,9 +287,84 @@ jobs:
         if: always()
         run: echo "status=${{ job.status }}" >> "$GITHUB_OUTPUT"
 
-# ─────────────────────────────────────────────────────────────────────────────
-# SUMMARY — Collect all gate results and publish artifact
-# ─────────────────────────────────────────────────────────────────────────────
+  # ─────────────────────────────────────────────────────────────────────────────
+  # GATE 7 — Version consistency (monorepo & contracts)
+  # ─────────────────────────────────────────────────────────────────────────────
+  gate-version-consistency:
+    name: '[Gate 7] Version Consistency'
+    runs-on: ubuntu-latest
+    outputs:
+      status: ${{ steps.result.outputs.status }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Verify version consistency
+        run: |
+          python3 - <<'PYEOF'
+          import json, os, sys, re
+
+          def get_root_version():
+              with open("package.json") as f:
+                  return json.load(f)["version"]
+
+          def get_cargo_version():
+              if not os.path.exists("contracts/Cargo.toml"):
+                  return None
+              with open("contracts/Cargo.toml") as f:
+                  content = f.read()
+                  match = re.search(r'^version\s*=\s*"([^"]+)"', content, re.M)
+                  return match.group(1) if match else None
+
+          root_version = get_root_version()
+          print(f"Root version: {root_version}")
+
+          errors = []
+
+          cargo_version = get_cargo_version()
+          if cargo_version and cargo_version != root_version:
+              errors.append(f"contracts/Cargo.toml version ({cargo_version}) != root ({root_version})")
+
+          package_files = []
+          for root, dirs, files in os.walk("."):
+              if "node_modules" in dirs:
+                  dirs.remove("node_modules")
+              if ".git" in dirs:
+                  dirs.remove(".git")
+              for file in files:
+                  if file == "package.json" and root != ".":
+                      package_files.append(os.path.join(root, file))
+
+          for p in package_files:
+              with open(p) as f:
+                  try:
+                      ver = json.load(f).get("version")
+                      if ver != root_version:
+                          errors.append(f"{p} version ({ver}) != root ({root_version})")
+                  except Exception as e:
+                      errors.append(f"Error parsing {p}: {e}")
+
+          ref = os.environ.get("GITHUB_REF", "")
+          if ref.startswith("refs/tags/v"):
+              tag_version = ref[len("refs/tags/v"):]
+              if tag_version != root_version:
+                  errors.append(f"Tag version ({tag_version}) != root version ({root_version})")
+
+          if errors:
+              print("Version consistency check FAILED:")
+              for e in errors:
+                  print(f"  ✗ {e}")
+              sys.exit(1)
+
+          print("✓ Version consistency check PASSED")
+          PYEOF
+
+      - id: result
+        if: always()
+        run: echo "status=${{ job.status }}" >> "$GITHUB_OUTPUT"
+
+  # ─────────────────────────────────────────────────────────────────────────────
+  # SUMMARY — Collect all gate results and publish artifact
+  # ─────────────────────────────────────────────────────────────────────────────
   gate-summary:
     name: Release Gate Summary
     needs:
@@ -299,6 +374,7 @@ jobs:
       - gate-observability
       - gate-release-docs
       - gate-extension-e2e-smoke
+      - gate-version-consistency
     runs-on: ubuntu-latest
     if: always()
     steps:
@@ -313,8 +389,9 @@ jobs:
           GATE4: ${{ needs.gate-observability.outputs.status }}
           GATE5: ${{ needs.gate-release-docs.outputs.status }}
           GATE6: ${{ needs.gate-extension-e2e-smoke.result }}
-          REF:   ${{ github.ref_name }}
-          SHA:   ${{ github.sha }}
+          GATE7: ${{ needs.gate-version-consistency.outputs.status }}
+          REF: ${{ github.ref_name }}
+          SHA: ${{ github.sha }}
           ACTOR: ${{ github.actor }}
           OVERRIDE: ${{ github.event.inputs.override_reason }}
           RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
@@ -333,6 +410,7 @@ jobs:
               "Observability Configs":   os.environ["GATE4"],
               "Release Docs":            os.environ["GATE5"],
               "Extension E2E Smoke":     os.environ["GATE6"],
+              "Version Consistency":     os.environ["GATE7"],
           }
 
           all_pass = all(v == "success" for v in gates.values())

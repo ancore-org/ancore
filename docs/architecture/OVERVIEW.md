@@ -36,6 +36,51 @@ This document provides a high-level overview of the Ancore system architecture.
                     Stellar Network
 ```
 
+## Repository Module Map
+
+The main architecture modules are organized as a monorepo. This tree intentionally lists only the top-level product, package, contract, service, and documentation modules that contributors are expected to navigate directly.
+
+<!-- repo-structure-check:start -->
+
+```
+ancore/
+├── apps/                     # User-facing applications
+│   ├── extension-wallet/     # Browser extension wallet
+│   ├── mobile-wallet/        # React Native mobile app
+│   └── web-dashboard/        # Web-based account management
+│
+├── packages/                 # Public SDKs and libraries
+│   ├── core-sdk/             # Main SDK for developers
+│   ├── account-abstraction/  # Account abstraction primitives
+│   ├── stellar/              # Stellar/Soroban utilities
+│   ├── crypto/               # Cryptographic utilities
+│   ├── ui-kit/               # Shared UI components
+│   ├── types/                # Shared TypeScript types
+│   ├── wallet-shared/      # dApp protocol, networks, allowlist keys
+│   ├── wallet-api/         # npm SDK for dApps (@ancore/wallet-api)
+│   └── test-fixtures/        # Shared test fixtures for apps and services
+│
+├── contracts/                # Soroban smart contracts
+│   ├── account/              # Core account contract
+│   ├── validation-modules/   # Planned pluggable validation module scaffolds
+│   ├── invoice/              # Planned invoice contract scaffolds
+│   └── upgrade/              # Planned upgrade contract scaffolds
+│
+├── services/                 # Optional infrastructure
+│   ├── relayer/              # Transaction relay service
+│   ├── indexer/              # Blockchain indexer
+│   └── ai-agent/             # AI agent MVP (draft-only intents)
+│
+└── docs/                     # Documentation
+    ├── architecture/         # System architecture
+    ├── security/             # Security model & audits
+    └── user-guide/           # End-user guides
+```
+
+<!-- repo-structure-check:end -->
+
+Run `pnpm docs:check-structure` before merging README or architecture changes that add, rename, or remove entries in this tree. Keep this block and the README repository tree in sync; if the check should cover a different set of docs, update `scripts/check-docs-repo-structure.mjs` and the CI workflow in the same change.
+
 ## Financial OS Positioning
 
 Ancore is designed as a financial operating system on top of Stellar:
@@ -83,25 +128,68 @@ Session keys enable seamless UX by allowing time-limited, permission-scoped sign
 
 ## Data Flow
 
-### Transaction Flow
+### Send Flow {#send-flow}
 
+End-to-end path for an extension wallet payment authorized by a **session key** and submitted through the **relayer**. This matches the production integration shape: build and sign in the client, validate and broadcast via `@ancore/relayer`, enforce rules on the **account contract**, settle on **Horizon**.
+
+| Step | Component | Responsibility |
+|------|-----------|----------------|
+| 1 | Extension wallet | UX, validation, handle resolution, fee estimate |
+| 2 | Core SDK | Build `Operation.payment`, wrap in `execute`, simulate via Soroban RPC, assemble XDR |
+| 3 | Extension (background) | Session key signs Soroban auth entry; never exposes owner key |
+| 4 | Relayer | `POST /relay/validate` (optional), `POST /relay/execute` — signature + nonce checks |
+| 5 | Horizon | Accepts signed envelope from relayer (`StellarClient.submitTransaction`) |
+| 6 | Account contract | `execute` verifies session key permissions and nonce, runs inner ops |
+| 7 | Extension | Polls relayer/indexer or Horizon for confirmation |
+
+```mermaid
+sequenceDiagram
+  autonumber
+  actor User
+  participant Ext as Extension Wallet
+  participant SDK as Core SDK
+  participant RPC as Soroban RPC
+  participant Rel as Relayer
+  participant Hor as Horizon
+  participant Acct as Account Contract
+
+  User->>Ext: Confirm send (to, amount)
+  Ext->>Ext: Validate inputs, resolve @handle
+  Ext->>RPC: get_nonce (AccountContract)
+  RPC-->>Ext: nonce
+  Ext->>SDK: AccountTransactionBuilder<br/>payment + execute()
+  SDK->>RPC: simulateTransaction
+  RPC-->>SDK: footprint and fees
+  SDK-->>Ext: transaction XDR
+  Ext->>Ext: Session key signs auth entry
+  Ext->>Rel: POST /relay/execute<br/>sessionKey, nonce, signature,<br/>signedTransactionXdr
+  opt Pre-flight
+    Ext->>Rel: POST /relay/validate
+    Rel-->>Ext: valid / error
+  end
+  Rel->>Rel: validateRelay (Ed25519, nonce)
+  Rel->>Hor: submitSignedTransaction(XDR)
+  Hor->>Acct: execute(sessionKey, operations)
+  Acct->>Acct: Check permissions and nonce,<br/>invoke payment operation
+  Acct-->>Hor: ledger result
+  Hor-->>Rel: transaction hash
+  Rel-->>Ext: success + transactionId
+  Ext->>Ext: Show confirmed / failed status
 ```
-1. User initiates transaction
-   ↓
-2. Wallet creates UserOp
-   ↓
-3. Session key signs (if available)
-   ↓
-4. Submit to relayer (optional)
-   ↓
-5. Relayer submits to network
-   ↓
-6. Account contract validates
-   ↓
-7. Transaction executes
-   ↓
-8. Events emitted
-```
+
+**Code references**
+
+- Extension send UI: `apps/extension-wallet/src/hooks/useSendTransaction.ts`, `apps/extension-wallet/src/screens/Send/`
+- SDK builders: `packages/core-sdk/src/account-transaction-builder.ts`, `packages/core-sdk/src/execute-with-session-key.ts`, `packages/core-sdk/src/send-payment.ts`
+- Relayer API: `services/relayer/README.md` (`POST /relay/execute`, `POST /relay/validate`)
+- On-chain entrypoint: `contracts/account` — `execute(address, Vec<bytes>)`
+- Network submission: `services/relayer/src/services/stellarSubmitter.ts` → `@ancore/stellar` → Horizon
+
+**Alternate path (no relayer):** When the owner key signs directly, `sendPayment()` in `@ancore/core-sdk` can submit through `StellarClient.submitTransaction` without calling the relayer. Session-key sends in the extension are expected to use the relay path above so the owner key stays offline.
+
+### Transaction Flow (summary)
+
+For other operation types (session-key management, contract calls), the same pattern applies: SDK builds the Soroban invocation → client signs → relayer validates and submits → account contract enforces policy → Horizon settles.
 
 ### Account Creation
 
@@ -166,26 +254,54 @@ Optional relayer network for:
 2. **Mobile Apps**: iOS/Android wallets
 3. **Web Dashboard**: Account management interface
 
-## Future Architecture
+## Implementation Status
 
-### Planned Enhancements
+| Component | Status | Notes |
+|-----------|--------|-------|
+| Smart account contract | ✅ Implemented | Audit pending — not production-ready |
+| Session keys (contract) | ✅ Implemented | Permission scoping (#831, #832) in progress |
+| AA SDK (TypeScript) | ✅ Implemented | relay-payload, transaction-builder, xdr-utils |
+| Extension vault + lock | ✅ Implemented | AES-GCM, PBKDF2, inactivity lock |
+| Extension onboarding | ⚠️ Demo path only | Real keygen (#815), contract deploy (#817) needed |
+| Extension send flow | ⚠️ Mock only | Real sign + relayer submit (#820) needed |
+| Extension dApp API | ❌ Stub | Content script (#808), wallet-api (#827) needed |
+| Approval UX routes | ❌ Missing | grant-access (#810), sign-transaction (#767) needed |
+| WebAuthn / Passkey | ❌ Not started | Design doc (#869), PasskeyModule (#859) planned |
+| Relayer security | ❌ Stub | Ed25519 verify (#854), nonce DB (#853) needed |
+| AI agent LLM | ❌ No LLM | Claude Haiku wiring (#836) planned |
+| Mobile WalletConnect | ❌ Not initialized | WalletKit init (#839) needed |
+| Mobile native apps | ❌ Library only | iOS (#848), Android (#849) planned |
+| Indexer contract events | ❌ Missing | Soroban event decoder (#856) planned |
 
-- [ ] Cross-chain support via bridges
-- [ ] Privacy features (zk-proofs)
-- [ ] Advanced recovery mechanisms
-- [ ] Decentralized relayer network
-- [ ] AI-powered financial agent
+## Roadmap Summary
+
+See [ROADMAP.md](../ROADMAP.md) for the full 5-phase plan. Short version:
+
+- **Phase 1** — Extension real-money path: onboarding, background signing, send flow, session persistence
+- **Phase 2** — dApp connectivity: wallet-api, content script, allowlist, signAuthEntry, side panel
+- **Phase 3** — Security parity: Blockaid, memo checks, expanded e2e
+- **Phase 4** — Mobile productionization: vault unify, keychain, WalletConnect, Fastlane
+- **Phase 5** — AA differentiation: session key scoping, passkey onboarding, relayer meta-tx, indexer AA events
+
+## Long-Term Architecture (Post-MVP)
+
+- WebAuthn/Passkey as primary auth (no seed phrase for users)
+- Session key policy scoping: contract allowlists, spend limits, time windows
+- Decentralized relayer network for censorship resistance
+- Cross-chain support via Stellar bridges
+- zk-proof validation modules for privacy-preserving auth
+- AI-powered financial agent with autonomous execution (after human-confirmation MVP)
 
 ## Related Documents
 
-- [Account Model](./ACCOUNT_MODEL.md)
-- [Session Keys](./SESSION_KEYS.md)
+- [ROADMAP.md](../ROADMAP.md)
+- [Integration guide](../integration-guide.md)
+- [Account Contract](../../contracts/account/README.md)
 - [Security Model](../security/THREAT_MODEL.md)
-- [API Reference](../api/REFERENCE.md)
+- [Freighter Comparison](../wallets/FREIGHTER_COMPARISON.md)
 
 ---
 
-> Note: Additional contract modules (validation, invoice, etc.) remain planned
-> roadmap items and are not part of the current repository layout.
+> Note: Planned contract and service scaffolds are intentionally present in the repository layout so contributors can preserve the architecture direction without implying production completeness.
 
-**Last Updated**: April 2026
+**Last Updated**: June 2026

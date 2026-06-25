@@ -2,6 +2,7 @@ const js = require('@eslint/js');
 const tseslint = require('@typescript-eslint/eslint-plugin');
 const tsparser = require('@typescript-eslint/parser');
 const globals = require('globals');
+const reactHooks = require('eslint-plugin-react-hooks');
 
 const jestGlobals = {
   describe: 'readonly',
@@ -21,32 +22,49 @@ module.exports = [
   },
   js.configs.recommended,
   {
-    files: ['**/*.ts'],
+    files: ['**/*.ts', '**/*.tsx'],
     languageOptions: {
       parser: tsparser,
       parserOptions: {
         ecmaVersion: 2020,
         sourceType: 'module',
+        ecmaFeatures: {
+          jsx: true,
+        },
       },
       globals: {
         ...globals.node,
+        ...globals.browser,
         Crypto: 'readonly',
         CryptoKey: 'readonly',
         TextEncoder: 'readonly',
         TextDecoder: 'readonly',
         crypto: 'readonly',
+        PublicKeyCredential: 'readonly',
       },
     },
     plugins: {
       '@typescript-eslint': tseslint,
+      'react-hooks': reactHooks,
     },
     rules: {
       ...tseslint.configs.recommended.rules,
-      '@typescript-eslint/no-unused-vars': ['warn', { argsIgnorePattern: '^_', varsIgnorePattern: '^_' }],
+      ...reactHooks.configs.recommended.rules,
+      '@typescript-eslint/no-unused-vars': [
+        'warn',
+        { argsIgnorePattern: '^_', varsIgnorePattern: '^_' },
+      ],
     },
   },
   {
-    files: ['**/__tests__/**/*.ts', '**/*.test.ts', '**/*.spec.ts'],
+    files: [
+      '**/__tests__/**/*.ts',
+      '**/__tests__/**/*.tsx',
+      '**/*.test.ts',
+      '**/*.test.tsx',
+      '**/*.spec.ts',
+      '**/*.spec.tsx',
+    ],
     languageOptions: {
       globals: {
         ...jestGlobals,

@@ -15,11 +15,50 @@ export interface RetryOptions {
   isRetryable?: (error: Error) => boolean;
 }
 
+export interface RetryPresetConfig {
+  /** Total attempts including the initial request */
+  maxAttempts: number;
+  /** Base delay in milliseconds between retries */
+  baseDelayMs: number;
+  /** Whether to use exponential backoff (default: true) */
+  exponential?: boolean;
+}
+
+/**
+ * Conservative wallet preset (fewer attempts, shorter backoff) and aggressive
+ * indexer preset (more attempts, longer backoff) for rate-limited endpoints.
+ */
+export const RETRY_PRESETS = {
+  wallet: { maxAttempts: 3, baseDelayMs: 200 },
+  indexer: { maxAttempts: 5, baseDelayMs: 500 },
+} as const;
+
+export type RetryPresetName = keyof typeof RETRY_PRESETS;
+
 const DEFAULT_OPTIONS: Required<Omit<RetryOptions, 'isRetryable'>> = {
   maxRetries: 3,
   baseDelayMs: 1000,
   exponential: true,
 };
+
+export function retryOptionsFromPreset(
+  preset: RetryPresetConfig,
+  overrides?: RetryOptions
+): RetryOptions {
+  return {
+    maxRetries: preset.maxAttempts - 1,
+    baseDelayMs: preset.baseDelayMs,
+    exponential: preset.exponential ?? true,
+    ...overrides,
+  };
+}
+
+export function resolveRetryOptions(
+  preset: RetryPresetName = 'wallet',
+  overrides?: RetryOptions
+): RetryOptions {
+  return retryOptionsFromPreset(RETRY_PRESETS[preset], overrides);
+}
 
 /**
  * Sleep for a specified duration

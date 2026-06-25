@@ -8,6 +8,7 @@ export type RelayErrorCode =
   | 'NONCE_REPLAY'
   | 'GAS_LIMIT_EXCEEDED'
   | 'SIMULATION_FAILED'
+  | 'TRANSFER_LIMIT_EXCEEDED'
   | 'UNAUTHORIZED'
   | 'INTERNAL_ERROR';
 
@@ -30,9 +31,21 @@ export interface ValidationResult {
   error?: RelayError;
 }
 
+export interface DependencyStatus {
+  status: 'ok' | 'degraded';
+  message?: string;
+  latencyMs?: number;
+}
+
 /** Response for GET /relay/status */
 export interface HealthResponse {
   status: 'ok' | 'degraded';
   uptime: number;
   timestamp: string;
+  dependencies?: {
+    queue: DependencyStatus;
+    rpc: DependencyStatus;
+    storage: DependencyStatus;
+    signatureService?: DependencyStatus;
+  };
 }

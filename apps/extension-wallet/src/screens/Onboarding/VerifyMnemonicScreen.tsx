@@ -121,9 +121,15 @@ export function VerifyMnemonicScreen({ mnemonic, onSuccess, onBack }: VerifyMnem
         <div className="space-y-4 mb-6">
           {inputs.map((input, inputIndex) => (
             <div key={inputIndex} className="space-y-2">
-              <label className="text-sm font-medium text-foreground">Word #{input.index + 1}</label>
+              <label
+                htmlFor={`word-input-${inputIndex}`}
+                className="text-sm font-medium text-foreground"
+              >
+                Word #{input.index + 1}
+              </label>
               <div className="relative">
                 <input
+                  id={`word-input-${inputIndex}`}
                   type="text"
                   value={input.userInput}
                   onChange={(e) => handleInputChange(inputIndex, e.target.value)}

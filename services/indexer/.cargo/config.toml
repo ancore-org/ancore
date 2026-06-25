@@ -1,0 +1,13 @@
+# SQLx offline mode: allows `cargo check` / `cargo build` without a live DATABASE_URL.
+# The `.sqlx/` directory in this package contains pre-generated query metadata that
+# SQLx reads at compile time when this flag is set.
+#
+# Usage:
+#   SQLX_OFFLINE=true cargo check   # already set here for the dev workflow
+#   SQLX_OFFLINE=true cargo build
+#   SQLX_OFFLINE=true cargo test --lib   # unit tests only
+#
+# To regenerate the cache against a live database:
+#   DATABASE_URL=postgres://... cargo sqlx prepare -- --lib
+[env]
+SQLX_OFFLINE = "true"

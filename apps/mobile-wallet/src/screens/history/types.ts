@@ -1,10 +1,12 @@
+export type TransactionStatus = 'pending' | 'completed' | 'failed' | 'success';
+
 export type Transaction = {
   id: string;
   amount: string;
   direction: 'in' | 'out';
   timestamp: string;
   asset?: string;
-  status?: 'pending' | 'completed' | 'failed';
+  status?: TransactionStatus;
 };
 
 export type HistoryPage = {

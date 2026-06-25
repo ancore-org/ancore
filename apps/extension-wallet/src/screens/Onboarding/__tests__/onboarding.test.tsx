@@ -124,7 +124,7 @@ describe('VerifyMnemonicScreen', () => {
     render(<VerifyMnemonicScreen mnemonic={testMnemonic} onSuccess={vi.fn()} onBack={vi.fn()} />);
 
     expect(screen.getByText(/Verify Your Backup/)).toBeInTheDocument();
-    expect(screen.getByPlaceholderText(/Enter word/)).toBeInTheDocument();
+    expect(screen.getAllByPlaceholderText(/Enter word/)[0]).toBeInTheDocument();
   });
 
   it('shows word #3 input (1-indexed)', () => {
@@ -159,6 +159,12 @@ describe('VerifyMnemonicScreen', () => {
   it('shows error when words are incorrect', async () => {
     const onSuccess = vi.fn();
     render(<VerifyMnemonicScreen mnemonic={testMnemonic} onSuccess={onSuccess} onBack={vi.fn()} />);
+
+    // Fill all inputs with wrong words to enable the button
+    const inputs = screen.getAllByPlaceholderText(/Enter word/);
+    inputs.forEach((input) => {
+      fireEvent.change(input, { target: { value: 'wrongword' } });
+    });
 
     fireEvent.click(screen.getByText('Verify & Continue'));
 

@@ -38,7 +38,7 @@ groups:
             - Verify new API tokens are valid
             - Check if clients have migrated to new tokens
             - Review auth service logs for specific error patterns
-          runbook_url: "https://github.com/ancore/ancore/blob/main/docs/ops/runbooks/key-rotation.md#api-authentication-token-rotation"
+          runbook_url: "https://github.com/ancore-org/ancore/blob/main/docs/security/INCIDENT_RESPONSE.md"
           dashboard_url: "{{ $externalURL }}/d/relayer-auth/authentication-metrics"
       
       - alert: CriticalAuthFailureSpike
@@ -66,7 +66,7 @@ groups:
             
             Current failure rate: {{ $value | humanizePercentage }}
             Critical threshold: 50%
-          runbook_url: "https://github.com/ancore/ancore/blob/main/docs/ops/runbooks/key-rotation.md#rollback-procedures"
+          runbook_url: "https://github.com/ancore-org/ancore/blob/main/docs/security/INCIDENT_RESPONSE.md"
           dashboard_url: "{{ $externalURL }}/d/relayer-auth/authentication-metrics"
       
       # ── Transaction Failures ────────────────────────────────────────────────
@@ -97,7 +97,7 @@ groups:
             2. Check Stellar network connectivity
             3. Review transaction error types
             4. Consider rollback if rate continues to increase
-          runbook_url: "https://github.com/ancore/ancore/blob/main/docs/ops/runbooks/key-rotation.md#relayer-signing-key-rotation"
+          runbook_url: "https://github.com/ancore-org/ancore/blob/main/docs/security/INCIDENT_RESPONSE.md"
           dashboard_url: "{{ $externalURL }}/d/relayer-overview/transaction-metrics"
       
       - alert: SignatureVerificationFailures
@@ -118,7 +118,7 @@ groups:
             - Verify signing key matches expected public key
             - Check for key format issues (hex encoding)
             - Review signature service logs
-          runbook_url: "https://github.com/ancore/ancore/blob/main/docs/ops/runbooks/key-rotation.md#validation-checklist"
+          runbook_url: "https://github.com/ancore-org/ancore/blob/main/docs/security/INCIDENT_RESPONSE.md"
       
       # ── Database Connectivity ───────────────────────────────────────────────
       
@@ -143,7 +143,7 @@ groups:
             4. Consider rollback if connections cannot be established
             
             Current error rate: {{ $value }} errors/sec
-          runbook_url: "https://github.com/ancore/ancore/blob/main/docs/ops/runbooks/key-rotation.md#database-credential-rotation"
+          runbook_url: "https://github.com/ancore-org/ancore/blob/main/docs/security/INCIDENT_RESPONSE.md"
       
       - alert: DatabaseConnectionPoolExhausted
         expr: |
@@ -165,7 +165,7 @@ groups:
             - Verify connections are being properly closed
             - Check for connection timeout issues
             - Review connection pool configuration
-          runbook_url: "https://github.com/ancore/ancore/blob/main/docs/ops/runbooks/key-rotation.md#database-credential-rotation"
+          runbook_url: "https://github.com/ancore-org/ancore/blob/main/docs/security/INCIDENT_RESPONSE.md"
       
       # ── Service Health ──────────────────────────────────────────────────────
       
@@ -188,7 +188,7 @@ groups:
             3. Initiate rollback if service cannot be restored quickly
             
             Downtime: {{ $value }}m
-          runbook_url: "https://github.com/ancore/ancore/blob/main/docs/ops/runbooks/key-rotation.md#rollback-procedures"
+          runbook_url: "https://github.com/ancore-org/ancore/blob/main/docs/security/INCIDENT_RESPONSE.md"
       
       - alert: PodRestartsDuringRotation
         expr: |
@@ -208,7 +208,7 @@ groups:
             - Pod logs for crash reasons
             - Secret mounting issues
             - Environment variable configuration
-          runbook_url: "https://github.com/ancore/ancore/blob/main/docs/ops/runbooks/key-rotation.md#validation-checklist"
+          runbook_url: "https://github.com/ancore-org/ancore/blob/main/docs/security/INCIDENT_RESPONSE.md"
       
       # ── Performance Degradation ─────────────────────────────────────────────
       
@@ -235,7 +235,7 @@ groups:
             - Database query performance
             - Network connectivity to Stellar RPC
             - Resource utilization (CPU, memory)
-          runbook_url: "https://github.com/ancore/ancore/blob/main/docs/ops/runbooks/key-rotation.md#monitoring-and-alerts"
+          runbook_url: "https://github.com/ancore-org/ancore/blob/main/docs/security/INCIDENT_RESPONSE.md"
       
       # ── Encryption Key Rotation ─────────────────────────────────────────────
       
@@ -263,7 +263,7 @@ groups:
             
             Job: {{ $labels.job_name }}
             Duration: {{ $value | humanizeDuration }}
-          runbook_url: "https://github.com/ancore/ancore/blob/main/docs/ops/runbooks/key-rotation.md#encryption-key-rotation-aes-256-gcm"
+          runbook_url: "https://github.com/ancore-org/ancore/blob/main/docs/security/INCIDENT_RESPONSE.md"
       
       - alert: ReencryptionJobFailed
         expr: |
@@ -285,7 +285,7 @@ groups:
             4. Restart job if transient failure
             
             Job: {{ $labels.job_name }}
-          runbook_url: "https://github.com/ancore/ancore/blob/main/docs/ops/runbooks/key-rotation.md#encryption-key-rotation-aes-256-gcm"
+          runbook_url: "https://github.com/ancore-org/ancore/blob/main/docs/security/INCIDENT_RESPONSE.md"
       
       # ── Security Alerts ─────────────────────────────────────────────────────
       
@@ -310,7 +310,7 @@ groups:
             - Review access logs for patterns
             - Verify credential migration status
             - Check for suspicious IP addresses or user agents
-          runbook_url: "https://github.com/ancore/ancore/blob/main/docs/ops/runbooks/key-rotation.md#emergency-rotation-compromise-response"
+          runbook_url: "https://github.com/ancore-org/ancore/blob/main/docs/security/INCIDENT_RESPONSE.md"
       
       - alert: SuspiciousKeyAccessPattern
         expr: |
@@ -333,7 +333,7 @@ groups:
             1. Review security logs
             2. Verify key access permissions
             3. Consider emergency rotation if compromise suspected
-          runbook_url: "https://github.com/ancore/ancore/blob/main/docs/ops/runbooks/key-rotation.md#emergency-rotation-compromise-response"
+          runbook_url: "https://github.com/ancore-org/ancore/blob/main/docs/security/INCIDENT_RESPONSE.md"
       
       # ── Stellar Network Connectivity ────────────────────────────────────────
       
@@ -356,7 +356,7 @@ groups:
             - Check RPC endpoint configuration
             - Test RPC connectivity manually
             - Review rate limiting status
-          runbook_url: "https://github.com/ancore/ancore/blob/main/docs/ops/runbooks/key-rotation.md#stellar-network-credentials-rotation"
+          runbook_url: "https://github.com/ancore-org/ancore/blob/main/docs/security/INCIDENT_RESPONSE.md"
       
       # ── Rollback Indicators ─────────────────────────────────────────────────
       
@@ -379,7 +379,7 @@ groups:
             Active alerts: {{ $value }}
             
             Review all active alerts and assess impact before proceeding.
-          runbook_url: "https://github.com/ancore/ancore/blob/main/docs/ops/runbooks/key-rotation.md#rollback-procedures"
+          runbook_url: "https://github.com/ancore-org/ancore/blob/main/docs/security/INCIDENT_RESPONSE.md"
 
   # ── Post-Rotation Validation ──────────────────────────────────────────────
   
@@ -407,4 +407,4 @@ groups:
             - Service health metrics
             
             If any issues detected, rollback window is still open.
-          runbook_url: "https://github.com/ancore/ancore/blob/main/docs/ops/runbooks/key-rotation.md#post-rotation-validation"
+          runbook_url: "https://github.com/ancore-org/ancore/blob/main/docs/security/INCIDENT_RESPONSE.md"

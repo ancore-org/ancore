@@ -19,7 +19,7 @@ groups:
           description: >
             P95 latency is {{ $value | humanizeDuration }}
             (SLO: 500ms) on {{ $labels.job }}.
-          runbook_url: "https://github.com/ancore-org/ancore/blob/main/docs/ops/runbooks/high-latency.md"
+          runbook_url: "https://github.com/ancore-org/ancore/blob/main/docs/security/INCIDENT_RESPONSE.md"
 
       - alert: HighP99Latency
         expr: >
@@ -36,7 +36,7 @@ groups:
           description: >
             P99 latency is {{ $value | humanizeDuration }}
             (SLO: 2000ms) on {{ $labels.job }}.
-          runbook_url: "https://github.com/ancore-org/ancore/blob/main/docs/ops/runbooks/high-latency.md"
+          runbook_url: "https://github.com/ancore-org/ancore/blob/main/docs/security/INCIDENT_RESPONSE.md"
 
       - alert: LatencySpikeDetected
         # Detects sudden 2× increase relative to the 1h baseline
@@ -51,4 +51,4 @@ groups:
         annotations:
           summary: "Latency spike on {{ $labels.job }}"
           description: "P95 latency doubled relative to 1-hour baseline."
-          runbook_url: "https://github.com/ancore-org/ancore/blob/main/docs/ops/runbooks/high-latency.md"
+          runbook_url: "https://github.com/ancore-org/ancore/blob/main/docs/security/INCIDENT_RESPONSE.md"

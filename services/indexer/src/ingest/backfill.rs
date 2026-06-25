@@ -28,9 +28,9 @@
 use anyhow::Context;
 use tracing::{info, warn};
 
-use crate::schema::canonical::{normalise, CanonicalEvent};
 use super::sink::EventSink;
 use super::source::EventSource;
+use crate::schema::canonical::{normalise, CanonicalEvent};
 
 // ── Config ────────────────────────────────────────────────────────────────────
 
@@ -90,7 +90,11 @@ where
 {
     /// Create a new backfill command.
     pub fn new(config: BackfillConfig, source: Src, sink: Snk) -> Self {
-        Self { config, source, sink }
+        Self {
+            config,
+            source,
+            sink,
+        }
     }
 
     /// Execute the backfill, fetching in batches from `from_ledger` to `to_ledger`.
@@ -207,7 +211,11 @@ mod tests {
     async fn backfill_processes_events_in_range() {
         let events = vec![make_raw(100), make_raw(101), make_raw(102)];
         let cmd = BackfillCommand::new(
-            BackfillConfig { from_ledger: 100, to_ledger: 102, batch_size: 10 },
+            BackfillConfig {
+                from_ledger: 100,
+                to_ledger: 102,
+                batch_size: 10,
+            },
             VecSource::new(events),
             MemorySink::default(),
         );
@@ -223,7 +231,11 @@ mod tests {
         // Events at ledger 50 and 200 are outside [100, 150]
         let events = vec![make_raw(50), make_raw(100), make_raw(150), make_raw(200)];
         let cmd = BackfillCommand::new(
-            BackfillConfig { from_ledger: 100, to_ledger: 150, batch_size: 10 },
+            BackfillConfig {
+                from_ledger: 100,
+                to_ledger: 150,
+                batch_size: 10,
+            },
             VecSource::new(events),
             MemorySink::default(),
         );
@@ -236,7 +248,11 @@ mod tests {
     #[tokio::test]
     async fn backfill_empty_source_returns_zero_stats() {
         let cmd = BackfillCommand::new(
-            BackfillConfig { from_ledger: 1, to_ledger: 10, batch_size: 10 },
+            BackfillConfig {
+                from_ledger: 1,
+                to_ledger: 10,
+                batch_size: 10,
+            },
             VecSource::new(vec![]),
             MemorySink::default(),
         );
@@ -248,7 +264,11 @@ mod tests {
     #[tokio::test]
     async fn backfill_rejects_invalid_range() {
         let cmd = BackfillCommand::new(
-            BackfillConfig { from_ledger: 200, to_ledger: 100, batch_size: 10 },
+            BackfillConfig {
+                from_ledger: 200,
+                to_ledger: 100,
+                batch_size: 10,
+            },
             VecSource::new(vec![]),
             MemorySink::default(),
         );
@@ -260,7 +280,11 @@ mod tests {
     #[tokio::test]
     async fn backfill_rejects_zero_batch_size() {
         let cmd = BackfillCommand::new(
-            BackfillConfig { from_ledger: 1, to_ledger: 10, batch_size: 0 },
+            BackfillConfig {
+                from_ledger: 1,
+                to_ledger: 10,
+                batch_size: 0,
+            },
             VecSource::new(vec![]),
             MemorySink::default(),
         );

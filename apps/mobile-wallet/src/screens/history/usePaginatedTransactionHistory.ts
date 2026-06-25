@@ -5,10 +5,14 @@ import {
   type Transaction,
   type TransactionHistoryAdapter,
 } from './types';
+import { detectErrorKind, type HistoryError } from './errorTypes';
 
 type Options = {
   adapter: TransactionHistoryAdapter;
   pageSize?: number;
+  maxRetries?: number;
+  initialBackoffMs?: number;
+  isOnline?: boolean;
 };
 
 type State = {
@@ -17,10 +21,17 @@ type State = {
   isLoadingInitial: boolean;
   isLoadingMore: boolean;
   isRefreshing: boolean;
-  error: string | null;
+  isOffline: boolean;
+  error: HistoryError | null;
+  retryCount: number;
 };
 
 const DEFAULT_PAGE_SIZE = 20;
+const DEFAULT_MAX_RETRIES = 3;
+const DEFAULT_INITIAL_BACKOFF_MS = 1000;
+
+const getDefaultOnlineStatus = (): boolean =>
+  typeof navigator === 'undefined' || navigator.onLine !== false;
 
 const mergeUniqueTransactions = (
   incoming: Transaction[],
@@ -42,6 +53,9 @@ const mergeUniqueTransactions = (
 export const usePaginatedTransactionHistory = ({
   adapter,
   pageSize = DEFAULT_PAGE_SIZE,
+  maxRetries: _maxRetries = DEFAULT_MAX_RETRIES,
+  initialBackoffMs: _initialBackoffMs = DEFAULT_INITIAL_BACKOFF_MS,
+  isOnline = getDefaultOnlineStatus(),
 }: Options) => {
   const [state, setState] = useState<State>({
     items: [],
@@ -49,10 +63,13 @@ export const usePaginatedTransactionHistory = ({
     isLoadingInitial: true,
     isLoadingMore: false,
     isRefreshing: false,
+    isOffline: !isOnline,
     error: null,
+    retryCount: 0,
   });
 
   const requestIdRef = useRef(0);
+  const backoffTimeoutRef = useRef<ReturnType<typeof setTimeout> | undefined>();
 
   const fetchPage = useCallback(
     async ({
@@ -64,11 +81,24 @@ export const usePaginatedTransactionHistory = ({
     }) => {
       const requestId = ++requestIdRef.current;
 
+      if (!isOnline) {
+        setState((prev) => ({
+          ...prev,
+          isLoadingInitial: false,
+          isLoadingMore: false,
+          isRefreshing: false,
+          isOffline: true,
+          error: null,
+        }));
+        return;
+      }
+
       setState((prev) => ({
         ...prev,
         isLoadingInitial: mode === 'initial',
         isLoadingMore: mode === 'loadMore',
         isRefreshing: mode === 'refresh',
+        isOffline: false,
         error: null,
       }));
 
@@ -92,6 +122,7 @@ export const usePaginatedTransactionHistory = ({
             isLoadingInitial: false,
             isLoadingMore: false,
             isRefreshing: false,
+            isOffline: false,
             error: null,
           };
         });
@@ -101,19 +132,20 @@ export const usePaginatedTransactionHistory = ({
             return prev;
           }
 
-          const normalizedError =
-            error instanceof Error ? error.message : 'Unable to load transactions.';
+          const historyError = detectErrorKind(error);
           return {
             ...prev,
             isLoadingInitial: false,
             isLoadingMore: false,
             isRefreshing: false,
-            error: normalizedError,
+            isOffline: false,
+            error: historyError,
+            retryCount: 0,
           };
         });
       }
     },
-    [adapter, pageSize]
+    [adapter, isOnline, pageSize]
   );
 
   useEffect(() => {
@@ -149,6 +181,16 @@ export const usePaginatedTransactionHistory = ({
 
     return fetchPage({ mode, cursor });
   }, [fetchPage, state.items.length, state.nextCursor]);
+
+  useEffect(() => {
+    const backoffTimeout = backoffTimeoutRef.current;
+
+    return () => {
+      if (backoffTimeout) {
+        clearTimeout(backoffTimeout);
+      }
+    };
+  }, []);
 
   return useMemo(
     () => ({

@@ -1,0 +1,77 @@
+# Docker Compose stack for local Ancore development
+# Provides postgres, indexer, and relayer services for full-stack testing
+#
+# Usage:
+#   docker compose -f docker-compose.dev.yml up
+#   docker compose -f docker-compose.dev.yml down
+#
+# See docs/development/local-services.md for detailed instructions
+
+version: '3.9'
+
+services:
+  # PostgreSQL database for indexer
+  postgres:
+    image: postgres:16-alpine
+    container_name: ancore-postgres
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: ancore
+      POSTGRES_DB: ancore_indexer
+    ports:
+      - '5432:5432'
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U postgres']
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    networks:
+      - ancore-network
+
+  # Indexer service
+  indexer:
+    build:
+      context: .
+      dockerfile: services/indexer/Dockerfile
+    container_name: ancore-indexer
+    environment:
+      DATABASE_URL: postgres://postgres:ancore@postgres:5432/ancore_indexer
+      PROMETHEUS_PORT: 9090
+      RUST_LOG: info
+    ports:
+      - '3000:3000'  # API server
+      - '9090:9090'  # Prometheus metrics
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks:
+      - ancore-network
+    restart: unless-stopped
+
+  # Relayer service
+  relayer:
+    build:
+      context: .
+      dockerfile: services/relayer/Dockerfile
+    container_name: ancore-relayer
+    environment:
+      PORT: 3000
+      NODE_ENV: development
+      # Add your Stellar network configuration here
+      # STELLAR_NETWORK: testnet
+      # STELLAR_HORIZON_URL: https://horizon-testnet.stellar.org
+    ports:
+      - '3001:3000'  # Relayer API
+    networks:
+      - ancore-network
+    restart: unless-stopped
+
+volumes:
+  postgres_data:
+    driver: local
+
+networks:
+  ancore-network:
+    driver: bridge

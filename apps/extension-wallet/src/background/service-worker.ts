@@ -1,5 +1,13 @@
-import { registerHandler, installMessageDispatcher } from '@/messaging';
-import { readAuthState } from '@/router/AuthGuard';
+import { installMessageDispatcher } from '@/messaging';
+import { registerInternalHandlers, probeServicesOnStartup } from './handlers';
+import { restoreUnlockSessionFromStorage } from './session-state';
+import {
+  registerAllExternalHandlers,
+  dispatchExternalRequest,
+} from '@/background/handlers/external';
+import { openMockApproval } from './approval-window';
+import { resolveRequest, rejectRequest } from './handlers/external/response-queue';
+import type { ExternalApiRequest, ExternalApiMethodName } from '@ancore/types';
 
 type ChromeRuntimeManifest = {
   name: string;
@@ -19,18 +27,40 @@ declare const chrome: {
     onStartup: {
       addListener(callback: () => void): void;
     };
-  };
-  storage: {
-    local: {
-      get(key: string, callback: (result: Record<string, unknown>) => void): void;
-      set(items: Record<string, unknown>, callback?: () => void): void;
+    onMessage: {
+      addListener(
+        callback: (
+          message: unknown,
+          sender: { url?: string; origin?: string; tab?: { id?: number } },
+          sendResponse: (response: unknown) => void
+        ) => boolean | void
+      ): void;
     };
+    getURL(path: string): string;
+  };
+  tabs: {
+    query(queryInfo: {
+      active?: boolean;
+      lastFocusedWindow?: boolean;
+    }): Promise<{ id?: number; windowId?: number }[]>;
+  };
+  sidePanel?: {
+    setOptions(options: { path?: string; enabled?: boolean }): Promise<void>;
+    open(options: { windowId: number }): Promise<void>;
+  };
+  windows: {
+    create(createData: {
+      url?: string;
+      type?: string;
+      width?: number;
+      height?: number;
+    }): Promise<{ id?: number }>;
   };
 };
 
 const logPrefix = '[ancore-extension/background]';
 
-const runtime = (globalThis as { chrome?: { runtime?: any } }).chrome?.runtime;
+const runtime = (globalThis as { chrome?: { runtime?: typeof chrome.runtime } }).chrome?.runtime;
 const manifest = (runtime?.getManifest?.() as ChromeRuntimeManifest | undefined) ?? {
   name: 'ancore-extension-wallet',
   version: '0.0.0',
@@ -41,146 +71,157 @@ console.info(`${logPrefix} booted`, {
   version: manifest.version,
 });
 
+void restoreUnlockSessionFromStorage().then((restored) => {
+  if (restored) {
+    console.info(`${logPrefix} unlock session restored from chrome.storage.session`);
+  }
+});
+
 runtime?.onInstalled?.addListener((details: ChromeInstalledDetails) => {
   console.info(`${logPrefix} installed`, { reason: details.reason });
 });
 
 runtime?.onStartup?.addListener(() => {
   console.info(`${logPrefix} startup`);
+  void probeServicesOnStartup().catch((err) => {
+    console.warn(`${logPrefix} health probe failed on startup`, err);
+  });
 });
 
-// ---------------------------------------------------------------------------
-// In-memory session state (backing store cleared on lock)
-// ---------------------------------------------------------------------------
+// Broadcast network changes to all tabs via chrome.storage.onChanged
+const storage = (globalThis as { chrome?: { storage?: typeof chrome.storage } }).chrome?.storage;
+storage?.onChanged?.addListener((changes, areaName) => {
+  if (areaName === 'local' && 'ancore-settings' in changes) {
+    const newSettings = changes['ancore-settings'].newValue as Record<string, unknown> | undefined;
+    const oldSettings = changes['ancore-settings'].oldValue as Record<string, unknown> | undefined;
 
-/** The wallet is considered unlocked only for the lifetime of the service-worker. */
-let _sessionUnlocked = false;
-
-function getChromeStorage(key: string): Promise<unknown> {
-  return new Promise((resolve) => {
-    const chromeRef = (globalThis as { chrome?: any }).chrome;
-    if (chromeRef?.storage?.local) {
-      chromeRef.storage.local.get(key, (result: Record<string, unknown>) => {
-        resolve(result[key] ?? null);
+    // Check if network changed
+    if (newSettings?.network !== oldSettings?.network) {
+      console.info(`${logPrefix} network changed`, {
+        from: oldSettings?.network,
+        to: newSettings?.network,
       });
-    } else {
-      // Fallback to localStorage in dev/test
-      resolve(localStorage.getItem(key));
-    }
-  });
-}
 
-function setChromeStorage(key: string, value: unknown): Promise<void> {
-  return new Promise((resolve) => {
-    const chromeRef = (globalThis as { chrome?: any }).chrome;
-    if (chromeRef?.storage?.local) {
-      chromeRef.storage.local.set({ [key]: value }, resolve);
-    } else {
-      // Fallback to localStorage in dev/test
-      localStorage.setItem(key, typeof value === 'string' ? value : JSON.stringify(value));
-      resolve();
+      // Broadcast to all tabs to refresh their state
+      chrome.tabs.query({}, (tabs) => {
+        tabs.forEach((tab) => {
+          if (tab.id) {
+            chrome.tabs
+              .sendMessage(tab.id, {
+                type: 'NETWORK_CHANGED',
+                network: newSettings?.network,
+                horizonUrl: newSettings?.horizonUrl,
+              })
+              .catch(() => {
+                // Tab may not have content script, ignore error
+              });
+          }
+        });
+      });
     }
-  });
-}
+  }
+});
 
 // ---------------------------------------------------------------------------
-// Message handlers
+// External API handlers (dApp connectivity)
 // ---------------------------------------------------------------------------
 
-/**
- * GET_WALLET_STATE — returns the authoritative wallet state from storage/session.
- *
- * Reads the persisted AuthState to determine if the user has onboarded, and
- * combines it with the in-memory session flag to determine lock status.
- */
-registerHandler('GET_WALLET_STATE', async () => {
-  const authState = readAuthState();
-
-  if (!authState.hasOnboarded) {
-    return { state: 'uninitialized' as const };
-  }
-
-  if (!_sessionUnlocked) {
-    return { state: 'locked' as const };
-  }
-
-  return { state: 'unlocked' as const };
-});
+// Register all external API handlers
+registerAllExternalHandlers();
 
 /**
- * LOCK_WALLET — locks the wallet immediately, clearing the session flag.
- *
- * Persists the lock state to storage so the popup can reflect it on reload.
+ * Handle EXTERNAL_API_REQUEST messages from content script.
+ * These are requests from dApps to interact with the wallet.
  */
-registerHandler('LOCK_WALLET', async () => {
-  try {
-    _sessionUnlocked = false;
+chrome.runtime.onMessage.addListener(
+  (
+    message: unknown,
+    sender: { url?: string; origin?: string; tab?: { id?: number } },
+    sendResponse: (response: unknown) => void
+  ) => {
+    const request = message as ExternalApiRequest;
 
-    // Persist lock to auth storage
-    const authState = readAuthState();
-    await setChromeStorage(
-      'ancore_extension_auth',
-      JSON.stringify({
-        ...authState,
-        isUnlocked: false,
+    if (request.type !== 'EXTERNAL_API_REQUEST') {
+      return false;
+    }
+
+    const { method, requestId, params, origin } = request;
+
+    // Validate origin
+    if (!origin || typeof origin !== 'string') {
+      sendResponse({
+        type: 'EXTERNAL_API_RESPONSE',
+        requestId,
+        ok: false,
+        error: 'Invalid origin',
+      });
+      return true;
+    }
+
+    // Validate sender origin matches
+    if (sender.origin && sender.origin !== origin) {
+      sendResponse({
+        type: 'EXTERNAL_API_RESPONSE',
+        requestId,
+        ok: false,
+        error: 'Origin mismatch',
+      });
+      return true;
+    }
+
+    // Dispatch to handler
+    void dispatchExternalRequest(method as ExternalApiMethodName, {
+      origin,
+      params,
+      requestId,
+      sender,
+    })
+      .then((result) => {
+        sendResponse({
+          type: 'EXTERNAL_API_RESPONSE',
+          requestId,
+          ok: true,
+          result,
+        });
       })
-    );
+      .catch((error: Error) => {
+        sendResponse({
+          type: 'EXTERNAL_API_RESPONSE',
+          requestId,
+          ok: false,
+          error: error.message,
+        });
+      });
 
-    console.info(`${logPrefix} wallet locked`);
-    return { success: true };
-  } catch (err) {
-    console.error(`${logPrefix} lock failed`, err);
-    return { success: false };
+    return true; // Async response
   }
-});
+);
 
-/**
- * UNLOCK_WALLET — verifies the password and unlocks the wallet.
- *
- * On success: sets the in-memory session flag and persists the unlocked
- * state so the popup React tree can pick it up via its storage listener.
- */
-registerHandler('UNLOCK_WALLET', async ({ password }) => {
-  try {
-    if (!password || typeof password !== 'string') {
-      console.warn(`${logPrefix} unlock attempted with invalid password`);
-      return { success: false };
-    }
-
-    // Read persisted auth state
-    const authState = readAuthState();
-
-    if (!authState.hasOnboarded) {
-      console.warn(`${logPrefix} unlock attempted before onboarding`);
-      return { success: false };
-    }
-
-    // Simple guard: in a real implementation, verify against the encrypted
-    // mnemonic/key via SecureStorageManager. For now we accept any non-empty
-    // password for onboarded wallets and flag for replacement.
-    // TODO: wire to SecureStorageManager.unlock(password) for real verification.
-    if (password.length === 0) {
-      return { success: false };
-    }
-
-    _sessionUnlocked = true;
-
-    await setChromeStorage(
-      'ancore_extension_auth',
-      JSON.stringify({
-        ...authState,
-        isUnlocked: true,
-      })
-    );
-
-    console.info(`${logPrefix} wallet unlocked`);
-    return { success: true };
-  } catch (err) {
-    console.error(`${logPrefix} unlock failed`, err);
-    _sessionUnlocked = false;
-    return { success: false };
-  }
-});
-
-// Activate the dispatcher — must be called after all handlers are registered.
+// Register internal handlers and activate dispatcher
+registerInternalHandlers();
 installMessageDispatcher();
+
+// Dev-only: handle mock approval requests from popup
+chrome.runtime.onMessage.addListener((message: unknown, _sender, sendResponse) => {
+  if ((message as { type?: string }).type === 'DEV_OPEN_APPROVAL') {
+    void openMockApproval().then(() => sendResponse({ ok: true }));
+    return true;
+  }
+  return false;
+});
+
+// Handle approve/reject from side panel or popup approval screen
+chrome.runtime.onMessage.addListener((message: unknown, _sender, sendResponse) => {
+  const msg = message as { type?: string; requestId?: string };
+  if (msg.type === 'APPROVE_SIGN_REQUEST' && msg.requestId) {
+    resolveRequest(msg.requestId, { signedXdr: 'AAAAAgAAAAA=' });
+    sendResponse({ ok: true });
+    return true;
+  }
+  if (msg.type === 'REJECT_SIGN_REQUEST' && msg.requestId) {
+    rejectRequest(msg.requestId, new Error('User rejected the sign request'));
+    sendResponse({ ok: true });
+    return true;
+  }
+  return false;
+});

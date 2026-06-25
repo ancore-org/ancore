@@ -13,9 +13,9 @@
     }
   },
   "scripts": {
-    "build": "tsup src/index.ts --format cjs,esm --dts",
+    "build": "tsup src/index.ts --format cjs,esm --dts --tsconfig tsconfig.build.json",
     "dev": "tsup src/index.ts --format cjs,esm --dts --watch",
-    "test": "jest --coverage",
+    "test": "node ./node_modules/jest/bin/jest.js --coverage",
     "lint": "eslint src/",
     "clean": "rm -rf dist"
   },

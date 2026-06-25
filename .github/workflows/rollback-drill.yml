@@ -37,10 +37,10 @@ jobs:
     name: Resolve Release Tags
     runs-on: ubuntu-latest
     outputs:
-      release_tag:  ${{ steps.tags.outputs.release_tag }}
+      release_tag: ${{ steps.tags.outputs.release_tag }}
       previous_tag: ${{ steps.tags.outputs.previous_tag }}
-      dry_run:      ${{ steps.tags.outputs.dry_run }}
-      env:          ${{ steps.tags.outputs.env }}
+      dry_run: ${{ steps.tags.outputs.dry_run }}
+      env: ${{ steps.tags.outputs.env }}
     steps:
       - uses: actions/checkout@v4
         with:

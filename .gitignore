@@ -7,6 +7,7 @@ node_modules/
 # Build outputs
 dist/
 build/
+**/stats.html
 .next/
 out/
 *.tsbuildinfo
@@ -57,7 +58,8 @@ __pycache__/
 *.pem
 secrets/
 
-# issues
+# issues (local contributor backlog — not published to GitHub)
+/issues/
 docs/issues
 
 # Admin-only tooling (local project management)
@@ -76,5 +78,8 @@ apps/extension-wallet/vitest.config.js
 apps/extension-wallet/vitest.config.js.map
 
 issues.md
-pr.mdimplementation.md
+pr.md
+implementation.md
 submission_details.md
+brief.md
+checks.md

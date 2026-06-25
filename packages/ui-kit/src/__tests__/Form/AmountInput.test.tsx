@@ -64,6 +64,11 @@ describe('AmountInput (standalone)', () => {
     expect(onMax).toHaveBeenCalledTimes(1);
   });
 
+  it('disables MAX button when maxDisabled is true', () => {
+    render(<AmountInput onMax={() => {}} maxDisabled />);
+    expect(screen.getByRole('button', { name: /max/i })).toBeDisabled();
+  });
+
   it('allows numeric input', async () => {
     const user = userEvent.setup();
     const onChange = vi.fn();

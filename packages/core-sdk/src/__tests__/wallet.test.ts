@@ -68,6 +68,6 @@ describe('wallet material helpers', () => {
     const wallet = await importWallet({ mnemonic: generateMnemonic() });
 
     expect(deriveContractId(wallet.publicKey)).toBe(wallet.contractId);
-    expect(wallet.contractId).toMatch(/^CAS[A-Z2-7]{55}$/);
+    expect(wallet.contractId).toMatch(/^C[A-Z2-7]{55}$/);
   });
 });

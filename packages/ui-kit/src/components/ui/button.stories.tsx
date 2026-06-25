@@ -93,6 +93,21 @@ export const Disabled: Story = {
   },
 };
 
+export const Loading: Story = {
+  args: {
+    children: 'Loading Button',
+    loading: true,
+  },
+};
+
+export const DestructiveLoading: Story = {
+  args: {
+    children: 'Deleting...',
+    variant: 'destructive',
+    loading: true,
+  },
+};
+
 export const AllVariants: Story = {
   render: () => (
     <div className="flex flex-col gap-4">

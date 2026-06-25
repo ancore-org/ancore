@@ -7,20 +7,17 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { SecureStorageManager } from '@ancore/core-sdk';
-import { createStorageAdapter } from '@ancore/core-sdk';
 import { LockManager } from '../security/lock-manager';
+import { getSharedStorageManager } from '../security/storage-manager';
 import { getSettingsState, useSettingsStore } from '../stores/settings';
 import { setSessionState } from '../stores/session';
+import { useHotkey } from './useHotkey';
 
 // Singleton storage manager shared across hook instances
 type StorageManagerInstance = InstanceType<typeof SecureStorageManager>;
-let _storageManager: StorageManagerInstance | null = null;
 
 function getStorageManager(): StorageManagerInstance {
-  if (!_storageManager) {
-    _storageManager = new SecureStorageManager(createStorageAdapter());
-  }
-  return _storageManager;
+  return getSharedStorageManager();
 }
 
 export interface UseLockManagerResult {
@@ -71,6 +68,12 @@ export function useLockManager(): UseLockManagerResult {
   const lock = useCallback(() => {
     managerRef.current?.lock();
   }, []);
+
+  const enableLockShortcut = useSettingsStore((state) => state.enableLockShortcut);
+
+  // Register cross-platform keyboard shortcut: ⌘+Shift+L (Mac) / Ctrl+Shift+L (Win/Linux)
+  useHotkey('Meta+Shift+L', lock, { enabled: enableLockShortcut && !isLocked, ignoreInputs: true });
+  useHotkey('Ctrl+Shift+L', lock, { enabled: enableLockShortcut && !isLocked, ignoreInputs: true });
 
   return { isLocked, unlock, lock };
 }

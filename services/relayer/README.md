@@ -14,9 +14,10 @@ Transaction relay service for the Ancore account abstraction layer. Accepts sign
 
 ### Environment Variables
 
-| Variable | Required | Description                        |
-| -------- | -------- | ---------------------------------- |
-| `PORT`   | No       | HTTP listen port (default: `3000`) |
+| Variable              | Required | Description                                                          |
+| --------------------- | -------- | -------------------------------------------------------------------- |
+| `PORT`                | No       | HTTP listen port (default: `3000`)                                   |
+| `RELAYER_AUTH_SECRET` | No       | Bearer token secret required for protected `/relay` routes (JWT/API) |
 
 > **MVP note:** Authentication and signature verification use stub implementations. Replace `stubAuthService` and `stubSignatureService` in `src/server.ts` before production deployment.
 
@@ -25,6 +26,81 @@ Transaction relay service for the Ancore account abstraction layer. Accepts sign
 ## API
 
 All endpoints accept and return `application/json`.
+
+### OpenAPI Specification
+
+The service publishes an OpenAPI 3.1 specification that documents all endpoints, request/response schemas, and authentication requirements.
+
+**Specification file:** `services/relayer/openapi.yaml`
+
+**View the spec:**
+
+```bash
+# View raw specification
+cat services/relayer/openapi.yaml
+
+# Or use a tool like Redoc locally
+npx @redocly/cli preview-docs services/relayer/openapi.yaml
+```
+
+### Generated TypeScript Types
+
+The OpenAPI specification can be used to generate TypeScript types for use in external integrations (e.g., wallet teams). This ensures type safety when calling the relayer API.
+
+**Regenerate types:**
+
+```bash
+# From repository root
+pnpm install -D openapi-typescript
+pnpm generate:openapi-types
+
+# Or run the script directly
+npx ts-node scripts/generate-openapi-types.ts
+```
+
+**Generated file:** `services/relayer/src/api/openapi-types.ts`
+
+The generated types include:
+
+- Request schemas (`RelayExecuteRequest`, `RelayValidateRequest`)
+- Response schemas (`RelayExecuteResponse`, `ValidationResult`, `HealthResponse`)
+- Error schemas (`RelayError`, `ValidationErrorResponse`)
+
+**Usage in external projects:**
+
+```typescript
+import type {
+  RelayExecuteRequest,
+  RelayExecuteResponse,
+  ValidationErrorResponse,
+} from '@ancore/relayer/src/api/openapi-types';
+
+// Type-safe request construction
+const request: RelayExecuteRequest = {
+  sessionKey: 'a'.repeat(64),
+  operation: 'relay_execute',
+  parameters: {
+    /* ... */
+  },
+  signature: 'b'.repeat(128),
+  nonce: 1,
+};
+```
+
+### Contract Tests
+
+The service includes contract tests that verify the actual API implementation matches the OpenAPI specification. These tests boot the real Express app and assert that routes, status codes, and response schemas align with the documented specification.
+
+**Run contract tests:**
+
+```bash
+pnpm --filter @ancore/relayer test -- tests/contract
+```
+
+If contract tests fail, it indicates either:
+
+1. The implementation has changed and the spec needs updating
+2. The spec has changed and the implementation needs updating
 
 ### `POST /relay/execute`
 
@@ -50,7 +126,7 @@ Execute a signed relay transaction.
 {
   "success": true,
   "transactionId": "<64-char hex>",
-  "gasUsed": 21000
+  "gasUsed": 0
 }
 ```
 
@@ -110,9 +186,70 @@ Health check. No authentication required.
 
 **HTTP status mapping:**
 
-- `400` — schema validation failure (`VALIDATION_ERROR`)
-- `401` — authentication failure (`UNAUTHORIZED`)
-- `422` — business-logic rejection (all other codes above)
+| HTTP status | Code(s)                                                                                               |
+| ----------- | ----------------------------------------------------------------------------------------------------- |
+| `400`       | `VALIDATION_ERROR` — request body failed schema validation                                            |
+| `401`       | `UNAUTHORIZED` — missing or invalid Bearer token                                                      |
+| `422`       | `INVALID_SIGNATURE`, `SESSION_KEY_EXPIRED`, `NONCE_REPLAY`, `GAS_LIMIT_EXCEEDED`, `SIMULATION_FAILED` |
+| `500`       | `INTERNAL_ERROR` — unexpected server-side error                                                       |
+
+**Client handling guide (TypeScript)**
+
+Use a discriminated switch over `error.code` to map relayer errors to user actions:
+
+```typescript
+interface RelayErrorBody {
+  success: false;
+  error: { code: string; message: string };
+}
+
+async function callRelay(request: RelayExecuteRequest): Promise<void> {
+  const res = await fetch(`${VITE_RELAYER_URL}/relay/execute`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+    body: JSON.stringify(request),
+  });
+
+  if (res.ok) return;
+
+  const body: RelayErrorBody = await res.json();
+
+  switch (body.error.code) {
+    case 'INVALID_SIGNATURE':
+      // Re-sign the payload with a fresh keypair or re-fetch the session key.
+      throw new Error('Signature verification failed — re-sign and retry.');
+
+    case 'SESSION_KEY_EXPIRED':
+      // Prompt the user to re-authenticate and obtain a new session key.
+      throw new Error('Session key expired — please re-authenticate.');
+
+    case 'NONCE_REPLAY':
+      // Increment and re-fetch the nonce; then retry the operation once.
+      throw new Error('Nonce already used — fetch a fresh nonce and retry.');
+
+    case 'GAS_LIMIT_EXCEEDED':
+      // Reduce operation complexity or split into smaller transactions.
+      throw new Error('Gas limit exceeded — simplify the transaction.');
+
+    case 'SIMULATION_FAILED':
+      // The contract rejected the simulated call — check inputs and contract state.
+      throw new Error('Transaction simulation failed — check your inputs.');
+
+    case 'UNAUTHORIZED':
+      // Re-authenticate and obtain a new Bearer token.
+      throw new Error('Not authorised — obtain a valid token and retry.');
+
+    case 'VALIDATION_ERROR':
+      // Programming error — fix the request shape at the call site.
+      throw new Error(`Invalid request: ${body.error.message}`);
+
+    default:
+      throw new Error(`Relayer error (${body.error.code}): ${body.error.message}`);
+  }
+}
+```
+
+> See [docs/integration-guide.md — Relayer error codes](../../docs/integration-guide.md#relayer-error-codes) for the cross-team handling contract.
 
 ---
 
@@ -186,6 +323,51 @@ Dependent services should:
 
 ---
 
+## Example cURL Commands
+
+**Execute a relay transaction:**
+
+```bash
+curl -X POST http://localhost:3000/relay/execute \
+  -H "Authorization: Bearer YOUR_TOKEN" \
+  -H "Content-Type: application/json" \
+  -H "idempotency-key: unique-request-id" \
+  -d '{
+    "sessionKey": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "operation": "relay_execute",
+    "parameters": {
+      "accountAddress": "GBBM6BKZPEBWYY3A3YR4IK7T7XZM5JC5K7NYGR7KDCXYBCJVPQYV5YAA",
+      "to": "GD7OEZ2NYNQXK7FLTLQZZCNY2DZV5C7M3F4TNZBAYEBQKVU5RQV6SRQQ",
+      "functionName": "transfer",
+      "args": ["base64_encoded_xdr"]
+    },
+    "signature": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+    "nonce": 1
+  }'
+```
+
+**Validate a relay transaction:**
+
+```bash
+curl -X POST http://localhost:3000/relay/validate \
+  -H "Authorization: Bearer YOUR_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "sessionKey": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "operation": "relay_execute",
+    "parameters": {
+      "accountAddress": "GBBM6BKZPEBWYY3A3YR4IK7T7XZM5JC5K7NYGR7KDCXYBCJVPQYV5YAA",
+      "to": "GD7OEZ2NYNQXK7FLTLQZZCNY2DZV5C7M3F4TNZBAYEBQKVU5RQV6SRQQ",
+      "functionName": "transfer",
+      "args": ["base64_encoded_xdr"]
+    },
+    "signature": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+    "nonce": 1
+  }'
+```
+
+---
+
 ## Project Structure
 
 ```
@@ -195,14 +377,16 @@ services/relayer/
 │   ├── handlers/         # Express route handlers (factories)
 │   ├── middleware/        # Auth and validation middleware
 │   ├── services/         # Core business logic (RelayService)
-│   ├── api/              # Zod schemas for existing API surface
+│   ├── api/              # Zod schemas and OpenAPI types
 │   ├── queue/            # In-memory job queue
 │   ├── workers/          # Queue worker
 │   └── server.ts         # App factory + entrypoint
 ├── tests/
 │   ├── unit/             # Unit tests (RelayService, middleware)
-│   └── integration/      # Supertest integration tests (all endpoints)
+│   ├── integration/      # Supertest integration tests (all endpoints)
+│   └── contract/         # OpenAPI contract tests (validate spec compliance)
 ├── package.json
 ├── tsconfig.json
+├── openapi.yaml          # OpenAPI 3.1 specification
 └── README.md
 ```

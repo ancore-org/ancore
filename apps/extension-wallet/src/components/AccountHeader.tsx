@@ -1,20 +1,15 @@
 import { Copy, Check, Globe } from 'lucide-react';
 import { Button } from '@ancore/ui-kit';
-import { Badge } from '@ancore/ui-kit';
+import { Badge, Tooltip } from '@ancore/ui-kit';
+import { useCopyWithFeedback } from '@/hooks/useCopyWithFeedback';
 
 interface AccountHeaderProps {
   address: string;
   network: string;
-  onCopyAddress: () => void;
-  copied?: boolean;
 }
 
-export function AccountHeader({
-  address,
-  network,
-  onCopyAddress,
-  copied = false,
-}: AccountHeaderProps) {
+export function AccountHeader({ address, network }: AccountHeaderProps) {
+  const { copy, copied } = useCopyWithFeedback();
   return (
     <div className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-card to-card/80 border border-border/50 shadow-lg p-6">
       {/* Background decorative elements */}
@@ -26,13 +21,30 @@ export function AccountHeader({
         <div className="mb-6">
           <div className="flex items-center justify-between mb-2">
             <h2 className="text-sm font-medium text-muted-foreground">Account Address</h2>
-            <Badge
-              variant="outline"
-              className="border-primary/30 bg-primary/5 text-primary font-medium"
+            <Tooltip
+              content={
+                network.toLowerCase() === 'mainnet'
+                  ? 'Environment: Production (Horizon Mainnet)'
+                  : network.toLowerCase() === 'staging'
+                    ? 'Environment: Staging (Horizon Testnet)'
+                    : network.toLowerCase() === 'testnet'
+                      ? 'Environment: Sandbox (Horizon Testnet)'
+                      : `Environment: ${network}`
+              }
             >
-              <Globe className="w-3 h-3 mr-1" />
-              {network}
-            </Badge>
+              <div
+                tabIndex={0}
+                className="focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary rounded cursor-help"
+              >
+                <Badge
+                  variant="outline"
+                  className="border-primary/30 bg-primary/5 text-primary font-medium"
+                >
+                  <Globe className="w-3 h-3 mr-1" />
+                  {network}
+                </Badge>
+              </div>
+            </Tooltip>
           </div>
 
           <div className="flex items-center gap-3">
@@ -46,7 +58,7 @@ export function AccountHeader({
             <Button
               variant="outline"
               size="icon"
-              onClick={onCopyAddress}
+              onClick={() => void copy(address)}
               className="shrink-0 rounded-full border-border/50 hover:border-primary/50 hover:bg-primary/5 transition-all duration-300 hover:scale-105"
               aria-label={copied ? 'Address copied' : 'Copy address'}
             >

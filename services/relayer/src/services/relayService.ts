@@ -1,26 +1,37 @@
 import { randomBytes } from 'crypto';
+import { validateTransferPolicy } from '@ancore/types';
+import type { JobQueue } from '../queue/JobQueue';
+import type { IdempotencyStore } from '../store/idempotency';
+import { NonceStore } from '../store/nonceStore';
 import type {
   RelayServiceContract,
   SignatureServiceContract,
+  TransactionSubmitterContract,
+  RelayServiceOptions,
   RelayExecuteRequest,
   RelayExecuteResponse,
   ValidationResult,
   HealthResponse,
+  DependencyStatus,
 } from '../types';
+import { mapSimulationError } from './mapSimulationError';
+import { mapSubmissionError } from './mapSubmissionError';
 
-const MOCK_GAS_USED = 21_000;
+const SIGNED_TX_PARAMETER = 'signedTransactionXdr';
 const startTime = Date.now();
 
-/** Generate a deterministic-looking mock transaction ID */
+/** Generate a synthetic transaction id for dev-only mock submission */
 function mockTxId(): string {
   return randomBytes(32).toString('hex').toUpperCase();
 }
 
+function isMockSubmissionEnabled(options?: RelayServiceOptions): boolean {
+  return options?.useMockSubmission === true || process.env.RELAYER_USE_MOCK_SUBMISSION === 'true';
+}
+
 /**
- * Mock implementation of RelayServiceContract.
- *
- * Validates the request signature via SignatureServiceContract, then
- * simulates execution. Replace with real Soroban submission logic when ready.
+ * RelayService validates signed relay requests and submits pre-signed Soroban
+ * transactions to Stellar via Horizon.
  *
  * Security checks performed:
  *  - Signature verification (Ed25519 via SignatureServiceContract)
@@ -28,7 +39,18 @@ function mockTxId(): string {
  *  - Session key must be a 64-char hex string
  */
 export class RelayService implements RelayServiceContract {
-  constructor(private readonly signatureService: SignatureServiceContract) {}
+  private readonly useMockSubmission: boolean;
+
+  constructor(
+    private readonly signatureService: SignatureServiceContract,
+    private readonly queue?: JobQueue,
+    private readonly store?: IdempotencyStore,
+    private readonly transactionSubmitter?: TransactionSubmitterContract,
+    options?: RelayServiceOptions,
+    private readonly nonceStore?: NonceStore
+  ) {
+    this.useMockSubmission = isMockSubmissionEnabled(options);
+  }
 
   async validateRelay(request: RelayExecuteRequest): Promise<ValidationResult> {
     const keyError = this.validateSessionKey(request.sessionKey);
@@ -41,6 +63,18 @@ export class RelayService implements RelayServiceContract {
       };
     }
 
+    if (this.nonceStore) {
+      try {
+        this.nonceStore.assertFresh(request.sessionKey, request.nonce);
+      } catch (err) {
+        const message = err instanceof Error ? err.message : 'Nonce already used';
+        return {
+          valid: false,
+          error: { code: 'NONCE_REPLAY', message },
+        };
+      }
+    }
+
     const payload = this.canonicalPayload(request);
     const ok = this.signatureService.verify(request.sessionKey, payload, request.signature);
     if (!ok) {
@@ -48,6 +82,18 @@ export class RelayService implements RelayServiceContract {
         valid: false,
         error: { code: 'INVALID_SIGNATURE', message: 'Signature verification failed' },
       };
+    }
+
+    // Validate transfer policy if provided
+    if (request.transferPolicy) {
+      const { policy, amount, todayTotal } = request.transferPolicy;
+      const policyResult = validateTransferPolicy(amount, todayTotal, policy);
+      if (policyResult.action === 'block') {
+        return {
+          valid: false,
+          error: { code: 'TRANSFER_LIMIT_EXCEEDED', message: policyResult.message },
+        };
+      }
     }
 
     return { valid: true };
@@ -59,19 +105,183 @@ export class RelayService implements RelayServiceContract {
       return { success: false, error: validation.error, gasUsed: 0 };
     }
 
-    // TODO: replace with real Soroban transaction submission
-    return { success: true, transactionId: mockTxId(), gasUsed: MOCK_GAS_USED };
+    if (this.nonceStore) {
+      this.nonceStore.track(request.sessionKey, request.nonce);
+    }
+
+    if (this.useMockSubmission) {
+      return { success: true, transactionId: mockTxId(), gasUsed: 0 };
+    }
+
+    if (!this.transactionSubmitter) {
+      return {
+        success: false,
+        error: {
+          code: 'INTERNAL_ERROR',
+          message: 'Transaction submitter is not configured',
+        },
+        gasUsed: 0,
+      };
+    }
+
+    const signedXdr = this.extractSignedTransactionXdr(request);
+    if (!signedXdr) {
+      return {
+        success: false,
+        error: {
+          code: 'INTERNAL_ERROR',
+          message: `Missing required parameter: ${SIGNED_TX_PARAMETER}`,
+        },
+        gasUsed: 0,
+      };
+    }
+
+    try {
+      const { assembledXdr, gasUsed } =
+        await this.transactionSubmitter.simulateAndAssembleTransaction(signedXdr);
+      const result = await this.transactionSubmitter.submitSignedTransaction(assembledXdr);
+      return {
+        success: true,
+        transactionId: result.transactionHash,
+        gasUsed,
+      };
+    } catch (error) {
+      return {
+        success: false,
+        error: mapSimulationError(error) ?? mapSubmissionError(error),
+        gasUsed: 0,
+      };
+    }
   }
 
   health(): HealthResponse {
+    const queueStatus: DependencyStatus = this.queue
+      ? { status: 'ok' }
+      : { status: 'degraded', message: 'Queue not initialized' };
+
+    const rpcStatus = this.resolveRpcStatus();
+
+    const storageStatus: DependencyStatus = this.store
+      ? { status: 'ok' }
+      : { status: 'degraded', message: 'Storage not initialized' };
+
+    const signatureServiceStatus = this.resolveSignatureServiceStatus();
+
+    const overallStatus =
+      queueStatus.status === 'ok' &&
+      rpcStatus.status === 'ok' &&
+      storageStatus.status === 'ok' &&
+      signatureServiceStatus.status === 'ok'
+        ? 'ok'
+        : 'degraded';
+
     return {
-      status: 'ok',
+      status: overallStatus,
       uptime: Math.floor((Date.now() - startTime) / 1000),
       timestamp: new Date().toISOString(),
+      dependencies: {
+        queue: queueStatus,
+        rpc: rpcStatus,
+        storage: storageStatus,
+        signatureService: signatureServiceStatus,
+      },
     };
   }
 
+  /** Async RPC health probe — call from a background tick or status handler when needed */
+  async checkRpcHealth(): Promise<DependencyStatus> {
+    if (this.useMockSubmission) {
+      return { status: 'ok', latencyMs: 12, message: 'Mock submission mode' };
+    }
+
+    if (!this.transactionSubmitter) {
+      return { status: 'degraded', message: 'Transaction submitter is not configured' };
+    }
+
+    try {
+      const result = await this.transactionSubmitter.isHealthy();
+      if (!result.healthy) {
+        return {
+          status: 'degraded',
+          message: 'Soroban RPC unreachable',
+          latencyMs: result.latencyMs,
+        };
+      }
+      return { status: 'ok', latencyMs: result.latencyMs };
+    } catch {
+      return { status: 'degraded', message: 'Soroban RPC health check failed' };
+    }
+  }
+
+  /** Async signature service health probe with configurable timeout */
+  async checkSignatureServiceHealth(): Promise<DependencyStatus> {
+    if (!this.signatureService.isHealthy) {
+      return { status: 'ok', message: 'Health check not implemented' };
+    }
+
+    const timeoutMs = parseInt(process.env.SIGNATURE_SERVICE_HEALTH_TIMEOUT_MS || '5000', 10);
+    
+    try {
+      const start = Date.now();
+      const timeoutPromise = new Promise<never>((_, reject) =>
+        setTimeout(() => reject(new Error('Health check timeout')), timeoutMs)
+      );
+
+      const result = await Promise.race([
+        this.signatureService.isHealthy(),
+        timeoutPromise,
+      ]);
+
+      const latencyMs = Date.now() - start;
+
+      if (!result.healthy) {
+        return {
+          status: 'degraded',
+          message: 'Signature service unreachable',
+          latencyMs: result.latencyMs ?? latencyMs,
+        };
+      }
+
+      return { status: 'ok', latencyMs: result.latencyMs ?? latencyMs };
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      return { status: 'degraded', message: `Signature service health check failed: ${errorMessage}` };
+    }
+  }
+
   // ── Private helpers ──────────────────────────────────────────────────────
+
+  private resolveRpcStatus(): DependencyStatus {
+    if (this.useMockSubmission) {
+      return { status: 'ok', latencyMs: 12, message: 'Mock submission mode' };
+    }
+
+    if (!this.transactionSubmitter) {
+      return { status: 'degraded', message: 'Transaction submitter is not configured' };
+    }
+
+    return { status: 'ok' };
+  }
+
+  private resolveSignatureServiceStatus(): DependencyStatus {
+    if (!this.signatureService) {
+      return { status: 'degraded', message: 'Signature service is not configured' };
+    }
+
+    if (!this.signatureService.isHealthy) {
+      return { status: 'ok', message: 'Health check not implemented' };
+    }
+
+    return { status: 'ok' };
+  }
+
+  private extractSignedTransactionXdr(request: RelayExecuteRequest): string | null {
+    const value = request.parameters[SIGNED_TX_PARAMETER];
+    if (typeof value !== 'string' || value.trim().length === 0) {
+      return null;
+    }
+    return value.trim();
+  }
 
   private validateSessionKey(key: string): string | null {
     if (!/^[0-9a-fA-F]{64}$/.test(key)) {

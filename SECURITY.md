@@ -45,7 +45,7 @@ The following components undergo rigorous security review:
 
 #### Smart Contracts
 
-- `contracts/account/` - Core account logic
+- `contracts/account/` - Core account abstraction and signature validation
 - `contracts/validation-modules/` - Planned validation module scaffold
 - `contracts/upgrade/` - Planned upgrade module scaffold
 
@@ -78,26 +78,96 @@ The following components undergo rigorous security review:
 
 ### Medium-Security Components
 
-- `packages/core-sdk/` - Main SDK
-- `services/relayer/` - Transaction relay service
+#### Core SDK
+
+- **Path**: `packages/core-sdk/`
+- **Responsibility**: Stellar network operations, account nonce tracking, signature coordination
+- **Assets Handled**: User session context (not private keys), transaction payloads, nonce state
+- **Threat Surface**: Network MITM, incorrect balance calculations, replay attacks
+- **Mitigations**: Input validation, comprehensive tests, Stellar SDK trust boundary
+- **Link**: See [THREAT_MODEL.md](docs/security/THREAT_MODEL.md) § SDK
+
+#### Relayer Service
+
+- **Path**: `services/relayer/`
+- **Responsibility**: Transaction relay, signature verification, idempotency, scheduled transfers
+- **Assets Handled**: No mnemonics; stores bearer tokens and scheduled transfer metadata
+- **Threat Surface**: CORS misconfiguration, token theft, rate-limit bypass, DOS
+- **Mitigations**: CORS allowlist config via `ALLOWED_ORIGINS` env, rate limiting, payload guard
+- **Link**: See [THREAT_MODEL.md](docs/security/THREAT_MODEL.md) § Relay
 
 **Requirements**:
 
 - Standard code review
 - Security considerations documented
 - Input validation and sanitization
+- HTTPS-only endpoints in production
+- Comprehensive logging without secret leakage
+
+### Medium-Security Services
+
+#### Indexer Service
+
+- **Path**: `services/indexer/` (GraphQL + REST API)
+- **Responsibility**: Reads blockchain data, exposes account state and transfer history
+- **Assets Handled**: Public blockchain data, historical transaction details
+- **Threat Surface**: DOS attacks, slow queries, data consistency with chain
+- **Mitigations**: Rate limiting, query complexity analysis, caching
+- **Link**: See [THREAT_MODEL.md](docs/security/THREAT_MODEL.md) § Indexer
+
+#### AI Agent Service
+
+- **Path**: `services/ai-agent/`
+- **Responsibility**: Intent interpretation and workflow validation
+- **Assets Handled**: Transaction intents, user preferences, temporary context
+- **Threat Surface**: Prompt injection, intent misinterpretation, DOS
+- **Mitigations**: Input sanitization, safety guardrails, execution limits
+- **Link**: See [THREAT_MODEL.md](docs/security/THREAT_MODEL.md) § AI Agent
 
 ### Lower-Risk Components
 
-- `apps/**` - User interfaces
-- `packages/ui-kit/` - UI components
-- `docs/**` - Documentation
+#### Applications (UIs)
 
-**Requirements**:
+- **Path**: `apps/extension-wallet/`, `apps/web-dashboard/`, `apps/mobile-wallet/`
+- **Responsibility**: User interaction, transaction signing, key management UI
+- **Assets Handled**: Private keys (extension only), session state, UI preferences
+- **Threat Surface**: XSS, CSRF, local storage tampering, malicious extensions
+- **Mitigations**: Content Security Policy, input validation, secure storage, permission audits
+- **Link**: See [docs/security/extension-wallet.md](docs/security/extension-wallet.md)
 
-- Standard code review
-- XSS prevention
-- CSRF protection
+#### SDK & Utilities
+
+- **Path**: `packages/ui-kit/`, `packages/types/`, `docs/**`
+- **Responsibility**: Reusable components, type definitions, documentation
+- **Requirements**:
+  - Standard code review
+  - XSS prevention (UI components)
+  - No hardcoded secrets
+
+### Data Flow Diagram
+
+```
+┌─────────────────────────────────────────────────────────────────┐
+│  User Device (Trusted, partially)                               │
+│  ┌──────────────────────┐      ┌──────────────────────┐        │
+│  │ Extension Wallet     │◄────►│ Local Encrypted      │        │
+│  │ (sign, auth, keys)   │      │ Storage (PBKDF2+GCM) │        │
+│  └──────────────────────┘      └──────────────────────┘        │
+└────┬────────────────────────────────────────────────────────────┘
+     │ HTTPS
+     ▼
+┌─────────────────────────────────────────────────────────────────┐
+│ Ancore Backend (CORS restricted)                               │
+│ ┌──────────────┐  ┌──────────────┐  ┌──────────────┐           │
+│ │   Relayer    │  │   Indexer    │  │  AI Agent    │           │
+│ │ (relay tx)   │  │  (read state) │  │  (validate)   │          │
+│ └──────────────┘  └──────────────┘  └──────────────┘           │
+└────┬──────────────────┬──────────────────────────────────────────┘
+     │ HTTPS            │ HTTPS
+     ▼                  ▼
+  Soroban RPC     Stellar Horizon
+  (invoke,        (account, balance,
+   submit)        history)
 
 ## Reporting a Vulnerability
 
@@ -234,6 +304,7 @@ High-security code must pass:
 ### Good Report
 
 ```
+
 Subject: Authorization Bypass in Session Key Validation
 
 Description:
@@ -241,6 +312,7 @@ The validateSessionKey function does not properly check expiration times,
 allowing expired session keys to be used.
 
 Steps to Reproduce:
+
 1. Create session key with 1-hour expiration
 2. Wait 2 hours
 3. Use expired key to sign transaction
@@ -252,12 +324,15 @@ Expired session keys can be used indefinitely, violating intended security model
 Suggested Fix:
 Add explicit timestamp check before signature validation in
 packages/account-abstraction/src/session.ts:145
+
 ```
 
 ### Bad Report
 
 ```
+
 Your code is insecure
+
 ```
 
 ## Security Updates
@@ -281,3 +356,4 @@ We thank the following security researchers:
 ---
 
 **Last Updated**: April 2026
+```

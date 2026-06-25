@@ -37,6 +37,31 @@ export const amountSchema = z
   });
 
 /**
+ * Returns the number of decimal places in a numeric string.
+ * Returns 0 if the value has no decimal part.
+ */
+export function getDecimalPlaces(value: string): number {
+  const match = value.match(/\.(\d+)$/);
+  return match ? match[1].length : 0;
+}
+
+/**
+ * Validates that an amount string does not exceed the asset's decimal precision.
+ * Returns an error message if the precision is violated, or undefined if valid.
+ *
+ * @param value - The raw amount string entered by the user
+ * @param decimals - The maximum decimal places allowed for the asset (e.g. 7 for XLM)
+ */
+export function validateAmountPrecision(value: string, decimals: number): string | undefined {
+  if (!value || isNaN(parseFloat(value))) return undefined;
+  const actual = getDecimalPlaces(value);
+  if (actual > decimals) {
+    return `Too many decimal places — ${decimals === 0 ? 'whole numbers only' : `max ${decimals}`}`;
+  }
+  return undefined;
+}
+
+/**
  * Parses an amount string to a number. Returns NaN if invalid.
  */
 export function parseAmount(value: string): number {
@@ -77,18 +102,18 @@ const STRENGTH_LABELS: PasswordStrength['label'][] = [
 
 const STRENGTH_COLOR_CLASSES: string[] = [
   'text-destructive',
-  'text-orange-500',
-  'text-yellow-500',
-  'text-blue-500',
-  'text-green-500',
+  'text-warning',
+  'text-info',
+  'text-primary',
+  'text-success',
 ];
 
 const STRENGTH_BG_CLASSES: string[] = [
   'bg-destructive',
-  'bg-orange-500',
-  'bg-yellow-500',
-  'bg-blue-500',
-  'bg-green-500',
+  'bg-warning',
+  'bg-info',
+  'bg-primary',
+  'bg-success',
 ];
 
 /**

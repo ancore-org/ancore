@@ -1,0 +1,11 @@
+{
+  "description": "Canonical payload for revoke_session_key operation",
+  "input": {
+    "sessionKey": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "operation": "revoke_session_key",
+    "nonce": 999
+  },
+  "expectedPayload": "7b2273657373696f6e4b6579223a2261616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161222c226f7065726174696f6e223a227265766f6b655f73657373696f6e5f6b6579222c226e6f6e6365223a3939397d",
+  "expectedHash": "9f8e7d6c5b4a39281726354b3c2d1e0f9a8b7c6d5e4f3a2b1c0d9e8f7a6b5c4d",
+  "version": "v1"
+}

@@ -10,7 +10,9 @@ Primary components:
 - Extension wallet UI/background runtime
 - Core SDK secure storage + crypto primitives
 - Soroban account contract and session-key authorization logic
-- Relayer API endpoints and bearer-token middleware
+- Relayer API endpoints and bearer-token middleware with CORS allowlist
+- Indexer service (GraphQL + REST) for blockchain state queries
+- AI Agent service for intent interpretation and validation
 - Stellar RPC/Horizon and third-party infra dependencies
 
 ## 2) Assets
@@ -45,6 +47,7 @@ Primary components:
 | T5 | Session key permission escalation | unauthorized operations | session key permission + expiry checks in contract tests | medium if integration mismatches exist |
 | T6 | Dependency compromise | broad compromise | lockfile, audit scripts, override pins | requires continuous audit discipline |
 | T7 | Sensitive logs/error leakage | data exposure | generic decryption failures | no explicit "no-secret-log" test gate yet |
+| T8 | CORS misconfiguration on relayer | unauthorized origin access | CORS allowlist via `ALLOWED_ORIGINS` env, deny wildcard in production | requires enforcement in deployment |
 
 ## 5) Abuse cases to test
 
@@ -69,7 +72,34 @@ Primary components:
 - High risks require dated remediation plan and owner.
 - Medium risks must be tracked in audit findings backlog.
 
-## 8) Owners and review cadence
+## 8) Service-specific threat analysis
+
+### Relay Service
+- **Threats**: Unauthorized origin access via CORS, request forgery, token theft
+- **Data Handled**: Bearer tokens, scheduled transfer metadata (no mnemonics)
+- **Mitigations**: CORS allowlist (`ALLOWED_ORIGINS`), rate limiting, idempotency
+- **Production Controls**: HTTPS-only, restrictive CORS default (empty = deny all)
+
+### Indexer Service
+- **Threats**: DOS via expensive queries, cache poisoning, data inconsistency
+- **Data Handled**: Public blockchain state, account balances, transaction history
+- **Mitigations**: Query complexity limits, caching, blockchain validation
+- **Production Controls**: Rate limiting, health checks
+
+### AI Agent Service
+- **Threats**: Prompt injection, incorrect intent interpretation, resource exhaustion
+- **Data Handled**: Unsigned user intents, transaction context
+- **Mitigations**: Input sanitization, safety guardrails, execution timeouts
+- **Production Controls**: API rate limits, sandboxed execution
+
+## 9) Cross-boundary considerations
+
+1. **Client → Relayer**: Only via HTTPS with CORS allowlist; no credentials passed in URL
+2. **Relayer → Soroban RPC**: Network-level security via HTTPS; RPC endpoints trusted
+3. **Client → Indexer**: Rate-limited queries; assume indexer availability risk
+4. **All services**: Centralized auth via bearer tokens (relayer); no trust cross-signing between services
+
+## 10) Owners and review cadence
 
 - Security owner: _TBD_
 - Engineering owner: _TBD_

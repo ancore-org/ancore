@@ -34,11 +34,24 @@ export interface AmountInputBaseProps extends Omit<
   asset?: string;
   /** Callback triggered when the user clicks "Max" */
   onMax?: () => void;
+  /** Whether the "Max" button should be rendered disabled */
+  maxDisabled?: boolean;
 }
 
 const AmountInputBase = React.forwardRef<HTMLInputElement, AmountInputBaseProps>(
   (
-    { label = 'Amount', error, balance, asset = 'XLM', onMax, className, id, onChange, ...props },
+    {
+      label = 'Amount',
+      error,
+      balance,
+      asset = 'XLM',
+      onMax,
+      maxDisabled,
+      className,
+      id,
+      onChange,
+      ...props
+    },
     ref
   ) => {
     const inputId = id ?? label.toLowerCase().replace(/\s+/g, '-');
@@ -93,7 +106,8 @@ const AmountInputBase = React.forwardRef<HTMLInputElement, AmountInputBaseProps>
             <button
               type="button"
               onClick={onMax}
-              className="absolute right-3 top-1/2 -translate-y-1/2 text-xs font-semibold text-primary hover:text-primary/80 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring rounded"
+              disabled={maxDisabled || props.disabled}
+              className="absolute right-3 top-1/2 -translate-y-1/2 text-xs font-semibold text-primary hover:text-primary/80 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring rounded disabled:cursor-not-allowed disabled:text-muted-foreground"
             >
               MAX
             </button>

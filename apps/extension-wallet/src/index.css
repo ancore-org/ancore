@@ -28,6 +28,10 @@
 }
 
 @layer base {
-  * { @apply border-border box-border; }
-  body { @apply bg-background text-foreground antialiased; }
+  * {
+    @apply border-border box-border;
+  }
+  body {
+    @apply bg-background text-foreground antialiased;
+  }
 }
