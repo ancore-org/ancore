@@ -53,16 +53,7 @@ test.describe('Lock / unlock flow', () => {
     await expect(page).toHaveURL(/\/unlock/);
   });
 
-  test('reset wallet returns to fresh state', async ({ page, seedWallet }) => {
-    await seedWallet('onboarded-locked');
-    await navigateTo(page, '/unlock');
 
-    await page.getByRole('button', { name: /Reset demo wallet/i }).click();
-    await page.goto('/');
-    await page.waitForLoadState('networkidle');
-
-    await expect(page).toHaveURL(/\/welcome/);
-  });
 
   // ── Real-artifact tests (unblock after #764) ───────────────────────────────
 

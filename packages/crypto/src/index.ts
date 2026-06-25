@@ -46,7 +46,7 @@ export { encryptSecretKey, decryptSecretKey } from './encryption';
 export type { EncryptedSecretKeyPayload } from './encryption';
 
 // Mnemonics
-export { generateMnemonic, validateMnemonic, validateMnemonicStrength } from './mnemonic';
+export { generateMnemonic, validateMnemonic, validateMnemonicStrength, getEnglishWordlist } from './mnemonic';
 export { MnemonicValidationError } from './mnemonic';
 
 // Key Derivation

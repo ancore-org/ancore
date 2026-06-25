@@ -7,6 +7,7 @@ import { SecuritySettings } from './SecuritySettings';
 import { AboutScreen } from './AboutScreen';
 import { EnvironmentSettings } from './EnvironmentSettings';
 import { DisplaySettings } from './DisplaySettings';
+import { ConnectedSitesScreen } from './ConnectedSitesScreen';
 import { useSettings } from '../../hooks/useSettings';
 import { useToast } from '@ancore/ui-kit';
 import type { Network } from '@ancore/types';
@@ -19,7 +20,7 @@ import {
   getThemeLabel,
 } from '../../i18n/settings-labels';
 
-type SettingsView = 'root' | 'network' | 'security' | 'environment' | 'display' | 'about';
+type SettingsView = 'root' | 'network' | 'security' | 'environment' | 'display' | 'about' | 'connected-sites';
 
 export function SettingsScreen() {
   const { t } = useTranslation();
@@ -96,6 +97,10 @@ export function SettingsScreen() {
     return <AboutScreen onBack={() => setView('root')} />;
   }
 
+  if (view === 'connected-sites') {
+    return <ConnectedSitesScreen onBack={() => setView('root')} />;
+  }
+
   const networkLabel = getNetworkLabel(settings.network, t);
   const timeoutLabel = getAutoLockLabel(settings.autoLockTimeout, t);
   const environmentLabel = getEnvironmentLabel(settings.environment, t);
@@ -170,6 +175,12 @@ export function SettingsScreen() {
             icon={<Timer className="h-4 w-4" />}
             value={timeoutLabel}
             onClick={() => setView('security')}
+          />
+          <SettingItem
+            label="Connected Sites"
+            description="Manage sites that have access to your wallet"
+            icon={<Globe className="h-4 w-4" />}
+            onClick={() => setView('connected-sites')}
           />
           <SettingItem
             label={t('settings.security.exportPrivateKey.label')}
