@@ -33,4 +33,31 @@ describe('TelemetryEmitter', () => {
     expect(events[0].type).toBe(TelemetryEventType.ADDRESS_COPIED);
     expect(JSON.stringify(events[0])).not.toMatch(/G[A-Z0-9]{55}/);
   });
+
+  it('drops events when disabled after being enabled', () => {
+    const emitter = initTelemetry({
+      enabled: true,
+      sessionId: 'test-session',
+      storageKey: 'test_telemetry_events',
+    });
+
+    emitter.emitAddressCopied();
+    expect(emitter.getEvents()).toHaveLength(1);
+
+    emitter.setEnabled(false);
+    emitter.emitAddressCopied();
+    expect(emitter.getEvents()).toHaveLength(1);
+  });
+
+  it('clears buffered events on clearEvents', () => {
+    const emitter = initTelemetry({
+      enabled: true,
+      sessionId: 'test-session',
+      storageKey: 'test_telemetry_events',
+    });
+
+    emitter.emitAddressCopied();
+    emitter.clearEvents();
+    expect(emitter.getEvents()).toHaveLength(0);
+  });
 });

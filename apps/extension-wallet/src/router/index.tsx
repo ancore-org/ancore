@@ -29,6 +29,7 @@ import { SettingsScreen } from '../screens/Settings/SettingsScreen';
 import { SendScreen as SendFlowScreen } from '../screens/Send/SendScreen';
 import { ScheduledTransfersScreen } from '../screens/ScheduledTransfers/ScheduledTransfersScreen';
 import { useDashboardSettingsStore } from '../state/dashboard-settings';
+import { useTelemetrySettingsSync } from '../hooks/useTelemetrySettingsSync';
 import { EmptyTransactions } from '../components/EmptyTransactions';
 import { ErrorBoundary } from '../components/ErrorBoundary/ErrorBoundary';
 import { useAccountStore } from '../stores/account';
@@ -813,11 +814,17 @@ function NotFoundScreen() {
   );
 }
 
+function TelemetrySettingsSync() {
+  useTelemetrySettingsSync();
+  return null;
+}
+
 export function ExtensionRouterContent() {
   const navigate = useNavigate();
 
   return (
     <PopupFrame>
+      <TelemetrySettingsSync />
       <TitleSync />
       <ErrorBoundary
         onGoHome={() => navigate('/home', { replace: true })}

@@ -1,5 +1,5 @@
 import * as React from 'react';
-import { Globe, Lock, Timer, Key, FileText, Info, Bell, Monitor, Server } from 'lucide-react';
+import { Globe, Lock, Timer, Key, FileText, Info, Bell, Monitor, Server, Shield } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { SettingsGroup, SettingItem } from '../../components/SettingsGroup';
 import { NetworkSettings } from './NetworkSettings';
@@ -36,6 +36,8 @@ export function SettingsScreen() {
   );
   const enableLockShortcut = useSettingsStore((state) => state.enableLockShortcut);
   const setEnableLockShortcut = useSettingsStore((state) => state.setEnableLockShortcut);
+  const telemetryOptIn = useSettingsStore((state) => state.telemetryOptIn);
+  const setTelemetryOptIn = useSettingsStore((state) => state.setTelemetryOptIn);
   const [view, setView] = React.useState<SettingsView>('root');
 
   function handleNetworkChange(network: Network) {
@@ -184,6 +186,20 @@ export function SettingsScreen() {
             icon={<FileText className="h-4 w-4" />}
             onClick={() => setView('security')}
             danger
+          />
+        </SettingsGroup>
+
+        <SettingsGroup title={t('settings.groups.privacy')}>
+          <SettingItem
+            label={t('settings.privacy.telemetry.label')}
+            description={t('settings.privacy.telemetry.description')}
+            icon={<Shield className="h-4 w-4" />}
+            value={
+              telemetryOptIn
+                ? t('settings.privacy.telemetry.enabled')
+                : t('settings.privacy.telemetry.disabled')
+            }
+            onClick={() => setTelemetryOptIn(!telemetryOptIn)}
           />
         </SettingsGroup>
 
