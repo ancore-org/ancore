@@ -3,10 +3,7 @@ import { describe, expect, it, vi } from 'vitest';
 import type { SessionKey } from '@ancore/types';
 import { SessionPermission } from '@ancore/types';
 
-import {
-  DEFAULT_SESSION_KEY_REFRESH_TTL_MS,
-  refreshSessionKeyTtl,
-} from '../refreshSessionKeyTtl';
+import { DEFAULT_SESSION_KEY_REFRESH_TTL_MS, refreshSessionKeyTtl } from '../refreshSessionKeyTtl';
 
 const baseKey: SessionKey = {
   publicKey: 'GABC1234567890ABCDEF1234567890ABCDEF1234567890ABCDEF1234567890',
@@ -20,7 +17,12 @@ describe('refreshSessionKeyTtl', () => {
     const refreshSessionKey = vi.fn().mockResolvedValue(undefined);
     const nowMs = 1_700_000_000_000;
 
-    await refreshSessionKeyTtl(baseKey, refreshSessionKey, DEFAULT_SESSION_KEY_REFRESH_TTL_MS, nowMs);
+    await refreshSessionKeyTtl(
+      baseKey,
+      refreshSessionKey,
+      DEFAULT_SESSION_KEY_REFRESH_TTL_MS,
+      nowMs
+    );
 
     expect(refreshSessionKey).toHaveBeenCalledWith(
       baseKey.publicKey,

@@ -20,20 +20,21 @@ function createMockCanvas() {
 
 describe('downloadQrPng', () => {
   beforeAll(() => {
-    // @ts-ignore
+    // @ts-expect-error jsdom canvas mock
     global.document.createElement = (tag: string) => {
       if (tag === 'canvas') return createMockCanvas();
       const el: any = { style: {}, setAttribute: () => {}, appendChild: () => {} };
       return el;
     };
-    // Mock dynamic import of 'qrcode'
-    // @ts-ignore
+    // @ts-expect-error jest mock for qrcode dynamic import
     jest.mock('qrcode', () => ({
       toCanvas: (_canvas: HTMLCanvasElement, _data: string, _opts: any, cb: any) => cb(null),
     }));
   });
 
   test('calls toBlob and resolves', async () => {
-    await expect(downloadQrPng('GTESTADDRESS', { filename: 'foo.png', scale: 2 })).resolves.toBeUndefined();
+    await expect(
+      downloadQrPng('GTESTADDRESS', { filename: 'foo.png', scale: 2 })
+    ).resolves.toBeUndefined();
   });
 });

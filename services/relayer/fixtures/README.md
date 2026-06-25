@@ -9,6 +9,7 @@ These fixtures ensure that the canonical payload builder produces consistent out
 ## Structure
 
 Each fixture file contains:
+
 - `description`: Human-readable description of the test case
 - `input`: The relay request fields (sessionKey, operation, nonce)
 - `expectedPayload`: The hex-encoded canonical payload
@@ -17,13 +18,13 @@ Each fixture file contains:
 
 ## Fixtures
 
-| File | Description |
-|------|-------------|
-| `canonical-payload-execute.json` | Standard relay_execute operation |
-| `canonical-payload-add-session-key.json` | Add session key operation |
-| `canonical-payload-revoke-session-key.json` | Revoke session key operation |
-| `canonical-payload-high-nonce.json` | Maximum safe integer nonce value |
-| `canonical-payload-zero-nonce.json` | Zero nonce edge case |
+| File                                        | Description                      |
+| ------------------------------------------- | -------------------------------- |
+| `canonical-payload-execute.json`            | Standard relay_execute operation |
+| `canonical-payload-add-session-key.json`    | Add session key operation        |
+| `canonical-payload-revoke-session-key.json` | Revoke session key operation     |
+| `canonical-payload-high-nonce.json`         | Maximum safe integer nonce value |
+| `canonical-payload-zero-nonce.json`         | Zero nonce edge case             |
 
 ## Versioning
 
@@ -76,6 +77,7 @@ it('matches golden fixture', () => {
 ## CI Integration
 
 The test suite runs these fixtures in CI. Any failure indicates:
+
 - Unintended change to payload construction
 - Breaking change requiring version bump
 - Need to update client SDK implementations

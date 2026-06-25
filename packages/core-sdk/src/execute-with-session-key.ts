@@ -6,7 +6,7 @@ import {
   UnauthorizedError,
   type InvocationArgs,
 } from '@ancore/account-abstraction';
-import { Address, StrKey, xdr } from '@stellar/stellar-sdk';
+import { Address, xdr } from '@stellar/stellar-sdk';
 
 import {
   AncoreSdkError,
@@ -164,7 +164,9 @@ function validateExecuteWithSessionKeyParams<
   }
 
   if (!signer) {
-    throw new SessionKeyExecutionValidationError('signer.publicKey must be a valid Stellar Ed25519 public key.');
+    throw new SessionKeyExecutionValidationError(
+      'signer.publicKey must be a valid Stellar Ed25519 public key.'
+    );
   }
 
   try {
