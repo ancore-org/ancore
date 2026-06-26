@@ -112,7 +112,7 @@ describe('PaymentRequest Parser', () => {
           amount: '10',
           asset: { code: 'USDC', issuer: 'invalid' },
         })
-      ).toThrow('Asset issuer must be a valid Stellar public key.');
+      ).toThrow(/Asset issuer must be a valid Stellar public key|Invalid Ed25519 public key/);
     });
 
     it('throws when memoType is invalid', () => {

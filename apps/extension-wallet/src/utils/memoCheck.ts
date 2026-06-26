@@ -10,9 +10,7 @@ export async function isMemoRequired(destination: string): Promise<boolean> {
   }
 
   try {
-    const res = await fetch(
-      `https://api.stellar.expert/explorer/public/directory/${destination}`
-    );
+    const res = await fetch(`https://api.stellar.expert/explorer/public/directory/${destination}`);
     if (!res.ok) {
       cache.set(destination, false);
       return false;

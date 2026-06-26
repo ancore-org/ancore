@@ -127,7 +127,9 @@ export function parsePaymentRequest(payload: unknown): PaymentRequest {
         assertValidEd25519PublicKey(a.issuer);
       } catch (err) {
         if (err instanceof StrKeyValidationError) {
-          throw new PaymentRequestValidationError(err.message);
+          throw new PaymentRequestValidationError(
+            'Asset issuer must be a valid Stellar public key.'
+          );
         }
         throw err;
       }

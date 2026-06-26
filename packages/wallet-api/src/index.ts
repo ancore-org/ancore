@@ -8,6 +8,9 @@
 import { ExternalApiMethod } from '@ancore/wallet-shared';
 import { sendExternalRequest } from './bridge';
 
+/** Stellar networks exposed to dApps via getNetwork(). */
+export type WalletNetwork = 'mainnet' | 'testnet';
+
 export interface RequestAccessResult {
   smartAccountId: string;
   /** Owner G-address derived from mnemonic (for display / Horizon lookups). */
@@ -32,6 +35,27 @@ export interface SignTransactionResult {
   txHash?: string;
 }
 
+interface BackgroundGetAddressResult {
+  address: string;
+  network?: string;
+  ownerPublicKey?: string;
+}
+
+interface BackgroundGetNetworkResult {
+  network: string;
+  networkPassphrase?: string;
+}
+
+interface BackgroundIsConnectedResult {
+  connected: boolean;
+}
+
+interface BackgroundRequestAccessResult {
+  smartAccountId: string;
+  network: string;
+  ownerPublicKey?: string;
+}
+
 /**
  * Prompt user to connect the dApp to their smart account (Freighter: requestAccess).
  */
@@ -39,9 +63,42 @@ export async function requestAccess(): Promise<RequestAccessResult> {
   return sendExternalRequest<RequestAccessResult>(ExternalApiMethod.REQUEST_ACCESS);
 }
 
-/** Returns connected smart account id without prompting if already allowed. */
+/**
+ * Connect the dApp to the wallet. Opens approval when not yet allowlisted.
+ * Resolves with the smart account C-address on success.
+ */
+export async function connect(): Promise<string> {
+  const result = await sendExternalRequest<BackgroundRequestAccessResult>(
+    ExternalApiMethod.CONNECT
+  );
+  return result.smartAccountId;
+}
+
+/** Returns connected smart account C-address without prompting if already allowed. */
 export async function getAddress(): Promise<GetAddressResult> {
-  return sendExternalRequest<GetAddressResult>(ExternalApiMethod.GET_ADDRESS);
+  const result = await sendExternalRequest<BackgroundGetAddressResult>(
+    ExternalApiMethod.GET_ADDRESS
+  );
+  return {
+    smartAccountId: result.address,
+    ownerPublicKey: result.ownerPublicKey,
+  };
+}
+
+/** Returns the wallet's active Stellar network. */
+export async function getNetwork(): Promise<WalletNetwork> {
+  const result = await sendExternalRequest<BackgroundGetNetworkResult>(
+    ExternalApiMethod.GET_NETWORK
+  );
+  return result.network as WalletNetwork;
+}
+
+/** Whether the current origin is allowlisted for the active account. */
+export async function isConnected(): Promise<boolean> {
+  const result = await sendExternalRequest<BackgroundIsConnectedResult>(
+    ExternalApiMethod.IS_CONNECTED
+  );
+  return result.connected;
 }
 
 /** Ancore-specific: full smart account metadata including deployment status. */

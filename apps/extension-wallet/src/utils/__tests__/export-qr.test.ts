@@ -1,10 +1,29 @@
+import { beforeAll, describe, expect, test, vi } from 'vitest';
+
+vi.mock('qrcode', () => ({
+  default: {
+    toCanvas: (
+      _canvas: HTMLCanvasElement,
+      _data: string,
+      _opts: unknown,
+      cb: (err: unknown) => void
+    ) => cb(null),
+  },
+  toCanvas: (
+    _canvas: HTMLCanvasElement,
+    _data: string,
+    _opts: unknown,
+    cb: (err: unknown) => void
+  ) => cb(null),
+}));
+
 import downloadQrPng from '../export-qr';
 
 // Mock Canvas/Blob APIs
 class FakeBlob {}
 
 function createMockCanvas() {
-  const canvas: any = {
+  const canvas: Record<string, unknown> = {
     width: 1,
     height: 1,
     getContext: () => ({
@@ -23,13 +42,16 @@ describe('downloadQrPng', () => {
     // @ts-expect-error jsdom canvas mock
     global.document.createElement = (tag: string) => {
       if (tag === 'canvas') return createMockCanvas();
-      const el: any = { style: {}, setAttribute: () => {}, appendChild: () => {} };
+      const el: Record<string, unknown> = {
+        style: {},
+        setAttribute: () => {},
+        appendChild: () => {},
+        click: () => {},
+      };
       return el;
     };
-    // @ts-expect-error jest mock for qrcode dynamic import
-    jest.mock('qrcode', () => ({
-      toCanvas: (_canvas: HTMLCanvasElement, _data: string, _opts: any, cb: any) => cb(null),
-    }));
+    global.URL.createObjectURL = vi.fn(() => 'blob:mock');
+    global.URL.revokeObjectURL = vi.fn();
   });
 
   test('calls toBlob and resolves', async () => {

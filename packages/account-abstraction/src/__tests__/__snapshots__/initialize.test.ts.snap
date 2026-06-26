@@ -1,0 +1,34 @@
+// Jest Snapshot v1, https://goo.gl/fbAQLP
+
+exports[`initialize snapshot: invocation args produces stable invocation for alternative owner address 1`] = `
+{
+  "args": [
+    "<scval-alt-owner>",
+  ],
+  "method": "initialize",
+}
+`;
+
+exports[`initialize snapshot: invocation args produces stable invocation for standard owner address 1`] = `
+{
+  "args": [
+    "<scval-owner>",
+  ],
+  "method": "initialize",
+}
+`;
+
+exports[`initialize snapshot: invocation args produces stable write result shape 1`] = `
+{
+  "invocation": {
+    "args": [
+      "<scval>",
+    ],
+    "method": "initialize",
+  },
+  "operation": {
+    "source": "GAAZI4TCR3TY5OJHCTJC2A4QSY6CJWJH5IAJTGKIN2ER7LBNVKOCCWN",
+    "type": "invokeHostFunction",
+  },
+}
+`;
