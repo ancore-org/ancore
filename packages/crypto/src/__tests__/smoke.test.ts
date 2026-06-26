@@ -22,6 +22,7 @@ const EXPECTED_EXPORTS = [
   'generateMnemonic',
   'validateMnemonic',
   'validateMnemonicStrength',
+  'getEnglishBip39Wordlist',
   'MnemonicValidationError',
   'deriveKeypairFromMnemonic',
   'signTransaction',

@@ -279,7 +279,10 @@ pub async fn get_account_activity(
     };
 
     let items: Vec<ActivityRecord> = if has_next_page {
-        rows[..effective_limit as usize].iter().map(map_row).collect()
+        rows[..effective_limit as usize]
+            .iter()
+            .map(map_row)
+            .collect()
     } else {
         rows.iter().map(map_row).collect()
     };

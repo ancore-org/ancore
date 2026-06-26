@@ -5,16 +5,9 @@
 
 import type { SessionKey } from '@ancore/types';
 import { Address, nativeToScVal, scValToNative, StrKey, xdr } from '@stellar/stellar-sdk';
+import { assertValidEd25519PublicKey } from './errors';
 
 const BYTES_N_32_LENGTH = 32;
-
-function assertValidEd25519PublicKey(publicKey: string): void {
-  if (typeof publicKey !== 'string' || !StrKey.isValidEd25519PublicKey(publicKey)) {
-    const snippet =
-      typeof publicKey === 'string' ? publicKey.slice(0, 8) + '...' : String(publicKey);
-    throw new TypeError(`Invalid Ed25519 public key: expected G... format, got ${snippet}`);
-  }
-}
 
 export interface InitializeParams {
   owner: string;

@@ -22,6 +22,7 @@ export {
   InsufficientPermissionError,
   ContractInvocationError,
   NotImplementedError,
+  StrKeyValidationError,
   mapContractError,
   CONTRACT_ERROR_MESSAGES,
   CONTRACT_ERROR_CODES,
