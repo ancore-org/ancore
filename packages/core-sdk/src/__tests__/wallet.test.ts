@@ -43,7 +43,7 @@ describe('wallet material helpers', () => {
 
   it('rejects malformed mnemonics during import', async () => {
     await expect(importWallet({ mnemonic: 'not a real mnemonic' })).rejects.toThrow(
-      'mnemonic must be a valid 12-word BIP39 phrase.'
+      'mnemonic must be a valid 12- or 24-word BIP39 phrase:'
     );
   });
 

@@ -3,7 +3,8 @@ import {
   deriveKeypairFromMnemonic,
   encryptSecretKey,
   generateMnemonic,
-  validateMnemonic,
+  MnemonicValidationError,
+  validateMnemonicStrength,
   type EncryptedSecretKeyPayload,
 } from '@ancore/crypto';
 import { StrKey } from '@stellar/stellar-sdk';
@@ -47,8 +48,14 @@ function normalizeAccountIndex(accountIndex: number | undefined): number {
 function normalizeMnemonic(mnemonic: string): string {
   const normalizedMnemonic = mnemonic.trim().replace(/\s+/g, ' ');
 
-  if (!validateMnemonic(normalizedMnemonic)) {
-    throw new Error('mnemonic must be a valid 12-word BIP39 phrase.');
+  try {
+    validateMnemonicStrength(normalizedMnemonic);
+  } catch (error) {
+    if (error instanceof MnemonicValidationError) {
+      throw new Error(`mnemonic must be a valid 12- or 24-word BIP39 phrase: ${error.message}`);
+    }
+
+    throw error;
   }
 
   return normalizedMnemonic;

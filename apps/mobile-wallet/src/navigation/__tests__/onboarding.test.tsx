@@ -3,9 +3,10 @@ import '@testing-library/jest-dom';
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 
 import { importWallet } from '@ancore/core-sdk';
-import { validateMnemonic } from '@ancore/crypto';
+import { MnemonicValidationError, validateMnemonicStrength } from '@ancore/crypto';
 
 import { OnboardingNavigatorTestHarness } from '..';
+import type { DiscoverAccountsFn } from '../../screens/onboarding/WalletImportScreen';
 
 jest.mock('@ancore/core-sdk', () => ({
   importWallet: jest.fn().mockResolvedValue({
@@ -18,24 +19,40 @@ jest.mock('@ancore/core-sdk', () => ({
   }),
 }));
 
-jest.mock('@ancore/crypto', () => ({
-  generateMnemonic: jest
-    .fn()
-    .mockReturnValue(
-      'abandon ability able about above absent absorb abstract absurd abuse access accident'
-    ),
-  validateMnemonic: jest.fn().mockReturnValue(true),
-  validatePasswordStrength: jest.fn().mockReturnValue({
-    valid: true,
-    strength: 'strong' as const,
-    reasons: [],
-  }),
-}));
+jest.mock('@ancore/crypto', () => {
+  const actual = jest.requireActual('@ancore/crypto');
+  return {
+    ...actual,
+    generateMnemonic: jest
+      .fn()
+      .mockReturnValue(
+        'abandon ability able about above absent absorb abstract absurd abuse access accident'
+      ),
+    validateMnemonicStrength: jest.fn(),
+    validatePasswordStrength: jest.fn().mockReturnValue({
+      valid: true,
+      strength: 'strong' as const,
+      reasons: [],
+    }),
+  };
+});
 
 const TEST_MNEMONIC =
   'abandon ability able about above absent absorb abstract absurd abuse access accident';
 const TEST_PASSWORD = 'StrongP@ssword1!';
 const TEST_WALLET_NAME = 'Demo Wallet';
+
+const mockDiscoverAccounts: DiscoverAccountsFn = jest.fn().mockResolvedValue([
+  {
+    accountIndex: 2,
+    publicKey: 'GFUNDED2222222222222222222222222222222222222222222222222222',
+    balance: '25.0000000',
+  },
+]);
+
+function mockValidMnemonic() {
+  jest.mocked(validateMnemonicStrength).mockImplementation(() => undefined);
+}
 
 function goThroughCreateFlow() {
   fireEvent.click(screen.getByRole('button', { name: /create a new wallet/i }));
@@ -45,11 +62,9 @@ function goThroughCreateFlow() {
   });
   fireEvent.click(screen.getByRole('button', { name: /^continue$/i }));
 
-  // MnemonicDisplayScreen
   expect(screen.getByRole('heading', { name: /your recovery phrase/i })).toBeInTheDocument();
   fireEvent.click(screen.getByRole('button', { name: /i wrote it down/i }));
 
-  // VerifyMnemonicScreen — handle 3 word verification steps
   expect(screen.getByRole('heading', { name: /verify your recovery phrase/i })).toBeInTheDocument();
 
   const words = TEST_MNEMONIC.split(' ');
@@ -63,11 +78,10 @@ function goThroughCreateFlow() {
     fireEvent.click(screen.getByRole('button', { name: correctWord }));
   }
 
-  // PasswordScreen
   expect(screen.getByRole('heading', { name: /set a password/i })).toBeInTheDocument();
 }
 
-function goThroughImportFlow() {
+async function goThroughImportFlow() {
   fireEvent.click(screen.getByRole('button', { name: /import an existing wallet/i }));
   expect(screen.getByRole('heading', { name: /import an existing wallet/i })).toBeInTheDocument();
 
@@ -76,7 +90,9 @@ function goThroughImportFlow() {
   });
   fireEvent.click(screen.getByRole('button', { name: /^continue$/i }));
 
-  // PasswordScreen
+  expect(await screen.findByRole('heading', { name: /choose an account/i })).toBeInTheDocument();
+  fireEvent.click(screen.getByRole('button', { name: /^continue$/i }));
+
   expect(screen.getByRole('heading', { name: /set a password/i })).toBeInTheDocument();
 }
 
@@ -93,10 +109,18 @@ function enterPassword() {
 describe('OnboardingNavigator', () => {
   beforeEach(() => {
     jest.clearAllMocks();
+    mockValidMnemonic();
+    jest.mocked(mockDiscoverAccounts).mockResolvedValue([
+      {
+        accountIndex: 2,
+        publicKey: 'GFUNDED2222222222222222222222222222222222222222222222222222',
+        balance: '25.0000000',
+      },
+    ]);
   });
 
   it('moves forward from entry to create and back to entry', () => {
-    render(<OnboardingNavigatorTestHarness />);
+    render(<OnboardingNavigatorTestHarness discoverAccounts={mockDiscoverAccounts} />);
 
     fireEvent.click(screen.getByRole('button', { name: /create a new wallet/i }));
     expect(screen.getByRole('heading', { name: /create a new wallet/i })).toBeInTheDocument();
@@ -106,14 +130,16 @@ describe('OnboardingNavigator', () => {
   });
 
   it('cancels import and recover flows back to the entry screen', () => {
-    const { rerender } = render(<OnboardingNavigatorTestHarness />);
+    const { rerender } = render(
+      <OnboardingNavigatorTestHarness discoverAccounts={mockDiscoverAccounts} />
+    );
 
     fireEvent.click(screen.getByRole('button', { name: /import an existing wallet/i }));
     expect(screen.getByRole('heading', { name: /import an existing wallet/i })).toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: /^cancel$/i }));
     expect(screen.getByRole('heading', { name: /set up your wallet/i })).toBeInTheDocument();
 
-    rerender(<OnboardingNavigatorTestHarness />);
+    rerender(<OnboardingNavigatorTestHarness discoverAccounts={mockDiscoverAccounts} />);
     fireEvent.click(screen.getByRole('button', { name: /recover from backup/i }));
     expect(screen.getByRole('heading', { name: /recover from backup/i })).toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: /^cancel$/i }));
@@ -123,7 +149,7 @@ describe('OnboardingNavigator', () => {
   it('completes a full create flow: display → verify → password → vault write → complete', async () => {
     const mockImportWallet = jest.mocked(importWallet);
 
-    render(<OnboardingNavigatorTestHarness />);
+    render(<OnboardingNavigatorTestHarness discoverAccounts={mockDiscoverAccounts} />);
 
     goThroughCreateFlow();
     enterPassword();
@@ -135,15 +161,16 @@ describe('OnboardingNavigator', () => {
     expect(mockImportWallet).toHaveBeenCalledWith({
       mnemonic: TEST_MNEMONIC,
       password: TEST_PASSWORD,
+      accountIndex: 0,
     });
   });
 
   it('completes a full import flow: validate mnemonic → password → vault write → complete', async () => {
     const mockImportWallet = jest.mocked(importWallet);
 
-    render(<OnboardingNavigatorTestHarness />);
+    render(<OnboardingNavigatorTestHarness discoverAccounts={mockDiscoverAccounts} />);
 
-    goThroughImportFlow();
+    await goThroughImportFlow();
     enterPassword();
 
     await waitFor(() => {
@@ -153,11 +180,12 @@ describe('OnboardingNavigator', () => {
     expect(mockImportWallet).toHaveBeenCalledWith({
       mnemonic: TEST_MNEMONIC,
       password: TEST_PASSWORD,
+      accountIndex: 2,
     });
   });
 
   it('clears mnemonic from state after vault write', async () => {
-    render(<OnboardingNavigatorTestHarness />);
+    render(<OnboardingNavigatorTestHarness discoverAccounts={mockDiscoverAccounts} />);
 
     goThroughCreateFlow();
     enterPassword();
@@ -170,41 +198,36 @@ describe('OnboardingNavigator', () => {
   });
 
   it('navigates back through create sub-steps', () => {
-    render(<OnboardingNavigatorTestHarness />);
+    render(<OnboardingNavigatorTestHarness discoverAccounts={mockDiscoverAccounts} />);
 
     fireEvent.click(screen.getByRole('button', { name: /create a new wallet/i }));
 
-    // create → create-display
     fireEvent.change(screen.getByLabelText(/wallet name/i), {
       target: { value: TEST_WALLET_NAME },
     });
     fireEvent.click(screen.getByRole('button', { name: /^continue$/i }));
     expect(screen.getByRole('heading', { name: /your recovery phrase/i })).toBeInTheDocument();
 
-    // Back to create
     fireEvent.click(screen.getByRole('button', { name: /^back$/i }));
     expect(screen.getByRole('heading', { name: /create a new wallet/i })).toBeInTheDocument();
 
-    // Type name again and forward to display
     fireEvent.change(screen.getByLabelText(/wallet name/i), {
       target: { value: TEST_WALLET_NAME },
     });
     fireEvent.click(screen.getByRole('button', { name: /^continue$/i }));
     expect(screen.getByRole('heading', { name: /your recovery phrase/i })).toBeInTheDocument();
 
-    // Forward to verify
     fireEvent.click(screen.getByRole('button', { name: /i wrote it down/i }));
     expect(
       screen.getByRole('heading', { name: /verify your recovery phrase/i })
     ).toBeInTheDocument();
 
-    // Back to display
     fireEvent.click(screen.getByRole('button', { name: /^back$/i }));
     expect(screen.getByRole('heading', { name: /your recovery phrase/i })).toBeInTheDocument();
   });
 
   it('completes and restarts to entry screen', async () => {
-    render(<OnboardingNavigatorTestHarness />);
+    render(<OnboardingNavigatorTestHarness discoverAccounts={mockDiscoverAccounts} />);
 
     goThroughCreateFlow();
     enterPassword();
@@ -218,15 +241,22 @@ describe('OnboardingNavigator', () => {
   });
 
   it('guards invalid initial routes back to the entry screen', () => {
-    render(<OnboardingNavigatorTestHarness initialState={{ route: 'complete' }} />);
+    render(
+      <OnboardingNavigatorTestHarness
+        discoverAccounts={mockDiscoverAccounts}
+        initialState={{ route: 'complete' }}
+      />
+    );
 
     expect(screen.getByRole('heading', { name: /set up your wallet/i })).toBeInTheDocument();
   });
 
-  it('shows error when import wallet has invalid mnemonic on WalletImportScreen', () => {
-    jest.mocked(validateMnemonic).mockReturnValue(false);
+  it('shows error when import wallet has invalid mnemonic on WalletImportScreen', async () => {
+    jest.mocked(validateMnemonicStrength).mockImplementation(() => {
+      throw new MnemonicValidationError('INVALID_CHECKSUM', 'Invalid recovery phrase');
+    });
 
-    render(<OnboardingNavigatorTestHarness />);
+    render(<OnboardingNavigatorTestHarness discoverAccounts={mockDiscoverAccounts} />);
 
     fireEvent.click(screen.getByRole('button', { name: /import an existing wallet/i }));
     fireEvent.change(screen.getByLabelText(/recovery phrase/i), {
@@ -239,9 +269,32 @@ describe('OnboardingNavigator', () => {
     expect(screen.getByRole('alert')).toHaveTextContent(/invalid recovery phrase/i);
   });
 
-  // HD account discovery scan on wallet import to surface existing funded accounts
-  // See https://github.com/anomalyco/ancore/issues/788
-  test.skip('import flow discovers funded HD accounts', () => {
-    expect(true).toBe(true);
+  it('import flow discovers funded HD accounts', async () => {
+    const onPersistWallet = jest.fn().mockResolvedValue(undefined);
+
+    render(
+      <OnboardingNavigatorTestHarness
+        discoverAccounts={mockDiscoverAccounts}
+        onPersistWallet={onPersistWallet}
+      />
+    );
+
+    await goThroughImportFlow();
+    enterPassword();
+
+    await waitFor(() => {
+      expect(screen.getByRole('heading', { name: /wallet setup complete/i })).toBeInTheDocument();
+    });
+
+    expect(mockDiscoverAccounts).toHaveBeenCalledWith(
+      TEST_MNEMONIC,
+      expect.objectContaining({ signal: expect.any(AbortSignal) })
+    );
+    expect(jest.mocked(importWallet)).toHaveBeenCalledWith({
+      mnemonic: TEST_MNEMONIC,
+      password: TEST_PASSWORD,
+      accountIndex: 2,
+    });
+    expect(onPersistWallet).toHaveBeenCalled();
   });
 });

@@ -17,6 +17,7 @@ export interface OnboardingState {
   history: OnboardingRoute[];
   mnemonic: string | null;
   password: string | null;
+  accountIndex: number | null;
 }
 
 export const DEFAULT_ONBOARDING_STATE: OnboardingState = {
@@ -25,4 +26,5 @@ export const DEFAULT_ONBOARDING_STATE: OnboardingState = {
   history: ['entry'],
   mnemonic: null,
   password: null,
+  accountIndex: null,
 };

@@ -56,6 +56,14 @@ export function assertEnglishMnemonic(mnemonic: string): void {
 }
 
 /**
+ * Returns the English BIP39 wordlist for mnemonic autocomplete UIs.
+ */
+export function getEnglishBip39Wordlist(): readonly string[] {
+  const allWordlists = (bip39 as unknown as { wordlists: Record<string, string[]> }).wordlists;
+  return allWordlists['english'];
+}
+
+/**
  * Generates a standard BIP39 12-word mnemonic phrase.
  * Uses secure randomness provided by the environment.
  *

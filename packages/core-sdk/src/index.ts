@@ -16,6 +16,16 @@ export {
   type WalletMaterial,
 } from './wallet';
 
+export {
+  discoverFundedHdAccounts,
+  DEFAULT_HD_SCAN_START_INDEX,
+  DEFAULT_HD_SCAN_END_INDEX,
+  type DiscoveredHdAccount,
+  type DiscoverFundedHdAccountsOptions,
+} from './wallet-discovery';
+
+export { createHorizonNativeBalanceFetcher } from './horizon-balance-fetcher';
+
 // Client
 export { AncoreClient, type AncoreClientOptions } from './ancore-client';
 
