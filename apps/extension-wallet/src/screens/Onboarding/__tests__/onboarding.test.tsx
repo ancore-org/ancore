@@ -1,5 +1,5 @@
 import { describe, it, expect, vi } from 'vitest';
-import { render, screen, fireEvent, waitFor } from '@testing-library/react';
+import { render, screen, fireEvent, waitFor, within } from '@testing-library/react';
 import { WelcomeScreen } from '../WelcomeScreen';
 import { MnemonicScreen } from '../MnemonicScreen';
 import { VerifyMnemonicScreen } from '../VerifyMnemonicScreen';
@@ -120,73 +120,90 @@ describe('VerifyMnemonicScreen', () => {
   const testMnemonic =
     'abandon ability able about above absent absorb abstract absurd abuse access accident';
 
-  it('renders verification inputs for selected words', () => {
+  function getChallengeContainers() {
+    return screen.getAllByText(/^Word #\d+$/).map((label) => {
+      const container = label.parentElement;
+      if (!container) {
+        throw new Error('Expected challenge container');
+      }
+      return { wordNumber: Number(label.textContent!.replace('Word #', '')), container };
+    });
+  }
+
+  function selectCorrectAnswers() {
+    const words = testMnemonic.split(' ');
+    getChallengeContainers().forEach(({ wordNumber, container }) => {
+      const correctWord = words[wordNumber - 1];
+      fireEvent.click(within(container).getByRole('button', { name: correctWord }));
+    });
+  }
+
+  function selectWrongAnswers() {
+    const words = testMnemonic.split(' ');
+    getChallengeContainers().forEach(({ wordNumber, container }) => {
+      const correctWord = words[wordNumber - 1];
+      const wrongButton = within(container)
+        .getAllByRole('button')
+        .find((button) => button.textContent?.trim() !== correctWord);
+      if (wrongButton) {
+        fireEvent.click(wrongButton);
+      }
+    });
+  }
+
+  it('renders verification challenges for selected words', () => {
     render(<VerifyMnemonicScreen mnemonic={testMnemonic} onSuccess={vi.fn()} onBack={vi.fn()} />);
 
     expect(screen.getByText(/Verify Your Backup/)).toBeInTheDocument();
-    expect(screen.getAllByPlaceholderText(/Enter word/)[0]).toBeInTheDocument();
+    expect(screen.getAllByText(/^Word #\d+$/)).toHaveLength(3);
+    expect(screen.getAllByRole('button', { name: /verify & continue/i })).toHaveLength(1);
   });
 
-  it('shows word #3 input (1-indexed)', () => {
+  it('shows word position labels (1-indexed)', () => {
     render(<VerifyMnemonicScreen mnemonic={testMnemonic} onSuccess={vi.fn()} onBack={vi.fn()} />);
 
-    expect(screen.getByLabelText('Word #3')).toBeInTheDocument();
+    const labels = screen.getAllByText(/^Word #\d+$/).map((node) => node.textContent);
+    labels.forEach((label) => {
+      const position = Number(label!.replace('Word #', ''));
+      expect(position).toBeGreaterThanOrEqual(1);
+      expect(position).toBeLessThanOrEqual(12);
+    });
   });
 
-  it('calls onSuccess when correct words are entered', async () => {
+  it('calls onSuccess when correct words are selected', async () => {
     const onSuccess = vi.fn();
     render(<VerifyMnemonicScreen mnemonic={testMnemonic} onSuccess={onSuccess} onBack={vi.fn()} />);
 
-    // The screen renders inputs for specific words
-    // For our test mnemonic, words at positions 3, 7, 11 (1-indexed) would be:
-    // Position 3 = "able" (index 2)
-    // Position 7 = "absorb" (index 6)
-    // Position 11 = "access" (index 10)
-
-    const inputs = screen.getAllByPlaceholderText(/Enter word/);
-
-    // Fill in the inputs with correct words
-    // The exact order depends on which indices are selected
-    if (inputs.length >= 3) {
-      fireEvent.change(inputs[0], { target: { value: 'able' } });
-      // ... etc
-    }
-
+    selectCorrectAnswers();
     fireEvent.click(screen.getByText('Verify & Continue'));
-    // onSuccess is only called if all words are correct
+
+    await waitFor(() => {
+      expect(onSuccess).toHaveBeenCalledTimes(1);
+    });
   });
 
   it('shows error when words are incorrect', async () => {
     const onSuccess = vi.fn();
     render(<VerifyMnemonicScreen mnemonic={testMnemonic} onSuccess={onSuccess} onBack={vi.fn()} />);
 
-    // Fill all inputs with wrong words to enable the button
-    const inputs = screen.getAllByPlaceholderText(/Enter word/);
-    inputs.forEach((input) => {
-      fireEvent.change(input, { target: { value: 'wrongword' } });
-    });
-
+    selectWrongAnswers();
     fireEvent.click(screen.getByText('Verify & Continue'));
 
     await waitFor(() => {
       expect(screen.getByText(/Some words are incorrect/)).toBeInTheDocument();
     });
+    expect(onSuccess).not.toHaveBeenCalled();
   });
 
-  it('clears inputs when retry is clicked', () => {
+  it('keeps verify disabled until all challenges are answered', () => {
     render(<VerifyMnemonicScreen mnemonic={testMnemonic} onSuccess={vi.fn()} onBack={vi.fn()} />);
 
-    const inputs = screen.getAllByPlaceholderText(/Enter word/);
-    if (inputs.length > 0) {
-      fireEvent.change(inputs[0], { target: { value: 'wrong' } });
-    }
+    const verifyButton = screen.getByRole('button', { name: /verify & continue/i });
+    expect(verifyButton).toBeDisabled();
 
-    fireEvent.click(screen.getByText('Clear'));
-
-    const clearedInputs = screen.getAllByPlaceholderText(/Enter word/);
-    if (clearedInputs.length > 0) {
-      expect(clearedInputs[0].getAttribute('value')).toBe('');
-    }
+    const [{ container }] = getChallengeContainers();
+    fireEvent.click(within(container).getAllByRole('button')[0]);
+    expect(verifyButton).toBeDisabled();
   });
 });
 

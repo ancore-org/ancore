@@ -80,7 +80,11 @@ export function ExtensionAuthProvider({
         const vaultExists = await storageManager.hasVault();
 
         setAuthState((current) => {
-          const next = { ...current, hasOnboarded: vaultExists };
+          const hasOnboarded = vaultExists ? true : current.hasOnboarded;
+          if (hasOnboarded === current.hasOnboarded) {
+            return current;
+          }
+          const next = { ...current, hasOnboarded };
           writeAuthState(next);
           return next;
         });
@@ -166,7 +170,10 @@ export function ExtensionAuthProvider({
   return (
     <AuthContext.Provider value={value}>
       {isInitializing ? (
-        <div className="flex min-h-screen items-center justify-center bg-background">
+        <div
+          className="flex min-h-screen items-center justify-center bg-background"
+          data-testid="auth-initializing"
+        >
           <div className="h-6 w-6 animate-spin rounded-full border-2 border-primary border-t-transparent" />
         </div>
       ) : (
