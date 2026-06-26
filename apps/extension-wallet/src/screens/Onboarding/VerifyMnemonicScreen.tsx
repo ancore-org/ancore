@@ -134,7 +134,9 @@ export function VerifyMnemonicScreen({ mnemonic, onSuccess, onBack }: VerifyMnem
                       className={`px-4 py-3 rounded-xl border transition-all text-sm font-medium flex items-center justify-between ${btnClass}`}
                     >
                       {option}
-                      {isSelected && challenge.isCorrect && error && <Check className="h-4 w-4 text-green-600" />}
+                      {isSelected && challenge.isCorrect && error && (
+                        <Check className="h-4 w-4 text-green-600" />
+                      )}
                     </button>
                   );
                 })}

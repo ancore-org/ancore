@@ -61,6 +61,7 @@ pub fn record_lag(lag_blocks: i64, lag_seconds: i64) {
 /// Record ingest worker metrics for Prometheus export.
 ///
 /// Records throughput histogram and lag gauge from ingest worker operations.
+#[allow(dead_code)] // exercised by integration tests; ingest worker wiring lands separately
 pub fn record_ingest_metrics(
     records_per_second: f64,
     lag_ledgers: i64,

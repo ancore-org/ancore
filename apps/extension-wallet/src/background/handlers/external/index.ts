@@ -13,7 +13,6 @@ import {
   handleIsConnected,
   handleGetSmartAccount,
   handleGetPublicKey,
-  handleGetNetwork,
   handleSignTransaction,
   handleSignAuthEntry,
   handleSignMessage,
@@ -31,7 +30,6 @@ export function registerAllExternalHandlers(): void {
   registerExternalHandler(ExternalApiMethodName.IS_CONNECTED, handleIsConnected);
   registerExternalHandler(ExternalApiMethodName.GET_SMART_ACCOUNT, handleGetSmartAccount);
   registerExternalHandler(ExternalApiMethodName.GET_PUBLIC_KEY, handleGetPublicKey);
-  registerExternalHandler(ExternalApiMethodName.GET_NETWORK, handleGetNetwork);
   registerExternalHandler(ExternalApiMethodName.SIGN_TRANSACTION, handleSignTransaction);
   registerExternalHandler(ExternalApiMethodName.SIGN_AUTH_ENTRY, handleSignAuthEntry);
   registerExternalHandler(ExternalApiMethodName.SIGN_MESSAGE, handleSignMessage);

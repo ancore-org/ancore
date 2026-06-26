@@ -196,7 +196,6 @@ function SecondaryLink({ to, children }: { to: string; children: React.ReactNode
   );
 }
 
-
 function UnlockScreen() {
   const navigate = useNavigate();
   const location = useLocation();
@@ -244,6 +243,7 @@ function UnlockScreen() {
             >
               {unlockError}
             </p>
+          ) : null}
           <PrimaryButton disabled={isSubmitting || !password.trim()} type="submit">
             {isSubmitting ? 'Unlocking…' : 'Unlock'}
           </PrimaryButton>

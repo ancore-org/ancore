@@ -17,7 +17,6 @@ export enum ExternalApiMethodName {
   IS_CONNECTED = 'isConnected',
   GET_SMART_ACCOUNT = 'getSmartAccount',
   GET_PUBLIC_KEY = 'getPublicKey',
-  GET_NETWORK = 'getNetwork',
   SIGN_TRANSACTION = 'signTransaction',
   SIGN_AUTH_ENTRY = 'signAuthEntry',
   SIGN_MESSAGE = 'signMessage',
@@ -157,12 +156,4 @@ export interface SignMessageResult {
  */
 export interface GetPublicKeyResult {
   readonly publicKey: string;
-}
-
-/**
- * Result from getNetwork handler.
- */
-export interface GetNetworkResult {
-  readonly network: string;
-  readonly networkPassphrase: string;
 }

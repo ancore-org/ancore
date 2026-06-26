@@ -50,6 +50,10 @@
         "never": "Never",
         "minutes": "{{count}} min"
       },
+      "connectedSites": {
+        "label": "Connected Sites",
+        "description": "Manage sites that have access to your wallet"
+      },
       "exportPrivateKey": {
         "label": "Export Private Key",
         "description": "Reveal your raw private key"

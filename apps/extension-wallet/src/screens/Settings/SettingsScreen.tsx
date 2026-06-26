@@ -1,5 +1,16 @@
 import * as React from 'react';
-import { Globe, Lock, Timer, Key, FileText, Info, Bell, Monitor, Server, Shield } from 'lucide-react';
+import {
+  Globe,
+  Lock,
+  Timer,
+  Key,
+  FileText,
+  Info,
+  Bell,
+  Monitor,
+  Server,
+  Shield,
+} from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { SettingsGroup, SettingItem } from '../../components/SettingsGroup';
 import { NetworkSettings } from './NetworkSettings';
@@ -20,7 +31,14 @@ import {
   getThemeLabel,
 } from '../../i18n/settings-labels';
 
-type SettingsView = 'root' | 'network' | 'security' | 'environment' | 'display' | 'about' | 'connected-sites';
+type SettingsView =
+  | 'root'
+  | 'network'
+  | 'security'
+  | 'environment'
+  | 'display'
+  | 'about'
+  | 'connected-sites';
 
 export function SettingsScreen() {
   const { t } = useTranslation();
@@ -179,8 +197,8 @@ export function SettingsScreen() {
             onClick={() => setView('security')}
           />
           <SettingItem
-            label="Connected Sites"
-            description="Manage sites that have access to your wallet"
+            label={t('settings.security.connectedSites.label')}
+            description={t('settings.security.connectedSites.description')}
             icon={<Globe className="h-4 w-4" />}
             onClick={() => setView('connected-sites')}
           />
