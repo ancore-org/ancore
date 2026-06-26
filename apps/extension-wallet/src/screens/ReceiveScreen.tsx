@@ -98,7 +98,8 @@ export function ReceiveScreen({
       });
     } catch (err) {
       // Fallback to previous SVG -> PNG method if QR lib unavailable
-      if (qrRef.current) downloadSvgAsPng(qrRef.current, `ancore-receive-${smartAccountId.slice(0, 8)}.png`);
+      if (qrRef.current)
+        downloadSvgAsPng(qrRef.current, `ancore-receive-${smartAccountId.slice(0, 8)}.png`);
     }
   }, [smartAccountId, paymentUri]);
 

@@ -85,10 +85,7 @@ const adapters: [string, AdapterFactory][] = [
       return new ChromeStorageAdapter(area as any);
     },
   ],
-  [
-    'BrowserStorageAdapter',
-    () => new BrowserStorageAdapter(makeBrowserArea() as any),
-  ],
+  ['BrowserStorageAdapter', () => new BrowserStorageAdapter(makeBrowserArea() as any)],
 ];
 
 // ─── Conformance suite ────────────────────────────────────────────────────────

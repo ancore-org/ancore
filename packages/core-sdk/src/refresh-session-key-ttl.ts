@@ -38,7 +38,9 @@ export interface RefreshSessionKeyTtlOptions extends AccountContractReadOptions 
 
 export interface SessionKeyTtlRefresher {
   refreshSessionKeyTtl(publicKey: string): InvocationArgs;
-  buildInvokeOperation(invocation: InvocationArgs): ReturnType<AccountContract['buildInvokeOperation']>;
+  buildInvokeOperation(
+    invocation: InvocationArgs
+  ): ReturnType<AccountContract['buildInvokeOperation']>;
 }
 
 export interface SessionKeyTtlRefreshedEvent {
@@ -87,6 +89,7 @@ const SESSION_KEY_TTL_REFRESHED_TOPIC = 'session_key_ttl_refreshed';
  * });
  * ```
  */
+/* eslint-disable no-redeclare -- TypeScript function overload signatures */
 export function refreshSessionKeyTtl(
   accountContract: SessionKeyTtlRefresher,
   params: RefreshSessionKeyTtlParams
@@ -102,6 +105,7 @@ export function refreshSessionKeyTtl(
   options?: RefreshSessionKeyTtlOptions
 ): InvocationArgs | Promise<RefreshSessionKeyTtlResult> {
   validateRefreshSessionKeyTtlParams(params, options?.nowMs);
+  /* eslint-enable no-redeclare */
 
   if (options) {
     return simulateRefreshSessionKeyTtl(accountContract, params, options);
@@ -149,10 +153,14 @@ function validateRefreshSessionKeyTtlParams(
   }
 
   if (typeof params.expiresAt !== 'number' || !Number.isFinite(params.expiresAt)) {
-    throw new BuilderValidationError('refreshSessionKeyTtl requires expiresAt to be a finite number.');
+    throw new BuilderValidationError(
+      'refreshSessionKeyTtl requires expiresAt to be a finite number.'
+    );
   }
 
-  if (!isSessionKeyActive({ expiresAt: params.expiresAt, publicKey: params.publicKey }, { nowMs })) {
+  if (
+    !isSessionKeyActive({ expiresAt: params.expiresAt, publicKey: params.publicKey }, { nowMs })
+  ) {
     const reason = getSessionKeyInactiveReason(
       { expiresAt: params.expiresAt, publicKey: params.publicKey },
       { nowMs }
