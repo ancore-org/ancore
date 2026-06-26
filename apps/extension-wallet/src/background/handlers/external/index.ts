@@ -7,7 +7,10 @@
 import { registerExternalHandler } from './registry';
 import {
   handleRequestAccess,
+  handleConnect,
   handleGetAddress,
+  handleGetNetwork,
+  handleIsConnected,
   handleGetSmartAccount,
   handleGetPublicKey,
   handleGetNetwork,
@@ -22,7 +25,10 @@ import { ExternalApiMethodName } from '@ancore/types';
  */
 export function registerAllExternalHandlers(): void {
   registerExternalHandler(ExternalApiMethodName.REQUEST_ACCESS, handleRequestAccess);
+  registerExternalHandler(ExternalApiMethodName.CONNECT, handleConnect);
   registerExternalHandler(ExternalApiMethodName.GET_ADDRESS, handleGetAddress);
+  registerExternalHandler(ExternalApiMethodName.GET_NETWORK, handleGetNetwork);
+  registerExternalHandler(ExternalApiMethodName.IS_CONNECTED, handleIsConnected);
   registerExternalHandler(ExternalApiMethodName.GET_SMART_ACCOUNT, handleGetSmartAccount);
   registerExternalHandler(ExternalApiMethodName.GET_PUBLIC_KEY, handleGetPublicKey);
   registerExternalHandler(ExternalApiMethodName.GET_NETWORK, handleGetNetwork);

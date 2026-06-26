@@ -11,7 +11,10 @@
  */
 export enum ExternalApiMethodName {
   REQUEST_ACCESS = 'requestAccess',
+  CONNECT = 'connect',
   GET_ADDRESS = 'getAddress',
+  GET_NETWORK = 'getNetwork',
+  IS_CONNECTED = 'isConnected',
   GET_SMART_ACCOUNT = 'getSmartAccount',
   GET_PUBLIC_KEY = 'getPublicKey',
   GET_NETWORK = 'getNetwork',
@@ -101,6 +104,21 @@ export interface RequestAccessResult {
 export interface GetAddressResult {
   readonly address: string; // Smart account C-address
   readonly network: string;
+}
+
+/**
+ * Result from getNetwork handler.
+ */
+export interface GetNetworkResult {
+  readonly network: string;
+  readonly networkPassphrase: string;
+}
+
+/**
+ * Result from isConnected handler.
+ */
+export interface IsConnectedResult {
+  readonly connected: boolean;
 }
 
 /**
