@@ -1,3 +1,4 @@
+import { randomUUID } from 'node:crypto';
 import { RequestHandler } from 'express';
 
 const HEADER = 'x-request-id';
@@ -27,17 +28,7 @@ export function createRequestIdMiddleware(): RequestHandler {
     }
 
     if (!id) {
-      // Prefer crypto.randomUUID when available
-      try {
-        // @ts-expect-error crypto may be unavailable in some runtimes
-        id =
-          typeof crypto !== 'undefined' && typeof (crypto as any).randomUUID === 'function'
-            ? (crypto as any).randomUUID()
-            : undefined;
-      } catch {
-        id = undefined;
-      }
-      if (!id) id = Math.random().toString(36).slice(2, 12);
+      id = randomUUID();
     }
 
     // Expose on request and response header

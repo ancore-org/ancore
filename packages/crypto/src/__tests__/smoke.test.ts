@@ -21,6 +21,8 @@ const EXPECTED_EXPORTS = [
   'decryptSecretKey',
   'generateMnemonic',
   'validateMnemonic',
+  'validateMnemonicStrength',
+  'MnemonicValidationError',
   'deriveKeypairFromMnemonic',
   'signTransaction',
   'verifySignature',
