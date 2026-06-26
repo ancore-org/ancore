@@ -17,6 +17,7 @@
     "test:e2e": "playwright test --config=tests/playwright.config.ts",
     "test:e2e:smoke": "playwright test --config=tests/playwright.config.ts --grep @smoke",
     "test:e2e:smoke:debug": "playwright test --config=tests/playwright.config.ts --grep @smoke --headed --workers=1 --project=chromium --trace=on",
+    "test:e2e:visual": "playwright test --config=tests/playwright.visual.config.ts",
     "test:e2e:ui": "playwright test --config=tests/playwright.config.ts --ui",
     "analyze": "node scripts/analyze-bundle.js",
     "check:csp": "node scripts/check-csp.js"
