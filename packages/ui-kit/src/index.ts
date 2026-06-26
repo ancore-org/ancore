@@ -26,7 +26,7 @@ export type { BadgeProps } from './components/ui/badge';
 
 export { Separator } from './components/ui/separator';
 
-export { Dialog } from './components/ui/dialog';
+export { Dialog, DialogContent } from './components/ui/dialog';
 export { Tooltip } from './components/ui/tooltip';
 
 export { Skeleton } from './components/ui/skeleton';

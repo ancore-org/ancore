@@ -78,7 +78,7 @@ export function ExtensionAuthProvider({
         const { getSharedStorageManager } = await import('../security/storage-manager');
         const storageManager = getSharedStorageManager();
         const vaultExists = await storageManager.hasVault();
-        
+
         setAuthState((current) => {
           const next = { ...current, hasOnboarded: vaultExists };
           writeAuthState(next);
@@ -90,7 +90,7 @@ export function ExtensionAuthProvider({
         setIsInitializing(false);
       }
     }
-    
+
     void initVault();
   }, []);
 

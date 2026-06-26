@@ -44,7 +44,10 @@ function isOriginPermitted(origin: string): boolean {
 
 const METHOD_TO_MESSAGE_TYPE: Partial<Record<ExternalApiMethodName, MessageType>> = {
   [ExternalApiMethod.REQUEST_ACCESS]: 'EXTERNAL_REQUEST_ACCESS',
+  [ExternalApiMethod.CONNECT]: 'EXTERNAL_REQUEST_ACCESS',
   [ExternalApiMethod.GET_ADDRESS]: 'EXTERNAL_GET_PUBLIC_KEY',
+  [ExternalApiMethod.GET_NETWORK]: 'EXTERNAL_GET_NETWORK',
+  [ExternalApiMethod.IS_CONNECTED]: 'EXTERNAL_IS_CONNECTED',
   [ExternalApiMethod.GET_SMART_ACCOUNT]: 'EXTERNAL_GET_PUBLIC_KEY',
   [ExternalApiMethod.SIGN_TRANSACTION]: 'EXTERNAL_SIGN_TRANSACTION',
 };
