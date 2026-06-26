@@ -1,4 +1,8 @@
-import { assertValidEd25519PublicKey, assertValidContractId, StrKeyValidationError } from '../errors';
+import {
+  assertValidEd25519PublicKey,
+  assertValidContractId,
+  StrKeyValidationError,
+} from '../errors';
 
 describe('StrKey validation helpers', () => {
   test('assertValidEd25519PublicKey throws StrKeyValidationError for invalid G key', () => {

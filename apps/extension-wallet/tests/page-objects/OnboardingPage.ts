@@ -18,8 +18,27 @@ export class OnboardingPage {
     }
   }
 
-  async confirmMnemonicWord(index: number, word: string) {
-    await this.page.getByTestId(`confirm-word-${index}`).fill(word);
+  async confirmMnemonicChallenge(words: string[]) {
+    const labels = await this.page.locator('label:has-text("Word #")').all();
+    for (const label of labels) {
+      const text = await label.innerText();
+      const match = text.match(/Word #(\d+)/);
+      if (match) {
+        const index = parseInt(match[1], 10) - 1;
+        const correctWord = words[index];
+        const container = label.locator('..');
+        await container.getByRole('button', { name: correctWord, exact: true }).click();
+      }
+    }
+  }
+
+  async failMnemonicChallenge() {
+    // Just click the first option for all challenges, which is statistically likely to fail at least one
+    const labels = await this.page.locator('label:has-text("Word #")').all();
+    for (const label of labels) {
+      const container = label.locator('..');
+      await container.getByRole('button').first().click();
+    }
   }
 
   async enterPassword(password: string) {

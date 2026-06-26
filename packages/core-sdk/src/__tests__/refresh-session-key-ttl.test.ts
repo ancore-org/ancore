@@ -4,7 +4,7 @@ import {
   publicKeyToBytes32ScVal,
   u64ToScVal,
 } from '@ancore/account-abstraction';
-import { Account, Keypair, Networks, rpc, xdr } from '@stellar/stellar-sdk';
+import { Keypair, Networks, rpc, xdr } from '@stellar/stellar-sdk';
 
 import {
   refreshSessionKeyTtl,
@@ -62,7 +62,9 @@ const SESSION_PUBLIC_KEY = 'GCM5WPR4DDR24FSAX5LIEM4J7AI3KOWJYANSXEPKYXCSZOTAYXE7
 const NOW_MS = Date.now();
 const NOW_SECONDS = Math.floor(NOW_MS / 1000);
 
-function makeActiveParams(overrides: Partial<RefreshSessionKeyTtlParams> = {}): RefreshSessionKeyTtlParams {
+function makeActiveParams(
+  overrides: Partial<RefreshSessionKeyTtlParams> = {}
+): RefreshSessionKeyTtlParams {
   return {
     publicKey: SESSION_PUBLIC_KEY,
     expiresAt: NOW_SECONDS + 3600,
@@ -70,13 +72,13 @@ function makeActiveParams(overrides: Partial<RefreshSessionKeyTtlParams> = {}): 
   };
 }
 
-function makeSessionKeyTtlRefreshedEvent(publicKey: string, expiresAt: number): {
+function makeSessionKeyTtlRefreshedEvent(
+  publicKey: string,
+  expiresAt: number
+): {
   event: xdr.ContractEvent;
 } {
-  const dataScVal = xdr.ScVal.scvVec([
-    publicKeyToBytes32ScVal(publicKey),
-    u64ToScVal(expiresAt),
-  ]);
+  const dataScVal = xdr.ScVal.scvVec([publicKeyToBytes32ScVal(publicKey), u64ToScVal(expiresAt)]);
 
   const contractEvent = {
     body: () => ({
@@ -514,9 +516,7 @@ describe('parseSessionKeyTtlRefreshedEvent', () => {
   it('reads contract events from contractEvent envelopes', () => {
     const contractEvent = makeSessionKeyTtlRefreshedEvent(SESSION_PUBLIC_KEY, NOW_SECONDS + 3600);
 
-    expect(
-      parseSessionKeyTtlRefreshedEvent([{ contractEvent: contractEvent.event }])
-    ).toEqual({
+    expect(parseSessionKeyTtlRefreshedEvent([{ contractEvent: contractEvent.event }])).toEqual({
       type: 'session_key_ttl_refreshed',
       publicKey: SESSION_PUBLIC_KEY,
       expiresAt: NOW_SECONDS + 3600,

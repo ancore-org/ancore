@@ -26,9 +26,8 @@ export { createStellarRpcHandlers, handleStellarRpcRequest } from './providers/s
 export type { StellarRpcHandlers } from './providers/stellar-handlers';
 export { SessionApprovalSheet } from './components/SessionApprovalSheet';
 export type { SessionProposal } from './components/SessionApprovalSheet';
-export {
-  parseWalletConnectDeepLink,
-  isWalletConnectDeepLink,
-  extractPairingUri,
-} from './linking/walletconnect';
-export type { WalletConnectDeepLinkParams } from './linking/walletconnect';
+export { WCPairingScreen } from './screens/walletconnect/WCPairingScreen';
+export type {
+  WCPairingScreenProps,
+  WCPairingStatus,
+} from './screens/walletconnect/WCPairingScreen';

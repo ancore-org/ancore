@@ -1,7 +1,7 @@
 import crypto from 'crypto';
 import { publicKeyToBytes32ScVal, bytes32ScValToPublicKey } from '../xdr-utils';
 import { StrKey } from '@stellar/stellar-sdk';
-import { StrKeyValidationError } from '@ancore/core-sdk';
+import { StrKeyValidationError } from '../strkey-validation';
 
 describe('xdr-utils session key round-trip', () => {
   test('round-trips a G... public key string', () => {

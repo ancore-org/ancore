@@ -25,8 +25,7 @@ export const SessionKeyRow: React.FC<SessionKeyRowProps> = ({
   const { status } = useExpiryCountdown(sessionKey.expiresAt);
   const isRevoked = sessionKey.expiresAt === 0;
 
-  const badgeLabel =
-    status === 'revoked' ? 'Revoked' : status === 'expired' ? 'Expired' : 'Active';
+  const badgeLabel = status === 'revoked' ? 'Revoked' : status === 'expired' ? 'Expired' : 'Active';
   const badgeClass =
     status === 'active' || status === 'expiring-soon'
       ? 'bg-green-100 text-green-700'

@@ -46,7 +46,7 @@ export { encryptSecretKey, decryptSecretKey } from './encryption';
 export type { EncryptedSecretKeyPayload } from './encryption';
 
 // Mnemonics
-export { generateMnemonic, validateMnemonic, validateMnemonicStrength } from './mnemonic';
+export { generateMnemonic, validateMnemonic, validateMnemonicStrength, getEnglishWordlist } from './mnemonic';
 export { MnemonicValidationError } from './mnemonic';
 
 // Key Derivation
@@ -56,4 +56,5 @@ export { deriveKeypairFromMnemonic } from './key-derivation';
 export { signTransaction, verifySignature } from './signing';
 
 // Constant-time comparison
+export { timingSafeEqual } from './timing-safe';
 export { constantTimeEqual } from './compare';

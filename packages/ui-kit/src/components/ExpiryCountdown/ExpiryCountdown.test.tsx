@@ -123,7 +123,9 @@ describe('ExpiryCountdown', () => {
   });
 
   it('shows loading state on refresh button', () => {
-    render(<ExpiryCountdown expiresAt={Date.now() + 86_400_000} onRefresh={vi.fn()} refreshLoading />);
+    render(
+      <ExpiryCountdown expiresAt={Date.now() + 86_400_000} onRefresh={vi.fn()} refreshLoading />
+    );
 
     expect(screen.getByTestId('expiry-refresh-button')).toHaveAttribute('aria-busy', 'true');
     expect(screen.getByTestId('expiry-refresh-button')).toBeDisabled();

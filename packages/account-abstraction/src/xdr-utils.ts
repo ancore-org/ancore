@@ -5,7 +5,7 @@
 
 import type { SessionKey } from '@ancore/types';
 import { Address, nativeToScVal, scValToNative, StrKey, xdr } from '@stellar/stellar-sdk';
-import { assertValidEd25519PublicKey } from '@ancore/core-sdk';
+import { assertValidEd25519PublicKey } from './strkey-validation';
 
 const BYTES_N_32_LENGTH = 32;
 

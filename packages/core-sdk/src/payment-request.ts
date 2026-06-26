@@ -1,5 +1,9 @@
-import { StrKey } from '@stellar/stellar-sdk';
-import { PaymentRequestValidationError, InvalidAmountError, assertValidEd25519PublicKey, StrKeyValidationError } from './errors';
+import {
+  PaymentRequestValidationError,
+  InvalidAmountError,
+  assertValidEd25519PublicKey,
+  StrKeyValidationError,
+} from './errors';
 import { normalizeAmount } from './amount';
 
 /**
@@ -78,7 +82,9 @@ export function parsePaymentRequest(payload: unknown): PaymentRequest {
   // 1. Destination validation
   const destination = raw.destination;
   if (typeof destination !== 'string') {
-    throw new PaymentRequestValidationError('destination is required and must be a valid Stellar public key.');
+    throw new PaymentRequestValidationError(
+      'destination is required and must be a valid Stellar public key.'
+    );
   }
   try {
     assertValidEd25519PublicKey(destination);

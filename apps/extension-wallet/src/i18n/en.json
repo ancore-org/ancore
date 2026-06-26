@@ -10,6 +10,7 @@
       "network": "Network",
       "display": "Display",
       "security": "Security",
+      "privacy": "Privacy",
       "about": "About",
       "notificationsDemo": "Notifications (Demo)"
     },
@@ -56,6 +57,14 @@
       "exportRecoveryPhrase": {
         "label": "Export Recovery Phrase",
         "description": "Reveal your 12-word mnemonic"
+      }
+    },
+    "privacy": {
+      "telemetry": {
+        "label": "Usage analytics",
+        "description": "Share anonymous events to help improve the wallet",
+        "enabled": "Enabled",
+        "disabled": "Disabled"
       }
     },
     "about": {

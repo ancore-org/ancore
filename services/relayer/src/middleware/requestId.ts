@@ -29,8 +29,11 @@ export function createRequestIdMiddleware(): RequestHandler {
     if (!id) {
       // Prefer crypto.randomUUID when available
       try {
-        // @ts-ignore
-        id = typeof crypto !== 'undefined' && typeof (crypto as any).randomUUID === 'function' ? (crypto as any).randomUUID() : undefined;
+        // @ts-expect-error crypto may be unavailable in some runtimes
+        id =
+          typeof crypto !== 'undefined' && typeof (crypto as any).randomUUID === 'function'
+            ? (crypto as any).randomUUID()
+            : undefined;
       } catch {
         id = undefined;
       }

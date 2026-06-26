@@ -8,6 +8,7 @@ import { createWallet, importWallet } from '@ancore/core-sdk';
 import type { Network } from '@ancore/types';
 import { useAccountStore } from '@/stores/account';
 import { createDeployClient, type DeployClient } from '@/services/deploy-account';
+import { getSharedStorageManager } from '@/security/storage-manager';
 
 /** chrome.storage.local key for the deployed smart-account C-address. */
 export const CONTRACT_ADDRESS_KEY = 'ancore_contract_address';
@@ -301,12 +302,22 @@ export function useOnboarding(options: UseOnboardingOptions = {}) {
           encryptedMnemonic: wallet.encryptedMnemonic,
         };
 
-        // #817 — Persist the C-address to chrome.storage.local so background
-        // handlers can serve it without decrypting the vault.
+        // #815 — Unlock the AES-GCM vault and persist the mnemonic so that
+        // downstream features (send, sign, session keys) have real key material.
+        // Best-effort: vault write failures (e.g. in test environments without
+        // chrome.storage) must not abort the deploy flow.
         try {
-          await persistContractAddress(contractId);
+          const vault = getSharedStorageManager();
+          const vaultReady = await vault.unlock(state.password!);
+          if (vaultReady) {
+            await vault.saveAccount({
+              privateKey: state.mnemonic!, // plaintext; vault re-encrypts with AES-GCM
+              publicKey,
+              contractId,
+            });
+          }
         } catch {
-          // Non-fatal: chrome.storage unavailable (falls back to localStorage).
+          // Non-fatal: chrome.storage unavailable or vault already locked.
         }
 
         // Persist contractId (smartAccountId) alongside the account in the

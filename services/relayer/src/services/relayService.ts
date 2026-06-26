@@ -220,17 +220,14 @@ export class RelayService implements RelayServiceContract {
     }
 
     const timeoutMs = parseInt(process.env.SIGNATURE_SERVICE_HEALTH_TIMEOUT_MS || '5000', 10);
-    
+
     try {
       const start = Date.now();
       const timeoutPromise = new Promise<never>((_, reject) =>
         setTimeout(() => reject(new Error('Health check timeout')), timeoutMs)
       );
 
-      const result = await Promise.race([
-        this.signatureService.isHealthy(),
-        timeoutPromise,
-      ]);
+      const result = await Promise.race([this.signatureService.isHealthy(), timeoutPromise]);
 
       const latencyMs = Date.now() - start;
 
@@ -245,7 +242,10 @@ export class RelayService implements RelayServiceContract {
       return { status: 'ok', latencyMs: result.latencyMs ?? latencyMs };
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : 'Unknown error';
-      return { status: 'degraded', message: `Signature service health check failed: ${errorMessage}` };
+      return {
+        status: 'degraded',
+        message: `Signature service health check failed: ${errorMessage}`,
+      };
     }
   }
 

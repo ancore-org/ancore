@@ -22,23 +22,7 @@ test.describe('Onboarding flow', () => {
     await expect(page.getByText('Create a wallet')).toBeVisible();
   });
 
-  test('create wallet flow completes onboarding and lands on /home', async ({ page }) => {
-    await page.goto('/welcome');
-    await page.waitForLoadState('networkidle');
 
-    await page.getByText('Create a wallet').click();
-    await expect(page).toHaveURL(/\/create-account/);
-    await expect(page.getByText('Create account')).toBeVisible();
-
-    const nameInput = page.getByPlaceholder('My Ancore Wallet');
-    await nameInput.clear();
-    await nameInput.fill('E2E Test Wallet');
-
-    await page.getByRole('button', { name: /Create wallet/i }).click();
-
-    await expect(page).toHaveURL(/\/home/);
-    await expect(page.getByRole('heading', { name: 'Home' })).toBeVisible();
-  });
 
   test('onboarded wallet skips welcome and goes to unlock', async ({ page, seedWallet }) => {
     await seedWallet('onboarded-locked');
@@ -62,11 +46,10 @@ test.describe('Onboarding flow', () => {
 
   // ── Real-artifact tests (unblock after #764 + #768) ───────────────────────
 
-  test.skip('create wallet — mnemonic revealed + verified + password set → home screen (real artifact)', async ({
+  test('create wallet — mnemonic revealed + verified + password set → home screen (real artifact)', async ({
     extensionContext,
     extensionUrl,
   }) => {
-    // TODO: unblocks after #764 + #768
     const page = await extensionContext.newPage();
     await page.goto(extensionUrl('index.html'));
     const onboarding = new OnboardingPage(page);
@@ -80,10 +63,10 @@ test.describe('Onboarding flow', () => {
     expect(words).toHaveLength(12);
 
     await page.getByRole('button', { name: /i.*saved|continue/i }).click();
-    for (let i = 0; i < words.length; i++) {
-      await onboarding.confirmMnemonicWord(i, words[i]);
-    }
-    await page.getByRole('button', { name: /verify|confirm/i }).click();
+    
+    await onboarding.confirmMnemonicChallenge(words);
+    
+    await page.getByRole('button', { name: /verify|continue/i }).click();
 
     await onboarding.enterPassword(TEST_PASSWORD);
     await onboarding.confirmPassword(TEST_PASSWORD);
@@ -92,11 +75,10 @@ test.describe('Onboarding flow', () => {
     await expect(page.getByTestId('home-screen')).toBeVisible();
   });
 
-  test.skip('import wallet — ALPHA mnemonic + password → home screen (real artifact)', async ({
+  test('import wallet — ALPHA mnemonic + password → home screen (real artifact)', async ({
     extensionContext,
     extensionUrl,
   }) => {
-    // TODO: unblocks after #764
     const page = await extensionContext.newPage();
     await page.goto(extensionUrl('index.html'));
     const onboarding = new OnboardingPage(page);
@@ -111,19 +93,20 @@ test.describe('Onboarding flow', () => {
     await expect(page.getByTestId('home-screen')).toBeVisible();
   });
 
-  test.skip('onboarding rejects mismatched mnemonic confirmation (real artifact)', async ({
+  test('onboarding rejects mismatched mnemonic confirmation (real artifact)', async ({
     extensionContext,
     extensionUrl,
   }) => {
-    // TODO: unblocks after #764
     const page = await extensionContext.newPage();
     await page.goto(extensionUrl('index.html'));
     const onboarding = new OnboardingPage(page);
 
     await onboarding.selectCreateWallet();
     await page.getByRole('button', { name: /i.*saved|continue/i }).click();
-    await onboarding.confirmMnemonicWord(0, 'wrong');
-    await page.getByRole('button', { name: /verify|confirm/i }).click();
+    
+    await onboarding.failMnemonicChallenge();
+
+    await page.getByRole('button', { name: /verify|continue/i }).click();
     await expect(page.getByRole('alert')).toBeVisible();
   });
 });
