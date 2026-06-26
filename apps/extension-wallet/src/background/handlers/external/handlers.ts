@@ -9,12 +9,38 @@ import type {
   RequestAccessResult,
   GetAddressResult,
   GetSmartAccountResult,
+  GetPublicKeyResult,
+  GetNetworkResult,
   SignTransactionResult,
 } from '@ancore/types';
 import { ExternalApiMethodName as MethodName } from '@ancore/types';
 import { isAllowed, addToAllowlist } from './allowlist';
 import { enqueueApproval } from './response-queue';
 import { openApprovalWindow } from '../../approval-window';
+import { getSettingsState } from '@/stores/settings';
+
+/** chrome.storage.local key for the deployed smart-account C-address. */
+const CONTRACT_ADDRESS_KEY = 'ancore_contract_address';
+
+/** Stellar network passphrases keyed by NetworkMode. */
+const NETWORK_PASSPHRASES: Record<string, string> = {
+  mainnet: 'Public Global Stellar Network ; September 2015',
+  testnet: 'Test SDF Network ; September 2015',
+  futurenet: 'Test SDF Future Network ; October 2022',
+};
+
+async function readFromChromeLocal(key: string): Promise<string | null> {
+  const chromeRef = (globalThis as { chrome?: any }).chrome;
+  if (chromeRef?.storage?.local) {
+    return new Promise((resolve) => {
+      chromeRef.storage.local.get(key, (result: Record<string, unknown>) => {
+        const value = result[key];
+        resolve(typeof value === 'string' ? value : null);
+      });
+    });
+  }
+  return localStorage.getItem(key);
+}
 
 /**
  * requestAccess handler
@@ -190,4 +216,47 @@ export async function handleSignMessage(
   return {
     signature: 'mock_signature_' + Date.now(),
   };
+}
+
+/**
+ * getPublicKey handler (#809)
+ * Reads the deployed smart-account C-address from chrome.storage.local and
+ * returns it as the wallet's public key. Requires prior requestAccess approval.
+ */
+export async function handleGetPublicKey(ctx: ExternalHandlerContext): Promise<GetPublicKeyResult> {
+  const { origin } = ctx;
+
+  const publicKey = await readFromChromeLocal(CONTRACT_ADDRESS_KEY);
+  if (!publicKey) {
+    throw new Error('Wallet not set up. Complete onboarding first.');
+  }
+
+  const { network } = getSettingsState();
+  const allowed = await isAllowed(network, publicKey, origin);
+  if (!allowed) {
+    throw new Error('Origin not allowed. Call requestAccess first.');
+  }
+
+  return { publicKey };
+}
+
+/**
+ * getNetwork handler (#809)
+ * Returns the active Stellar network and its passphrase.
+ * Requires prior requestAccess approval.
+ */
+export async function handleGetNetwork(ctx: ExternalHandlerContext): Promise<GetNetworkResult> {
+  const { origin } = ctx;
+
+  const publicKey = await readFromChromeLocal(CONTRACT_ADDRESS_KEY);
+  const { network } = getSettingsState();
+
+  const smartAccountId = publicKey ?? 'CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA';
+  const allowed = await isAllowed(network, smartAccountId, origin);
+  if (!allowed) {
+    throw new Error('Origin not allowed. Call requestAccess first.');
+  }
+
+  const networkPassphrase = NETWORK_PASSPHRASES[network] ?? NETWORK_PASSPHRASES['testnet'];
+  return { network, networkPassphrase };
 }

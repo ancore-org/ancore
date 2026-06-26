@@ -175,6 +175,15 @@ export class SecureStorageManager {
   }
 
   /**
+   * Checks if a vault has been created (i.e., master salt exists).
+   * @returns true if a vault exists, false otherwise
+   */
+  public async hasVault(): Promise<boolean> {
+    const salt = await this.storage.get(MASTER_SALT_STORAGE_KEY);
+    return salt != null;
+  }
+
+  /**
    * Record activity and reset the inactivity auto-lock timer.
    */
   public touch(): void {

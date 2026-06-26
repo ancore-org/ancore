@@ -22,11 +22,13 @@ const EXPECTED_EXPORTS = [
   'generateMnemonic',
   'validateMnemonic',
   'validateMnemonicStrength',
+  'getEnglishWordlist',
   'getEnglishBip39Wordlist',
   'MnemonicValidationError',
   'deriveKeypairFromMnemonic',
   'signTransaction',
   'verifySignature',
+  'timingSafeEqual',
   'constantTimeEqual',
 ] as const;
 

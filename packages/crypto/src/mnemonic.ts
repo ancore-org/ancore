@@ -7,6 +7,11 @@ import * as bip39 from 'bip39';
  */
 export const SUPPORTED_MNEMONIC_LANGUAGE = 'english' as const;
 
+export function getEnglishWordlist(): string[] {
+  const allWordlists = (bip39 as unknown as { wordlists: Record<string, string[]> }).wordlists;
+  return allWordlists['english'] || [];
+}
+
 /**
  * Error thrown when a mnemonic phrase contains words from an unsupported
  * (non-English) BIP39 wordlist.

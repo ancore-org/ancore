@@ -50,6 +50,7 @@ export {
   generateMnemonic,
   validateMnemonic,
   validateMnemonicStrength,
+  getEnglishWordlist,
   getEnglishBip39Wordlist,
 } from './mnemonic';
 export { MnemonicValidationError } from './mnemonic';
@@ -61,4 +62,5 @@ export { deriveKeypairFromMnemonic } from './key-derivation';
 export { signTransaction, verifySignature } from './signing';
 
 // Constant-time comparison
+export { timingSafeEqual } from './timing-safe';
 export { constantTimeEqual } from './compare';

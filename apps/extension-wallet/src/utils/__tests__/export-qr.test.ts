@@ -19,7 +19,6 @@ vi.mock('qrcode', () => ({
 
 import downloadQrPng from '../export-qr';
 
-// Mock Canvas/Blob APIs
 class FakeBlob {}
 
 function createMockCanvas() {
@@ -39,7 +38,7 @@ function createMockCanvas() {
 
 describe('downloadQrPng', () => {
   beforeAll(() => {
-    // @ts-expect-error test shim for canvas
+    // @ts-expect-error jsdom canvas mock
     global.document.createElement = (tag: string) => {
       if (tag === 'canvas') return createMockCanvas();
       const el: Record<string, unknown> = {

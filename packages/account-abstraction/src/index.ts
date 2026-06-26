@@ -22,12 +22,12 @@ export {
   InsufficientPermissionError,
   ContractInvocationError,
   NotImplementedError,
-  StrKeyValidationError,
   mapContractError,
   CONTRACT_ERROR_MESSAGES,
   CONTRACT_ERROR_CODES,
 } from './errors';
 export { toCanonicalError as toCanonicalAccountError } from './errors';
+export { StrKeyValidationError } from './strkey-validation';
 
 export {
   addressToScVal,

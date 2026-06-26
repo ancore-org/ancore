@@ -3,8 +3,6 @@
  * Maps Soroban contract panics and host errors to TypeScript errors.
  */
 
-import { StrKey } from '@stellar/stellar-sdk';
-
 /**
  * Base error for account contract operations.
  */
@@ -230,38 +228,4 @@ export function toCanonicalError(err: unknown) {
     };
   }
   return { code: 'ACCOUNT_CONTRACT_ERROR', message: String(err) };
-}
-
-// ---------------------------------------------------------------------------
-// StrKey validation (local copy to avoid circular dependency with core-sdk)
-// ---------------------------------------------------------------------------
-
-export type StrKeyErrorCode = 'INVALID_G_KEY';
-
-export class StrKeyValidationError extends Error {
-  readonly code: StrKeyErrorCode;
-  readonly input?: string;
-
-  constructor(code: StrKeyErrorCode, message: string, input?: string) {
-    super(message);
-    this.name = 'StrKeyValidationError';
-    this.code = code;
-    this.input = input;
-    Object.setPrototypeOf(this, StrKeyValidationError.prototype);
-  }
-}
-
-/**
- * Assert that the provided value is a valid Stellar Ed25519 public key (G...).
- */
-export function assertValidEd25519PublicKey(publicKey: string): void {
-  if (typeof publicKey !== 'string' || !StrKey.isValidEd25519PublicKey(publicKey)) {
-    const snippet =
-      typeof publicKey === 'string' ? publicKey.slice(0, 8) + '...' : String(publicKey);
-    throw new StrKeyValidationError(
-      'INVALID_G_KEY',
-      `Invalid Ed25519 public key: expected G... format, got ${snippet}`,
-      typeof publicKey === 'string' ? publicKey : undefined
-    );
-  }
 }
