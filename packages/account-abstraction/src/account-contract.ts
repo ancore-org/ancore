@@ -12,6 +12,7 @@ import {
   publicKeyToBytes32ScVal,
   scValToAddress,
   scValToOptionalSessionKey,
+  scValToU32,
   scValToU64,
   symbolToScVal,
   u64ToScVal,
@@ -22,6 +23,7 @@ import {
   type ExecuteOptions,
   type ExecuteResult,
 } from './execute';
+import type { SimulationError } from './types/simulation';
 
 /** Options for read calls (getOwner, getNonce, getSessionKey) when using a server */
 export interface AccountContractReadOptions {
@@ -45,13 +47,6 @@ export interface AccountContractWriteResult {
   operation: ReturnType<AccountContract['buildInvokeOperation']>;
 }
 
-interface SimulateErrorShape {
-  error?: string;
-  message?: string;
-  result?: {
-    retval?: xdr.ScVal;
-  };
-}
 
 /**
  * AccountContract wraps the Ancore account abstraction contract (contracts/account).
@@ -185,6 +180,13 @@ export class AccountContract {
   }
 
   /**
+   * Build invocation for get_version (read-only).
+   */
+  getVersionInvocation(): InvocationArgs {
+    return { method: 'get_version', args: [] };
+  }
+
+  /**
    * Return a Stellar operation that invokes the given method with the given args.
    */
   call(method: string, ...args: xdr.ScVal[]) {
@@ -212,6 +214,15 @@ export class AccountContract {
   async getNonce(options: AccountContractReadOptions): Promise<number> {
     const result = await this.simulateRead('get_nonce', [], options);
     return scValToU64(result);
+  }
+
+  /**
+   * Get the contract's current version. Returns 0 if the version key is absent
+   * (pre-initialize state). Requires server and source account for simulation.
+   */
+  async getVersion(options: AccountContractReadOptions): Promise<number> {
+    const result = await this.simulateRead('get_version', [], options);
+    return scValToU32(result);
   }
 
   /**
@@ -282,7 +293,7 @@ export class AccountContract {
 
     const raw = txBuilder.build();
 
-    const sim = (await server.simulateTransaction(raw)) as SimulateErrorShape;
+    const sim = (await server.simulateTransaction(raw)) as SimulationError;
 
     if (sim && typeof sim === 'object' && ('error' in sim || 'message' in sim)) {
       const errMsg =

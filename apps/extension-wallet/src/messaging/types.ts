@@ -71,6 +71,11 @@ export interface Messages {
     request: { origin: string };
     response: { network: string; networkPassphrase: string };
   };
+  /** dApp checks whether the current origin is allowlisted. */
+  EXTERNAL_IS_CONNECTED: {
+    request: { origin: string };
+    response: { connected: boolean };
+  };
 }
 
 /** Union of all valid message type names */

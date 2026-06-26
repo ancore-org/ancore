@@ -9,6 +9,8 @@
  * Any changes to the canonical format must be versioned and documented.
  */
 
+import { createHash } from 'node:crypto';
+
 export interface CanonicalPayloadInput {
   sessionKey: string;
   operation: string;
@@ -51,6 +53,5 @@ export function buildCanonicalPayload(input: CanonicalPayloadInput): string {
  * @returns SHA-256 hash of the payload as hex string
  */
 export function hashPayload(payload: string): string {
-  const crypto = require('crypto');
-  return crypto.createHash('sha256').update(payload, 'hex').digest('hex');
+  return createHash('sha256').update(payload, 'hex').digest('hex');
 }

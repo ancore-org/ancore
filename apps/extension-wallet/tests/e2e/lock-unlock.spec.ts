@@ -53,8 +53,6 @@ test.describe('Lock / unlock flow', () => {
     await expect(page).toHaveURL(/\/unlock/);
   });
 
-
-
   // ── Real-artifact tests (unblock after #764) ───────────────────────────────
 
   test.skip('extension popup opens and renders root UI (real artifact)', async ({

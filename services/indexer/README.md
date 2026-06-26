@@ -440,9 +440,20 @@ Tests are marked with `#[ignore]` to prevent accidental execution without a test
 
 ## CI Quality Gates
 
-The following checks run automatically on every PR via the `indexer` CI job:
+The following checks run automatically on every PR:
+
+**`indexer-migrations` job** — spins an ephemeral Postgres 16 container and:
+1. Applies every file in `migrations/` in filename order (up smoke)
+2. Drops all application tables, then re-applies migrations (down/up idempotency check)
+
+The job fails if any migration file errors or the schema cannot be rebuilt from scratch.
+
+**`indexer` job:**
 
 ```bash
+# Lint migration filenames and sequence numbers
+pnpm indexer:lint-migrations
+
 # Check formatting (must pass before merge)
 cargo fmt --check
 
@@ -453,7 +464,71 @@ cargo clippy -- -D warnings
 cargo test
 ```
 
-Run these locally from `services/indexer/` before pushing to avoid CI failures.
+Run locally from `services/indexer/` before pushing to avoid CI failures.
+
+### Running the migration check locally
+
+```bash
+# Start a local Postgres instance (docker example)
+docker run -d --name ancore-pg \
+  -e POSTGRES_USER=ancore -e POSTGRES_PASSWORD=ancore -e POSTGRES_DB=ancore_test \
+  -p 5432:5432 postgres:16
+
+# Run the check script
+DATABASE_URL=postgres://ancore:ancore@localhost:5432/ancore_test \
+  bash services/indexer/scripts/check-migrations.sh
+```
+
+## Rollback Procedure
+
+Migrations are **forward-only** (no auto-generated down scripts). To roll back a
+broken migration in production, follow these steps:
+
+### 1. Identify the bad migration
+
+Check which migration was last applied and which introduced the regression:
+
+```bash
+# List tables / columns to see current schema state
+psql "$DATABASE_URL" -c "\dt"
+psql "$DATABASE_URL" -c "\d account_activity"
+```
+
+### 2. Write a compensating migration
+
+Create a new migration file with the next sequence number that undoes the change:
+
+```bash
+# Example: undo migration 004 that added a NOT NULL column without a default
+touch services/indexer/migrations/005_rollback_bad_column.sql
+```
+
+```sql
+-- 005_rollback_bad_column.sql
+ALTER TABLE account_activity DROP COLUMN IF EXISTS bad_column;
+```
+
+Never edit or delete an already-applied migration file — that creates drift
+between environments.
+
+### 3. Apply the compensating migration
+
+```bash
+psql "$DATABASE_URL" -v ON_ERROR_STOP=1 \
+  -f services/indexer/migrations/005_rollback_bad_column.sql
+```
+
+### 4. Verify the schema
+
+```bash
+DATABASE_URL="$DATABASE_URL" \
+  bash services/indexer/scripts/check-migrations.sh
+```
+
+### 5. Deploy and monitor
+
+Deploy the service revision that includes the compensating migration and monitor
+`indexer_lag_blocks` / `indexer_lag_seconds` in Prometheus to confirm recovery.
 
 ## License
 

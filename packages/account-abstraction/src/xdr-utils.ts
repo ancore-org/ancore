@@ -227,6 +227,16 @@ export function scValToAddress(scVal: xdr.ScVal): string {
 }
 
 /**
+ * Decode ScVal to number (u32).
+ */
+export function scValToU32(scVal: xdr.ScVal): number {
+  const native = scValToNative(scVal);
+  if (typeof native === 'number') return native;
+  if (typeof native === 'bigint') return Number(native);
+  throw new TypeError('Expected u32 number from ScVal');
+}
+
+/**
  * Decode ScVal to number (u64).
  */
 export function scValToU64(scVal: xdr.ScVal): number {
@@ -339,6 +349,13 @@ export function decodeOwnerResult(scVal: xdr.ScVal): string {
  */
 export function decodeNonceResult(scVal: xdr.ScVal): number {
   return scValToU64(scVal);
+}
+
+/**
+ * Decode get_version result.
+ */
+export function decodeVersionResult(scVal: xdr.ScVal): number {
+  return scValToU32(scVal);
 }
 
 /**
