@@ -38,10 +38,8 @@ describe('createSecureStoreAdapter', () => {
     const adapter = createSecureStoreAdapter({ forceProduction: true, bundleId: PROD_BUNDLE_ID });
     await adapter.set('vault_key', 'encrypted_data');
 
-    expect(Keychain.setGenericPassword).toHaveBeenCalledWith(
-      'ancore',
-      'encrypted_data',
-      { service: 'org.ancore.wallet.vault_key' }
-    );
+    expect(Keychain.setGenericPassword).toHaveBeenCalledWith('ancore', 'encrypted_data', {
+      service: 'org.ancore.wallet.vault_key',
+    });
   });
 });

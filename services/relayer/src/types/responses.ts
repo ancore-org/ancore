@@ -46,5 +46,6 @@ export interface HealthResponse {
     queue: DependencyStatus;
     rpc: DependencyStatus;
     storage: DependencyStatus;
+    signatureService?: DependencyStatus;
   };
 }

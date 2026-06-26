@@ -195,6 +195,9 @@ importers:
       '@ancore/crypto':
         specifier: workspace:*
         version: link:../../packages/crypto
+      '@ancore/stellar':
+        specifier: workspace:*
+        version: link:../../packages/stellar
       '@ancore/types':
         specifier: workspace:*
         version: link:../../packages/types

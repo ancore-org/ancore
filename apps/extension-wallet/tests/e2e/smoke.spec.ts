@@ -57,7 +57,8 @@ test.describe('Extension release-candidate smoke @smoke', () => {
     await seedWallet('onboarded-unlocked');
     await navigateTo(page, '/session-keys');
 
-    await expect(page.getByText('Active keys')).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'Session Keys' })).toBeVisible();
+    await expect(page.getByText('Active Keys')).toBeVisible();
     await expect(page.getByRole('button', { name: /Add session key/i })).toBeVisible();
 
     await clearWallet();

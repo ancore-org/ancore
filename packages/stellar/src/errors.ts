@@ -47,6 +47,16 @@ export class AccountNotFoundError extends StellarError {
 }
 
 /**
+ * Error thrown when Soroban transaction simulation fails
+ */
+export class SimulationFailedError extends StellarError {
+  constructor(message: string) {
+    super(message);
+    this.name = 'SimulationFailedError';
+  }
+}
+
+/**
  * Error thrown when a transaction submission fails
  */
 type HorizonErrorPayload = {

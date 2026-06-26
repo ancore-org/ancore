@@ -144,11 +144,9 @@ describe('KeychainSecureStoreAdapter', () => {
     const adapter = new KeychainSecureStoreAdapter({ bundleId: DEV_BUNDLE_ID });
     await adapter.set('k', 'v');
 
-    expect(mockKeychain.setGenericPassword).toHaveBeenCalledWith(
-      KEYCHAIN_USERNAME,
-      'v',
-      { service: 'org.ancore.wallet.dev.k' }
-    );
+    expect(mockKeychain.setGenericPassword).toHaveBeenCalledWith(KEYCHAIN_USERNAME, 'v', {
+      service: 'org.ancore.wallet.dev.k',
+    });
   });
 
   it('defaults to the production bundle ID when none is provided', async () => {
@@ -157,11 +155,9 @@ describe('KeychainSecureStoreAdapter', () => {
     const adapter = new KeychainSecureStoreAdapter();
     await adapter.set('k', 'v');
 
-    expect(mockKeychain.setGenericPassword).toHaveBeenCalledWith(
-      KEYCHAIN_USERNAME,
-      'v',
-      { service: `${PROD_BUNDLE_ID}.k` }
-    );
+    expect(mockKeychain.setGenericPassword).toHaveBeenCalledWith(KEYCHAIN_USERNAME, 'v', {
+      service: `${PROD_BUNDLE_ID}.k`,
+    });
   });
 
   it('defaults to the development bundle ID when __DEV__ is set', async () => {
@@ -172,11 +168,9 @@ describe('KeychainSecureStoreAdapter', () => {
       const adapter = new KeychainSecureStoreAdapter();
       await adapter.set('k', 'v');
 
-      expect(mockKeychain.setGenericPassword).toHaveBeenCalledWith(
-        KEYCHAIN_USERNAME,
-        'v',
-        { service: `${DEV_BUNDLE_ID}.k` }
-      );
+      expect(mockKeychain.setGenericPassword).toHaveBeenCalledWith(KEYCHAIN_USERNAME, 'v', {
+        service: `${DEV_BUNDLE_ID}.k`,
+      });
     } finally {
       delete (globalThis as { __DEV__?: boolean }).__DEV__;
     }

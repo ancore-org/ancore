@@ -88,6 +88,40 @@ runtime?.onStartup?.addListener(() => {
   });
 });
 
+// Broadcast network changes to all tabs via chrome.storage.onChanged
+const storage = (globalThis as { chrome?: { storage?: typeof chrome.storage } }).chrome?.storage;
+storage?.onChanged?.addListener((changes, areaName) => {
+  if (areaName === 'local' && 'ancore-settings' in changes) {
+    const newSettings = changes['ancore-settings'].newValue as Record<string, unknown> | undefined;
+    const oldSettings = changes['ancore-settings'].oldValue as Record<string, unknown> | undefined;
+
+    // Check if network changed
+    if (newSettings?.network !== oldSettings?.network) {
+      console.info(`${logPrefix} network changed`, {
+        from: oldSettings?.network,
+        to: newSettings?.network,
+      });
+
+      // Broadcast to all tabs to refresh their state
+      chrome.tabs.query({}, (tabs) => {
+        tabs.forEach((tab) => {
+          if (tab.id) {
+            chrome.tabs
+              .sendMessage(tab.id, {
+                type: 'NETWORK_CHANGED',
+                network: newSettings?.network,
+                horizonUrl: newSettings?.horizonUrl,
+              })
+              .catch(() => {
+                // Tab may not have content script, ignore error
+              });
+          }
+        });
+      });
+    }
+  }
+});
+
 // ---------------------------------------------------------------------------
 // External API handlers (dApp connectivity)
 // ---------------------------------------------------------------------------

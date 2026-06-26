@@ -42,6 +42,12 @@ module.exports = {
       lines: 85,
       statements: 85,
     },
+    './src/timing-safe.ts': {
+      branches: 80,
+      functions: 100,
+      lines: 100,
+      statements: 100,
+    },
   },
   testMatch: ['**/__tests__/**/*.test.ts'],
   testPathIgnorePatterns: ['/node_modules/'],

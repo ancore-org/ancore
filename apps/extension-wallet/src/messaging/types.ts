@@ -48,6 +48,29 @@ export interface Messages {
       indexer: ServiceHealthResult;
     };
   };
+
+  // ── External dApp messages (content script → background) ──────────────────
+
+  /** dApp requests wallet access; background checks/updates the allowlist. */
+  EXTERNAL_REQUEST_ACCESS: {
+    request: { origin: string; params?: Record<string, unknown> };
+    response: { smartAccountId: string; network: string };
+  };
+  /** dApp asks the background to sign an XDR transaction envelope. */
+  EXTERNAL_SIGN_TRANSACTION: {
+    request: { xdr: string; origin: string; networkPassphrase?: string };
+    response: { signedXdr: string };
+  };
+  /** dApp requests the wallet's public key / smart-account address. */
+  EXTERNAL_GET_PUBLIC_KEY: {
+    request: { origin: string };
+    response: { publicKey: string };
+  };
+  /** dApp queries which Stellar network the wallet is currently on. */
+  EXTERNAL_GET_NETWORK: {
+    request: { origin: string };
+    response: { network: string; networkPassphrase: string };
+  };
 }
 
 /** Union of all valid message type names */

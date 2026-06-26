@@ -4,7 +4,7 @@
 //! to enable proactive monitoring and alerting.
 
 use chrono::{DateTime, Utc};
-use metrics::{describe_gauge, gauge};
+use metrics::{describe_gauge, describe_histogram, gauge, histogram};
 use serde::Serialize;
 use sqlx::{PgPool, Row};
 
@@ -35,6 +35,9 @@ pub const CURSOR_STALE_THRESHOLD_SECONDS: i64 = 300;
 pub fn init_prometheus_metrics() {
     describe_gauge!("indexer_lag_blocks", "Number of ledgers behind chain head");
     describe_gauge!("indexer_lag_seconds", "Estimated seconds behind chain head");
+    describe_gauge!("indexer_ingest_lag_ledgers", "Number of ledgers between cursor and network head");
+    describe_histogram!("indexer_ingest_records_per_second", "Ingestion throughput in records per second");
+    describe_histogram!("indexer_ingest_batch_duration_seconds", "Duration of ingest batch processing");
 }
 
 /// Record lag metrics for Prometheus export.
@@ -44,6 +47,15 @@ pub fn init_prometheus_metrics() {
 pub fn record_lag(lag_blocks: i64, lag_seconds: i64) {
     gauge!("indexer_lag_blocks").set(lag_blocks as f64);
     gauge!("indexer_lag_seconds").set(lag_seconds as f64);
+}
+
+/// Record ingest worker metrics for Prometheus export.
+///
+/// Records throughput histogram and lag gauge from ingest worker operations.
+pub fn record_ingest_metrics(records_per_second: f64, lag_ledgers: i64, batch_duration_seconds: f64) {
+    histogram!("indexer_ingest_records_per_second").record(records_per_second);
+    gauge!("indexer_ingest_lag_ledgers").set(lag_ledgers as f64);
+    histogram!("indexer_ingest_batch_duration_seconds").record(batch_duration_seconds);
 }
 
 /// Fetch cursor staleness metrics for all ingestion streams.
@@ -159,5 +171,24 @@ mod tests {
 
         assert!(!is_stale);
         assert_eq!(staleness_seconds, CURSOR_STALE_THRESHOLD_SECONDS);
+    }
+
+    #[test]
+    fn record_ingest_metrics_accepts_valid_values() {
+        record_ingest_metrics(150.0, 5, 2.5);
+        record_ingest_metrics(0.0, 0, 0.0);
+        record_ingest_metrics(1000.0, 100, 10.0);
+    }
+
+    #[test]
+    fn record_lag_accepts_valid_values() {
+        record_lag(10, 50);
+        record_lag(0, 0);
+        record_lag(1000, 5000);
+    }
+
+    #[test]
+    fn init_prometheus_metrics_runs_without_panic() {
+        init_prometheus_metrics();
     }
 }

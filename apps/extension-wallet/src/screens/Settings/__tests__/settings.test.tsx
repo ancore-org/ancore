@@ -324,6 +324,7 @@ describe('SettingsScreen', () => {
   beforeEach(() => {
     localStorage.clear();
     useDashboardSettingsStore.setState(DEFAULT_DASHBOARD_SETTINGS);
+    useSettingsStore.setState(DEFAULTS);
   });
 
   it('renders all top-level groups', () => {
@@ -331,7 +332,17 @@ describe('SettingsScreen', () => {
     expect(screen.getByText('Settings')).toBeInTheDocument();
     expect(screen.getAllByText('Network').length).toBeGreaterThanOrEqual(1);
     expect(screen.getByText('Security')).toBeInTheDocument();
+    expect(screen.getByText('Privacy')).toBeInTheDocument();
     expect(screen.getByText('About Ancore')).toBeInTheDocument();
+  });
+
+  it('toggles telemetry opt-in from privacy settings', async () => {
+    renderSettingsScreen();
+    expect(screen.getByText('Disabled')).toBeInTheDocument();
+
+    await userEvent.click(screen.getByRole('button', { name: /usage analytics/i }));
+    expect(useSettingsStore.getState().telemetryOptIn).toBe(true);
+    expect(screen.getByText('Enabled')).toBeInTheDocument();
   });
 
   it('navigates to network settings', async () => {

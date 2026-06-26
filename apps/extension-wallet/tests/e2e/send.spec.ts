@@ -11,11 +11,10 @@ const BRAVO_ADDRESS = 'GDQP2KPQGKIHYJGXNUIYOMHARUARCA7DJT5FO2FFOOKY3B2WSQHG4W37'
  * Full flow unblocks after #764 (real vault unlock).
  */
 test.describe('send', () => {
-  test.skip('unlock → fill send form → mock Horizon submit → tx hash shown in history', async ({
+  test('unlock → fill send form → mock Horizon submit → tx hash shown in history', async ({
     context,
     extensionUrl,
   }) => {
-    // TODO: unblocks after #764
     const page = await context.newPage();
 
     // Mock Horizon transaction submission
@@ -32,7 +31,8 @@ test.describe('send', () => {
 
     await page.goto(extensionUrl('index.html'));
 
-    // Unlock wallet (depends on #764 for real vault state)
+    // Unlock wallet
+    await page.getByRole('button', { name: /lock/i }).click();
     await page.getByLabel(/password/i).fill('TestPassword123!');
     await page.getByRole('button', { name: /unlock/i }).click();
     await page.waitForSelector('[data-testid="home-screen"]');
@@ -58,10 +58,13 @@ test.describe('send', () => {
     expect(firstHash).toBe(hash);
   });
 
-  test.skip('send form rejects invalid Stellar address', async ({ context, extensionUrl }) => {
-    // TODO: unblocks after #764
+  test('send form rejects invalid Stellar address', async ({ context, extensionUrl }) => {
     const page = await context.newPage();
     await page.goto(extensionUrl('index.html'));
+    await page.getByRole('button', { name: /lock/i }).click();
+    await page.getByLabel(/password/i).fill('TestPassword123!');
+    await page.getByRole('button', { name: /unlock/i }).click();
+    await page.waitForSelector('[data-testid="home-screen"]');
 
     const send = new SendPage(page);
     await send.navigate();
@@ -71,10 +74,13 @@ test.describe('send', () => {
     await expect(page.getByRole('alert')).toContainText(/invalid.*address/i);
   });
 
-  test.skip('send form rejects amount exceeding balance', async ({ context, extensionUrl }) => {
-    // TODO: unblocks after #764
+  test('send form rejects amount exceeding balance', async ({ context, extensionUrl }) => {
     const page = await context.newPage();
     await page.goto(extensionUrl('index.html'));
+    await page.getByRole('button', { name: /lock/i }).click();
+    await page.getByLabel(/password/i).fill('TestPassword123!');
+    await page.getByRole('button', { name: /unlock/i }).click();
+    await page.waitForSelector('[data-testid="home-screen"]');
 
     const send = new SendPage(page);
     await send.navigate();

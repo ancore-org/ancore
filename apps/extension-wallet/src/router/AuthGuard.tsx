@@ -66,10 +66,33 @@ export function ExtensionAuthProvider({
 }) {
   const [authState, setAuthState] = React.useState<AuthState>(readAuthState);
   const [unlockError, setUnlockError] = React.useState<string | null>(null);
+  const [isInitializing, setIsInitializing] = React.useState(true);
 
   React.useEffect(() => {
     writeAuthState(authState);
   }, [authState]);
+
+  React.useEffect(() => {
+    async function initVault() {
+      try {
+        const { getSharedStorageManager } = await import('../security/storage-manager');
+        const storageManager = getSharedStorageManager();
+        const vaultExists = await storageManager.hasVault();
+        
+        setAuthState((current) => {
+          const next = { ...current, hasOnboarded: vaultExists };
+          writeAuthState(next);
+          return next;
+        });
+      } catch (err) {
+        console.error('Failed to check vault', err);
+      } finally {
+        setIsInitializing(false);
+      }
+    }
+    
+    void initVault();
+  }, []);
 
   React.useEffect(() => {
     function handleStorage(event: StorageEvent) {
@@ -140,7 +163,17 @@ export function ExtensionAuthProvider({
     [authState, unlockError, unlockVerifier]
   );
 
-  return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
+  return (
+    <AuthContext.Provider value={value}>
+      {isInitializing ? (
+        <div className="flex min-h-screen items-center justify-center bg-background">
+          <div className="h-6 w-6 animate-spin rounded-full border-2 border-primary border-t-transparent" />
+        </div>
+      ) : (
+        children
+      )}
+    </AuthContext.Provider>
+  );
 }
 
 export function useExtensionAuth(): AuthContextValue {

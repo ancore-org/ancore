@@ -1,5 +1,5 @@
-import { TransactionBuilder, Transaction } from '@stellar/stellar-sdk';
-import { StellarClient } from '@ancore/stellar';
+import { rpc, TransactionBuilder, Transaction } from '@stellar/stellar-sdk';
+import { SimulationFailedError, StellarClient } from '@ancore/stellar';
 import type { Network } from '@ancore/types';
 import type { TransactionSubmitterContract, TransactionSubmissionResult } from '../types';
 
@@ -29,11 +29,37 @@ export class StellarTransactionSubmitter implements TransactionSubmitterContract
       new StellarClient({ network: config.network, networkPassphrase: this.networkPassphrase });
   }
 
+  async simulateAndAssembleTransaction(
+    signedXdr: string
+  ): Promise<{ assembledXdr: string; gasUsed: number }> {
+    const transaction = this.parseTransaction(signedXdr);
+    const simulation = await this.client.simulateTransaction(transaction);
+
+    if (rpc.Api.isSimulationError(simulation)) {
+      throw new SimulationFailedError(simulation.error);
+    }
+
+    if (rpc.Api.isSimulationRestore(simulation)) {
+      throw new SimulationFailedError(
+        'Transaction simulation requires state restoration before submission'
+      );
+    }
+
+    if (!rpc.Api.isSimulationSuccess(simulation)) {
+      throw new SimulationFailedError(
+        'Unexpected simulation response shape. Please check Soroban RPC health.'
+      );
+    }
+
+    const assembled = rpc.assembleTransaction(transaction, simulation).build();
+    return {
+      assembledXdr: assembled.toXDR(),
+      gasUsed: Number.parseInt(String(assembled.fee), 10) || 0,
+    };
+  }
+
   async submitSignedTransaction(signedXdr: string): Promise<TransactionSubmissionResult> {
-    const transaction = TransactionBuilder.fromXDR(
-      signedXdr,
-      this.networkPassphrase
-    ) as Transaction;
+    const transaction = this.parseTransaction(signedXdr);
     const response = await this.client.submitTransaction(transaction);
 
     return {
@@ -46,6 +72,10 @@ export class StellarTransactionSubmitter implements TransactionSubmitterContract
     const started = Date.now();
     const healthy = await this.client.isHealthy();
     return { healthy, latencyMs: Date.now() - started };
+  }
+
+  private parseTransaction(signedXdr: string): Transaction {
+    return TransactionBuilder.fromXDR(signedXdr, this.networkPassphrase) as Transaction;
   }
 }
 

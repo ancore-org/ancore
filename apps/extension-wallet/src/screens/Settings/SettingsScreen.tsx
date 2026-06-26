@@ -1,4 +1,5 @@
 import * as React from 'react';
+
 import {
   Globe,
   Lock,
@@ -11,6 +12,9 @@ import {
   Server,
   PanelRight,
 } from 'lucide-react';
+
+import { Globe, Lock, Timer, Key, FileText, Info, Bell, Monitor, Server, Shield } from 'lucide-react';
+
 import { useTranslation } from 'react-i18next';
 import { SettingsGroup, SettingItem } from '../../components/SettingsGroup';
 import { NetworkSettings } from './NetworkSettings';
@@ -18,6 +22,7 @@ import { SecuritySettings } from './SecuritySettings';
 import { AboutScreen } from './AboutScreen';
 import { EnvironmentSettings } from './EnvironmentSettings';
 import { DisplaySettings } from './DisplaySettings';
+import { ConnectedSitesScreen } from './ConnectedSitesScreen';
 import { useSettings } from '../../hooks/useSettings';
 import { DASHBOARD_SETTINGS_STORAGE_KEY } from '../../state/dashboard-settings';
 import { useToast } from '@ancore/ui-kit';
@@ -31,7 +36,7 @@ import {
   getThemeLabel,
 } from '../../i18n/settings-labels';
 
-type SettingsView = 'root' | 'network' | 'security' | 'environment' | 'display' | 'about';
+type SettingsView = 'root' | 'network' | 'security' | 'environment' | 'display' | 'about' | 'connected-sites';
 
 export function SettingsScreen() {
   const { t } = useTranslation();
@@ -48,6 +53,8 @@ export function SettingsScreen() {
   );
   const enableLockShortcut = useSettingsStore((state) => state.enableLockShortcut);
   const setEnableLockShortcut = useSettingsStore((state) => state.setEnableLockShortcut);
+  const telemetryOptIn = useSettingsStore((state) => state.telemetryOptIn);
+  const setTelemetryOptIn = useSettingsStore((state) => state.setTelemetryOptIn);
   const [view, setView] = React.useState<SettingsView>('root');
 
   React.useEffect(() => {
@@ -114,6 +121,10 @@ export function SettingsScreen() {
 
   if (view === 'about') {
     return <AboutScreen onBack={() => setView('root')} />;
+  }
+
+  if (view === 'connected-sites') {
+    return <ConnectedSitesScreen onBack={() => setView('root')} />;
   }
 
   const networkLabel = getNetworkLabel(settings.network, t);
@@ -207,6 +218,12 @@ export function SettingsScreen() {
             onClick={() => setView('security')}
           />
           <SettingItem
+            label="Connected Sites"
+            description="Manage sites that have access to your wallet"
+            icon={<Globe className="h-4 w-4" />}
+            onClick={() => setView('connected-sites')}
+          />
+          <SettingItem
             label={t('settings.security.exportPrivateKey.label')}
             description={t('settings.security.exportPrivateKey.description')}
             icon={<Key className="h-4 w-4" />}
@@ -219,6 +236,20 @@ export function SettingsScreen() {
             icon={<FileText className="h-4 w-4" />}
             onClick={() => setView('security')}
             danger
+          />
+        </SettingsGroup>
+
+        <SettingsGroup title={t('settings.groups.privacy')}>
+          <SettingItem
+            label={t('settings.privacy.telemetry.label')}
+            description={t('settings.privacy.telemetry.description')}
+            icon={<Shield className="h-4 w-4" />}
+            value={
+              telemetryOptIn
+                ? t('settings.privacy.telemetry.enabled')
+                : t('settings.privacy.telemetry.disabled')
+            }
+            onClick={() => setTelemetryOptIn(!telemetryOptIn)}
           />
         </SettingsGroup>
 

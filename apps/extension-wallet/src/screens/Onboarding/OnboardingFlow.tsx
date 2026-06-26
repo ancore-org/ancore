@@ -1,6 +1,7 @@
 import * as React from 'react';
 import { useNavigate } from 'react-router-dom';
 import { ChevronRight, Download } from 'lucide-react';
+import { validateMnemonicStrength, MnemonicValidationError } from '@ancore/crypto';
 import { useOnboarding } from '@/hooks/useOnboarding';
 import { useExtensionAuth } from '@/router/AuthGuard';
 import { WelcomeScreen } from './WelcomeScreen';
@@ -31,11 +32,18 @@ function WalletImportScreen({
     e.preventDefault();
     setError(null);
 
-    const words = mnemonic.trim().split(/\s+/);
-    if (words.length !== 12 && words.length !== 24) {
-      setError('Recovery phrase must be 12 or 24 words.');
+    // Validate mnemonic using the BIP39 strength validator before encrypting
+    try {
+      validateMnemonicStrength(mnemonic);
+    } catch (err) {
+      if (err instanceof MnemonicValidationError) {
+        setError(err.message);
+      } else {
+        setError('Invalid recovery phrase. Please check your input.');
+      }
       return;
     }
+
     if (password.length < 8) {
       setError('Password must be at least 8 characters.');
       return;

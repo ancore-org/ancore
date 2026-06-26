@@ -89,4 +89,5 @@ export type {
   TransactionBuilderOptions,
   ContractExecuteParams,
   SimulationResult,
+  RefreshSessionKeyTtlParams,
 } from './transaction-builder';

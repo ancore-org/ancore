@@ -40,7 +40,8 @@
                 },
                 {
                   "vec": []
-                }
+                },
+                "void"
               ]
             }
           },
@@ -96,6 +97,12 @@
                 "durability": "persistent",
                 "val": {
                   "map": [
+                    {
+                      "key": {
+                        "symbol": "allowed_contracts"
+                      },
+                      "val": "void"
+                    },
                     {
                       "key": {
                         "symbol": "expires_at"
@@ -383,7 +390,8 @@
                 },
                 {
                   "vec": []
-                }
+                },
+                "void"
               ]
             }
           }

@@ -23,6 +23,14 @@ export { AncoreClient, type AncoreClientOptions } from './ancore-client';
 export { addSessionKey, type AddSessionKeyParams } from './add-session-key';
 export { revokeSessionKey, type RevokeSessionKeyParams } from './revoke-session-key';
 export {
+  refreshSessionKeyTtl,
+  parseSessionKeyTtlRefreshedEvent,
+  type RefreshSessionKeyTtlParams,
+  type RefreshSessionKeyTtlOptions,
+  type RefreshSessionKeyTtlResult,
+  type SessionKeyTtlRefreshedEvent,
+} from './refresh-session-key-ttl';
+export {
   permissionToLabel,
   permissionsToLabels,
   formatPermissions,
@@ -74,6 +82,9 @@ export {
   TransactionSubmissionError,
   PaymentRequestValidationError,
   InvalidAmountError,
+  StrKeyValidationError,
+  assertValidEd25519PublicKey,
+  assertValidContractId,
 } from './errors';
 
 // Normalization helpers
@@ -89,6 +100,23 @@ export {
   type RetryPresetName,
   getRetryPreset,
 } from './retry-presets';
+
+// Account sequence fetch helper — re-exported from @ancore/stellar for SDK consumers.
+// Use fetchAccountSequence to retrieve a Stellar account's current sequence number
+// before building transactions in the send flow.
+//
+// Example:
+//   import { fetchAccountSequence } from '@ancore/core-sdk';
+//   const { sequence } = await fetchAccountSequence(horizonServer, publicKey, {
+//     maxRetries: 3,
+//     cacheTtlMs: 5_000,
+//   });
+export {
+  fetchAccountSequence,
+  clearSequenceCache,
+  type AccountSequenceResult,
+  type FetchAccountSequenceOptions,
+} from '@ancore/stellar';
 
 // Scheduled transfers
 export {
