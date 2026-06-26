@@ -26,9 +26,9 @@ export function createHealthHandler(relayService: RelayServiceContract) {
     };
 
     const overallStatus =
-      updatedHealth.dependencies.queue.status === 'ok' &&
+      updatedHealth.dependencies.queue?.status === 'ok' &&
       rpcStatus.status === 'ok' &&
-      updatedHealth.dependencies.storage.status === 'ok' &&
+      updatedHealth.dependencies.storage?.status === 'ok' &&
       signatureStatus.status === 'ok'
         ? 'ok'
         : 'degraded';
