@@ -106,6 +106,7 @@ export function refreshSessionKeyTtl(
 ): InvocationArgs | Promise<RefreshSessionKeyTtlResult> {
   /* eslint-enable no-redeclare */
   validateRefreshSessionKeyTtlParams(params, options?.nowMs);
+  /* eslint-enable no-redeclare */
 
   if (options) {
     return simulateRefreshSessionKeyTtl(accountContract, params, options);

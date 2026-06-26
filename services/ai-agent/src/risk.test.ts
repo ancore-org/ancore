@@ -1,7 +1,11 @@
 import { scoreRisk } from './risk';
 import type { DraftIntent } from './types';
 
-function payment(amount: string, asset: 'XLM' | 'USDC' = 'XLM', destination = 'GDEST'): DraftIntent {
+function payment(
+  amount: string,
+  asset: 'XLM' | 'USDC' = 'XLM',
+  destination = 'GDEST'
+): DraftIntent {
   return { type: 'payment', amount, asset, destination };
 }
 

@@ -1,16 +1,3 @@
-import * as React from 'react';
-import {
-  Globe,
-  Lock,
-  Timer,
-  Key,
-  FileText,
-  Info,
-  Bell,
-  Monitor,
-  Server,
-  Shield,
-} from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { SettingsGroup, SettingItem } from '../../components/SettingsGroup';
 import { NetworkSettings } from './NetworkSettings';
@@ -20,6 +7,7 @@ import { EnvironmentSettings } from './EnvironmentSettings';
 import { DisplaySettings } from './DisplaySettings';
 import { ConnectedSitesScreen } from './ConnectedSitesScreen';
 import { useSettings } from '../../hooks/useSettings';
+import { DASHBOARD_SETTINGS_STORAGE_KEY } from '../../state/dashboard-settings';
 import { useToast } from '@ancore/ui-kit';
 import type { Network } from '@ancore/types';
 import { useSettingsStore } from '../../stores/settings';
@@ -58,6 +46,14 @@ export function SettingsScreen() {
   const telemetryOptIn = useSettingsStore((state) => state.telemetryOptIn);
   const setTelemetryOptIn = useSettingsStore((state) => state.setTelemetryOptIn);
   const [view, setView] = React.useState<SettingsView>('root');
+
+  React.useEffect(() => {
+    if (typeof chrome === 'undefined') return;
+
+    chrome.storage?.local?.set?.({
+      [DASHBOARD_SETTINGS_STORAGE_KEY]: JSON.stringify({ state: settings }),
+    });
+  }, [settings]);
 
   function handleNetworkChange(network: Network) {
     updateSettings({ network });
@@ -126,6 +122,10 @@ export function SettingsScreen() {
   const environmentLabel = getEnvironmentLabel(settings.environment, t);
   const displayLabel = getDisplayLabel(settings.displayPreference, t);
   const themeLabel = getThemeLabel(runtimeTheme, t);
+  const approvalUxLabel =
+    settings.approvalUx === 'sidePanel'
+      ? t('settings.approvals.sidePanel')
+      : t('settings.approvals.popup');
 
   return (
     <div className="flex flex-col min-h-screen bg-background">
@@ -184,6 +184,17 @@ export function SettingsScreen() {
 
         <SettingsGroup title={t('settings.groups.security')}>
           <SettingItem
+            label={t('settings.approvals.label')}
+            description={t('settings.approvals.description')}
+            icon={<PanelRight className="h-4 w-4" />}
+            value={approvalUxLabel}
+            onClick={() =>
+              updateSettings({
+                approvalUx: settings.approvalUx === 'sidePanel' ? 'popup' : 'sidePanel',
+              })
+            }
+          />
+          <SettingItem
             label={t('settings.security.changePassword.label')}
             description={t('settings.security.changePassword.description')}
             icon={<Lock className="h-4 w-4" />}
@@ -197,8 +208,6 @@ export function SettingsScreen() {
             onClick={() => setView('security')}
           />
           <SettingItem
-            label={t('settings.connectedSites.title')}
-            description={t('settings.connectedSites.description')}
             icon={<Globe className="h-4 w-4" />}
             onClick={() => setView('connected-sites')}
           />

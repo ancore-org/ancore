@@ -13,7 +13,6 @@ vi.mock('@ancore/core-sdk', () => ({
     async unlock() {}
     lock() {}
   },
-  ChromeStorageAdapter: class {},
   createStorageAdapter: () => ({}),
 }));
 

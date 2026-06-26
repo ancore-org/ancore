@@ -15,7 +15,7 @@ import {
   isExternalResponse,
 } from '@ancore/wallet-shared';
 
-const DEFAULT_TIMEOUT_MS = 60_000;
+const DEFAULT_TIMEOUT_MS = 30_000;
 
 function randomRequestId(): string {
   if (typeof crypto !== 'undefined' && crypto.randomUUID) {

@@ -19,6 +19,9 @@ describe('RelayService health check with signature service', () => {
 
     mockSubmitter = {
       submitSignedTransaction: jest.fn(),
+      simulateAndAssembleTransaction: jest
+        .fn()
+        .mockResolvedValue({ assembledXdr: 'xdr', gasUsed: 0 }),
       isHealthy: jest.fn().mockResolvedValue({ healthy: true, latencyMs: 50 }),
     };
   });
@@ -99,7 +102,7 @@ describe('RelayService health check with signature service', () => {
 
       expect(health.status).toBe('ok');
       expect(health.dependencies?.signatureService).toBeDefined();
-      expect(health.dependencies?.signatureService.status).toBe('ok');
+      expect(health.dependencies?.signatureService?.status).toBe('ok');
     });
 
     it('returns degraded when signature service is unhealthy', () => {

@@ -22,8 +22,6 @@ test.describe('Onboarding flow', () => {
     await expect(page.getByText('Create a wallet')).toBeVisible();
   });
 
-
-
   test('onboarded wallet skips welcome and goes to unlock', async ({ page, seedWallet }) => {
     await seedWallet('onboarded-locked');
     await page.reload();
@@ -63,9 +61,9 @@ test.describe('Onboarding flow', () => {
     expect(words).toHaveLength(12);
 
     await page.getByRole('button', { name: /i.*saved|continue/i }).click();
-    
+
     await onboarding.confirmMnemonicChallenge(words);
-    
+
     await page.getByRole('button', { name: /verify|continue/i }).click();
 
     await onboarding.enterPassword(TEST_PASSWORD);
@@ -103,7 +101,7 @@ test.describe('Onboarding flow', () => {
 
     await onboarding.selectCreateWallet();
     await page.getByRole('button', { name: /i.*saved|continue/i }).click();
-    
+
     await onboarding.failMnemonicChallenge();
 
     await page.getByRole('button', { name: /verify|continue/i }).click();

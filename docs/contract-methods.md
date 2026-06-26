@@ -131,7 +131,54 @@ Return the current contract version.
 pub fn get_version(env: Env) -> u32
 ```
 
-**Returns** `u32` (0 if version key is absent)
+**Returns** `u32` — current version integer. Returns `0` if the version key is absent
+(contract deployed but not yet initialized).
+
+**Errors** none
+
+**Lifecycle**
+
+| State | Value |
+|-------|-------|
+| Deployed, not initialized | `0` |
+| After `initialize()` | `1` |
+| After each `upgrade()` | previous + 1 |
+| After `migrate(n)` | `n` (must be strictly > previous) |
+
+**SDK usage**
+
+```typescript
+import { getVersion } from '@ancore/account-abstraction';
+
+const version = await getVersion(contractId, { server, sourceAccount });
+// version === 1 after initialize, 2 after first upgrade, etc.
+```
+
+Or via `AccountContract`:
+
+```typescript
+import { AccountContract } from '@ancore/account-abstraction';
+
+const contract = new AccountContract(contractId);
+const version = await contract.getVersion({ server, sourceAccount });
+```
+
+**Compatibility matrix**
+
+Use the version to gate client-side feature flags before attempting calls that
+only exist in newer contract versions.
+
+| Contract version | Supported features |
+|------------------|--------------------|
+| `0` | Not initialized — all calls will fail with `NotInitialized (2)` |
+| `1` | Baseline: `initialize`, `execute`, `add_session_key`, `revoke_session_key`, `get_owner`, `get_nonce`, `get_version`, `get_session_key` |
+| `≥ 2` | Same as v1 plus any additions introduced by `upgrade()` / `migrate()` |
+
+> **Caching policy:** `get_version` is a read-only simulation — cache the result
+> for the duration of a session or until an `upgrade`/`migrated` event is observed.
+> Re-fetch after any transaction that calls `upgrade()` or `migrate()`.
+
+See also: [`upgrade`](#upgrade), [`migrate`](#migrate)
 
 ---
 

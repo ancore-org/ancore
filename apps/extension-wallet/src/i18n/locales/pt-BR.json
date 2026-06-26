@@ -1,0 +1,136 @@
+{
+  "common": {
+    "cancel": "Cancelar",
+    "confirm": "Confirmar",
+    "continue": "Continuar",
+    "back": "Voltar",
+    "close": "Fechar",
+    "copy": "Copiar",
+    "copied": "Copiado!",
+    "loading": "Carregando…",
+    "error": "Erro",
+    "save": "Salvar",
+    "done": "Concluído",
+    "next": "Próximo",
+    "skip": "Pular"
+  },
+  "onboarding": {
+    "welcome": {
+      "title": "Bem-vindo ao Ancore",
+      "beforeYouStart": "Antes de começar",
+      "getStarted": "Começar"
+    },
+    "password": {
+      "title": "Crie Sua Senha",
+      "passwordLabel": "Senha",
+      "passwordPlaceholder": "Digite sua senha",
+      "confirmLabel": "Confirmar Senha",
+      "confirmPlaceholder": "Confirme sua senha",
+      "strengthLabel": "Força",
+      "mismatch": "As senhas não coincidem",
+      "match": "As senhas coincidem",
+      "noRecovery": "Não é possível recuperar sua senha",
+      "minLength": "Mín. 8 caracteres"
+    },
+    "mnemonic": {
+      "title": "Sua Frase de Recuperação",
+      "warning": "Anote estas palavras na ordem exata e guarde em local seguro.",
+      "copied": "Frase copiada"
+    },
+    "verifyMnemonic": {
+      "title": "Verificar Frase de Recuperação",
+      "instruction": "Selecione as palavras na ordem correta para verificar sua frase de recuperação."
+    },
+    "success": {
+      "title": "Carteira Pronta!",
+      "description": "Sua carteira Ancore está configurada. Comece a explorar a Stellar."
+    }
+  },
+  "unlock": {
+    "title": "Carteira Bloqueada",
+    "subtitle": "Digite sua senha para desbloquear",
+    "passwordPlaceholder": "Senha",
+    "unlockButton": "Desbloquear"
+  },
+  "home": {
+    "balance": "Saldo",
+    "send": "Enviar",
+    "receive": "Receber",
+    "history": "Histórico",
+    "noTransactions": "Nenhuma transação ainda"
+  },
+  "send": {
+    "title": "Enviar",
+    "recipientLabel": "Destinatário",
+    "recipientPlaceholder": "G…",
+    "amountLabel": "Valor",
+    "amountPlaceholder": "0,00",
+    "memoLabel": "Memo (opcional)",
+    "review": "Revisar",
+    "confirm": "Confirmar e Enviar",
+    "success": "Transação Enviada",
+    "failed": "Transação Falhou",
+    "transactionHash": "Hash da Transação"
+  },
+  "receive": {
+    "title": "Receber",
+    "yourAddress": "Seu Endereço",
+    "scanQr": "Escaneie o QR code para enviar fundos para este endereço",
+    "copyAddress": "Copiar Endereço"
+  },
+  "settings": {
+    "title": "Configurações",
+    "subtitle": "Gerencie as preferências da sua carteira",
+    "walletName": "Minha Carteira Ancore",
+    "groups": {
+      "network": "Rede",
+      "display": "Exibição",
+      "security": "Segurança",
+      "about": "Sobre",
+      "notifications": "Notificações"
+    },
+    "network": {
+      "title": "Rede",
+      "switchToMainnet": "Mudar para Mainnet?",
+      "switchNetwork": "Mudar de Rede"
+    },
+    "display": {
+      "title": "Exibição",
+      "theme": "Tema",
+      "layoutDensity": "Densidade do layout"
+    },
+    "security": {
+      "title": "Segurança",
+      "exportRecoveryPhrase": "Exportar Frase de Recuperação",
+      "exportPrivateKey": "Exportar Chave Privada",
+      "sensitiveInformation": "Informação Sensível",
+      "currentPasswordPlaceholder": "Digite a senha atual",
+      "newPasswordPlaceholder": "Mín. 8 caracteres",
+      "repeatPasswordPlaceholder": "Repita a nova senha",
+      "passwordUpdated": "Senha Atualizada"
+    },
+    "about": {
+      "title": "Sobre",
+      "appName": "Ancore Wallet",
+      "description": "Abstração de conta para Stellar",
+      "license": "Apache-2.0 OR MIT",
+      "builtWith": "Desenvolvido com"
+    },
+    "language": {
+      "title": "Idioma",
+      "select": "Selecionar idioma"
+    }
+  },
+  "sessionKeys": {
+    "title": "Chaves de Sessão",
+    "noKeys": "Nenhuma chave de sessão ainda",
+    "addKey": "Adicionar Chave de Sessão",
+    "revoke": "Revogar"
+  },
+  "errors": {
+    "generic": "Algo deu errado. Por favor, tente novamente.",
+    "networkError": "Erro de rede. Verifique sua conexão.",
+    "invalidAddress": "Endereço Stellar inválido",
+    "insufficientFunds": "Fundos insuficientes"
+  }
+}
