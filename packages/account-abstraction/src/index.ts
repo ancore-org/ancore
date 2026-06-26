@@ -28,6 +28,8 @@ export {
 } from './errors';
 export { toCanonicalError as toCanonicalAccountError } from './errors';
 
+export { StrKeyValidationError } from './strkey-validation';
+
 export {
   addressToScVal,
   decodeAddSessionKeyArgs,
