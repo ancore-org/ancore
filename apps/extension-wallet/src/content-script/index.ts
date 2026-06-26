@@ -1,18 +1,22 @@
 /**
- * Content script — dApp ↔ extension bridge (stub).
+ * Content script — dApp ↔ extension bridge.
+ *
+ * Validates postMessage requests from the dApp page, filters by origin,
+ * routes typed methods to the background service worker, and forwards
+ * responses back to the page using the page's own requestId.
  *
  * Freighter reference:
  *   extension/src/contentScript/redirectMessagesToBackground.ts
- *
- * Forwards validated ANCORE_WALLET_REQUEST messages to the background worker.
- * Full approval flow + allowlist: docs/wallets/FREIGHTER_COMPARISON.md
  */
 
 import {
   ANCORE_WALLET_RESPONSE,
   CONTENT_SCRIPT_SOURCE,
+  ExternalApiMethod,
   isExternalRequest,
+  type ExternalApiMethodName,
 } from '@ancore/wallet-shared';
+import type { MessageType } from '@/messaging/types';
 
 const logPrefix = '[ancore/content-script]';
 
@@ -23,6 +27,29 @@ type ChromeRuntime = {
 };
 
 declare const chrome: ChromeRuntime;
+
+// ── Origin filter ─────────────────────────────────────────────────────────────
+
+const ALLOWED_PROTOCOLS = new Set(['https:', 'http:']);
+
+function isOriginPermitted(origin: string): boolean {
+  try {
+    return ALLOWED_PROTOCOLS.has(new URL(origin).protocol);
+  } catch {
+    return false;
+  }
+}
+
+// ── Method → typed message-type mapping ───────────────────────────────────────
+
+const METHOD_TO_MESSAGE_TYPE: Partial<Record<ExternalApiMethodName, MessageType>> = {
+  [ExternalApiMethod.REQUEST_ACCESS]: 'EXTERNAL_REQUEST_ACCESS',
+  [ExternalApiMethod.GET_ADDRESS]: 'EXTERNAL_GET_PUBLIC_KEY',
+  [ExternalApiMethod.GET_SMART_ACCOUNT]: 'EXTERNAL_GET_PUBLIC_KEY',
+  [ExternalApiMethod.SIGN_TRANSACTION]: 'EXTERNAL_SIGN_TRANSACTION',
+};
+
+// ── Response helpers ──────────────────────────────────────────────────────────
 
 function respond(requestId: string, ok: boolean, result?: unknown, error?: string): void {
   window.postMessage(
@@ -38,25 +65,44 @@ function respond(requestId: string, ok: boolean, result?: unknown, error?: strin
   );
 }
 
+// ── Message listener ──────────────────────────────────────────────────────────
+
 window.addEventListener('message', (event) => {
-  // Only accept messages from the same page (not iframes / other origins).
+  // Only accept messages from the same window (not iframes or other origins).
   if (event.source !== window) return;
   if (!isExternalRequest(event.data)) return;
 
   const { requestId, method, params } = event.data;
+  const origin = window.location.origin;
 
-  if (import.meta.env.DEV) {
-    console.debug(`${logPrefix} ← ${method}`, { requestId, params });
+  // Block requests from non-http(s) origins (file://, extensions, etc.).
+  if (!isOriginPermitted(origin)) {
+    respond(requestId, false, undefined, `Origin not permitted: ${origin}`);
+    return;
   }
 
-  // Forward to background — external handler registry not wired yet.
+  // Map the method to a typed background message type; reject unknown methods.
+  const messageType = METHOD_TO_MESSAGE_TYPE[method];
+  if (!messageType) {
+    respond(requestId, false, undefined, `Unknown method: ${method}`);
+    return;
+  }
+
+  if (import.meta.env.DEV) {
+    console.debug(`${logPrefix} ← ${method} (${messageType})`, { requestId, params });
+  }
+
+  // Generate an internal correlation ID so the background response can be
+  // matched back to this page request even if multiple requests are in flight.
+  const correlationId = crypto.randomUUID();
+
   chrome.runtime
     .sendMessage({
       type: 'EXTERNAL_API_REQUEST',
-      requestId,
+      requestId: correlationId,
       method,
       params: params ?? {},
-      origin: window.location.origin,
+      origin,
     })
     .then((backgroundResult: unknown) => {
       const payload = backgroundResult as { ok?: boolean; result?: unknown; error?: string };
@@ -64,12 +110,7 @@ window.addEventListener('message', (event) => {
         respond(requestId, payload.ok, payload.result, payload.error);
         return;
       }
-      respond(
-        requestId,
-        false,
-        undefined,
-        'External API not implemented. Track progress: github.com/ancore-org/ancore/issues'
-      );
+      respond(requestId, false, undefined, 'Unexpected response from background');
     })
     .catch((err: unknown) => {
       const message = err instanceof Error ? err.message : String(err);

@@ -7,6 +7,8 @@ import {
   xdr,
 } from '@stellar/stellar-sdk';
 
+import { publicKeyToBytes32ScVal } from './xdr-utils';
+
 type SorobanData = xdr.SorobanTransactionData;
 
 export type TransactionBuilderOptions = {
@@ -25,13 +27,24 @@ export interface ContractExecuteParams {
 type BuilderOp =
   | {
       type: 'sessionKey';
-      op: 'add' | 'revoke';
+      op: 'add' | 'revoke' | 'refreshTtl';
       sessionKey: string;
       permissions: number[];
       expiresAt: number;
+      ttlSeconds?: number;
     }
   | ({ type: 'contractExecute' } & ContractExecuteParams)
   | { type: 'custom'; operation: xdr.Operation };
+
+export interface RefreshSessionKeyTtlParams {
+  /** Session key public key (64-char hex string or G… address). */
+  publicKey: string;
+  /**
+   * Expected remaining logical lifetime in seconds. Used for client-side validation
+   * before building the contract invocation; the on-chain call only takes public_key.
+   */
+  ttlSeconds: number;
+}
 
 export interface SimulationResult {
   fee: string;
@@ -82,6 +95,27 @@ export class TransactionBuilder {
       sessionKey: publicKey,
       permissions,
       expiresAt,
+    });
+    return this;
+  }
+
+  /**
+   * Refresh the Soroban storage TTL for an existing session key.
+   * Does not change the key's logical `expires_at`; see `isSessionKeyActive` in core-sdk
+   * to verify the key is still active before refreshing.
+   *
+   * @param params.publicKey - Session key public key
+   * @param params.ttlSeconds - Minimum remaining logical lifetime (seconds) the key must have
+   */
+  refreshSessionKeyTtl(params: RefreshSessionKeyTtlParams): this {
+    this.assertRefreshSessionKeyTtlParams(params);
+    this.ops.push({
+      type: 'sessionKey',
+      op: 'refreshTtl',
+      sessionKey: params.publicKey,
+      permissions: [],
+      expiresAt: 0,
+      ttlSeconds: params.ttlSeconds,
     });
     return this;
   }
@@ -204,7 +238,29 @@ export class TransactionBuilder {
       );
     }
 
+    if (op.op === 'refreshTtl') {
+      return contract.call('refresh_session_key_ttl', publicKeyToBytes32ScVal(op.sessionKey));
+    }
+
     return contract.call('revoke_session_key', nativeToScVal(op.sessionKey));
+  }
+
+  private assertRefreshSessionKeyTtlParams(params: RefreshSessionKeyTtlParams): void {
+    if (!params || typeof params !== 'object') {
+      throw new TypeError('refreshSessionKeyTtl requires a parameter object.');
+    }
+
+    if (!params.publicKey || typeof params.publicKey !== 'string') {
+      throw new TypeError('refreshSessionKeyTtl requires a non-empty publicKey string.');
+    }
+
+    if (typeof params.ttlSeconds !== 'number' || !Number.isFinite(params.ttlSeconds)) {
+      throw new TypeError('refreshSessionKeyTtl requires ttlSeconds to be a finite number.');
+    }
+
+    if (params.ttlSeconds <= 0) {
+      throw new TypeError('refreshSessionKeyTtl requires ttlSeconds to be greater than zero.');
+    }
   }
 
   private assertSessionKeyParams(

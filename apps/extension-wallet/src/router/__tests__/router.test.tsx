@@ -122,7 +122,7 @@ describe('extension router', () => {
       isUnlocked: true,
     });
 
-    expect(screen.getByRole('heading', { name: /session keys/i })).toBeInTheDocument();
+    expect(screen.getByRole('heading', { level: 1, name: 'Session Keys' })).toBeInTheDocument();
 
     await user.click(screen.getByRole('button', { name: /go back/i }));
 

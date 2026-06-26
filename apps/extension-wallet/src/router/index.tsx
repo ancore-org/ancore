@@ -28,7 +28,9 @@ import { ReceiveScreen as ReceiveScreenComponent } from '../screens/ReceiveScree
 import { SettingsScreen } from '../screens/Settings/SettingsScreen';
 import { SendScreen as SendFlowScreen } from '../screens/Send/SendScreen';
 import { ScheduledTransfersScreen } from '../screens/ScheduledTransfers/ScheduledTransfersScreen';
+import { SessionKeysScreen } from '../screens/SessionKeys/SessionKeysScreen';
 import { useDashboardSettingsStore } from '../state/dashboard-settings';
+import { useTelemetrySettingsSync } from '../hooks/useTelemetrySettingsSync';
 import { EmptyTransactions } from '../components/EmptyTransactions';
 import { ErrorBoundary } from '../components/ErrorBoundary/ErrorBoundary';
 import { useAccountStore } from '../stores/account';
@@ -194,42 +196,6 @@ function SecondaryLink({ to, children }: { to: string; children: React.ReactNode
   );
 }
 
-// Demo CreateAccountScreen preserved only for local development with VITE_DEMO_ROUTER=true
-function DemoCreateAccountScreen() {
-  const navigate = useNavigate();
-  const { completeOnboarding } = useExtensionAuth();
-  const [walletName, setWalletName] = React.useState('My Ancore Wallet');
-
-  function handleCreate(event: React.FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-    completeOnboarding(walletName);
-    navigate('/home', { replace: true });
-  }
-
-  return (
-    <PageScaffold
-      backTo="/welcome"
-      eyebrow="Demo only"
-      title="Create account (demo)"
-      description="This demo path is only available in development with VITE_DEMO_ROUTER=true."
-    >
-      <Card title="Wallet profile" description="Pick a name for the local demo wallet session.">
-        <form className="space-y-4" onSubmit={handleCreate}>
-          <label className="block text-sm font-medium text-foreground">
-            Wallet name
-            <input
-              className="mt-2 w-full rounded-xl border border-border bg-background px-3 py-3 text-sm outline-none ring-0 transition focus:border-primary"
-              onChange={(event) => setWalletName(event.target.value)}
-              placeholder="My Ancore Wallet"
-              value={walletName}
-            />
-          </label>
-          <PrimaryButton type="submit">Create wallet (demo)</PrimaryButton>
-        </form>
-      </Card>
-    </PageScaffold>
-  );
-}
 
 function UnlockScreen() {
   const navigate = useNavigate();
@@ -278,19 +244,11 @@ function UnlockScreen() {
             >
               {unlockError}
             </p>
-          ) : null}
           <PrimaryButton disabled={isSubmitting || !password.trim()} type="submit">
             {isSubmitting ? 'Unlocking…' : 'Unlock'}
           </PrimaryButton>
         </form>
       </Card>
-      <button
-        className="w-full text-center text-sm font-medium text-muted-foreground transition hover:text-foreground"
-        onClick={resetWallet}
-        type="button"
-      >
-        Reset demo wallet
-      </button>
     </PageScaffold>
   );
 }
@@ -760,37 +718,6 @@ function HistoryScreen() {
   );
 }
 
-function SessionKeysScreen() {
-  return (
-    <PageScaffold
-      backTo="/settings"
-      eyebrow="Security"
-      title="Session Keys"
-      description="Manage temporary signing permissions without leaving the extension flow."
-    >
-      <Card
-        title="Active keys"
-        description="Session keys can be rotated or revoked without affecting the primary wallet."
-      >
-        <div className="space-y-3">
-          <div className="rounded-xl border border-border px-4 py-3">
-            <p className="text-sm font-medium text-foreground">Trading bot</p>
-            <p className="mt-1 text-xs text-muted-foreground">Valid for 12 more hours</p>
-          </div>
-          <div className="rounded-xl border border-border px-4 py-3">
-            <p className="text-sm font-medium text-foreground">Automation script</p>
-            <p className="mt-1 text-xs text-muted-foreground">Read-only access, expires tomorrow</p>
-          </div>
-        </div>
-      </Card>
-      <PrimaryButton>
-        <PlusCircle className="mr-2 h-4 w-4" />
-        Add session key
-      </PrimaryButton>
-    </PageScaffold>
-  );
-}
-
 function NotFoundScreen() {
   const { authState } = useExtensionAuth();
   const fallbackPath = !authState.hasOnboarded
@@ -813,11 +740,17 @@ function NotFoundScreen() {
   );
 }
 
+function TelemetrySettingsSync() {
+  useTelemetrySettingsSync();
+  return null;
+}
+
 export function ExtensionRouterContent() {
   const navigate = useNavigate();
 
   return (
     <PopupFrame>
+      <TelemetrySettingsSync />
       <TitleSync />
       <ErrorBoundary
         onGoHome={() => navigate('/home', { replace: true })}
@@ -835,17 +768,7 @@ export function ExtensionRouterContent() {
             }
             path="/onboarding/*"
           />
-          {/* Demo create-account path — dev only */}
-          {import.meta.env.DEV && (
-            <Route
-              element={
-                <PublicOnlyGuard mode="onboarding">
-                  <DemoCreateAccountScreen />
-                </PublicOnlyGuard>
-              }
-              path="/create-account"
-            />
-          )}
+
           {/* Smart-account deploy harness (#768) — dev only, excluded from prod build */}
           {import.meta.env.DEV && <Route element={<DeployTestScreen />} path="/deploy-test" />}
           <Route

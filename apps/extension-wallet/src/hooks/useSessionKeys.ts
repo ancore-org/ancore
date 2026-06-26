@@ -103,7 +103,6 @@ export function useSessionKeys(): UseSessionKeysReturn {
 
   const refreshSessionKey = useCallback(
     async (publicKey: string, newExpiresAt: number): Promise<void> => {
-      setIsLoading(true);
       setError(null);
 
       const snapshot = keys.find((k: SessionKey) => k.publicKey === publicKey);
@@ -120,8 +119,6 @@ export function useSessionKeys(): UseSessionKeysReturn {
         const msg = err instanceof Error ? err.message : 'Failed to refresh session key';
         setError(msg);
         throw err;
-      } finally {
-        setIsLoading(false);
       }
     },
     [keys, updateKey]

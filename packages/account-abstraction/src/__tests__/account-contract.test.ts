@@ -85,6 +85,14 @@ describe('AccountContract', () => {
     });
   });
 
+  describe('refreshSessionKeyTtl', () => {
+    it('returns method and single publicKey arg', () => {
+      const inv = contract.refreshSessionKeyTtl(OWNER_ADDRESS);
+      expect(inv.method).toBe('refresh_session_key_ttl');
+      expect(inv.args).toHaveLength(1);
+    });
+  });
+
   describe('getOwnerInvocation / getNonceInvocation', () => {
     it('getOwnerInvocation has no args', () => {
       const inv = contract.getOwnerInvocation();

@@ -24,6 +24,7 @@ const EXPECTED_EXPORTS = [
   'deriveKeypairFromMnemonic',
   'signTransaction',
   'verifySignature',
+  'timingSafeEqual',
   'constantTimeEqual',
 ] as const;
 

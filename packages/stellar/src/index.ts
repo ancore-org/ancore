@@ -22,6 +22,7 @@ export {
   StellarError,
   NetworkError,
   AccountNotFoundError,
+  SimulationFailedError,
   TransactionError,
   RetryExhaustedError,
 } from './errors';
@@ -44,3 +45,11 @@ export type { FeeStats, FeeStatsOptions } from './fee-stats';
 // Simulation
 export { parseSimulationResponse, simulateUnsignedTransaction } from './simulation';
 export type { ParsedSimulationResult, SorobanResourceLimits } from './simulation';
+
+// Horizon URL validation
+export { validateHorizonUrl, isValidHorizonUrl } from './horizon-url';
+export { HorizonUrlValidationError } from './horizon-url';
+
+// Account sequence fetch helper
+export { fetchAccountSequence, clearSequenceCache } from './account-sequence';
+export type { AccountSequenceResult, FetchAccountSequenceOptions } from './account-sequence';

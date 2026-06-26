@@ -1,4 +1,5 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
+import { isMemoRequired } from '@/utils/memoCheck';
 import {
   AddressInput,
   Button,
@@ -53,6 +54,21 @@ export function SendScreen({ balance, assetDecimals, service, pollIntervalMs }: 
 
   const send = useSendTransaction({ balance, assetDecimals, service, pollIntervalMs });
   const { recipients, addRecipient } = useRecentRecipients();
+  const [memoWarning, setMemoWarning] = useState<string | null>(null);
+
+  const isMainnet = send.tx?.fee?.network === 'mainnet' || !send.tx;
+
+  useEffect(() => {
+    setMemoWarning(null);
+    if (!form.to || !isMainnet) return;
+    isMemoRequired(form.to).then((required) => {
+      if (required && !form.note) {
+        setMemoWarning(
+          'This address belongs to an exchange and requires a memo. Add a memo or funds may be lost.'
+        );
+      }
+    });
+  }, [form.to, form.note, isMainnet]);
 
   const balanceDisplay = balance !== undefined ? balance.toString() : undefined;
   const maxDisabled = balance === undefined || balance <= BASE_SEND_RESERVE + DEFAULT_SEND_FEE;
@@ -63,6 +79,7 @@ export function SendScreen({ balance, assetDecimals, service, pollIntervalMs }: 
   };
 
   const handleReview = async () => {
+    if (memoWarning) return;
     const success = await send.goToReview(form);
     if (success) {
       await addRecipient({ address: send.tx?.to ?? form.to });
@@ -171,6 +188,16 @@ export function SendScreen({ balance, assetDecimals, service, pollIntervalMs }: 
           />
         </div>
 
+        {memoWarning && (
+          <div className="p-4 rounded-2xl bg-amber-500/10 border border-amber-500/20 text-[10px] text-amber-400 animate-in fade-in slide-in-from-top-2 duration-300 flex items-start gap-3">
+            <AlertCircle className="w-4 h-4 shrink-0" />
+            <div className="space-y-1">
+              <strong className="block uppercase tracking-wider font-black">Memo Required</strong>
+              <p className="font-medium leading-relaxed">{memoWarning}</p>
+            </div>
+          </div>
+        )}
+
         {send.errors.simulation && (
           <div className="p-4 rounded-2xl bg-red-500/10 border border-red-500/20 text-[10px] text-red-400 mb-4 animate-in fade-in slide-in-from-top-2 duration-300 flex items-start gap-3">
             <AlertCircle className="w-4 h-4 shrink-0" />
@@ -193,7 +220,7 @@ export function SendScreen({ balance, assetDecimals, service, pollIntervalMs }: 
             )}
             onClick={handleReview}
             loading={send.submitting}
-            disabled={send.submitting}
+            disabled={send.submitting || !!memoWarning}
           >
             {send.submitting ? 'Calculating...' : 'Review Transaction'}
           </Button>

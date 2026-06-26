@@ -14,9 +14,10 @@ Transaction relay service for the Ancore account abstraction layer. Accepts sign
 
 ### Environment Variables
 
-| Variable | Required | Description                        |
-| -------- | -------- | ---------------------------------- |
-| `PORT`   | No       | HTTP listen port (default: `3000`) |
+| Variable              | Required | Description                                                          |
+| --------------------- | -------- | -------------------------------------------------------------------- |
+| `PORT`                | No       | HTTP listen port (default: `3000`)                                   |
+| `RELAYER_AUTH_SECRET` | No       | Bearer token secret required for protected `/relay` routes (JWT/API) |
 
 > **MVP note:** Authentication and signature verification use stub implementations. Replace `stubAuthService` and `stubSignatureService` in `src/server.ts` before production deployment.
 
@@ -125,7 +126,7 @@ Execute a signed relay transaction.
 {
   "success": true,
   "transactionId": "<64-char hex>",
-  "gasUsed": 21000
+  "gasUsed": 0
 }
 ```
 

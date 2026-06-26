@@ -119,7 +119,7 @@ paths:
                   value:
                     success: true
                     transactionId: "8a7b6c5d4e3f2a1b0c9d8e7f6a5b4c3d2e1f0a9b8c7d6e5f4a3b2c1d0e9f8a7b"
-                    gasUsed: 21000
+                    gasUsed: 150
         '400':
           description: Request validation failed
           content:
@@ -423,7 +423,7 @@ components:
           type: integer
           minimum: 0
           description: Gas consumed by the transaction
-          example: 21000
+          example: 150
 
     ValidationResult:
       type: object

@@ -13,6 +13,8 @@ export enum ExternalApiMethodName {
   REQUEST_ACCESS = 'requestAccess',
   GET_ADDRESS = 'getAddress',
   GET_SMART_ACCOUNT = 'getSmartAccount',
+  GET_PUBLIC_KEY = 'getPublicKey',
+  GET_NETWORK = 'getNetwork',
   SIGN_TRANSACTION = 'signTransaction',
   SIGN_AUTH_ENTRY = 'signAuthEntry',
   SIGN_MESSAGE = 'signMessage',
@@ -129,4 +131,20 @@ export interface SignAuthEntryResult {
  */
 export interface SignMessageResult {
   readonly signature: string;
+}
+
+/**
+ * Result from getPublicKey handler.
+ * Returns the deployed smart-account C-address as the wallet's public identity.
+ */
+export interface GetPublicKeyResult {
+  readonly publicKey: string;
+}
+
+/**
+ * Result from getNetwork handler.
+ */
+export interface GetNetworkResult {
+  readonly network: string;
+  readonly networkPassphrase: string;
 }

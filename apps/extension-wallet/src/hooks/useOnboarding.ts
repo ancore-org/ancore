@@ -8,6 +8,7 @@ import { createWallet, importWallet } from '@ancore/core-sdk';
 import type { Network } from '@ancore/types';
 import { useAccountStore } from '@/stores/account';
 import { createDeployClient, type DeployClient } from '@/services/deploy-account';
+import { getSharedStorageManager } from '@/security/storage-manager';
 
 /**
  * Onboarding step enum
@@ -286,6 +287,24 @@ export function useOnboarding(options: UseOnboardingOptions = {}) {
           alreadyDeployed,
           encryptedMnemonic: wallet.encryptedMnemonic,
         };
+
+        // #815 — Unlock the AES-GCM vault and persist the mnemonic so that
+        // downstream features (send, sign, session keys) have real key material.
+        // Best-effort: vault write failures (e.g. in test environments without
+        // chrome.storage) must not abort the deploy flow.
+        try {
+          const vault = getSharedStorageManager();
+          const vaultReady = await vault.unlock(state.password!);
+          if (vaultReady) {
+            await vault.saveAccount({
+              privateKey: state.mnemonic!, // plaintext; vault re-encrypts with AES-GCM
+              publicKey,
+              contractId,
+            });
+          }
+        } catch {
+          // Non-fatal: chrome.storage unavailable or vault already locked.
+        }
 
         // Persist contractId (smartAccountId) alongside the account in the
         // vault auth state store.

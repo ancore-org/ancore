@@ -504,6 +504,53 @@ export class StellarClient {
   }
 
   /**
+   * Simulate a Soroban transaction against the RPC server.
+   *
+   * When passed a `Transaction`, returns the raw Soroban RPC response (for
+   * assemble/submit flows). When passed unsigned XDR, returns a parsed
+   * wallet-friendly simulation result.
+   */
+  async simulateTransaction(
+    transaction: Transaction
+  ): Promise<StellarRpc.Api.SimulateTransactionResponse>;
+  async simulateTransaction(unsignedXdr: string): Promise<ParsedSimulationResult>;
+  async simulateTransaction(
+    transactionOrXdr: Transaction | string
+  ): Promise<StellarRpc.Api.SimulateTransactionResponse | ParsedSimulationResult> {
+    if (typeof transactionOrXdr === 'string') {
+      return simulateUnsignedTransaction(transactionOrXdr, this.networkPassphrase, (transaction) =>
+        this.executeRpcWithFailover((server) => server.simulateTransaction(transaction))
+      ).catch((error) => ({
+        fee: '0.0000000',
+        resourceLimits: { cpuInsn: 0, memBytes: 0 },
+        authEntries: [],
+        footprint: '',
+        error: error instanceof Error ? error.message : 'Simulation request failed',
+      }));
+    }
+
+    try {
+      return await withRetry(
+        async () =>
+          this.executeRpcWithFailover((rpcServer) =>
+            rpcServer.simulateTransaction(transactionOrXdr)
+          ),
+        {
+          ...this.retryOptions,
+          isRetryable: (error) => this.isRetryableRpcError(error),
+        }
+      );
+    } catch (error: unknown) {
+      if (error instanceof RetryExhaustedError && error.lastError) {
+        if (error.lastError instanceof NetworkError) {
+          throw error.lastError;
+        }
+      }
+      throw error;
+    }
+  }
+
+  /**
    * Submit a signed transaction to the network
    *
    * @param transaction - The signed transaction to submit
@@ -622,24 +669,6 @@ export class StellarClient {
       }
       throw error;
     }
-  }
-
-  /**
-   * Simulate an unsigned transaction against Soroban RPC.
-   *
-   * @param unsignedXdr - Unsigned transaction envelope XDR
-   * @returns Parsed fee, resource limits, auth entries, and footprint
-   */
-  async simulateTransaction(unsignedXdr: string): Promise<ParsedSimulationResult> {
-    return simulateUnsignedTransaction(unsignedXdr, this.networkPassphrase, (transaction) =>
-      this.executeRpcWithFailover((server) => server.simulateTransaction(transaction))
-    ).catch((error) => ({
-      fee: '0.0000000',
-      resourceLimits: { cpuInsn: 0, memBytes: 0 },
-      authEntries: [],
-      footprint: '',
-      error: error instanceof Error ? error.message : 'Simulation request failed',
-    }));
   }
 
   /**

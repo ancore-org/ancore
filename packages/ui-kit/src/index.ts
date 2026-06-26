@@ -51,6 +51,19 @@ export type { IdenticonProps } from './components/Identicon';
 export { MerchantBadge } from './components/MerchantBadge';
 export type { MerchantBadgeProps, MerchantBadgeStatus } from './components/MerchantBadge';
 
+export { ExpiryCountdown, useExpiryCountdown } from './components/ExpiryCountdown';
+export type { ExpiryCountdownProps } from './components/ExpiryCountdown';
+export {
+  COUNTDOWN_UPDATE_INTERVAL_MS,
+  EXPIRING_SOON_THRESHOLD_MS,
+  formatExpiryRemaining,
+  getExpiryStatus,
+  getExpiryThreshold,
+  getThresholdAnnouncement,
+  isRevokedExpiry,
+} from './components/ExpiryCountdown';
+export type { ExpiryStatus, ExpiryThreshold } from './components/ExpiryCountdown';
+
 // Form system
 export { Form, FormSubmit, FormError } from './components/Form/Form';
 export type { FormProps, FormSubmitProps, FormErrorProps } from './components/Form/Form';
