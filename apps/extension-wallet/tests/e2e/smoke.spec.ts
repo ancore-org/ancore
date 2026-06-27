@@ -7,12 +7,11 @@ test.describe('Extension release-candidate smoke @smoke', () => {
     freezeTime,
   }) => {
     await freezeTime('2026-01-15T10:00:00.000Z');
-    await page.goto('/', { waitUntil: 'domcontentloaded' });
     await clearWallet();
-    await page.reload({ waitUntil: 'domcontentloaded' });
+    await page.goto('/', { waitUntil: 'domcontentloaded' });
     await waitForAppReady(page);
 
-    await expect(page).toHaveURL(/\/onboarding/);
+    await page.waitForURL(/\/onboarding/, { timeout: 15_000 });
     await expect(page.getByRole('heading', { name: /Welcome to Ancore/i })).toBeVisible();
     await page.getByRole('button', { name: /Create New Wallet/i }).click();
     await expect(page.getByRole('button', { name: /I've Saved My Recovery Phrase/i })).toBeVisible({
@@ -23,31 +22,26 @@ test.describe('Extension release-candidate smoke @smoke', () => {
   test('onboarded unlocked wallet lands on home', async ({ page, seedWallet, freezeTime }) => {
     await freezeTime('2026-01-15T10:00:00.000Z');
     await seedWallet('onboarded-unlocked');
-    await page.goto('/home', { waitUntil: 'domcontentloaded' });
-    await waitForAppReady(page);
 
-    await expect(page).toHaveURL(/\/home/);
-    await expect(page.getByRole('heading', { name: 'Home' })).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'Home' })).toBeVisible({ timeout: 15_000 });
   });
 
   test('locked wallet unlocks and returns to home', async ({ page, seedWallet, freezeTime }) => {
     await freezeTime('2026-01-15T10:00:00.000Z');
     await seedWallet('onboarded-locked');
-    await page.goto('/', { waitUntil: 'domcontentloaded' });
-    await waitForAppReady(page);
 
-    await expect(page).toHaveURL(/\/unlock/);
+    await page.waitForURL(/\/unlock/, { timeout: 15_000 });
     await page.getByPlaceholder('Enter your password').fill('smoke-pass');
     await page.getByRole('button', { name: /Unlock/i }).click();
 
-    await expect(page).toHaveURL(/\/home/);
+    await page.waitForURL(/\/home/, { timeout: 15_000 });
     await expect(page.getByText('Available balance')).toBeVisible();
   });
 
   test('send and receive core screens are reachable', async ({ page, seedWallet, freezeTime }) => {
     await freezeTime('2026-01-15T10:00:00.000Z');
     await seedWallet('onboarded-unlocked');
-    await navigateTo(page, '/home');
+    await page.waitForURL(/\/home/, { timeout: 15_000 });
 
     await page.getByRole('link', { name: /Send funds/i }).click();
     await expect(page).toHaveURL(/\/send/);
@@ -81,9 +75,9 @@ test.describe('Extension release-candidate smoke @smoke', () => {
   });
 
   test('settings screen renders i18n copy without layout regression @smoke', async ({
-    page,
     seedWallet,
     freezeTime,
+    page,
   }) => {
     await freezeTime('2026-01-15T10:00:00.000Z');
     await seedWallet('onboarded-unlocked');

@@ -41,21 +41,38 @@ export interface ExtensionFixtures {
 }
 
 export const test = base.extend<ExtensionFixtures>({
+  page: async ({ page }, use) => {
+    // Vite dev-server runs as a normal page; a partial `chrome` global can hang vault init.
+    await page.addInitScript(() => {
+      if ('chrome' in window) {
+        try {
+          delete (window as Window & { chrome?: unknown }).chrome;
+        } catch {
+          // ignore non-configurable globals
+        }
+      }
+    });
+    await use(page);
+  },
+
   seedWallet: async ({ page }, use) => {
     await use(async (state: WalletState) => {
-      await page.goto('/', { waitUntil: 'domcontentloaded' });
-      await page.evaluate(
+      await page.addInitScript(
         ([key, value]) => {
           localStorage.setItem(key, JSON.stringify(value));
         },
         [AUTH_KEY, AUTH_PRESETS[state]] as [string, object]
       );
+      await page.goto('/', { waitUntil: 'domcontentloaded' });
+      await waitForAppReady(page);
     });
   },
 
   clearWallet: async ({ page }, use) => {
     await use(async () => {
-      await page.evaluate((key) => localStorage.removeItem(key), AUTH_KEY);
+      await page.addInitScript((key) => {
+        localStorage.removeItem(key);
+      }, AUTH_KEY);
     });
   },
 
