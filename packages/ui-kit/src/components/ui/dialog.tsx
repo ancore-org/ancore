@@ -61,8 +61,8 @@ export const Dialog: React.FC<DialogProps> = ({
       onCancel={handleCancel}
       onClick={handleBackdropClick}
       className={cn(
-        "backdrop:bg-foreground/50 bg-transparent p-0 m-auto overflow-visible",
-        "open:animate-in open:fade-in-0 backdrop:animate-in backdrop:fade-in-0"
+        'backdrop:bg-foreground/50 bg-transparent p-0 m-auto overflow-visible',
+        'open:animate-in open:fade-in-0 backdrop:animate-in backdrop:fade-in-0'
       )}
     >
       {children}
@@ -76,10 +76,7 @@ export const DialogContent: React.FC<{
 }> = ({ children, className }) => {
   return (
     <div
-      className={cn(
-        'rounded bg-popover p-4 text-popover-foreground shadow-lg relative',
-        className
-      )}
+      className={cn('rounded bg-popover p-4 text-popover-foreground shadow-lg relative', className)}
     >
       {children}
     </div>
