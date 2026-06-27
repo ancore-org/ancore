@@ -41,20 +41,6 @@ export interface ExtensionFixtures {
 }
 
 export const test = base.extend<ExtensionFixtures>({
-  page: async ({ page }, use) => {
-    // Vite dev-server runs as a normal page; a partial `chrome` global can hang vault init.
-    await page.addInitScript(() => {
-      if ('chrome' in window) {
-        try {
-          delete (window as Window & { chrome?: unknown }).chrome;
-        } catch {
-          // ignore non-configurable globals
-        }
-      }
-    });
-    await use(page);
-  },
-
   seedWallet: async ({ page }, use) => {
     await use(async (state: WalletState) => {
       await page.addInitScript(

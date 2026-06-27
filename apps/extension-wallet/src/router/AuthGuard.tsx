@@ -57,6 +57,16 @@ function writeAuthState(authState: AuthState): void {
   window.localStorage.setItem(AUTH_STORAGE_KEY, JSON.stringify(authState));
 }
 
+function hasExtensionStorage(): boolean {
+  if (typeof chrome !== 'undefined' && chrome.storage?.local) {
+    return true;
+  }
+  if (typeof browser !== 'undefined' && browser.storage?.local) {
+    return true;
+  }
+  return false;
+}
+
 export function ExtensionAuthProvider({
   children,
   unlockVerifier,
@@ -74,6 +84,11 @@ export function ExtensionAuthProvider({
 
   React.useEffect(() => {
     async function initVault() {
+      if (!hasExtensionStorage()) {
+        setIsInitializing(false);
+        return;
+      }
+
       try {
         const { getSharedStorageManager } = await import('../security/storage-manager');
         const storageManager = getSharedStorageManager();
