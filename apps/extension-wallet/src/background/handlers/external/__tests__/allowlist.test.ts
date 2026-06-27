@@ -9,6 +9,7 @@ import {
   getAllowedOrigins,
   clearAllowlist,
 } from '../allowlist';
+import { useAllowlistStore } from '../../../../stores/allowlist';
 
 // Mock chrome storage
 const mockStorage = new Map<string, unknown>();
@@ -30,8 +31,10 @@ const mockStorage = new Map<string, unknown>();
 };
 
 describe('allowlist service', () => {
-  beforeEach(() => {
+  beforeEach(async () => {
     mockStorage.clear();
+    useAllowlistStore.setState({ approvedSites: {} });
+    await clearAllowlist();
   });
 
   describe('isAllowed', () => {
