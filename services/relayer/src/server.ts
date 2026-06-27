@@ -16,7 +16,9 @@ import { createExecuteRelayHandler } from './handlers/executeRelay';
 import { createValidateRelayHandler } from './handlers/validateRelay';
 import { createHealthHandler } from './routes/health';
 import { IdempotencyStore } from './store/idempotency';
-import { NonceStore } from './store/nonceStore';
+import { NonceStore, MemoryNonceStore } from './store/nonceStore';
+import { PgNonceStore } from './store/pgNonceStore';
+import { Pool } from 'pg';
 import { JobQueue } from './queue/JobQueue';
 import { createBearerAuthService } from './services/bearerAuthService';
 import type {
@@ -87,8 +89,13 @@ export function createApp(
   idempotencyStore: IdempotencyStore = new IdempotencyStore(),
   transactionSubmitter?: TransactionSubmitterContract,
   relayOptions?: RelayServiceOptions,
-  nonceStore: NonceStore = new NonceStore()
+  nonceStore?: NonceStore
 ): Express {
+  const actualNonceStore =
+    nonceStore ??
+    (process.env.DATABASE_URL
+      ? new PgNonceStore(new Pool({ connectionString: process.env.DATABASE_URL }))
+      : new MemoryNonceStore());
   const authSecret = process.env.RELAYER_AUTH_SECRET;
   const resolvedAuthService =
     authService ?? (authSecret ? createBearerAuthService(authSecret) : stubAuthService);
@@ -155,7 +162,7 @@ export function createApp(
       useMockSubmission,
       ...relayOptions,
     },
-    nonceStore
+    actualNonceStore
   );
   const auth = createAuthMiddleware(resolvedAuthService);
   const validate = validateBody(relayRequestSchema);
@@ -230,8 +237,24 @@ export function createApp(
 
 if (require.main === module) {
   const PORT = process.env['PORT'] ?? 3000;
-  const app = createApp();
+  
+  let nonceStore;
+  if (process.env.DATABASE_URL) {
+    const pool = new Pool({ connectionString: process.env.DATABASE_URL });
+    nonceStore = new PgNonceStore(pool);
+  } else {
+    nonceStore = new MemoryNonceStore();
+  }
+
+  const app = createApp(undefined, undefined, undefined, undefined, undefined, nonceStore);
   app.listen(PORT, () => {
     console.log(`Relayer service listening on port ${PORT}`);
   });
+
+  // Daily cleanup of expired nonces
+  setInterval(() => {
+    nonceStore.clearExpired()?.catch((err: unknown) => {
+      console.error('Failed to clean up expired nonces', err);
+    });
+  }, 24 * 60 * 60 * 1000);
 }

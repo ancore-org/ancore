@@ -16,57 +16,9 @@ function decodeBase64Url(input: string): ArrayBuffer {
   return buffer;
 }
 
-export class WebAuthnBiometricService implements IBiometricAuthService {
-  private rpId: string;
-  private credentialId: string | null;
+import { NativeBiometricAdapter } from './NativeBiometricAdapter';
 
-  constructor(rpId: string, credentialId: string | null = null) {
-    this.rpId = rpId;
-    this.credentialId = credentialId;
-  }
-
-  async isAvailable(): Promise<boolean> {
-    if (!window.PublicKeyCredential) return false;
-    try {
-      return await PublicKeyCredential.isUserVerifyingPlatformAuthenticatorAvailable();
-    } catch {
-      return false;
-    }
-  }
-
-  async authenticate(_promptMessage: string): Promise<{
-    success: boolean;
-    errorCode?: BiometricFailureReason;
-  }> {
-    if (!this.credentialId) {
-      return { success: false, errorCode: 'BIOMETRIC_NOT_ENROLLED' };
-    }
-
-    try {
-      const challenge = crypto.getRandomValues(new Uint8Array(32));
-
-      await navigator.credentials.get({
-        publicKey: {
-          challenge,
-          rpId: this.rpId,
-          allowCredentials: [
-            {
-              id: decodeBase64Url(this.credentialId),
-              type: 'public-key',
-              transports: ['internal'],
-            },
-          ],
-          userVerification: 'required',
-          timeout: 60_000,
-        },
-      });
-
-      return { success: true };
-    } catch (err) {
-      return { success: false, errorCode: mapWebAuthnError(err) };
-    }
-  }
-}
+export const WebAuthnBiometricService = NativeBiometricAdapter;
 
 function mapWebAuthnError(err: unknown): BiometricFailureReason {
   if (!(err instanceof Error)) return 'UNKNOWN';

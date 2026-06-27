@@ -3,7 +3,13 @@
  * Prevents replay attacks by ensuring that nonces are only used once per session key.
  */
 
-export class NonceStore {
+export interface NonceStore {
+  assertFresh(key: string, nonce: number): void | Promise<void>;
+  track(key: string, nonce: number): void | Promise<void>;
+  clearExpired(): void | Promise<void>;
+}
+
+export class MemoryNonceStore implements NonceStore {
   // Store structure: sessionKey -> Map<nonce, expiresAt>
   private readonly seen = new Map<string, Map<number, number>>();
 
