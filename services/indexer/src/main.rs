@@ -12,10 +12,12 @@ mod api;
 mod error;
 mod metrics;
 mod repositories;
+mod schema;
 
 use ancore_indexer::ingest::CheckpointStore;
 
 use api::account_activity;
+use api::contract_events;
 use api::health;
 use api::metrics::{metrics_handler, prometheus_metrics_handler};
 use api::statements;
@@ -123,6 +125,19 @@ async fn main() -> anyhow::Result<()> {
         .route(
             "/api/v1/accounts/:account_id/statements/rows",
             get(statements::rows_handler),
+        )
+        // Contract events API
+        .route(
+            "/api/v1/contract-events",
+            get(contract_events::list_handler),
+        )
+        .route(
+            "/api/v1/contract-events/:event_id",
+            get(contract_events::get_by_id_handler),
+        )
+        .route(
+            "/api/v1/contract-events/types",
+            get(contract_events::list_types_handler),
         )
         .route("/health", get(health::health_handler))
         .route("/metrics", get(metrics_handler))

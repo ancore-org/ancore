@@ -208,9 +208,6 @@ export function SettingsScreen() {
             onClick={() => setView('security')}
           />
           <SettingItem
-            icon={<Globe className="h-4 w-4" />}
-            onClick={() => setView('connected-sites')}
-          />
           <SettingItem
             label={t('settings.security.exportPrivateKey.label')}
             description={t('settings.security.exportPrivateKey.description')}

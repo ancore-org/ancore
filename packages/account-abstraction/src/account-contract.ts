@@ -47,7 +47,6 @@ export interface AccountContractWriteResult {
   operation: ReturnType<AccountContract['buildInvokeOperation']>;
 }
 
-
 /**
  * AccountContract wraps the Ancore account abstraction contract (contracts/account).
  * Use it to build invoke operations or to run read-only calls via a Soroban RPC server.

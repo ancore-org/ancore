@@ -1,4 +1,13 @@
-import type { DraftIntent, RiskLevel, RiskScore } from './types';
+import type { RiskLevel, RiskScore } from './types';
+
+type ScoreablePayment = {
+  type: 'payment';
+  amount: string;
+  asset: string;
+  destination: string;
+};
+
+type ScoreableIntent = ScoreablePayment | { type: 'invoice' };
 
 const MEDIUM_THRESHOLD_USDC = 1000;
 const HIGH_THRESHOLD_USDC = 10_000;
@@ -10,8 +19,12 @@ interface RiskContext {
   knownRecipients?: Set<string>;
 }
 
-export function scoreRisk(intent: DraftIntent, ctx: RiskContext = {}): RiskScore {
+export function scoreRisk(intent: ScoreableIntent, ctx: RiskContext = {}): RiskScore {
   const reasons: string[] = [];
+
+  if (intent.type === 'invoice') {
+    return { level: 'low', reasons };
+  }
 
   if (intent.type === 'payment') {
     const amount = parseFloat(intent.amount);
