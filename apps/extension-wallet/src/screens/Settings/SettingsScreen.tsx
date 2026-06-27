@@ -1,4 +1,5 @@
-import * as React from 'react'
+import * as React from 'react';
+import {
   Globe,
   Lock,
   Timer,
@@ -8,20 +9,9 @@ import * as React from 'react'
   Bell,
   Monitor,
   Server,
-
-
-
-
+  Shield,
   PanelRight,
 } from 'lucide-react';
-
-import { Globe, Lock, Timer, Key, FileText, Info, Bell, Monitor, Server, Shield } from 'lucide-react';
-
-
-  Shield,
-} from 'lucide-react';
-
-
 import { useTranslation } from 'react-i18next';
 import { SettingsGroup, SettingItem } from '../../components/SettingsGroup';
 import { NetworkSettings } from './NetworkSettings';
