@@ -1,0 +1,74 @@
+[
+  {
+    "name": "ed25519-1-0b",
+    "curve": "ed25519",
+    "encoding": "utf8",
+    "payload": "",
+    "secret": "SCO76EADZZ2MMEJWHSOFFMTKF332ZG4F6FGZRX3XWMG5Y5PIFYSVZD42",
+    "publicKey": "GADMD4EBBSMMB4QHCSAZKXGUAM3ALRGIUIA356YHRFOOSFUU3VNQCC32",
+    "signature": "1b2bafe06574fc08bbb5911b808e6c03923ae768f3a2bbdd565e4a423ae7fbf9d6be64770c58d9a2630b4cb7ff335d4f0e2112a33119d635a9d04c5f368ff600"
+  },
+  {
+    "name": "ed25519-2-1b",
+    "curve": "ed25519",
+    "encoding": "utf8",
+    "payload": "a",
+    "secret": "SBYRY2Q2MC2VUWBCNNI6CWUCGY2TLTRUZT335UZH3TLO2K656NMTMK22",
+    "publicKey": "GAWFP2XFN5GCVEYM3ZDO77TZJ5TATYYXKHGVSGFPW2R434BZCWKLHE7F",
+    "signature": "07b41885ec5a756faeffc85f68544c6a073420566e7ff5fec4f637f99703ef4713df797818f57ead8d643eae8e118a6b193476799d512a1074a7d73e94d4d302"
+  },
+  {
+    "name": "ed25519-3-24b",
+    "curve": "ed25519",
+    "encoding": "utf8",
+    "payload": "Ancore intent: authorize",
+    "secret": "SCHWKWIZ5EXVNJPBM7GN2ERZY4MSXVOSGH2Y2RIAK7WYAZRQLSS7MQXB",
+    "publicKey": "GC4XYAWVPF7ADGVH5PYIPFNSP6GMCBJAGBIJLSKTLJN26LN63IEBK5JL",
+    "signature": "9a272d5f09e51f29a72c3dc9afa4822d62ffc26b7d828453c8511274816e9d848765d612b498093217b1ccf9b6cb8b25d175c988d2508dd5f0d61913abafea04"
+  },
+  {
+    "name": "ed25519-4-29b",
+    "curve": "ed25519",
+    "encoding": "utf8",
+    "payload": "transfer:10000000:XLM:testnet",
+    "secret": "SBGS52JWRH6CI2J4KFHKEKBOPG4BXPYWDD4PO26AJOVHPX67J6WZKBSN",
+    "publicKey": "GBMHJWKN6H4JYOWEQY6OHL4JKSXO6FRXZ6ODIPXMDJWP4FV6BDPKWEBL",
+    "signature": "e643d7172de190022d881f4e11523801096b68e236516b262d7da6abb08125f5519d81f0060d397d6038e08e31ab1b588e2ac64fdbf05f7d36faa23fb64fdb0e"
+  },
+  {
+    "name": "ed25519-5-31b",
+    "curve": "ed25519",
+    "encoding": "utf8",
+    "payload": "0000000000000000000000000000000",
+    "secret": "SDIMPWGG7GMNN5U2447R4PKBPTRPGC4ICGUX3U5MGVX7F6E5DAQF35CH",
+    "publicKey": "GBCN7X4MWT2WWM2KEVFP3TKNMDWMVLUJ6RK2YVAQUGNMOTGKENNDVFF3",
+    "signature": "a845c131ee466f6fd5362c025776d9a7d48a0bc2424d2b6bc7d51d16f451217163f1ffdc35b2ac8ef5f977d8340ffa54cf44ab90440f72560c127dab6c3ec10a"
+  },
+  {
+    "name": "ed25519-6-32b",
+    "curve": "ed25519",
+    "encoding": "utf8",
+    "payload": "11111111111111111111111111111111",
+    "secret": "SAO5U2GV7XSP5G2IJWTNQT2UBHYQUN3QAWSF5N6BXRVYOEIHHGJGUKVO",
+    "publicKey": "GCNZCRVBSTYCQ4KT3JHB2GCR7CKTGANGOIHCKJUUWNDYUE46FWKVPMF4",
+    "signature": "18a284c3db6ae59d5996598d7ad8ac9965a56b6a86276bb87ab6ef6ecfd8122166c7976a1adae86d32d03f00f8cf7d72501fc3c97c9f1f4780b4455f1e730304"
+  },
+  {
+    "name": "ed25519-7-64b",
+    "curve": "ed25519",
+    "encoding": "utf8",
+    "payload": "2222222222222222222222222222222222222222222222222222222222222222",
+    "secret": "SDX2UCBSXDBFEHS4SHSZ53TNQGELS4YQOYGUFPLLAGPOQV5P6J6UH5CR",
+    "publicKey": "GACO7BHC4WPJ44DOPBWIREKNMAG76VV5DGDHVDYCOWKCYIWTTBDPEXND",
+    "signature": "10b6e7767c0d7bc0c24e8a5a1e25f561669ce7d2ddae3963214a8751f563c8599ef698a18fb746ab41cf0317812328c9cd4dd759538dd6e56a3474b49568fb0f"
+  },
+  {
+    "name": "ed25519-8-257b",
+    "curve": "ed25519",
+    "encoding": "utf8",
+    "payload": "edge:xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+    "secret": "SACPVIKBUU5JSJFET7KVHPMTFOVTHNFU7CMU72DGOWWYXXS5D4FJF3CU",
+    "publicKey": "GCCAYX4BDBU5KYQVF4C6V3TXBKEP4BI36PIYIY7RMXOLNIQLRG4XGK3P",
+    "signature": "eea0f3260a9e12833b27df8a2a00e23a1a51c4776fd3ba3d461f271cedd0428323f279b3f0a2df4f2ebf2d16a1885dc0f740d598f1d014abbb659bd0e7ffff0e"
+  }
+]
