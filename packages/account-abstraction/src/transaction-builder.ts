@@ -8,6 +8,9 @@ import {
 } from '@stellar/stellar-sdk';
 
 import { publicKeyToBytes32ScVal } from './xdr-utils';
+import type { SimulationResult } from './types/simulation';
+
+export type { SimulationResult };
 
 type SorobanData = xdr.SorobanTransactionData;
 
@@ -44,13 +47,6 @@ export interface RefreshSessionKeyTtlParams {
    * before building the contract invocation; the on-chain call only takes public_key.
    */
   ttlSeconds: number;
-}
-
-export interface SimulationResult {
-  fee: string;
-  operationCount: number;
-  minResourceFee?: string;
-  transactionData?: SorobanData;
 }
 
 export class TransactionBuilder {

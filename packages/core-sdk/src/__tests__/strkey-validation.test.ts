@@ -1,4 +1,8 @@
-import { assertValidEd25519PublicKey, assertValidContractId, StrKeyValidationError } from '../errors';
+import {
+  assertValidEd25519PublicKey,
+  assertValidContractId,
+  StrKeyValidationError,
+} from '../errors';
 
 describe('StrKey validation helpers', () => {
   test('assertValidEd25519PublicKey throws StrKeyValidationError for invalid G key', () => {
@@ -7,7 +11,7 @@ describe('StrKey validation helpers', () => {
       assertValidEd25519PublicKey('GINVALID');
     } catch (err) {
       expect(err).toHaveProperty('code', 'INVALID_G_KEY');
-      expect(err).toMatchSnapshot();
+      expect((err as Error).message).toContain('expected G... format');
     }
   });
 
@@ -17,7 +21,7 @@ describe('StrKey validation helpers', () => {
       assertValidContractId('CINVALID');
     } catch (err) {
       expect(err).toHaveProperty('code', 'INVALID_C_KEY');
-      expect(err).toMatchSnapshot();
+      expect((err as Error).message).toContain('expected C... format');
     }
   });
 });

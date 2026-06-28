@@ -8,11 +8,7 @@
 
 import { initialize } from '../initialize';
 import { AccountContract, type AccountContractReadOptions } from '../account-contract';
-import {
-  AlreadyInitializedError,
-  ContractInvocationError,
-  UnauthorizedError,
-} from '../errors';
+import { AlreadyInitializedError, ContractInvocationError, UnauthorizedError } from '../errors';
 
 jest.mock('../account-contract', () => {
   const mockInitialize = jest.fn();
@@ -186,7 +182,11 @@ describe('initialize', () => {
       __mocks.mockInitialize.mockReturnValue(invocation);
       __mocks.mockBuildInvokeOperation.mockReturnValue(operation);
 
-      const result = await initialize(CONTRACT_ID, { owner: OWNER }, {} as AccountContractReadOptions);
+      const result = await initialize(
+        CONTRACT_ID,
+        { owner: OWNER },
+        {} as AccountContractReadOptions
+      );
 
       expect(result).toMatchSnapshot();
     });

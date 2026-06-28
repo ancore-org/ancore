@@ -12,6 +12,7 @@ import {
   NotInitializedError,
   permissionsToScVal,
   publicKeyToBytes32ScVal,
+  StrKeyValidationError,
   scValToAddress,
   scValToOptionalSessionKey,
   scValToSessionKey,
@@ -218,7 +219,7 @@ describe('XDR encoding helpers', () => {
     });
 
     it('throws for invalid public key format', () => {
-      expect(() => publicKeyToBytes32ScVal('invalid')).toThrow(TypeError);
+      expect(() => publicKeyToBytes32ScVal('invalid')).toThrow(StrKeyValidationError);
     });
 
     it('throws for wrong byte length', () => {

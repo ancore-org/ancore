@@ -57,6 +57,16 @@ function writeAuthState(authState: AuthState): void {
   window.localStorage.setItem(AUTH_STORAGE_KEY, JSON.stringify(authState));
 }
 
+function hasExtensionStorage(): boolean {
+  if (typeof chrome !== 'undefined' && chrome.storage?.local) {
+    return true;
+  }
+  if (typeof browser !== 'undefined' && browser.storage?.local) {
+    return true;
+  }
+  return false;
+}
+
 export function ExtensionAuthProvider({
   children,
   unlockVerifier,
@@ -66,10 +76,42 @@ export function ExtensionAuthProvider({
 }) {
   const [authState, setAuthState] = React.useState<AuthState>(readAuthState);
   const [unlockError, setUnlockError] = React.useState<string | null>(null);
+  const [isInitializing, setIsInitializing] = React.useState(true);
 
   React.useEffect(() => {
     writeAuthState(authState);
   }, [authState]);
+
+  React.useEffect(() => {
+    async function initVault() {
+      if (!hasExtensionStorage()) {
+        setIsInitializing(false);
+        return;
+      }
+
+      try {
+        const { getSharedStorageManager } = await import('../security/storage-manager');
+        const storageManager = getSharedStorageManager();
+        const vaultExists = await storageManager.hasVault();
+
+        setAuthState((current) => {
+          const hasOnboarded = vaultExists ? true : current.hasOnboarded;
+          if (hasOnboarded === current.hasOnboarded) {
+            return current;
+          }
+          const next = { ...current, hasOnboarded };
+          writeAuthState(next);
+          return next;
+        });
+      } catch (err) {
+        console.error('Failed to check vault', err);
+      } finally {
+        setIsInitializing(false);
+      }
+    }
+
+    void initVault();
+  }, []);
 
   React.useEffect(() => {
     function handleStorage(event: StorageEvent) {
@@ -140,7 +182,20 @@ export function ExtensionAuthProvider({
     [authState, unlockError, unlockVerifier]
   );
 
-  return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
+  return (
+    <AuthContext.Provider value={value}>
+      {isInitializing ? (
+        <div
+          className="flex min-h-screen items-center justify-center bg-background"
+          data-testid="auth-initializing"
+        >
+          <div className="h-6 w-6 animate-spin rounded-full border-2 border-primary border-t-transparent" />
+        </div>
+      ) : (
+        children
+      )}
+    </AuthContext.Provider>
+  );
 }
 
 export function useExtensionAuth(): AuthContextValue {

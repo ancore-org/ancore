@@ -1,9 +1,11 @@
-import { test as base, chromium, type Page, type BrowserContext } from '@playwright/test';
+import { test as base, chromium, expect, type Page, type BrowserContext } from '@playwright/test';
 import path from 'path';
 
 const AUTH_KEY = 'ancore_extension_auth';
 
 export type WalletState = 'fresh' | 'onboarded-locked' | 'onboarded-unlocked';
+
+const TEST_SMART_ACCOUNT_ID = 'CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAD2KM';
 
 const AUTH_PRESETS = {
   fresh: {
@@ -17,12 +19,14 @@ const AUTH_PRESETS = {
     isUnlocked: false,
     walletName: 'Test Wallet',
     accountAddress: 'GCFX...WALLET',
+    smartAccountId: TEST_SMART_ACCOUNT_ID,
   },
   'onboarded-unlocked': {
     hasOnboarded: true,
     isUnlocked: true,
     walletName: 'Test Wallet',
     accountAddress: 'GCFX...WALLET',
+    smartAccountId: TEST_SMART_ACCOUNT_ID,
   },
 } as const;
 
@@ -39,19 +43,22 @@ export interface ExtensionFixtures {
 export const test = base.extend<ExtensionFixtures>({
   seedWallet: async ({ page }, use) => {
     await use(async (state: WalletState) => {
-      await page.goto('/', { waitUntil: 'domcontentloaded' });
-      await page.evaluate(
+      await page.addInitScript(
         ([key, value]) => {
           localStorage.setItem(key, JSON.stringify(value));
         },
         [AUTH_KEY, AUTH_PRESETS[state]] as [string, object]
       );
+      await page.goto('/', { waitUntil: 'domcontentloaded' });
+      await waitForAppReady(page);
     });
   },
 
   clearWallet: async ({ page }, use) => {
     await use(async () => {
-      await page.evaluate((key) => localStorage.removeItem(key), AUTH_KEY);
+      await page.addInitScript((key) => {
+        localStorage.removeItem(key);
+      }, AUTH_KEY);
     });
   },
 
@@ -115,6 +122,15 @@ export const test = base.extend<ExtensionFixtures>({
 
 export { expect } from '@playwright/test';
 
+/** Wait for AuthGuard vault init spinner to finish before asserting routes. */
+export async function waitForAppReady(page: Page): Promise<void> {
+  const spinner = page.getByTestId('auth-initializing');
+  if (await spinner.count()) {
+    await expect(spinner).toBeHidden({ timeout: 15_000 });
+  }
+}
+
 export async function navigateTo(page: Page, path: string): Promise<void> {
   await page.goto(path, { waitUntil: 'domcontentloaded' });
+  await waitForAppReady(page);
 }

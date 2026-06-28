@@ -8,12 +8,13 @@ beforeEach(() => {
 
 describe('useSettingsStore', () => {
   it('has correct defaults', () => {
-    const { network, theme, autoLockMinutes, requirePasswordForSensitiveActions } =
+    const { network, theme, autoLockMinutes, requirePasswordForSensitiveActions, telemetryOptIn } =
       useSettingsStore.getState();
     expect(network).toBe('testnet');
     expect(theme).toBe('dark');
     expect(autoLockMinutes).toBe(15);
     expect(requirePasswordForSensitiveActions).toBe(true);
+    expect(telemetryOptIn).toBe(false);
   });
 
   it('updates network', () => {
@@ -35,6 +36,11 @@ describe('useSettingsStore', () => {
   it('updates security toggle', () => {
     useSettingsStore.getState().setRequirePasswordForSensitiveActions(false);
     expect(useSettingsStore.getState().requirePasswordForSensitiveActions).toBe(false);
+  });
+
+  it('updates telemetry opt-in', () => {
+    useSettingsStore.getState().setTelemetryOptIn(true);
+    expect(useSettingsStore.getState().telemetryOptIn).toBe(true);
   });
 
   it('resets to defaults', () => {
@@ -65,5 +71,6 @@ describe('useSettingsStore', () => {
     expect(state.requirePasswordForSensitiveActions).toBe(
       DEFAULTS.requirePasswordForSensitiveActions
     );
+    expect(state.telemetryOptIn).toBe(DEFAULTS.telemetryOptIn);
   });
 });

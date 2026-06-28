@@ -13,8 +13,14 @@ function useRequestId(propsRequestId?: string): string | null {
 
 export function SignTransactionApprovalScreen({
   requestId: propRequestId,
+  title = 'Sign Transaction',
+  subtitle = 'Review and approve the transaction',
+  description = 'A dApp is requesting to sign a transaction. Approve only if you trust the source.',
 }: {
   requestId?: string;
+  title?: string;
+  subtitle?: string;
+  description?: string;
 }) {
   const requestId = useRequestId(propRequestId);
   const [done, setDone] = React.useState(false);
@@ -57,16 +63,14 @@ export function SignTransactionApprovalScreen({
   return (
     <div className="flex min-h-screen flex-col bg-background">
       <header className="bg-gradient-to-br from-primary to-purple-800 px-5 pb-6 pt-8 text-white">
-        <h1 className="text-2xl font-bold tracking-tight">Sign Transaction</h1>
-        <p className="mt-1 text-sm text-white/70">Review and approve the transaction</p>
+        <h1 className="text-2xl font-bold tracking-tight">{title}</h1>
+        <p className="mt-1 text-sm text-white/70">{subtitle}</p>
       </header>
       <main className="flex-1 space-y-4 p-4">
         <section className="rounded-2xl border border-border bg-card p-4 shadow-sm">
           <h2 className="text-sm font-semibold text-foreground">Request</h2>
           <p className="mt-2 text-sm text-muted-foreground">ID: {requestId}</p>
-          <p className="text-sm text-muted-foreground">
-            A dApp is requesting to sign a transaction. Approve only if you trust the source.
-          </p>
+          <p className="text-sm text-muted-foreground">{description}</p>
         </section>
         <div className="flex gap-3">
           <button

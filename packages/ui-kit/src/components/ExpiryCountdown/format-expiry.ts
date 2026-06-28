@@ -4,11 +4,7 @@ export const COUNTDOWN_UPDATE_INTERVAL_MS = 60 * 1000;
 
 export type ExpiryStatus = 'active' | 'expiring-soon' | 'expired' | 'revoked';
 
-export type ExpiryThreshold =
-  | 'less-than-one-day'
-  | 'expiring-soon'
-  | 'expired'
-  | 'revoked';
+export type ExpiryThreshold = 'less-than-one-day' | 'expiring-soon' | 'expired' | 'revoked';
 
 export function isRevokedExpiry(expiresAt: number): boolean {
   return expiresAt === 0;

@@ -31,6 +31,7 @@ export interface SettingsState {
   dailyTransferLimit: number;
   transferStepUpThreshold: number;
   enableLockShortcut: boolean;
+  telemetryOptIn: boolean;
 
   setNetwork: (network: NetworkMode) => void;
   setTheme: (theme: ThemePreference) => void;
@@ -80,9 +81,10 @@ export const DEFAULTS = {
   dailyTransferLimit: 1000,
   transferStepUpThreshold: 250,
   enableLockShortcut: true,
+  telemetryOptIn: false,
 };
 
-const STORE_VERSION = 3;
+const STORE_VERSION = 4;
 
 function applyTheme(theme: ThemePreference): void {
   if (typeof document === 'undefined') return;
@@ -124,6 +126,7 @@ export const useSettingsStore = create<SettingsState>()(
       setDailyTransferLimit: (dailyTransferLimit) => set({ dailyTransferLimit }),
       setTransferStepUpThreshold: (transferStepUpThreshold) => set({ transferStepUpThreshold }),
       setEnableLockShortcut: (enableLockShortcut) => set({ enableLockShortcut }),
+      setTelemetryOptIn: (telemetryOptIn) => set({ telemetryOptIn }),
       reset: () => set(DEFAULTS),
     }),
     {
@@ -139,6 +142,7 @@ export const useSettingsStore = create<SettingsState>()(
         dailyTransferLimit: state.dailyTransferLimit,
         transferStepUpThreshold: state.transferStepUpThreshold,
         enableLockShortcut: state.enableLockShortcut,
+        telemetryOptIn: state.telemetryOptIn,
       }),
       migrate: (persistedState) => persistedState as SettingsState,
       merge: (persistedState, currentState) => {
@@ -192,6 +196,10 @@ export const useSettingsStore = create<SettingsState>()(
             typeof persisted.enableLockShortcut === 'boolean'
               ? persisted.enableLockShortcut
               : DEFAULTS.enableLockShortcut,
+          telemetryOptIn:
+            typeof persisted.telemetryOptIn === 'boolean'
+              ? persisted.telemetryOptIn
+              : DEFAULTS.telemetryOptIn,
         };
       },
       onRehydrateStorage: () => (state) => {

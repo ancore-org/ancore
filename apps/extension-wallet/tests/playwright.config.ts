@@ -28,8 +28,10 @@ export default defineConfig({
   ],
 
   webServer: {
-    // ui-kit must be built before dev server starts; CI runs `pnpm build:deps` first
-    command: 'corepack pnpm --filter @ancore/ui-kit build && corepack pnpm dev',
+    // ui-kit and workspace dependencies must be built before dev server starts;
+    // CI runs `pnpm build:deps` first.
+    command:
+      'corepack pnpm --filter @ancore/ui-kit --filter @ancore/crypto --filter @ancore/stellar --filter @ancore/account-abstraction build && corepack pnpm dev',
     url: 'http://localhost:5173',
     reuseExistingServer: !process.env.CI,
     timeout: 120_000,

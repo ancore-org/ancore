@@ -6,6 +6,7 @@
 - Stellar key derivation uses the hardened path `m/44'/148'/{index}'`.
 - Secret material encryption uses PBKDF2-SHA256 with 100000 iterations and AES-256-GCM.
 - Signature helpers only support Stellar Ed25519 transaction envelopes and raw message verification.
+- Compare secret bytes, MAC tags, and derived keys with `timingSafeEqual` from `timing-safe.ts`; do not use `===` or short-circuiting array equality on sensitive material.
 
 ## Supported transaction envelope types
 

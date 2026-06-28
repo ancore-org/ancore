@@ -88,6 +88,7 @@ export function ReceiveScreen({
   const { copy: copySmartId, copied: smartIdCopied } = useCopyWithFeedback();
   const { copy: copyPublicKey, copied: publicKeyCopied } = useCopyWithFeedback();
   const qrRef = React.useRef<SVGSVGElement>(null);
+  const paymentUri = smartAccountId ? buildPaymentUri(smartAccountId, network) : '';
 
   const handleDownload = React.useCallback(async () => {
     if (!smartAccountId) return;
@@ -96,9 +97,10 @@ export function ReceiveScreen({
         filename: `ancore-receive-${smartAccountId.slice(0, 8)}.png`,
         scale: 3,
       });
-    } catch (err) {
+    } catch {
       // Fallback to previous SVG -> PNG method if QR lib unavailable
-      if (qrRef.current) downloadSvgAsPng(qrRef.current, `ancore-receive-${smartAccountId.slice(0, 8)}.png`);
+      if (qrRef.current)
+        downloadSvgAsPng(qrRef.current, `ancore-receive-${smartAccountId.slice(0, 8)}.png`);
     }
   }, [smartAccountId, paymentUri]);
 
@@ -132,8 +134,6 @@ export function ReceiveScreen({
       </Card>
     );
   }
-
-  const paymentUri = buildPaymentUri(smartAccountId, network);
 
   return (
     <Card className={cn('mx-auto w-full max-w-md border-slate-200', className)}>

@@ -1,5 +1,5 @@
 import { publicKeyToBytes32ScVal } from '../xdr-utils';
-import { StrKeyValidationError } from '@ancore/core-sdk';
+import { StrKeyValidationError } from '../strkey-validation';
 
 describe('xdr-utils publicKey validation', () => {
   test('publicKeyToBytes32ScVal throws StrKeyValidationError for invalid public key string', () => {
