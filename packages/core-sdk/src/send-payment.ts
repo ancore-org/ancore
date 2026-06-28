@@ -1,13 +1,3 @@
-/**
- * sendPayment — build → sign → submit a Stellar payment via the Ancore account contract.
- *
- * Flow:
- *  1. Build a payment transaction using AccountTransactionBuilder (simulate + assemble).
- *  2. Sign the assembled transaction via the provided signer.
- *  3. Submit to the Stellar network via StellarClient.
- *  4. Return a typed TransactionResult.
- */
-
 import { Account, Asset, Operation } from '@stellar/stellar-sdk';
 import type { Transaction } from '@stellar/stellar-sdk';
 import type { TransactionResult } from '@ancore/types';
@@ -17,7 +7,15 @@ import {
   AccountTransactionBuilder,
   type AccountTransactionBuilderOptions,
 } from './account-transaction-builder';
-import { AncoreSdkError, BuilderValidationError, TransactionSubmissionError } from './errors';
+import {
+  AncoreSdkError,
+  BuilderValidationError,
+  TransactionSubmissionError,
+  SimulationFailedError,
+  SimulationExpiredError,
+  InvalidAmountError,
+} from './errors';
+import { normalizeAmount } from './amount';
 
 // ---------------------------------------------------------------------------
 // Public interfaces
@@ -96,9 +94,17 @@ export async function sendPayment(
     builtTx = await builder.build();
   } catch (error) {
     if (error instanceof AncoreSdkError) throw error;
-    throw new BuilderValidationError(
-      `Failed to build payment transaction: ${error instanceof Error ? error.message : String(error)}`
-    );
+
+    // Check for specific simulation failures if the builder throws them
+    const msg = error instanceof Error ? error.message : String(error);
+    if (msg.includes('simulation failed')) {
+      throw new SimulationFailedError(msg);
+    }
+    if (msg.includes('expired') || msg.includes('restoration')) {
+      throw new SimulationExpiredError();
+    }
+
+    throw new BuilderValidationError(`Failed to build payment transaction: ${msg}`);
   }
 
   // 3. Sign the transaction
@@ -146,11 +152,14 @@ function validateSendPaymentParams(params: SendPaymentParams): void {
   if (typeof params.to !== 'string' || params.to.trim().length === 0) {
     throw new BuilderValidationError('sendPayment: "to" must be a non-empty Stellar address.');
   }
-  if (typeof params.amount !== 'string' || params.amount.trim().length === 0) {
-    throw new BuilderValidationError('sendPayment: "amount" must be a non-empty string.');
-  }
-  if (isNaN(parseFloat(params.amount)) || parseFloat(params.amount) <= 0) {
-    throw new BuilderValidationError('sendPayment: "amount" must be a positive numeric string.');
+  try {
+    // Normalize and validate the amount string
+    params.amount = normalizeAmount(params.amount);
+  } catch (error) {
+    if (error instanceof InvalidAmountError) {
+      throw new BuilderValidationError(`sendPayment: ${error.message}`);
+    }
+    throw error;
   }
   if (!params.signer || typeof params.signer.sign !== 'function') {
     throw new BuilderValidationError(

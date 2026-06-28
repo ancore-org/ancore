@@ -1,69 +1,96 @@
 import React, { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { AddSessionKeyDialog } from './AddSessionKeyDialog';
 import { useSessionKeys } from '../../hooks/useSessionKeys';
-import { Tooltip } from '@ancore/ui-kit';
+import { SessionKeyRow } from '../../features/session-keys';
 
 export const SessionKeysScreen: React.FC = () => {
-  const { sessionKeys, revokeSessionKey } = useSessionKeys();
+  const navigate = useNavigate();
+  const {
+    sessionKeys,
+    isLoading,
+    error,
+    addSessionKey,
+    revokeSessionKey,
+    refreshSessionKey,
+    clearError,
+  } = useSessionKeys();
   const [isDialogOpen, setDialogOpen] = useState(false);
-
-  const handleRevoke = async (keyId: string) => {
-    await revokeSessionKey(keyId);
-  };
 
   return (
     <div className="p-4">
       <header className="flex justify-between items-center mb-4">
-        <button onClick={() => window.history.back()} className="text-blue-500">
+        <button
+          type="button"
+          onClick={() => navigate('/settings')}
+          className="text-blue-500"
+          aria-label="Go back"
+        >
           ← Back
         </button>
         <h1 className="text-xl font-bold">Session Keys</h1>
-        <button onClick={() => setDialogOpen(true)} className="text-blue-500">
+        <button
+          onClick={() => setDialogOpen(true)}
+          className="text-blue-500"
+          aria-label="Add session key"
+        >
           +
         </button>
       </header>
 
-      {/* Added educational tooltips to explain session keys */}
+      {error && (
+        <div
+          role="alert"
+          className="mb-4 p-3 rounded bg-red-100 text-red-700 flex justify-between items-start"
+        >
+          <span>{error}</span>
+          <button onClick={clearError} className="ml-2 font-bold" aria-label="Dismiss error">
+            ×
+          </button>
+        </div>
+      )}
+
       <section className="mb-4">
         <h2 className="text-lg font-semibold">What are session keys?</h2>
-        <Tooltip content="Session keys allow you to perform transactions securely without sharing your main key. They can have specific permissions and expiry times.">
-          <button className="text-blue-500">Learn More</button>
-        </Tooltip>
+        <p className="text-sm text-gray-500 mt-1">
+          Session keys let apps act on your behalf with limited permissions and a fixed expiry — no
+          main key exposure.
+        </p>
       </section>
 
       <section>
         <h2 className="text-lg font-semibold mb-2">Active Keys</h2>
-        {sessionKeys.length === 0 ? (
-          <p>No active session keys.</p>
-        ) : (
-          <ul>
+
+        {isLoading && <p className="text-sm text-gray-400">Loading…</p>}
+
+        {!isLoading && sessionKeys.length === 0 && (
+          <p className="text-sm text-gray-500">No session keys yet.</p>
+        )}
+
+        {!isLoading && sessionKeys.length > 0 && (
+          <ul className="space-y-3">
             {sessionKeys.map((key) => (
-              <li key={key.publicKey} className="mb-4">
-                <div className="flex justify-between items-center">
-                  <div>
-                    <p className="font-medium">🔑 {key.label || 'Unnamed Key'}</p>
-                    <p className="text-sm">Permissions: {key.permissions.join(', ')}</p>
-                    <p className="text-sm">Expires: {new Date(key.expiresAt).toLocaleString()}</p>
-                  </div>
-                  <button onClick={() => handleRevoke(key.publicKey)} className="text-red-500">
-                    Revoke
-                  </button>
-                </div>
-              </li>
+              <SessionKeyRow
+                key={key.publicKey}
+                sessionKey={key}
+                onRevoke={revokeSessionKey}
+                onRefresh={refreshSessionKey}
+              />
             ))}
           </ul>
         )}
       </section>
 
-      <button onClick={() => setDialogOpen(true)} className="mt-4 text-blue-500">
+      <button onClick={() => setDialogOpen(true)} className="mt-4 text-blue-500 text-sm">
         + Add Session Key
       </button>
 
       <AddSessionKeyDialog
         open={isDialogOpen}
         onClose={() => setDialogOpen(false)}
-        onSave={async (key) => {
-          console.log('Saving key:', key);
+        onSave={async (input) => {
+          await addSessionKey(input);
+          setDialogOpen(false);
         }}
       />
     </div>

@@ -1,0 +1,120 @@
+name: Extension e2e
+
+on:
+  pull_request:
+    branches: [main, develop]
+    paths:
+      - 'apps/extension-wallet/**'
+      - '.github/workflows/e2e.yml'
+  schedule:
+    # Full suite nightly at 02:00 UTC on main
+    - cron: '0 2 * * *'
+  workflow_dispatch:
+    inputs:
+      suite:
+        description: 'Which suite to run'
+        required: false
+        default: 'smoke'
+        type: choice
+        options: [smoke, full]
+
+concurrency:
+  group: e2e-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  smoke:
+    name: Smoke (PR / < 60 s)
+    runs-on: ubuntu-latest
+    if: github.event_name != 'schedule'
+    defaults:
+      run:
+        working-directory: apps/extension-wallet
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v2
+        with:
+          version: 9
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'pnpm'
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+        working-directory: .
+
+      # Pre-build workspace library packages so Vite dev server can resolve imports.
+      # tests/playwright.config.ts only pre-builds ui-kit; account-abstraction,
+      # crypto, stellar, etc. also need dist/ to exist before pnpm dev starts.
+      - name: Build workspace library packages
+        run: pnpm turbo run build --filter=@ancore/types --filter=@ancore/crypto --filter=@ancore/stellar --filter=@ancore/core-sdk --filter=@ancore/ui-kit --filter=@ancore/account-abstraction --filter=@ancore/wallet-shared --filter=@ancore/wallet-api
+        working-directory: .
+
+      - name: Install Playwright browsers
+        run: pnpm exec playwright install chromium --with-deps
+
+      # tests/playwright.config.ts starts the Vite dev server internally via webServer
+      - name: Run smoke specs
+        run: pnpm test:e2e:smoke --project=chromium
+        timeout-minutes: 3
+
+      - name: Upload traces on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: smoke-traces
+          path: apps/extension-wallet/test-results/
+
+  full:
+    name: Full suite (nightly)
+    runs-on: ubuntu-latest
+    if: github.event_name == 'schedule' || (github.event_name == 'workflow_dispatch' && inputs.suite == 'full')
+    defaults:
+      run:
+        working-directory: apps/extension-wallet
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v2
+        with:
+          version: 9
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'pnpm'
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+        working-directory: .
+
+      - name: Build workspace library packages
+        run: pnpm turbo run build --filter=@ancore/types --filter=@ancore/crypto --filter=@ancore/stellar --filter=@ancore/core-sdk --filter=@ancore/ui-kit --filter=@ancore/account-abstraction --filter=@ancore/wallet-shared --filter=@ancore/wallet-api
+        working-directory: .
+
+      - name: Install Playwright browsers
+        run: pnpm exec playwright install chromium --with-deps
+
+      # tests/playwright.config.ts starts the Vite dev server internally via webServer
+      - name: Run full e2e suite
+        run: pnpm test:e2e --project=chromium
+        timeout-minutes: 15
+
+      - name: Upload report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-report
+          path: apps/extension-wallet/playwright-report/
+
+      - name: Upload traces on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: full-traces
+          path: apps/extension-wallet/test-results/

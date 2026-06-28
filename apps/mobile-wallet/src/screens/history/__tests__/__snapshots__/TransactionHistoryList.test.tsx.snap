@@ -1,0 +1,167 @@
+// Jest Snapshot v1, https://goo.gl/fbAQLP
+
+exports[`TransactionHistoryList snapshot tests matches snapshot for completed transaction row 1`] = `
+<ul
+  aria-label="Transaction history"
+>
+  <li
+    class="flex items-center gap-3 py-3 border-b border-slate-200"
+  >
+    <span
+      aria-label="Transaction completed"
+      class="inline-flex items-center justify-center w-5 h-5 font-semibold text-green-600"
+      role="img"
+    >
+      ✓
+    </span>
+    <div
+      class="flex-1"
+    >
+      <strong>
+        Received
+      </strong>
+       
+      100.00
+       USDC
+       · 
+      5/29/2026, 11:00:00 AM
+    </div>
+  </li>
+</ul>
+`;
+
+exports[`TransactionHistoryList snapshot tests matches snapshot for failed transaction row 1`] = `
+<ul
+  aria-label="Transaction history"
+>
+  <li
+    class="flex items-center gap-3 py-3 border-b border-slate-200"
+  >
+    <span
+      aria-label="Transaction failed"
+      class="inline-flex items-center justify-center w-5 h-5 font-semibold text-red-600"
+      role="img"
+    >
+      ✕
+    </span>
+    <div
+      class="flex-1"
+    >
+      <strong>
+        Received
+      </strong>
+       
+      100.00
+       USDC
+       · 
+      5/29/2026, 11:00:00 AM
+    </div>
+  </li>
+</ul>
+`;
+
+exports[`TransactionHistoryList snapshot tests matches snapshot for multiple transactions with mixed statuses 1`] = `
+<ul
+  aria-label="Transaction history"
+>
+  <li
+    class="flex items-center gap-3 py-3 border-b border-slate-200"
+  >
+    <span
+      aria-label="Transaction completed"
+      class="inline-flex items-center justify-center w-5 h-5 font-semibold text-green-600"
+      role="img"
+    >
+      ✓
+    </span>
+    <div
+      class="flex-1"
+    >
+      <strong>
+        Received
+      </strong>
+       
+      100.00
+       USDC
+       · 
+      5/29/2026, 11:00:00 AM
+    </div>
+  </li>
+  <li
+    class="flex items-center gap-3 py-3 border-b border-slate-200"
+  >
+    <span
+      aria-label="Transaction pending"
+      class="inline-flex items-center justify-center w-5 h-5 font-semibold text-amber-600"
+      role="img"
+    >
+      ⏳
+    </span>
+    <div
+      class="flex-1"
+    >
+      <strong>
+        Received
+      </strong>
+       
+      100.00
+       USDC
+       · 
+      5/29/2026, 11:00:00 AM
+    </div>
+  </li>
+  <li
+    class="flex items-center gap-3 py-3 border-b border-slate-200"
+  >
+    <span
+      aria-label="Transaction failed"
+      class="inline-flex items-center justify-center w-5 h-5 font-semibold text-red-600"
+      role="img"
+    >
+      ✕
+    </span>
+    <div
+      class="flex-1"
+    >
+      <strong>
+        Received
+      </strong>
+       
+      100.00
+       USDC
+       · 
+      5/29/2026, 11:00:00 AM
+    </div>
+  </li>
+</ul>
+`;
+
+exports[`TransactionHistoryList snapshot tests matches snapshot for pending transaction row 1`] = `
+<ul
+  aria-label="Transaction history"
+>
+  <li
+    class="flex items-center gap-3 py-3 border-b border-slate-200"
+  >
+    <span
+      aria-label="Transaction pending"
+      class="inline-flex items-center justify-center w-5 h-5 font-semibold text-amber-600"
+      role="img"
+    >
+      ⏳
+    </span>
+    <div
+      class="flex-1"
+    >
+      <strong>
+        Received
+      </strong>
+       
+      100.00
+       USDC
+       · 
+      5/29/2026, 11:00:00 AM
+    </div>
+  </li>
+</ul>
+`;

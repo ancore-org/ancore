@@ -2,6 +2,8 @@
 
 Browser extension wallet for the Ancore account abstraction layer on Stellar.
 
+**Agent / contributor guide:** [AGENTS.md](./AGENTS.md) (modeled on [Freighter AGENTS.md](https://github.com/stellar/freighter/blob/master/AGENTS.md)).
+
 ## Architecture
 
 ```
@@ -34,6 +36,8 @@ The build outputs to `dist/` with:
 - `background/service-worker.js` — background worker
 - `icons/` — extension icons (16, 32, 48, 128px)
 
+**Troubleshooting:** See [Extension Build Troubleshooting Guide](../../docs/troubleshooting/extension-build.md) for common build issues and fixes.
+
 ## Loading in Chrome
 
 1. Run `pnpm build`
@@ -63,4 +67,26 @@ Configure timeout via `useSettingsStore().setAutoLockMinutes(n)` (0 = never lock
 ## Permissions
 
 - `storage` — persist wallet state
-- `activeTab` — interact with active tab for dApp connections
+
+## E2E Smoke Suite
+
+Release candidates use a deterministic Playwright smoke suite that validates:
+
+- onboarding (`/welcome` -> `/home`)
+- lock/unlock (`/unlock` -> `/home`)
+- send/receive navigation (`/send`, `/receive`)
+- session key access controls (`/session-keys`)
+
+Run locally:
+
+```bash
+pnpm --filter @ancore/extension-wallet test:e2e:smoke
+```
+
+Debug locally (headed, single worker, traces on):
+
+```bash
+pnpm --filter @ancore/extension-wallet test:e2e:smoke:debug
+```
+
+See `docs/testing/extension-e2e-smoke.md` for troubleshooting and CI behavior.

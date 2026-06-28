@@ -1,0 +1,14 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1280" height="800" viewBox="0 0 1280 800">
+  <rect width="1280" height="800" fill="#eef3ff"/>
+  <rect x="420" y="60" width="440" height="680" rx="22" fill="#ffffff" stroke="#d2ddff"/>
+  <text x="460" y="120" font-family="Inter, Segoe UI, Arial" font-size="34" font-weight="700" fill="#10204a">Home</text>
+  <text x="460" y="170" font-family="Inter, Segoe UI, Arial" font-size="24" fill="#5c6d96">Available balance</text>
+  <text x="460" y="225" font-family="Inter, Segoe UI, Arial" font-size="44" font-weight="700" fill="#1d3678">1,245.80 XLM</text>
+  <rect x="460" y="280" width="360" height="64" rx="14" fill="#1d3678"/>
+  <text x="590" y="322" font-family="Inter, Segoe UI, Arial" font-size="24" fill="#ffffff">Send funds</text>
+  <rect x="460" y="364" width="360" height="64" rx="14" fill="#e7edff"/>
+  <text x="582" y="406" font-family="Inter, Segoe UI, Arial" font-size="24" fill="#1d3678">Receive funds</text>
+  <rect x="460" y="448" width="360" height="64" rx="14" fill="#e7edff"/>
+  <text x="600" y="490" font-family="Inter, Segoe UI, Arial" font-size="24" fill="#1d3678">View history</text>
+  <text x="30" y="770" font-family="Inter, Segoe UI, Arial" font-size="24" fill="#344675">Screenshot 2: Home dashboard and balance</text>
+</svg>

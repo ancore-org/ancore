@@ -63,10 +63,10 @@ export function Identicon({
       viewBox="0 0 5 5"
       role="img"
       aria-label={ariaLabel}
-      className={cn('overflow-hidden rounded-lg border border-slate-200 bg-slate-50', className)}
+      className={cn('overflow-hidden rounded-lg border border-border bg-muted', className)}
       {...props}
     >
-      <rect x="0" y="0" width="5" height="5" fill="white" />
+      <rect x="0" y="0" width="5" height="5" fill="hsl(var(--background))" />
       {matrix.flatMap((row, rowIndex) =>
         row.map((enabled, columnIndex) =>
           enabled ? (

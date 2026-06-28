@@ -102,6 +102,21 @@ export class InsufficientPermissionError extends AccountContractError {
 }
 
 /**
+ * Thrown when a code path is not yet implemented in the MVP.
+ * The error message includes a pointer to the README Limitations section.
+ */
+export class NotImplementedError extends AccountContractError {
+  constructor(feature: string) {
+    super(
+      `${feature} is not yet implemented. See packages/account-abstraction/README.md#limitations`,
+      'NOT_IMPLEMENTED'
+    );
+    this.name = 'NotImplementedError';
+    Object.setPrototypeOf(this, NotImplementedError.prototype);
+  }
+}
+
+/**
  * Thrown when contract invocation fails with an unexpected error (e.g. host/system).
  */
 export class ContractInvocationError extends AccountContractError {
@@ -194,4 +209,23 @@ export function mapContractError(
     return new UnauthorizedError(message);
   }
   return new ContractInvocationError(message, raw);
+}
+
+/** Map account-abstraction errors into the core-sdk normalized shape.
+ * Keep this local to avoid circular dependency on core-sdk; consumers can
+ * call into core-sdk's normalizeError for final normalization.
+ */
+export function toCanonicalError(err: unknown) {
+  if (err instanceof AccountContractError) {
+    return { code: err.code, message: err.message, name: err.name };
+  }
+  if (err instanceof Error) {
+    const typedErr = err as Error & { code?: string };
+    return {
+      code: typedErr.code ?? 'ACCOUNT_CONTRACT_ERROR',
+      message: err.message,
+      name: err.name,
+    };
+  }
+  return { code: 'ACCOUNT_CONTRACT_ERROR', message: String(err) };
 }

@@ -7,6 +7,7 @@ node_modules/
 # Build outputs
 dist/
 build/
+**/stats.html
 .next/
 out/
 *.tsbuildinfo
@@ -15,6 +16,7 @@ storybook-static/
 # Rust/Soroban
 target/
 Cargo.lock
+!contracts/Cargo.lock
 **/*.rs.bk
 
 # Testing
@@ -48,13 +50,16 @@ pnpm-debug.log*
 tmp/
 temp/
 *.tmp
+__pycache__/
+*.py[cod]
 
 # Secrets
 *.key
 *.pem
 secrets/
 
-# issues
+# issues (local contributor backlog — not published to GitHub)
+/issues/
 docs/issues
 
 # Admin-only tooling (local project management)
@@ -74,3 +79,7 @@ apps/extension-wallet/vitest.config.js.map
 
 issues.md
 pr.md
+implementation.md
+submission_details.md
+brief.md
+checks.md

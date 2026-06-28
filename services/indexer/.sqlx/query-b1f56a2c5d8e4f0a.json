@@ -1,0 +1,18 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "SELECT last_ledger_seq FROM ingest_checkpoints WHERE stream = $1",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "last_ledger_seq",
+        "type_info": "Int8"
+      }
+    ],
+    "parameters": {
+      "Left": ["Text"]
+    },
+    "nullable": [false]
+  },
+  "hash": "b1f56a2c5d8e4f0a9b3c7d1e2f4a6b8c"
+}

@@ -1,0 +1,46 @@
+{
+  "name": "@ancore/wallet-api",
+  "version": "0.1.0",
+  "description": "Browser API for dApps to connect to the Ancore extension wallet (Freighter-api equivalent)",
+  "main": "./dist/index.js",
+  "module": "./dist/index.mjs",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "import": "./dist/index.mjs",
+      "require": "./dist/index.js",
+      "types": "./dist/index.d.ts"
+    }
+  },
+  "scripts": {
+    "build": "tsup src/index.ts --format cjs,esm --dts --tsconfig tsconfig.json",
+    "dev": "tsup src/index.ts --format cjs,esm --dts --watch",
+    "test": "jest --coverage",
+    "lint": "eslint src/",
+    "clean": "rm -rf dist"
+  },
+  "keywords": [
+    "ancore",
+    "wallet",
+    "stellar",
+    "soroban",
+    "account-abstraction"
+  ],
+  "author": "Ancore Contributors",
+  "license": "Apache-2.0",
+  "dependencies": {
+    "@ancore/wallet-shared": "workspace:*"
+  },
+  "devDependencies": {
+    "@eslint/js": "^9.0.0",
+    "@types/jest": "^29.5.0",
+    "@typescript-eslint/eslint-plugin": "^8.0.0",
+    "@typescript-eslint/parser": "^8.0.0",
+    "eslint": "^9.0.0",
+    "jest": "^29.7.0",
+    "jest-environment-jsdom": "^30.3.0",
+    "ts-jest": "^29.4.0",
+    "tsup": "^8.0.0",
+    "typescript": "^5.6.0"
+  }
+}

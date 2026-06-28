@@ -44,21 +44,88 @@ export interface TransactionResult {
   timestamp: number;
 }
 
+/**
+ * Strict Zod schema for UserOperation validation.
+ * Ensures all required fields are present and correctly typed.
+ */
 export const UserOperationSchema = z.object({
-  id: z.string().min(1),
-  type: z.string().min(1),
-  operation: z.object({}).passthrough(), // Operation object is complex, validate loosely
-  gasLimit: z.number().int().positive().optional(),
-  createdAt: z.number().int().nonnegative(),
+  id: z
+    .string()
+    .min(1, 'Operation ID must not be empty')
+    .describe('Unique identifier for the operation'),
+  type: z
+    .string()
+    .min(1, 'Operation type must not be empty')
+    .describe('Operation type (e.g., payment, invoke, manage_data)'),
+  operation: z.object({}).passthrough().describe('Stellar Operation object'),
+  gasLimit: z
+    .number()
+    .int('Gas limit must be an integer')
+    .positive('Gas limit must be positive')
+    .optional()
+    .describe('Maximum gas units to consume'),
+  createdAt: z
+    .number()
+    .int('Timestamp must be an integer')
+    .nonnegative('Timestamp must be non-negative')
+    .describe('Unix timestamp (ms) when operation was created'),
 });
 
+/**
+ * Strict Zod schema for TransactionResult validation.
+ */
 export const TransactionResultSchema = z.object({
-  status: z.enum(['success', 'failure', 'pending']),
-  hash: z.string().optional(),
-  ledger: z.number().int().positive().optional(),
-  error: z.string().optional(),
-  timestamp: z.number().int().nonnegative(),
+  status: z
+    .enum(['success', 'failure', 'pending'], {
+      errorMap: () => ({
+        message: 'Status must be one of: success, failure, pending',
+      }),
+    })
+    .describe('Transaction result status'),
+  hash: z.string().optional().describe('Transaction hash on Stellar network'),
+  ledger: z
+    .number()
+    .int('Ledger must be an integer')
+    .positive('Ledger must be positive')
+    .optional()
+    .describe('Ledger sequence number where transaction was confirmed'),
+  error: z.string().optional().describe('Error message if transaction failed'),
+  timestamp: z
+    .number()
+    .int('Timestamp must be an integer')
+    .nonnegative('Timestamp must be non-negative')
+    .describe('Unix timestamp (ms) when result was recorded'),
 });
 
+/**
+ * Type inferred from UserOperationSchema for use across SDK and extensions.
+ */
 export type UserOperationFromSchema = z.infer<typeof UserOperationSchema>;
+
+/**
+ * Type inferred from TransactionResultSchema for use across SDK and extensions.
+ */
 export type TransactionResultFromSchema = z.infer<typeof TransactionResultSchema>;
+
+/**
+ * Safe parser wrapper for UserOperation validation.
+ * Returns validation result with detailed error messages.
+ *
+ * @example
+ * const result = parseUserOperation(data);
+ * if (result.success) {
+ *   console.log('Valid operation:', result.data);
+ * } else {
+ *   console.error('Validation failed:', result.error.issues);
+ * }
+ */
+export function parseUserOperation(data: unknown) {
+  return UserOperationSchema.safeParse(data);
+}
+
+/**
+ * Safe parser wrapper for TransactionResult validation.
+ */
+export function parseTransactionResult(data: unknown) {
+  return TransactionResultSchema.safeParse(data);
+}

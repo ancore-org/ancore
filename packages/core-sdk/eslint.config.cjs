@@ -36,6 +36,15 @@ module.exports = [
         chrome: 'readonly',
         browser: 'readonly',
         localStorage: 'readonly',
+        // Fetch API globals
+        fetch: 'readonly',
+        Request: 'readonly',
+        RequestInit: 'readonly',
+        Response: 'readonly',
+        URLSearchParams: 'readonly',
+        URL: 'readonly',
+        // Runtime environment detection
+        process: 'readonly',
       },
     },
     plugins: {
@@ -43,7 +52,10 @@ module.exports = [
     },
     rules: {
       ...tseslint.configs.recommended.rules,
-      '@typescript-eslint/no-unused-vars': ['warn', { argsIgnorePattern: '^_', varsIgnorePattern: '^_' }],
+      '@typescript-eslint/no-unused-vars': [
+        'warn',
+        { argsIgnorePattern: '^_', varsIgnorePattern: '^_' },
+      ],
       '@typescript-eslint/no-explicit-any': 'off',
     },
   },

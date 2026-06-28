@@ -3,13 +3,36 @@ import { render, screen, fireEvent } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { renderHook, act } from '@testing-library/react';
 import { NotificationProvider } from '@ancore/ui-kit';
+import i18n from '../../../i18n';
 
 import { useSettings } from '../../../hooks/useSettings';
+import {
+  DASHBOARD_SETTINGS_STORAGE_KEY,
+  DEFAULT_DASHBOARD_SETTINGS,
+  useDashboardSettingsStore,
+} from '../../../state/dashboard-settings';
+import { DEFAULTS, useSettingsStore } from '../../../stores/settings';
+import { useAccountStore } from '../../../stores/account';
+import { useAllowlistStore } from '../../../stores/allowlist';
 import { SettingsScreen } from '../SettingsScreen';
 import { NetworkSettings } from '../NetworkSettings';
 import { SecuritySettings } from '../SecuritySettings';
 import { AboutScreen } from '../AboutScreen';
+import { ConnectedSitesScreen } from '../ConnectedSitesScreen';
+import { revealVaultSecret, VaultExportError } from '../../../security/vault-export';
 import { SettingsGroup, SettingItem } from '../../../components/SettingsGroup';
+
+vi.mock('../../../security/vault-export', () => ({
+  VaultExportError: class VaultExportError extends Error {
+    constructor(message: string) {
+      super(message);
+      this.name = 'VaultExportError';
+    }
+  },
+  revealVaultSecret: vi.fn(async ({ kind }: { kind: 'privateKey' | 'mnemonic' }) =>
+    kind === 'privateKey' ? 'STESTPRIVATEKEY' : 'word '.repeat(12).trim()
+  ),
+}));
 
 function renderSettingsScreen() {
   return render(
@@ -22,30 +45,49 @@ function renderSettingsScreen() {
 // ── useSettings ──────────────────────────────────────────────────────────────
 
 describe('useSettings', () => {
-  beforeEach(() => localStorage.clear());
+  beforeEach(() => {
+    localStorage.clear();
+    useDashboardSettingsStore.setState(DEFAULT_DASHBOARD_SETTINGS);
+    useSettingsStore.setState(DEFAULTS);
+  });
 
   it('returns default settings on first load', () => {
     const { result } = renderHook(() => useSettings());
     expect(result.current.settings.network).toBe('testnet');
     expect(result.current.settings.autoLockTimeout).toBe(5);
+    expect(result.current.settings.environment).toBe('production');
+    expect(result.current.settings.displayPreference).toBe('comfortable');
   });
 
   it('persists settings to localStorage', () => {
     const { result } = renderHook(() => useSettings());
-    act(() => result.current.updateSettings({ network: 'mainnet' }));
+    act(() => result.current.updateSettings({ network: 'mainnet', environment: 'staging' }));
     expect(result.current.settings.network).toBe('mainnet');
-    const stored = JSON.parse(localStorage.getItem('ancore_settings')!);
-    expect(stored.network).toBe('mainnet');
+    const stored = JSON.parse(localStorage.getItem(DASHBOARD_SETTINGS_STORAGE_KEY)!);
+    expect(stored.state.network).toBe('mainnet');
+    expect(stored.state.environment).toBe('staging');
   });
 
-  it('rehydrates settings from localStorage', () => {
+  it('rehydrates settings from localStorage', async () => {
     localStorage.setItem(
-      'ancore_settings',
-      JSON.stringify({ network: 'mainnet', autoLockTimeout: 15 })
+      DASHBOARD_SETTINGS_STORAGE_KEY,
+      JSON.stringify({
+        state: {
+          ...DEFAULT_DASHBOARD_SETTINGS,
+          network: 'mainnet',
+          autoLockTimeout: 15,
+          displayPreference: 'compact',
+        },
+        version: 0,
+      })
     );
+
+    await useDashboardSettingsStore.persist.rehydrate();
+
     const { result } = renderHook(() => useSettings());
     expect(result.current.settings.network).toBe('mainnet');
     expect(result.current.settings.autoLockTimeout).toBe(15);
+    expect(result.current.settings.displayPreference).toBe('compact');
   });
 
   it('merges partial updates', () => {
@@ -83,6 +125,32 @@ describe('SettingItem', () => {
     render(<SettingItem label="Export Key" danger onClick={vi.fn()} />);
     const btn = screen.getByRole('button', { name: /export key/i });
     expect(btn.className).toContain('text-destructive');
+  });
+});
+
+describe('ConnectedSitesScreen', () => {
+  beforeEach(() => {
+    useAllowlistStore.setState({ approvedSites: {} });
+    useAccountStore.setState({ accounts: [], activeAccountId: null });
+  });
+
+  it('shows connected sites and allows disconnecting all', async () => {
+    useAccountStore.setState({
+      accounts: [{ id: 'acct-1', address: 'CABC...', label: 'Primary' }],
+      activeAccountId: 'acct-1',
+    });
+    useSettingsStore.setState({ ...DEFAULTS, network: 'testnet' });
+    useAllowlistStore.getState().approve('https://example.com', 'acct-1', 'testnet');
+    useAllowlistStore.getState().approve('https://demo.app', 'acct-1', 'testnet');
+
+    render(<ConnectedSitesScreen onBack={vi.fn()} />);
+
+    expect(screen.getByText('example.com')).toBeInTheDocument();
+    expect(screen.getByText('demo.app')).toBeInTheDocument();
+
+    await userEvent.click(screen.getByRole('button', { name: /disconnect all/i }));
+
+    expect(screen.getByText(/no connected sites/i)).toBeInTheDocument();
   });
 });
 
@@ -143,9 +211,17 @@ describe('NetworkSettings', () => {
 describe('SecuritySettings', () => {
   const defaultProps = {
     autoLockTimeout: 5,
+    requirePasswordForSensitiveActions: true,
+    onRequirePasswordForSensitiveActionsChange: vi.fn(),
     onAutoLockChange: vi.fn(),
     onBack: vi.fn(),
   };
+
+  beforeEach(() => {
+    vi.mocked(revealVaultSecret).mockImplementation(async ({ kind }) =>
+      kind === 'privateKey' ? 'STESTPRIVATEKEY' : 'word '.repeat(12).trim()
+    );
+  });
 
   it('renders security menu items', () => {
     render(<SecuritySettings {...defaultProps} />);
@@ -196,6 +272,18 @@ describe('SecuritySettings', () => {
     expect(screen.getByPlaceholderText(/enter password/i)).toBeInTheDocument();
   });
 
+  it('toggles require password for exports', async () => {
+    const onRequirePasswordForSensitiveActionsChange = vi.fn();
+    render(
+      <SecuritySettings
+        {...defaultProps}
+        onRequirePasswordForSensitiveActionsChange={onRequirePasswordForSensitiveActionsChange}
+      />
+    );
+    await userEvent.click(screen.getByText('Require password for exports'));
+    expect(onRequirePasswordForSensitiveActionsChange).toHaveBeenCalledWith(false);
+  });
+
   it('shows export mnemonic warning', async () => {
     render(<SecuritySettings {...defaultProps} />);
     await userEvent.click(screen.getByText('Export Recovery Phrase'));
@@ -207,10 +295,32 @@ describe('SecuritySettings', () => {
     await userEvent.click(screen.getByText('Export Private Key'));
     await userEvent.type(screen.getByPlaceholderText(/enter password/i), 'mypassword');
     await userEvent.click(screen.getByRole('button', { name: /reveal/i }));
+    expect(revealVaultSecret).toHaveBeenCalledWith({
+      kind: 'privateKey',
+      password: 'mypassword',
+      requirePassword: true,
+    });
     expect(screen.getByText(/never share this with anyone/i)).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /reveal/i })).toBeInTheDocument();
+  });
+
+  it('shows vault export errors without leaking secret material', async () => {
+    vi.mocked(revealVaultSecret).mockRejectedValueOnce(new VaultExportError('Incorrect password.'));
+
+    render(<SecuritySettings {...defaultProps} />);
+    await userEvent.click(screen.getByText('Export Private Key'));
+    await userEvent.type(screen.getByPlaceholderText(/enter password/i), 'wrong-password');
+    await userEvent.click(screen.getByRole('button', { name: /reveal/i }));
+
+    expect(screen.getByText('Incorrect password.')).toBeInTheDocument();
+    expect(screen.queryByText('STESTPRIVATEKEY')).not.toBeInTheDocument();
   });
 
   it('shows error when reveal attempted without password', async () => {
+    vi.mocked(revealVaultSecret).mockRejectedValueOnce(
+      new VaultExportError('Enter your password.')
+    );
+
     render(<SecuritySettings {...defaultProps} />);
     await userEvent.click(screen.getByText('Export Private Key'));
     await userEvent.click(screen.getByRole('button', { name: /reveal/i }));
@@ -240,14 +350,28 @@ describe('AboutScreen', () => {
 // ── SettingsScreen (integration) ─────────────────────────────────────────────
 
 describe('SettingsScreen', () => {
-  beforeEach(() => localStorage.clear());
+  beforeEach(() => {
+    localStorage.clear();
+    useDashboardSettingsStore.setState(DEFAULT_DASHBOARD_SETTINGS);
+    useSettingsStore.setState(DEFAULTS);
+  });
 
   it('renders all top-level groups', () => {
     renderSettingsScreen();
     expect(screen.getByText('Settings')).toBeInTheDocument();
     expect(screen.getAllByText('Network').length).toBeGreaterThanOrEqual(1);
     expect(screen.getByText('Security')).toBeInTheDocument();
+    expect(screen.getByText('Privacy')).toBeInTheDocument();
     expect(screen.getByText('About Ancore')).toBeInTheDocument();
+  });
+
+  it('toggles telemetry opt-in from privacy settings', async () => {
+    renderSettingsScreen();
+    expect(screen.getByText('Disabled')).toBeInTheDocument();
+
+    await userEvent.click(screen.getByRole('button', { name: /usage analytics/i }));
+    expect(useSettingsStore.getState().telemetryOptIn).toBe(true);
+    expect(screen.getByText('Enabled')).toBeInTheDocument();
   });
 
   it('navigates to network settings', async () => {
@@ -274,12 +398,31 @@ describe('SettingsScreen', () => {
     expect(screen.getByText(/0\.1\.0/)).toBeInTheDocument();
   });
 
+  it('navigates to display and environment settings', async () => {
+    renderSettingsScreen();
+
+    await userEvent.click(screen.getByRole('button', { name: /density/i }));
+    expect(screen.getByText(/layout density/i)).toBeInTheDocument();
+
+    await userEvent.click(screen.getByRole('button', { name: /go back/i }));
+    await userEvent.click(screen.getByRole('button', { name: /environment/i }));
+    expect(screen.getByText(/runtime target/i)).toBeInTheDocument();
+  });
+
   it('shows current network in root view', () => {
-    localStorage.setItem(
-      'ancore_settings',
-      JSON.stringify({ network: 'mainnet', autoLockTimeout: 5 })
-    );
+    useDashboardSettingsStore.setState({
+      ...DEFAULT_DASHBOARD_SETTINGS,
+      network: 'mainnet',
+      autoLockTimeout: 5,
+    });
     renderSettingsScreen();
     expect(screen.getAllByText('Mainnet').length).toBeGreaterThanOrEqual(1);
+  });
+
+  it('renders SettingsScreen copy from i18n keys', () => {
+    renderSettingsScreen();
+    expect(screen.getByText(i18n.t('settings.title'))).toBeInTheDocument();
+    expect(screen.getByText(i18n.t('settings.subtitle'))).toBeInTheDocument();
+    expect(screen.getByText(i18n.t('settings.account.name'))).toBeInTheDocument();
   });
 });

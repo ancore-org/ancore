@@ -1,6 +1,9 @@
 export { Form, FormSubmit, FormError } from './Form';
 export type { FormProps, FormSubmitProps, FormErrorProps } from './Form';
 
+export { Field } from './Field';
+export type { FieldProps } from './Field';
+
 export { AddressInput, AddressInputBase } from './AddressInput';
 export type { AddressInputProps, AddressInputBaseProps } from './AddressInput';
 
@@ -18,6 +21,8 @@ export {
   parseAmount,
   formatAmount,
   getPasswordStrength,
+  getDecimalPlaces,
+  validateAmountPrecision,
   STELLAR_ADDRESS_REGEX,
 } from './validation';
 export type { PasswordStrength } from './validation';

@@ -17,7 +17,7 @@ groups:
           description: >
             Ledger is {{ $value }}s behind current network time (threshold: 30s).
             Node may be partitioned or stalled.
-          runbook_url: "https://github.com/ancore-org/ancore/blob/main/docs/ops/runbooks/stellar-sync.md"
+          runbook_url: "https://github.com/ancore-org/ancore/blob/main/docs/security/INCIDENT_RESPONSE.md"
 
       - alert: TransactionFailureRateHigh
         expr: >
@@ -31,7 +31,7 @@ groups:
         annotations:
           summary: "High transaction failure rate"
           description: "{{ $value | humanizePercentage }} of transactions failing (threshold: 5%)"
-          runbook_url: "https://github.com/ancore-org/ancore/blob/main/docs/ops/runbooks/tx-failures.md"
+          runbook_url: "https://github.com/ancore-org/ancore/blob/main/docs/security/INCIDENT_RESPONSE.md"
 
       - alert: StellarNodeDown
         expr: up{job="stellar-core"} == 0
@@ -41,4 +41,4 @@ groups:
           escalation: pagerduty
         annotations:
           summary: "Stellar core node unreachable"
-          runbook_url: "https://github.com/ancore-org/ancore/blob/main/docs/ops/runbooks/stellar-sync.md"
+          runbook_url: "https://github.com/ancore-org/ancore/blob/main/docs/security/INCIDENT_RESPONSE.md"

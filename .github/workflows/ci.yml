@@ -10,67 +10,179 @@ concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
 
+permissions:
+  contents: read
+
 jobs:
-  lint:
-    name: Lint
+  audit:
+    name: Dependency Audit
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
 
-      - name: Setup pnpm
-        uses: pnpm/action-setup@v2
+      - uses: pnpm/action-setup@v2
         with:
           version: 9
 
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
+      - uses: actions/setup-node@v4
         with:
           node-version: '20'
           cache: 'pnpm'
 
-      - name: Install dependencies
-        run: pnpm install --frozen-lockfile
+      - run: pnpm install --frozen-lockfile
 
-      - name: Run linter
-        run: pnpm lint
+      - name: Validate pnpm audit allowlist
+        run: node scripts/check-audit-allowlist.js
+
+  format:
+    name: Format Check
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v2
+        with:
+          version: 9
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'pnpm'
+
+      - run: pnpm install --frozen-lockfile
 
       - name: Check formatting
         run: pnpm format:check
 
-  test:
-    name: Test
+  lint-translations:
+    name: Extension Translation Lint
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
 
-      - name: Setup pnpm
-        uses: pnpm/action-setup@v2
+      - uses: pnpm/action-setup@v2
         with:
           version: 9
 
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
+      - uses: actions/setup-node@v4
         with:
           node-version: '20'
           cache: 'pnpm'
 
-      - name: Install dependencies
-        run: pnpm install --frozen-lockfile
+      - run: pnpm install --frozen-lockfile
 
-      - name: Build packages
-        run: pnpm build
+      - name: Lint extension translation keys
+        run: pnpm --filter @ancore/extension-wallet lint:translations
 
-      - name: Run tests
-        run: pnpm test
+  package:
+    name: Package — ${{ matrix.name }}
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: types
+            filter: '@ancore/types'
+          - name: crypto
+            filter: '@ancore/crypto'
+          - name: stellar
+            filter: '@ancore/stellar'
+          - name: core-sdk
+            filter: '@ancore/core-sdk'
+          - name: ui-kit
+            filter: '@ancore/ui-kit'
+          - name: account-abstraction
+            filter: '@ancore/account-abstraction'
+          - name: wallet-shared
+            filter: '@ancore/wallet-shared'
+          - name: wallet-api
+            filter: '@ancore/wallet-api'
+    steps:
+      - uses: actions/checkout@v4
 
-  contracts:
-    name: Build & Test Contracts
+      - uses: pnpm/action-setup@v2
+        with:
+          version: 9
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'pnpm'
+
+      - run: pnpm install --frozen-lockfile
+
+      - name: Lint
+        run: pnpm turbo run lint --filter=${{ matrix.filter }}
+
+      - name: Test
+        run: pnpm turbo run test --filter=${{ matrix.filter }}
+
+  app:
+    name: App — ${{ matrix.name }}
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: extension-wallet
+            filter: '@ancore/extension-wallet'
+          - name: web-dashboard
+            filter: '@ancore/web-dashboard'
+          - name: mobile-wallet
+            filter: '@ancore/mobile-wallet'
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v2
+        with:
+          version: 9
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'pnpm'
+
+      - run: pnpm install --frozen-lockfile
+
+      - name: Lint
+        run: pnpm turbo run lint --filter=${{ matrix.filter }}
+
+      - name: Test
+        run: pnpm turbo run test --filter=${{ matrix.filter }}
+
+  services:
+    name: Services — Lint & Test
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
 
-      - name: Setup Rust
-        uses: dtolnay/rust-toolchain@stable
+      - uses: pnpm/action-setup@v2
+        with:
+          version: 9
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'pnpm'
+
+      - run: pnpm install --frozen-lockfile
+
+      - name: Lint services
+        run: pnpm turbo run lint --filter='@ancore/relayer' --filter='@ancore/ai-agent'
+
+      - name: Test services
+        run: pnpm turbo run test --filter='@ancore/relayer' --filter='@ancore/ai-agent' --concurrency=1
+
+      - name: Check documented repository structure
+        run: pnpm docs:check-structure
+
+  contracts:
+    name: Contracts — Build & Test
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: dtolnay/rust-toolchain@1.81.0
 
       - name: Ensure Cargo cache directories exist
         run: |
@@ -80,8 +192,7 @@ jobs:
           mkdir -p $HOME/.cargo/git/db
           mkdir -p ${{ github.workspace }}/contracts/target
 
-      - name: Cache Cargo
-        uses: actions/cache@v3
+      - uses: actions/cache@v3
         with:
           path: |
             ~/.cargo/bin
@@ -91,8 +202,7 @@ jobs:
             ${{ github.workspace }}/contracts/target
           key: ${{ runner.os }}-cargo-${{ hashFiles('contracts/Cargo.lock') }}
 
-      - name: Add wasm32 target
-        run: rustup target add wasm32-unknown-unknown
+      - run: rustup target add wasm32-unknown-unknown
 
       - name: Install Stellar CLI
         run: |
@@ -117,26 +227,78 @@ jobs:
         working-directory: ./contracts
         run: cargo test
 
-  security:
-    name: Security Audit
+      - name: Check WASM size regression
+        run: node scripts/check-wasm-size.js
+
+  indexer-migrations:
+    name: Indexer — Migration Check
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: ancore
+          POSTGRES_PASSWORD: ancore
+          POSTGRES_DB: ancore_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U ancore"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Apply migrations (up smoke)
+        env:
+          DATABASE_URL: postgres://ancore:ancore@localhost:5432/ancore_test
+        run: bash services/indexer/scripts/check-migrations.sh
+
+  indexer:
+    name: Indexer — Build & Test
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
 
-      - name: Setup pnpm
-        uses: pnpm/action-setup@v2
+      - uses: pnpm/action-setup@v2
         with:
           version: 9
 
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
+      - uses: actions/setup-node@v4
         with:
           node-version: '20'
           cache: 'pnpm'
 
-      - name: Install dependencies
-        run: pnpm install --frozen-lockfile
+      - run: pnpm install --frozen-lockfile
 
-      - name: Run security audit
-        run: pnpm audit --audit-level=moderate
-        continue-on-error: true
+      - name: Lint indexer migrations
+        run: pnpm indexer:lint-migrations
+
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt, clippy
+
+      - uses: actions/cache@v3
+        with:
+          path: |
+            ~/.cargo/bin
+            ~/.cargo/registry/index
+            ~/.cargo/registry/cache
+            ~/.cargo/git/db
+            ${{ github.workspace }}/services/indexer/target
+          key: ${{ runner.os }}-indexer-cargo-${{ hashFiles('services/indexer/Cargo.lock', 'services/Cargo.toml') }}
+          restore-keys: |
+            ${{ runner.os }}-indexer-cargo-
+
+      - name: Check formatting
+        working-directory: ./services/indexer
+        run: cargo fmt --check
+
+      - name: Run clippy
+        working-directory: ./services/indexer
+        run: cargo clippy -- -D warnings
+
+      - name: Run tests
+        working-directory: ./services/indexer
+        run: cargo test

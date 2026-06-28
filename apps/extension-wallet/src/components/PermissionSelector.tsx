@@ -1,37 +1,41 @@
 import React from 'react';
+import { SessionPermission } from '@ancore/types';
+import {
+  ALL_SESSION_PERMISSIONS,
+  formatPermissionLabel,
+  hasPermission,
+  togglePermission,
+} from '@ancore/account-abstraction';
 
 interface PermissionSelectorProps {
-  selectedPermissions: string[];
-  onChange: (permissions: string[]) => void;
+  /** Selected permission bitmask. */
+  value: number;
+  onChange: (bitmask: number) => void;
   className?: string;
 }
 
-const availablePermissions = ['Read', 'Write', 'Execute', 'Admin'];
+const PERMISSION_OPTIONS: { label: string; value: SessionPermission }[] =
+  ALL_SESSION_PERMISSIONS.map((permission) => ({
+    value: permission,
+    label: formatPermissionLabel(permission),
+  }));
 
 export const PermissionSelector: React.FC<PermissionSelectorProps> = ({
-  selectedPermissions,
+  value,
   onChange,
   className,
 }) => {
-  const togglePermission = (permission: string) => {
-    if (selectedPermissions.includes(permission)) {
-      onChange(selectedPermissions.filter((p) => p !== permission));
-    } else {
-      onChange([...selectedPermissions, permission]);
-    }
-  };
-
   return (
     <div className={className}>
-      {availablePermissions.map((permission) => (
+      {PERMISSION_OPTIONS.map(({ label, value: permission }) => (
         <label key={permission} className="block mb-2">
           <input
             type="checkbox"
-            checked={selectedPermissions.includes(permission)}
-            onChange={() => togglePermission(permission)}
+            checked={hasPermission(value, permission)}
+            onChange={() => onChange(togglePermission(value, permission))}
             className="mr-2"
           />
-          {permission}
+          {label}
         </label>
       ))}
     </div>

@@ -111,6 +111,11 @@ describe('validatePasswordStrength()', () => {
       const result2 = validatePasswordStrength('adminadminadmin1!');
       expectWeak(result2);
     });
+
+    it('rejects strong-looking passwords that still embed a weak dictionary substring', () => {
+      const result = validatePasswordStrength('A!9_password_suffixZ');
+      expectWeak(result);
+    });
   });
 
   describe('medium passwords → valid with suggestions', () => {

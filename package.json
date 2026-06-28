@@ -15,16 +15,34 @@
   "scripts": {
     "build": "turbo run build",
     "dev": "turbo run dev",
+    "dev:extension": "pnpm --filter @ancore/extension-wallet run dev",
+    "dev:dashboard": "pnpm --filter @ancore/web-dashboard run dev",
+    "dev:mobile": "pnpm --filter @ancore/mobile-wallet run dev",
+    "test:extension": "pnpm --filter @ancore/extension-wallet run test",
+    "test:ui": "pnpm --filter @ancore/ui-kit run test",
     "test": "turbo run test",
     "lint": "turbo run lint",
+    "typecheck": "turbo run build",
     "format": "prettier --write \"**/*.{ts,tsx,js,jsx,json,md}\"",
     "format:check": "prettier --check \"**/*.{ts,tsx,js,jsx,json,md}\"",
     "clean": "turbo run clean && rm -rf node_modules",
     "contracts:build": "cd contracts && cargo build --target wasm32-unknown-unknown --release",
     "contracts:test": "cd contracts && cargo test",
-    "prepare": "husky"
+    "contracts:fmt": "cd contracts && cargo fmt --check",
+    "contracts:clippy": "cd contracts && cargo clippy -- -D warnings",
+    "indexer:check": "cd services/indexer && cargo check",
+    "indexer:lint-migrations": "node services/indexer/scripts/lint-migrations.mjs",
+    "audit:security": "node tools/security-audit.js",
+    "docs:validate-links": "node scripts/validate-doc-links.js",
+    "verify": "pnpm lint && pnpm typecheck && pnpm test",
+    "prepare": "husky",
+    "docs:check-structure": "node scripts/check-docs-repo-structure.mjs",
+    "verify:theme-tokens": "node scripts/verify-theme-tokens.ts"
   },
   "devDependencies": {
+    "@testing-library/jest-dom": "^6.9.1",
+    "@testing-library/react": "^14.0.0",
+    "@testing-library/user-event": "^14.5.0",
     "@turbo/gen": "^2.3.0",
     "@types/chrome": "^0.1.38",
     "@types/node": "^25.5.0",
@@ -56,6 +74,24 @@
     ],
     "packages/account-abstraction/src/**/*.{ts,tsx,js,jsx}": [
       "pnpm --dir packages/account-abstraction exec eslint --fix"
+    ],
+    "packages/wallet-shared/src/**/*.{ts,tsx,js,jsx}": [
+      "pnpm --dir packages/wallet-shared exec eslint --fix"
+    ],
+    "packages/wallet-api/src/**/*.{ts,tsx,js,jsx}": [
+      "pnpm --dir packages/wallet-api exec eslint --fix"
+    ],
+    "apps/extension-wallet/src/**/*.{ts,tsx,js,jsx}": [
+      "pnpm --dir apps/extension-wallet exec eslint --fix"
+    ],
+    "apps/web-dashboard/src/**/*.{ts,tsx,js,jsx}": [
+      "pnpm --dir apps/web-dashboard exec eslint --fix"
+    ],
+    "apps/mobile-wallet/src/**/*.{ts,tsx,js,jsx}": [
+      "pnpm --dir apps/mobile-wallet exec eslint --fix"
+    ],
+    "services/relayer/src/**/*.{ts,tsx,js,jsx}": [
+      "pnpm --dir services/relayer exec eslint --fix"
     ]
   },
   "pnpm": {

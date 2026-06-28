@@ -17,10 +17,10 @@ import {
 } from '@/utils/transaction-formatter';
 
 const STATUS_STYLES: Record<TransactionStatus, string> = {
-  confirmed: 'bg-emerald-100 text-emerald-700',
-  pending: 'bg-amber-100 text-amber-700',
-  failed: 'bg-rose-100 text-rose-700',
-  cancelled: 'bg-slate-100 text-slate-600',
+  confirmed: 'bg-success/10 text-success',
+  pending: 'bg-warning/10 text-warning',
+  failed: 'bg-destructive/10 text-destructive',
+  cancelled: 'bg-muted text-muted-foreground',
 };
 
 const TYPE_ICONS: Record<string, React.ReactNode> = {
@@ -32,7 +32,10 @@ const TYPE_ICONS: Record<string, React.ReactNode> = {
   withdrawal: <FiTrendingDown className="h-4 w-4" aria-hidden="true" />,
 };
 
-export interface TransactionItemProps extends React.HTMLAttributes<HTMLButtonElement> {
+export interface TransactionItemProps extends Omit<
+  React.HTMLAttributes<HTMLButtonElement>,
+  'onClick'
+> {
   transaction: TransactionRecord;
   onClick?: (transaction: TransactionRecord) => void;
 }
@@ -52,7 +55,7 @@ export function TransactionItem({
     <button
       type="button"
       className={cn(
-        'w-full rounded-lg border border-slate-200 px-3 py-2 text-left transition-colors hover:bg-slate-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring',
+        'w-full rounded-lg border border-border px-3 py-2 text-left transition-colors hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring',
         className
       )}
       onClick={() => onClick?.(transaction)}
@@ -60,26 +63,23 @@ export function TransactionItem({
     >
       <div className="flex items-start justify-between gap-3">
         <div className="flex min-w-0 items-start gap-3">
-          <span className="mt-0.5 rounded-full bg-slate-100 p-2 text-slate-600">{icon}</span>
+          <span className="mt-0.5 rounded-full bg-muted p-2 text-muted-foreground">{icon}</span>
           <div className="min-w-0">
-            <p className="text-sm font-medium capitalize text-slate-900">{transaction.type}</p>
-            <p className="text-xs text-slate-500">
-              {formatAddress(transaction.from)} → {formatAddress(transaction.to)}
+            <p className="text-sm font-medium capitalize text-foreground">{transaction.type}</p>
+            <p className="text-xs text-muted-foreground">
+              {formatAddress(transaction.from)} &rarr; {formatAddress(transaction.to)}
             </p>
           </div>
         </div>
 
         <div className="text-right">
           <p
-            className={cn(
-              'text-sm font-semibold',
-              isOutgoing ? 'text-slate-900' : 'text-emerald-700'
-            )}
+            className={cn('text-sm font-semibold', isOutgoing ? 'text-foreground' : 'text-success')}
           >
             {isOutgoing ? '-' : '+'}
             {formatTransactionAmount(transaction.amount, transaction.assetCode)}
           </p>
-          <p className="text-xs text-slate-500">{formatTime(transaction.timestamp)}</p>
+          <p className="text-xs text-muted-foreground">{formatTime(transaction.timestamp)}</p>
         </div>
       </div>
 

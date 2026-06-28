@@ -1,10 +1,29 @@
 {
   "extends": "../../tsconfig.base.json",
   "compilerOptions": {
+    "rootDir": "./src",
     "outDir": "./dist",
-    "composite": false,
-    "declarationDir": "./dist"
+    "composite": true,
+    "declarationDir": "./dist",
+    "tsBuildInfoFile": "./dist/.tsbuildinfo",
+    "baseUrl": ".",
+    "paths": {
+      "@ancore/types": ["../types/dist"],
+      "@ancore/types/*": ["../types/dist/*"],
+      "@ancore/crypto": ["../crypto/dist"],
+      "@ancore/crypto/*": ["../crypto/dist/*"],
+      "@ancore/stellar": ["../stellar/dist"],
+      "@ancore/stellar/*": ["../stellar/dist/*"],
+      "@ancore/test-fixtures": ["../test-fixtures/dist"],
+      "@ancore/test-fixtures/*": ["../test-fixtures/dist/*"]
+    }
   },
+  "references": [
+    { "path": "../types" },
+    { "path": "../crypto" },
+    { "path": "../stellar" },
+    { "path": "../test-fixtures" }
+  ],
   "include": ["src/**/*"],
   "exclude": ["node_modules", "dist", "**/*.test.ts"]
 }

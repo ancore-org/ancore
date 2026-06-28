@@ -24,6 +24,13 @@ describe('validateMnemonic', () => {
     expect(validateMnemonic(valid15WordMnemonic)).toBe(false);
   });
 
+  it('returns false for a valid 24-word mnemonic because the public API is restricted to 12 words', () => {
+    const valid24WordMnemonic = bip39.generateMnemonic(256);
+
+    expect(bip39.validateMnemonic(valid24WordMnemonic)).toBe(true);
+    expect(validateMnemonic(valid24WordMnemonic)).toBe(false);
+  });
+
   it('returns false for an invalid length (e.g. 11 words)', () => {
     const validMnemonic = bip39.generateMnemonic(128);
     const words = validMnemonic.split(' ');
@@ -42,5 +49,11 @@ describe('validateMnemonic', () => {
     // Extra spaces should be handled correctly by our split logic
     const spacedMnemonic = validMnemonic.replace(' ', '   ');
     expect(validateMnemonic(spacedMnemonic)).toBe(true);
+  });
+
+  it('returns false for uppercased mnemonics instead of silently rewriting casing', () => {
+    const validMnemonic = bip39.generateMnemonic(128);
+
+    expect(validateMnemonic(validMnemonic.toUpperCase())).toBe(false);
   });
 });

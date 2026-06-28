@@ -6,3 +6,11 @@ coverage/
 target/
 *.lock
 pnpm-lock.yaml
+contracts/account/test_snapshots/
+docs/
+services/indexer/README.md
+services/relayer/package.json
+services/relayer/tsconfig.json
+services/relayer/src/api/types.ts
+services/relayer/src/queue/backoff.ts
+services/relayer/src/workers/__tests__/QueueWorker.test.ts

@@ -33,6 +33,10 @@
       "content": "Use unique credentials, keep devices updated, and verify all transaction details before signing."
     },
     {
+      "title": "Keyboard shortcuts",
+      "content": "Lock your wallet instantly with ⌘+Shift+L on Mac or Ctrl+Shift+L on Windows/Linux. The shortcut is disabled while typing in any input field. You can turn it off in Settings → Security → Lock shortcut."
+    },
+    {
       "title": "Troubleshooting",
       "content": "Check network selection, balances, and error messages first; then recreate issue with minimal steps."
     }

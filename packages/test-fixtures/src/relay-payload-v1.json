@@ -1,0 +1,11 @@
+{
+  "sessionKey": "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
+  "operation": "relay_execute",
+  "parameters": {
+    "to": "GBHHL5543KUJHAWEBZZZIJHQP2EMYY3YPZS2WRJDQ7X6G5HC77625CW7",
+    "amount": "100",
+    "asset": "XLM"
+  },
+  "signature": "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
+  "nonce": 42
+}

@@ -1,0 +1,134 @@
+name: Publish @ancore/wallet-api
+
+on:
+  push:
+    tags:
+      - 'wallet-api/v*'
+  release:
+    types: [published]
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: 'Publish in dry-run mode (no actual npm publish)'
+        required: false
+        default: 'true'
+        type: choice
+        options: ['true', 'false']
+
+permissions:
+  contents: read
+  id-token: write
+
+concurrency:
+  group: publish-wallet-api-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  # ── Dry-run check — runs on every PR that touches packages/wallet-api/ ────
+  dry-run-check:
+    name: Dry-Run Publish Check
+    runs-on: ubuntu-latest
+    if: github.event_name != 'push' || !startsWith(github.ref, 'refs/tags/')
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v2
+        with:
+          version: 9
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'pnpm'
+          registry-url: 'https://registry.npmjs.org'
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Build @ancore/wallet-api
+        run: pnpm --filter @ancore/wallet-api build
+
+      - name: Dry-run publish check
+        run: pnpm --filter @ancore/wallet-api publish --dry-run --no-git-checks
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+
+      - name: Verify TypeScript types are present
+        run: |
+          if [ ! -f packages/wallet-api/dist/index.d.ts ]; then
+            echo "ERROR: dist/index.d.ts not found — types will not ship with the package"
+            exit 1
+          fi
+          echo "✓ TypeScript declaration file present at dist/index.d.ts"
+
+  # ── Real publish — triggered by wallet-api/v* tag or release event ────────
+  publish:
+    name: Publish to npm
+    runs-on: ubuntu-latest
+    if: |
+      (github.event_name == 'push' && startsWith(github.ref, 'refs/tags/wallet-api/v')) ||
+      (github.event_name == 'release' && github.event.action == 'published') ||
+      (github.event_name == 'workflow_dispatch' && github.event.inputs.dry_run == 'false')
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - uses: pnpm/action-setup@v2
+        with:
+          version: 9
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'pnpm'
+          registry-url: 'https://registry.npmjs.org'
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Build @ancore/wallet-api
+        run: pnpm --filter @ancore/wallet-api build
+
+      - name: Run tests
+        run: pnpm --filter @ancore/wallet-api test
+
+      - name: Verify TypeScript types are present
+        run: |
+          if [ ! -f packages/wallet-api/dist/index.d.ts ]; then
+            echo "ERROR: dist/index.d.ts not found — types will not ship with the package"
+            exit 1
+          fi
+
+      - name: Extract version from package.json
+        id: pkg
+        run: |
+          VERSION=$(node -p "require('./packages/wallet-api/package.json').version")
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+          echo "Publishing @ancore/wallet-api@$VERSION"
+
+      - name: Check version not already published
+        run: |
+          VERSION=${{ steps.pkg.outputs.version }}
+          if npm view "@ancore/wallet-api@$VERSION" version 2>/dev/null; then
+            echo "ERROR: @ancore/wallet-api@$VERSION is already published to npm. Bump the version before releasing."
+            exit 1
+          fi
+          echo "✓ Version $VERSION is not yet published — proceeding"
+
+      - name: Publish to npm
+        run: pnpm --filter @ancore/wallet-api publish --no-git-checks --access public
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+
+      - name: Publish summary
+        run: |
+          echo "## Published @ancore/wallet-api@${{ steps.pkg.outputs.version }}" >> "$GITHUB_STEP_SUMMARY"
+          echo "" >> "$GITHUB_STEP_SUMMARY"
+          echo "| Field | Value |" >> "$GITHUB_STEP_SUMMARY"
+          echo "|-------|-------|" >> "$GITHUB_STEP_SUMMARY"
+          echo "| Version | \`${{ steps.pkg.outputs.version }}\` |" >> "$GITHUB_STEP_SUMMARY"
+          echo "| Registry | https://www.npmjs.com/package/@ancore/wallet-api |" >> "$GITHUB_STEP_SUMMARY"
+          echo "| Trigger | \`${{ github.event_name }}\` |" >> "$GITHUB_STEP_SUMMARY"

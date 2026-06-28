@@ -1,11 +1,12 @@
 /**
- * Unit tests for getOwner and getNonce functions with mocked contract responses.
+ * Unit tests for getOwner, getNonce, and getVersion functions with mocked contract responses.
  */
 
 import { Address, xdr } from '@stellar/stellar-sdk';
 import {
   getOwner,
   getNonce,
+  getVersion,
   type AccountContractReadOptions,
   NotInitializedError,
   InvalidNonceError,
@@ -191,5 +192,91 @@ describe('getNonce', () => {
     });
 
     expect(result).toBe(largeNonce);
+  });
+});
+
+describe('getVersion', () => {
+  it('returns version as number from mocked u32 response', async () => {
+    const versionScVal = xdr.ScVal.scvU32(1);
+    const mockSimSuccess = { result: { retval: versionScVal } };
+    const server = {
+      getAccount: jest.fn().mockResolvedValue({ id: OWNER_ADDRESS, sequence: '1' }),
+      simulateTransaction: jest.fn().mockResolvedValue(mockSimSuccess),
+    } as AccountContractReadOptions['server'];
+
+    const result = await getVersion(CONTRACT_ID, {
+      server,
+      sourceAccount: OWNER_ADDRESS,
+      networkPassphrase: 'Test SDF Network ; September 2015',
+    });
+
+    expect(result).toBe(1);
+    expect(typeof result).toBe('number');
+  });
+
+  it('returns 0 when version key is absent (pre-initialize)', async () => {
+    const versionScVal = xdr.ScVal.scvU32(0);
+    const mockSimSuccess = { result: { retval: versionScVal } };
+    const server = {
+      getAccount: jest.fn().mockResolvedValue({ id: OWNER_ADDRESS, sequence: '1' }),
+      simulateTransaction: jest.fn().mockResolvedValue(mockSimSuccess),
+    } as AccountContractReadOptions['server'];
+
+    const result = await getVersion(CONTRACT_ID, {
+      server,
+      sourceAccount: OWNER_ADDRESS,
+      networkPassphrase: 'Test SDF Network ; September 2015',
+    });
+
+    expect(result).toBe(0);
+  });
+
+  it('returns incremented version after upgrade', async () => {
+    const versionScVal = xdr.ScVal.scvU32(2);
+    const mockSimSuccess = { result: { retval: versionScVal } };
+    const server = {
+      getAccount: jest.fn().mockResolvedValue({ id: OWNER_ADDRESS, sequence: '1' }),
+      simulateTransaction: jest.fn().mockResolvedValue(mockSimSuccess),
+    } as AccountContractReadOptions['server'];
+
+    const result = await getVersion(CONTRACT_ID, {
+      server,
+      sourceAccount: OWNER_ADDRESS,
+      networkPassphrase: 'Test SDF Network ; September 2015',
+    });
+
+    expect(result).toBe(2);
+  });
+
+  it('throws TypeError when contract returns unexpected type', async () => {
+    const unexpectedScVal = new Address(OWNER_ADDRESS).toScVal();
+    const mockSimSuccess = { result: { retval: unexpectedScVal } };
+    const server = {
+      getAccount: jest.fn().mockResolvedValue({ id: OWNER_ADDRESS, sequence: '1' }),
+      simulateTransaction: jest.fn().mockResolvedValue(mockSimSuccess),
+    } as AccountContractReadOptions['server'];
+
+    await expect(
+      getVersion(CONTRACT_ID, {
+        server,
+        sourceAccount: OWNER_ADDRESS,
+        networkPassphrase: 'Test SDF Network ; September 2015',
+      })
+    ).rejects.toThrow(TypeError);
+  });
+
+  it('throws ContractInvocationError when simulation fails', async () => {
+    const server = {
+      getAccount: jest.fn().mockResolvedValue({ id: OWNER_ADDRESS, sequence: '1' }),
+      simulateTransaction: jest.fn().mockResolvedValue({ error: 'Host function failure' }),
+    } as AccountContractReadOptions['server'];
+
+    await expect(
+      getVersion(CONTRACT_ID, {
+        server,
+        sourceAccount: OWNER_ADDRESS,
+        networkPassphrase: 'Test SDF Network ; September 2015',
+      })
+    ).rejects.toThrow(ContractInvocationError);
   });
 });

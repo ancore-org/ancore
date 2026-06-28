@@ -1,12 +1,35 @@
 {
   "files": [
     {
-      "maxSize": "200kB"
+      "path": "apps/extension-wallet/dist/popup.js",
+      "maxSize": "150kB",
+      "compression": "gzip"
+    },
+    {
+      "path": "apps/extension-wallet/dist/background.js",
+      "maxSize": "120kB",
+      "compression": "gzip"
+    },
+    {
+      "path": "apps/extension-wallet/dist/content.js",
+      "maxSize": "80kB",
+      "compression": "gzip"
     },
     {
       "path": "apps/extension-wallet/dist/assets/*.css",
-      "maxSize": "50kB"
+      "maxSize": "50kB",
+      "compression": "gzip"
+    },
+    {
+      "path": "apps/extension-wallet/dist/**/*.js",
+      "maxSize": "500kB",
+      "compression": "gzip"
     }
   ],
-  "bundlewatchServiceHost": "https://service.bundlewatch.io"
+  "bundlewatchServiceHost": "https://service.bundlewatch.io",
+  "ci": {
+    "trackBranches": ["main", "develop"],
+    "commitstatusCheckContext": "bundlewatch",
+    "desiredMetrics": ["gzip"]
+  }
 }

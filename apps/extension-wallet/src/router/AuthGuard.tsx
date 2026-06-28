@@ -8,6 +8,7 @@ export interface AuthState {
   isUnlocked: boolean;
   walletName: string;
   accountAddress: string;
+  smartAccountId?: string;
 }
 
 export const DEFAULT_AUTH_STATE: AuthState = {
@@ -19,13 +20,18 @@ export const DEFAULT_AUTH_STATE: AuthState = {
 
 interface AuthContextValue {
   authState: AuthState;
-  completeOnboarding: (walletName: string) => void;
-  unlockWallet: () => void;
+  unlockError: string | null;
+  completeOnboarding: (walletName: string, publicKey?: string, smartAccountId?: string) => void;
+  unlockWallet: (password: string) => Promise<boolean>;
   lockWallet: () => void;
   resetWallet: () => void;
 }
 
 const AuthContext = React.createContext<AuthContextValue | null>(null);
+
+export type UnlockVerifier = (password: string) => boolean | Promise<boolean>;
+
+const DEFAULT_UNLOCK_ERROR = 'Incorrect password. Please try again.';
 
 export function readAuthState(): AuthState {
   if (typeof window === 'undefined') {
@@ -51,12 +57,61 @@ function writeAuthState(authState: AuthState): void {
   window.localStorage.setItem(AUTH_STORAGE_KEY, JSON.stringify(authState));
 }
 
-export function ExtensionAuthProvider({ children }: { children: React.ReactNode }) {
+function hasExtensionStorage(): boolean {
+  if (typeof chrome !== 'undefined' && chrome.storage?.local) {
+    return true;
+  }
+  if (typeof browser !== 'undefined' && browser.storage?.local) {
+    return true;
+  }
+  return false;
+}
+
+export function ExtensionAuthProvider({
+  children,
+  unlockVerifier,
+}: {
+  children: React.ReactNode;
+  unlockVerifier?: UnlockVerifier;
+}) {
   const [authState, setAuthState] = React.useState<AuthState>(readAuthState);
+  const [unlockError, setUnlockError] = React.useState<string | null>(null);
+  const [isInitializing, setIsInitializing] = React.useState(true);
 
   React.useEffect(() => {
     writeAuthState(authState);
   }, [authState]);
+
+  React.useEffect(() => {
+    async function initVault() {
+      if (!hasExtensionStorage()) {
+        setIsInitializing(false);
+        return;
+      }
+
+      try {
+        const { getSharedStorageManager } = await import('../security/storage-manager');
+        const storageManager = getSharedStorageManager();
+        const vaultExists = await storageManager.hasVault();
+
+        setAuthState((current) => {
+          const hasOnboarded = vaultExists ? true : current.hasOnboarded;
+          if (hasOnboarded === current.hasOnboarded) {
+            return current;
+          }
+          const next = { ...current, hasOnboarded };
+          writeAuthState(next);
+          return next;
+        });
+      } catch (err) {
+        console.error('Failed to check vault', err);
+      } finally {
+        setIsInitializing(false);
+      }
+    }
+
+    void initVault();
+  }, []);
 
   React.useEffect(() => {
     function handleStorage(event: StorageEvent) {
@@ -72,35 +127,75 @@ export function ExtensionAuthProvider({ children }: { children: React.ReactNode 
   const value = React.useMemo<AuthContextValue>(
     () => ({
       authState,
-      completeOnboarding: (walletName: string) => {
+      unlockError,
+      completeOnboarding: (walletName: string, publicKey?: string, smartAccountId?: string) => {
+        setUnlockError(null);
         setAuthState({
           hasOnboarded: true,
           isUnlocked: true,
           walletName: walletName.trim() || DEFAULT_AUTH_STATE.walletName,
-          accountAddress: DEFAULT_AUTH_STATE.accountAddress,
+          accountAddress: publicKey ?? DEFAULT_AUTH_STATE.accountAddress,
+          ...(smartAccountId ? { smartAccountId } : {}),
         });
       },
-      unlockWallet: () => {
-        setAuthState((current) => ({
-          ...current,
-          hasOnboarded: true,
-          isUnlocked: true,
-        }));
+      unlockWallet: async (password: string) => {
+        try {
+          const isValid = await (unlockVerifier?.(password) ?? Boolean(password.trim()));
+
+          if (!isValid) {
+            setUnlockError(DEFAULT_UNLOCK_ERROR);
+            setAuthState((current) => ({
+              ...current,
+              isUnlocked: false,
+            }));
+            return false;
+          }
+
+          setUnlockError(null);
+          setAuthState((current) => ({
+            ...current,
+            hasOnboarded: true,
+            isUnlocked: true,
+          }));
+          return true;
+        } catch {
+          setUnlockError(DEFAULT_UNLOCK_ERROR);
+          setAuthState((current) => ({
+            ...current,
+            isUnlocked: false,
+          }));
+          return false;
+        }
       },
       lockWallet: () => {
+        setUnlockError(null);
         setAuthState((current) => ({
           ...current,
           isUnlocked: false,
         }));
       },
       resetWallet: () => {
+        setUnlockError(null);
         setAuthState(DEFAULT_AUTH_STATE);
       },
     }),
-    [authState]
+    [authState, unlockError, unlockVerifier]
   );
 
-  return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
+  return (
+    <AuthContext.Provider value={value}>
+      {isInitializing ? (
+        <div
+          className="flex min-h-screen items-center justify-center bg-background"
+          data-testid="auth-initializing"
+        >
+          <div className="h-6 w-6 animate-spin rounded-full border-2 border-primary border-t-transparent" />
+        </div>
+      ) : (
+        children
+      )}
+    </AuthContext.Provider>
+  );
 }
 
 export function useExtensionAuth(): AuthContextValue {
@@ -118,7 +213,7 @@ export function AuthGuard() {
   const location = useLocation();
 
   if (!authState.hasOnboarded) {
-    return <Navigate replace state={{ from: location.pathname }} to="/welcome" />;
+    return <Navigate replace state={{ from: location.pathname }} to="/onboarding" />;
   }
 
   if (!authState.isUnlocked) {
@@ -133,7 +228,7 @@ export function PublicOnlyGuard({
   mode,
 }: {
   children: React.ReactElement;
-  mode: 'welcome' | 'create-account' | 'unlock';
+  mode: 'welcome' | 'onboarding' | 'unlock';
 }) {
   const { authState } = useExtensionAuth();
 

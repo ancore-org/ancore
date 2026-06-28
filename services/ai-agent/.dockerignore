@@ -1,0 +1,42 @@
+# Dependencies — never copy into the build context; installed inside the image
+node_modules/
+
+# TypeScript source maps and declaration files not needed at runtime
+**/*.js.map
+**/*.d.ts.map
+
+# Test files
+tests/
+**/*.test.ts
+**/*.spec.ts
+
+# Build output (rebuilt inside the image)
+dist/
+
+# Development and editor config
+.env
+.env.*
+*.local
+.editorconfig
+.eslintrc*
+eslint.config.*
+.prettierrc*
+.nvmrc
+.node-version
+
+# Git and CI metadata
+.git/
+.github/
+.gitignore
+
+# Documentation
+docs/
+README.md
+CHANGELOG.md
+
+# Coverage reports
+coverage/
+
+# Logs
+*.log
+npm-debug.log*

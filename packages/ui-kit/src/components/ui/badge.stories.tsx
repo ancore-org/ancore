@@ -11,7 +11,16 @@ const meta = {
   argTypes: {
     variant: {
       control: 'select',
-      options: ['default', 'secondary', 'destructive', 'outline'],
+      options: [
+        'default',
+        'secondary',
+        'destructive',
+        'outline',
+        'success',
+        'warning',
+        'pending',
+        'failed',
+      ],
     },
   },
 } satisfies Meta<typeof Badge>;
@@ -61,6 +70,33 @@ export const AllVariants: Story = {
       <Badge variant="secondary">Secondary</Badge>
       <Badge variant="destructive">Destructive</Badge>
       <Badge variant="outline">Outline</Badge>
+    </div>
+  ),
+};
+
+export const Success: Story = {
+  args: { children: 'Confirmed', variant: 'success' },
+};
+
+export const Warning: Story = {
+  args: { children: 'Warning', variant: 'warning' },
+};
+
+export const Pending: Story = {
+  args: { children: 'Pending', variant: 'pending' },
+};
+
+export const Failed: Story = {
+  args: { children: 'Failed', variant: 'failed' },
+};
+
+export const TransactionStatusVariants: Story = {
+  render: () => (
+    <div className="flex flex-wrap gap-2">
+      <Badge variant="success">Confirmed</Badge>
+      <Badge variant="warning">Warning</Badge>
+      <Badge variant="pending">Pending</Badge>
+      <Badge variant="failed">Failed</Badge>
     </div>
   ),
 };

@@ -6,7 +6,7 @@
  */
 
 import { SecureStorageManager } from '@ancore/core-sdk';
-import { InactivityDetector } from './inactivity-detector';
+import { InactivityDetector, minutesToInactivityMs } from './inactivity-detector';
 
 type StorageManagerInstance = InstanceType<typeof SecureStorageManager>;
 
@@ -32,7 +32,10 @@ export class LockManager {
     this.onLock = options.onLock;
     this.onUnlock = options.onUnlock;
 
-    this.detector = new InactivityDetector(() => this.lock(), options.autoLockMinutes * 60 * 1000);
+    this.detector = new InactivityDetector(
+      () => this.lock(),
+      minutesToInactivityMs(options.autoLockMinutes)
+    );
   }
 
   get isLocked(): boolean {
@@ -41,12 +44,16 @@ export class LockManager {
 
   /**
    * Unlock the wallet with the given password.
-   * Throws if the password is incorrect.
+   * Throws if the password is incorrect or the storage layer does not
+   * positively confirm that the unlock succeeded.
    */
   async unlock(password: string): Promise<void> {
-    // Delegates password verification to SecureStorageManager.
-    // unlock() will throw 'Invalid password or corrupted data' on bad password.
-    await this.storageManager.unlock(password);
+    const unlocked = await this.storageManager.unlock(password);
+
+    if (!unlocked) {
+      this.storageManager.lock();
+      throw new Error('Invalid password or corrupted data');
+    }
 
     this.status = 'unlocked';
     this.detector.start();
@@ -67,7 +74,7 @@ export class LockManager {
    * Update the auto-lock timeout (e.g. when user changes settings).
    */
   setAutoLockMinutes(minutes: number): void {
-    this.detector.setTimeoutMs(minutes * 60 * 1000);
+    this.detector.setTimeoutMs(minutesToInactivityMs(minutes));
   }
 
   /**

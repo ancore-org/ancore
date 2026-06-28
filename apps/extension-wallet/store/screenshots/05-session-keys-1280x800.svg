@@ -1,0 +1,15 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1280" height="800" viewBox="0 0 1280 800">
+  <rect width="1280" height="800" fill="#eef3ff"/>
+  <rect x="420" y="60" width="440" height="680" rx="22" fill="#ffffff" stroke="#d2ddff"/>
+  <text x="460" y="120" font-family="Inter, Segoe UI, Arial" font-size="34" font-weight="700" fill="#10204a">Session keys</text>
+  <text x="460" y="170" font-family="Inter, Segoe UI, Arial" font-size="20" fill="#5c6d96">Active keys</text>
+  <rect x="460" y="190" width="360" height="100" rx="14" fill="#f6f9ff" stroke="#cfdafc"/>
+  <text x="478" y="230" font-family="Inter, Segoe UI, Arial" font-size="22" fill="#1d3678">Trading bot</text>
+  <text x="478" y="262" font-family="Inter, Segoe UI, Arial" font-size="18" fill="#7a87a9">Valid for 12 more hours</text>
+  <rect x="460" y="306" width="360" height="100" rx="14" fill="#f6f9ff" stroke="#cfdafc"/>
+  <text x="478" y="346" font-family="Inter, Segoe UI, Arial" font-size="22" fill="#1d3678">Automation script</text>
+  <text x="478" y="378" font-family="Inter, Segoe UI, Arial" font-size="18" fill="#7a87a9">Expires tomorrow</text>
+  <rect x="460" y="454" width="360" height="64" rx="14" fill="#1d3678"/>
+  <text x="560" y="496" font-family="Inter, Segoe UI, Arial" font-size="24" fill="#ffffff">Add session key</text>
+  <text x="30" y="770" font-family="Inter, Segoe UI, Arial" font-size="24" fill="#344675">Screenshot 5: Session key management screen</text>
+</svg>

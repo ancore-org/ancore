@@ -8,8 +8,7 @@ import {
 
 // ─── Shared test fixtures ─────────────────────────────────────────────────────
 
-// G + 55 uppercase alphanumeric chars = valid Stellar address format
-const VALID_STELLAR_ADDRESS = 'G' + 'A'.repeat(55);
+const VALID_STELLAR_ADDRESS = 'GAAZI4TCR3TY5OJHCTJC2A4QSY6CJWJH5IAJTGKIN2ER7LBNVKOCCWNA';
 const VALID_SESSION_PK = 'a'.repeat(64); // 64 hex chars
 const VALID_SIGNATURE = 'b'.repeat(128); // 128 hex chars
 const VALID_PAYLOAD = 'deadbeef';
@@ -46,12 +45,14 @@ describe('relayExecuteRequestSchema', () => {
   });
 
   it('defaults args to [] when omitted', () => {
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
     const { args: _args, ...noArgs } = valid;
     const result = validateRequest(relayExecuteRequestSchema, noArgs);
     expect(result.args).toEqual([]);
   });
 
   it('rejects missing accountAddress', () => {
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
     const { accountAddress: _a, ...bad } = valid;
     expect(() => validateRequest(relayExecuteRequestSchema, bad)).toThrow();
   });
@@ -92,16 +93,16 @@ describe('relayExecuteRequestSchema', () => {
 
   it('validation error includes field path', () => {
     const bad = { ...valid, accountAddress: 'bad' };
-    let caught: unknown;
+    let capturedError: ValidationErrorResponse | undefined;
     try {
       validateRequest(relayExecuteRequestSchema, bad);
     } catch (err) {
-      caught = err;
+      capturedError = err as ValidationErrorResponse;
     }
-    expect(caught).toBeDefined();
-    const typed = caught as ValidationErrorResponse;
-    expect(typed.error).toBe('VALIDATION_ERROR');
-    expect(typed.details.some((d) => d.field === 'accountAddress')).toBe(true);
+
+    expect(capturedError).toBeDefined();
+    expect(capturedError?.error).toBe('VALIDATION_ERROR');
+    expect(capturedError?.details.some((d) => d.field === 'accountAddress')).toBe(true);
   });
 });
 
@@ -123,6 +124,7 @@ describe('relayAddSessionKeyRequestSchema', () => {
   });
 
   it('defaults permissions to [] when omitted', () => {
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
     const { permissions: _p, ...noPerms } = valid;
     const result = validateRequest(relayAddSessionKeyRequestSchema, noPerms);
     expect(result.permissions).toEqual([]);
@@ -134,6 +136,7 @@ describe('relayAddSessionKeyRequestSchema', () => {
   });
 
   it('rejects missing signature', () => {
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
     const { signature: _s, ...bad } = valid;
     expect(() => validateRequest(relayAddSessionKeyRequestSchema, bad)).toThrow();
   });
@@ -160,6 +163,7 @@ describe('relayRevokeSessionKeyRequestSchema', () => {
   });
 
   it('rejects missing sessionPublicKey', () => {
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
     const { sessionPublicKey: _sk, ...bad } = valid;
     expect(() => validateRequest(relayRevokeSessionKeyRequestSchema, bad)).toThrow();
   });

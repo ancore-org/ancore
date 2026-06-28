@@ -51,58 +51,28 @@ const PASSWORD_REQUIREMENTS: PasswordRequirements[] = [
  * Get strength color based on score
  */
 function getStrengthColor(score: number): string {
-  switch (score) {
-    case 0:
-      return 'bg-red-500';
-    case 1:
-      return 'bg-red-500';
-    case 2:
-      return 'bg-yellow-500';
-    case 3:
-      return 'bg-yellow-500';
-    case 4:
-      return 'bg-green-500';
-    default:
-      return 'bg-gray-300';
-  }
+  if (score <= 2) return 'bg-red-500';
+  if (score <= 4) return 'bg-yellow-500';
+  return 'bg-green-500';
 }
 
 /**
  * Get strength label based on score
  */
 function getStrengthLabel(score: number): string {
-  switch (score) {
-    case 0:
-      return 'Very Weak';
-    case 1:
-      return 'Weak';
-    case 2:
-      return 'Fair';
-    case 3:
-      return 'Good';
-    case 4:
-      return 'Strong';
-    default:
-      return '';
-  }
+  if (score <= 2) return 'Very Weak';
+  if (score === 3) return 'Fair';
+  if (score === 4) return 'Good';
+  return 'Strong';
 }
 
 /**
  * Get strength color for text based on score
  */
 function getStrengthTextColor(score: number): string {
-  switch (score) {
-    case 0:
-    case 1:
-      return 'text-red-600';
-    case 2:
-    case 3:
-      return 'text-yellow-600';
-    case 4:
-      return 'text-green-600';
-    default:
-      return 'text-muted-foreground';
-  }
+  if (score <= 2) return 'text-red-600';
+  if (score <= 4) return 'text-yellow-600';
+  return 'text-green-600';
 }
 
 /**
@@ -176,9 +146,12 @@ export function PasswordScreen({ onSubmit, onBack }: PasswordScreenProps) {
         <form onSubmit={handleSubmit} className="space-y-5">
           {/* Password Input */}
           <div className="space-y-2">
-            <label className="text-sm font-medium text-foreground">Password</label>
+            <label htmlFor="password-input" className="text-sm font-medium text-foreground">
+              Password
+            </label>
             <div className="relative">
               <input
+                id="password-input"
                 type={showPassword ? 'text' : 'password'}
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
@@ -242,9 +215,12 @@ export function PasswordScreen({ onSubmit, onBack }: PasswordScreenProps) {
 
           {/* Confirm Password Input */}
           <div className="space-y-2">
-            <label className="text-sm font-medium text-foreground">Confirm Password</label>
+            <label htmlFor="confirm-password-input" className="text-sm font-medium text-foreground">
+              Confirm Password
+            </label>
             <div className="relative">
               <input
+                id="confirm-password-input"
                 type={showConfirmPassword ? 'text' : 'password'}
                 value={confirmPassword}
                 onChange={(e) => setConfirmPassword(e.target.value)}

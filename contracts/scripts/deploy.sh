@@ -1,5 +1,6 @@
 #!/bin/bash
 # Deploy Soroban contract to testnet and output contract ID
+# Requires: stellar CLI v22.0.1+
 
 set -e
 
@@ -13,11 +14,11 @@ if [ -z "$DEPLOYER_SECRET" ]; then
   exit 1
 fi
 
-# Fund deployer account if needed (Soroban testnet)
-soroban auth fund-account --network $NETWORK --source $DEPLOYER_SECRET || true
+# Fund deployer account if needed (Stellar testnet)
+stellar keys fund --network $NETWORK --source $DEPLOYER_SECRET || true
 
 # Deploy contract
-CONTRACT_ID=$(soroban contract deploy --network $NETWORK --source $DEPLOYER_SECRET --wasm $WASM_FILE | grep 'Contract ID:' | awk '{print $NF}')
+CONTRACT_ID=$(stellar contract deploy --network $NETWORK --source $DEPLOYER_SECRET --wasm $WASM_FILE | grep 'Contract ID:' | awk '{print $NF}')
 
 if [ -z "$CONTRACT_ID" ]; then
   echo "Contract deployment failed."

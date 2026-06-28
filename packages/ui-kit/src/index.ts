@@ -26,8 +26,14 @@ export type { BadgeProps } from './components/ui/badge';
 
 export { Separator } from './components/ui/separator';
 
-export { Dialog } from './components/ui/dialog';
+export { Dialog, DialogContent } from './components/ui/dialog';
 export { Tooltip } from './components/ui/tooltip';
+
+export { Skeleton } from './components/ui/skeleton';
+export type { SkeletonProps } from './components/ui/skeleton';
+
+export { EmptyState } from './components/ui/empty-state';
+export type { EmptyStateProps } from './components/ui/empty-state';
 
 // Custom wallet components
 export { AmountInput } from './components/amount-input';
@@ -42,9 +48,28 @@ export type { QRCodeProps } from './components/QRCode';
 export { Identicon } from './components/Identicon';
 export type { IdenticonProps } from './components/Identicon';
 
+export { MerchantBadge } from './components/MerchantBadge';
+export type { MerchantBadgeProps, MerchantBadgeStatus } from './components/MerchantBadge';
+
+export { ExpiryCountdown, useExpiryCountdown } from './components/ExpiryCountdown';
+export type { ExpiryCountdownProps } from './components/ExpiryCountdown';
+export {
+  COUNTDOWN_UPDATE_INTERVAL_MS,
+  EXPIRING_SOON_THRESHOLD_MS,
+  formatExpiryRemaining,
+  getExpiryStatus,
+  getExpiryThreshold,
+  getThresholdAnnouncement,
+  isRevokedExpiry,
+} from './components/ExpiryCountdown';
+export type { ExpiryStatus, ExpiryThreshold } from './components/ExpiryCountdown';
+
 // Form system
 export { Form, FormSubmit, FormError } from './components/Form/Form';
 export type { FormProps, FormSubmitProps, FormErrorProps } from './components/Form/Form';
+
+export { Field } from './components/Form/Field';
+export type { FieldProps } from './components/Form/Field';
 
 export { AddressInput, AddressInputBase } from './components/Form/AddressInput';
 export type { AddressInputProps, AddressInputBaseProps } from './components/Form/AddressInput';
@@ -67,6 +92,8 @@ export {
   parseAmount,
   formatAmount,
   getPasswordStrength,
+  getDecimalPlaces,
+  validateAmountPrecision,
   STELLAR_ADDRESS_REGEX,
 } from './components/Form/validation';
 export type { PasswordStrength } from './components/Form/validation';
@@ -75,7 +102,7 @@ export { Toast } from './components/Toast/Toast';
 export type { ToastProps } from './components/Toast/Toast';
 export { ToastContainer } from './components/Toast/ToastContainer';
 export { NotificationProvider } from './components/Toast/NotificationProvider';
-export type { ToastItem, ToastVariant } from './components/Toast/NotificationProvider';
+export type { Toast as ToastItem, ToastVariant } from './components/Toast/NotificationProvider';
 export { useToast } from './components/Toast/useToast';
 
 // Utility functions

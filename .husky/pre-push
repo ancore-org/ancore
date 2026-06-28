@@ -7,7 +7,7 @@ npx pnpm build || {
 echo "✅ Build successful!"
 
 echo "🧪 Running tests..."
-npx pnpm test || {
+npx pnpm test -- --concurrency=4 || {
   echo "❌ Tests failed. Please fix failing tests before pushing."
   exit 1
 }

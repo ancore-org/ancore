@@ -5,6 +5,7 @@
     { "path": "packages/crypto" },
     { "path": "packages/stellar" },
     { "path": "packages/account-abstraction" },
-    { "path": "packages/core-sdk" }
+    { "path": "packages/core-sdk" },
+    { "path": "packages/test-fixtures" }
   ]
 }

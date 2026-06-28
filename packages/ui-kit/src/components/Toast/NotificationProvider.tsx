@@ -2,13 +2,15 @@ import * as React from 'react';
 import * as ReactDOM from 'react-dom';
 import { Toast as ToastComponent } from './Toast';
 
-export type ToastVariant = 'success' | 'error' | 'info';
+export type ToastVariant = 'success' | 'error' | 'warning' | 'info';
 
 export interface Toast {
   id: string;
   message: string;
   variant: ToastVariant;
 }
+
+export type ToastItem = Toast;
 
 interface NotificationContextValue {
   toast: (message: string, variant?: ToastVariant, duration?: number) => void;

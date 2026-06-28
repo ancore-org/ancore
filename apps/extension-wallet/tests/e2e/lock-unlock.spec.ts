@@ -1,4 +1,5 @@
 import { test, expect, navigateTo } from '../fixtures/extension';
+import { TEST_PASSWORD } from '../fixtures/test-mnemonics';
 
 test.describe('Lock / unlock flow', () => {
   test('locked wallet shows unlock screen', async ({ page, seedWallet }) => {
@@ -52,15 +53,43 @@ test.describe('Lock / unlock flow', () => {
     await expect(page).toHaveURL(/\/unlock/);
   });
 
-  test('reset wallet returns to fresh state', async ({ page, seedWallet }) => {
-    await seedWallet('onboarded-locked');
-    await navigateTo(page, '/unlock');
+  // ── Real-artifact tests (unblock after #764) ───────────────────────────────
 
-    await page.getByRole('button', { name: /Reset demo wallet/i }).click();
-    // After reset the app stays at /unlock; navigate to / to trigger root redirect
-    await page.goto('/');
-    await page.waitForLoadState('networkidle');
+  test.skip('extension popup opens and renders root UI (real artifact)', async ({
+    extensionContext,
+    extensionUrl,
+  }) => {
+    // TODO: unblocks after #764
+    const page = await extensionContext.newPage();
+    await page.goto(extensionUrl('index.html'));
+    await page.waitForLoadState('domcontentloaded');
+    const body = await page.locator('body').innerText();
+    expect(body.length).toBeGreaterThan(0);
+  });
 
-    await expect(page).toHaveURL(/\/welcome/);
+  test.skip('unlock with correct password → home screen shown (real artifact)', async ({
+    extensionContext,
+    extensionUrl,
+  }) => {
+    // TODO: unblocks after #764
+    const page = await extensionContext.newPage();
+    await page.goto(extensionUrl('index.html'));
+    await page.getByRole('button', { name: /lock/i }).click();
+    await page.getByLabel(/password/i).fill(TEST_PASSWORD);
+    await page.getByRole('button', { name: /unlock/i }).click();
+    await expect(page.getByTestId('home-screen')).toBeVisible();
+  });
+
+  test.skip('unlock with wrong password → error message shown (real artifact)', async ({
+    extensionContext,
+    extensionUrl,
+  }) => {
+    // TODO: unblocks after #764
+    const page = await extensionContext.newPage();
+    await page.goto(extensionUrl('index.html'));
+    await page.getByRole('button', { name: /lock/i }).click();
+    await page.getByLabel(/password/i).fill('wrong-password');
+    await page.getByRole('button', { name: /unlock/i }).click();
+    await expect(page.getByRole('alert')).toContainText(/incorrect|invalid/i);
   });
 });

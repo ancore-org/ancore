@@ -209,6 +209,65 @@ describe('CONTRACT_ERROR_CODES', () => {
     expect(Object.keys(CONTRACT_ERROR_CODES)).toHaveLength(7);
   });
 
+  it('matches the contract error code table snapshot', () => {
+    const snapshotTable = Object.entries(CONTRACT_ERROR_CODES).map(([code, factory]) => {
+      const err = factory();
+      return {
+        code: Number(code),
+        name: err.name,
+        message: err.message,
+        errorCode: err.code,
+      };
+    });
+
+    expect(snapshotTable).toMatchInlineSnapshot(`
+      [
+        {
+          "code": 1,
+          "errorCode": "ALREADY_INITIALIZED",
+          "message": "Account contract is already initialized",
+          "name": "AlreadyInitializedError",
+        },
+        {
+          "code": 2,
+          "errorCode": "NOT_INITIALIZED",
+          "message": "Account contract is not initialized",
+          "name": "NotInitializedError",
+        },
+        {
+          "code": 3,
+          "errorCode": "UNAUTHORIZED",
+          "message": "Caller is not authorized",
+          "name": "UnauthorizedError",
+        },
+        {
+          "code": 4,
+          "errorCode": "INVALID_NONCE",
+          "message": "Invalid nonce (replay or stale)",
+          "name": "InvalidNonceError",
+        },
+        {
+          "code": 5,
+          "errorCode": "SESSION_KEY_NOT_FOUND",
+          "message": "Session key not found",
+          "name": "SessionKeyNotFoundError",
+        },
+        {
+          "code": 6,
+          "errorCode": "SESSION_KEY_EXPIRED",
+          "message": "Session key has expired",
+          "name": "SessionKeyExpiredError",
+        },
+        {
+          "code": 7,
+          "errorCode": "INSUFFICIENT_PERMISSION",
+          "message": "Insufficient permission for this operation",
+          "name": "InsufficientPermissionError",
+        },
+      ]
+    `);
+  });
+
   it('code 1 → AlreadyInitializedError', () => {
     expect(CONTRACT_ERROR_CODES[1]()).toBeInstanceOf(AlreadyInitializedError);
   });

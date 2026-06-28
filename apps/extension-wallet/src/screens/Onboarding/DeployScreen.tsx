@@ -1,5 +1,15 @@
 import * as React from 'react';
-import { Loader2, CheckCircle2, AlertCircle, Rocket, Key, Globe, Wallet } from 'lucide-react';
+import {
+  Loader2,
+  CheckCircle2,
+  AlertCircle,
+  Rocket,
+  Key,
+  Globe,
+  Wallet,
+  ExternalLink,
+} from 'lucide-react';
+import { getTransactionExplorerLink } from '@/utils/explorer-links';
 
 /**
  * DeployScreen props
@@ -11,6 +21,10 @@ export interface DeployScreenProps {
   isLoading?: boolean;
   error?: string | null;
   status?: 'idle' | 'deploying' | 'funding' | 'initializing' | 'success' | 'error' | 'ready';
+  /** Deployment transaction hash, surfaced once the contract is deployed. */
+  txHash?: string;
+  /** True when the contract already existed on-chain (reimport path). */
+  alreadyDeployed?: boolean;
 }
 
 /**
@@ -68,10 +82,13 @@ export function DeployScreen({
   isLoading = false,
   error = null,
   status = 'idle',
+  txHash,
+  alreadyDeployed = false,
 }: DeployScreenProps) {
   const isDeploying = status === 'deploying' || status === 'funding' || status === 'initializing';
   const isSuccess = status === 'success';
   const hasError = status === 'error' || error;
+  const explorerLink = txHash ? getTransactionExplorerLink(txHash, 'testnet') : null;
 
   // Determine which steps are complete
   const completedSteps = React.useMemo(() => {
@@ -196,10 +213,30 @@ export function DeployScreen({
 
         {/* Success Details */}
         {isSuccess && (
-          <div className="mt-6 p-4 bg-green-50 border border-green-200 rounded-xl max-w-sm mx-auto">
+          <div className="mt-6 p-4 bg-green-50 border border-green-200 rounded-xl max-w-sm mx-auto space-y-3">
             <p className="text-sm text-green-700 text-center">
-              Your smart wallet is now ready to use on Stellar testnet!
+              {alreadyDeployed
+                ? 'We found your existing smart account on Stellar testnet — no redeploy needed.'
+                : 'Your smart wallet is now ready to use on Stellar testnet!'}
             </p>
+            {explorerLink && (
+              <div className="space-y-1">
+                <p className="text-xs font-medium uppercase tracking-wide text-green-700/80">
+                  Transaction
+                </p>
+                <a
+                  href={explorerLink}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="flex items-center justify-center gap-1.5 text-sm font-medium text-green-700 hover:text-green-800 underline underline-offset-2"
+                >
+                  <span className="font-mono">
+                    {txHash!.slice(0, 8)}…{txHash!.slice(-8)}
+                  </span>
+                  <ExternalLink className="w-3.5 h-3.5" />
+                </a>
+              </div>
+            )}
           </div>
         )}
       </div>

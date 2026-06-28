@@ -2,6 +2,7 @@ import * as React from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { cn } from '@/lib/utils';
 import { TransactionItem } from '@/components/TransactionItem';
+import { EmptyState } from '@/components/ui/empty-state';
 import { groupTransactionsByDate, type TransactionRecord } from '@/utils/transaction-formatter';
 
 export interface TransactionHistoryProps extends React.HTMLAttributes<HTMLDivElement> {
@@ -17,7 +18,7 @@ function LoadingState() {
       {Array.from({ length: 4 }).map((_, index) => (
         <div
           key={index}
-          className="h-20 animate-pulse rounded-lg border border-slate-200 bg-slate-100"
+          className="h-20 animate-pulse rounded-lg border border-border bg-muted"
           aria-hidden="true"
         />
       ))}
@@ -44,14 +45,12 @@ export function TransactionHistory({
         {loading ? (
           <LoadingState />
         ) : groups.length === 0 ? (
-          <p className="rounded-lg border border-dashed border-slate-200 py-8 text-center text-sm text-slate-500">
-            {emptyMessage}
-          </p>
+          <EmptyState title={emptyMessage} />
         ) : (
           <div className="space-y-6">
             {groups.map((group) => (
               <section key={group.dateKey} aria-label={`Transactions for ${group.label}`}>
-                <h3 className="mb-3 text-xs font-semibold uppercase tracking-wide text-slate-500">
+                <h3 className="mb-3 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
                   {group.label}
                 </h3>
                 <div className="space-y-2">

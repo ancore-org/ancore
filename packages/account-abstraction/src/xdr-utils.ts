@@ -5,6 +5,7 @@
 
 import type { SessionKey } from '@ancore/types';
 import { Address, nativeToScVal, scValToNative, StrKey, xdr } from '@stellar/stellar-sdk';
+import { assertValidEd25519PublicKey } from './strkey-validation';
 
 const BYTES_N_32_LENGTH = 32;
 
@@ -50,11 +51,8 @@ export function addressToScVal(address: string): xdr.ScVal {
 export function publicKeyToBytes32ScVal(publicKey: string | Uint8Array): xdr.ScVal {
   let bytes: Uint8Array;
   if (typeof publicKey === 'string') {
-    if (!StrKey.isValidEd25519PublicKey(publicKey)) {
-      throw new TypeError(
-        `Invalid Ed25519 public key: expected G... format, got ${publicKey.slice(0, 8)}...`
-      );
-    }
+    // Use centralized validation which throws `StrKeyValidationError` on failure
+    assertValidEd25519PublicKey(publicKey);
     const buf = StrKey.decodeEd25519PublicKey(publicKey);
     bytes = new Uint8Array(buf);
   } else {
@@ -229,6 +227,16 @@ export function scValToAddress(scVal: xdr.ScVal): string {
 }
 
 /**
+ * Decode ScVal to number (u32).
+ */
+export function scValToU32(scVal: xdr.ScVal): number {
+  const native = scValToNative(scVal);
+  if (typeof native === 'number') return native;
+  if (typeof native === 'bigint') return Number(native);
+  throw new TypeError('Expected u32 number from ScVal');
+}
+
+/**
  * Decode ScVal to number (u64).
  */
 export function scValToU64(scVal: xdr.ScVal): number {
@@ -341,6 +349,13 @@ export function decodeOwnerResult(scVal: xdr.ScVal): string {
  */
 export function decodeNonceResult(scVal: xdr.ScVal): number {
   return scValToU64(scVal);
+}
+
+/**
+ * Decode get_version result.
+ */
+export function decodeVersionResult(scVal: xdr.ScVal): number {
+  return scValToU32(scVal);
 }
 
 /**

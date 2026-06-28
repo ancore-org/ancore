@@ -6,12 +6,14 @@ import {
   UnauthorizedError,
   type InvocationArgs,
 } from '@ancore/account-abstraction';
-import { Address, StrKey, xdr } from '@stellar/stellar-sdk';
+import { Address, xdr } from '@stellar/stellar-sdk';
 
 import {
   AncoreSdkError,
   SessionKeyExecutionError,
   SessionKeyExecutionValidationError,
+  assertValidEd25519PublicKey,
+  StrKeyValidationError,
 } from './errors';
 
 export interface SessionKeySignerInputs {
@@ -79,7 +81,11 @@ export class AncoreClient {
         request.target,
         request.function,
         Array.from(request.args),
-        request.expectedNonce
+        request.expectedNonce,
+        request.signer.publicKey,
+        // Note: The signature will be added by the execution layer
+        // since it needs to sign the auth entry XDR
+        undefined
       );
 
       return await this.executionLayer.executeWithSessionKey<TResult, TArgs>({
@@ -157,10 +163,19 @@ function validateExecuteWithSessionKeyParams<
     throw new SessionKeyExecutionValidationError('expectedNonce must be a non-negative integer.');
   }
 
-  if (!signer || !StrKey.isValidEd25519PublicKey(signer.publicKey)) {
+  if (!signer) {
     throw new SessionKeyExecutionValidationError(
       'signer.publicKey must be a valid Stellar Ed25519 public key.'
     );
+  }
+
+  try {
+    assertValidEd25519PublicKey(signer.publicKey);
+  } catch (err) {
+    if (err instanceof StrKeyValidationError) {
+      throw new SessionKeyExecutionValidationError(err.message);
+    }
+    throw err;
   }
 
   if (typeof signer.signAuthEntryXdr !== 'function') {

@@ -54,6 +54,8 @@ module.exports = [
     },
     rules: {
       ...tseslint.configs.recommended.rules,
+      // TypeScript already resolves symbols and types; this rule causes false positives for DOM/lib types.
+      'no-undef': 'off',
       '@typescript-eslint/no-unused-vars': ['warn', { argsIgnorePattern: '^_' }],
       '@typescript-eslint/no-explicit-any': ['warn'],
     },

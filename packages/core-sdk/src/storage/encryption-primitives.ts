@@ -8,6 +8,12 @@ const SALT_LENGTH = 16;
 const IV_LENGTH = 12;
 const AES_KEY_LENGTH = 256;
 
+function toArrayBufferView(value: Uint8Array): Uint8Array<ArrayBuffer> {
+  const normalized = new Uint8Array(new ArrayBuffer(value.byteLength));
+  normalized.set(value);
+  return normalized;
+}
+
 export interface EncryptedPayload {
   /** Base64-encoded salt for PBKDF2 key derivation */
   salt: string;
@@ -49,7 +55,7 @@ export async function deriveKey(
   return globalThis.crypto.subtle.deriveKey(
     {
       name: 'PBKDF2',
-      salt: salt as unknown as BufferSource,
+      salt: toArrayBufferView(salt),
       iterations,
       hash: 'SHA-256',
     },
@@ -129,9 +135,9 @@ export async function decrypt(payload: EncryptedPayload, password: string): Prom
 
     // Decrypt the ciphertext
     const plaintext = await globalThis.crypto.subtle.decrypt(
-      { name: 'AES-GCM', iv: iv as unknown as BufferSource },
+      { name: 'AES-GCM', iv: toArrayBufferView(iv) },
       key,
-      ciphertext as unknown as BufferSource
+      toArrayBufferView(ciphertext)
     );
 
     return new TextDecoder().decode(plaintext);
