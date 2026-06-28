@@ -64,9 +64,7 @@
         "justifyMode": "auto",
         "orientation": "auto",
         "reduceOptions": {
-          "calcs": [
-            "lastNotNull"
-          ],
+          "calcs": ["lastNotNull"],
           "fields": "",
           "values": false
         },
@@ -126,9 +124,7 @@
       "options": {
         "orientation": "auto",
         "reduceOptions": {
-          "calcs": [
-            "lastNotNull"
-          ],
+          "calcs": ["lastNotNull"],
           "fields": "",
           "values": false
         },
@@ -313,11 +309,7 @@
   "refresh": "5m",
   "schemaVersion": 36,
   "style": "dark",
-  "tags": [
-    "ancore",
-    "slo",
-    "mainnet"
-  ],
+  "tags": ["ancore", "slo", "mainnet"],
   "templating": {
     "list": []
   },

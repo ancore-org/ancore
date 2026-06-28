@@ -1,21 +1,26 @@
 # Runbook: TransactionFailureRateHigh
 
 ## Alert
+
 Fires when more than 5% of Stellar transactions are failing for more than 5 minutes.
 
 ## Severity & Escalation
+
 - **Level:** warning
 - **Escalation:** Slack #ancore-alerts
 - **Escalation path:** On-call engineer → Platform lead (if not resolved in 2 hours)
 
 ## Diagnosis Steps
+
 1. Check stellar-core logs for transaction failure reasons:
+
 ```bash
 # Kubernetes
 kubectl logs -n ancore deploy/stellar-core --tail=500 --since=15m | grep -i "tx\|transaction"
 # Docker
 docker logs stellar-core --tail=500 | grep -i "tx\|transaction"
 ```
+
 2. Check if the Stellar network is experiencing issues
 3. Check relayer service logs for submission errors
 4. Verify account balances and sequence numbers
@@ -23,6 +28,7 @@ docker logs stellar-core --tail=500 | grep -i "tx\|transaction"
 6. Review recent code changes to transaction submission logic
 
 ## Remediation
+
 - **Check Stellar network status:** Verify the network is operational
 - **Retry failed transactions:** Implement exponential backoff retry logic
 - **Check account sequence numbers:** Ensure sequence numbers are correct
@@ -31,6 +37,7 @@ docker logs stellar-core --tail=500 | grep -i "tx\|transaction"
 - **Review transaction validation:** Check if transaction validation logic is correct
 
 ## Prevention
+
 - Implement transaction submission with automatic retry
 - Add monitoring for transaction success rates
 - Set up alerts for network congestion
@@ -39,6 +46,7 @@ docker logs stellar-core --tail=500 | grep -i "tx\|transaction"
 - Monitor account sequence numbers to prevent conflicts
 
 ## Post-Incident
+
 - File incident report within 24 hours
 - Update this runbook with new findings
 - Review transaction submission logic

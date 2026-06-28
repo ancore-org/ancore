@@ -23,10 +23,7 @@ const signatureSchema = z
 const unixTimestampSchema = z.number().int().positive('Timestamp must be a positive integer');
 
 /** Ledger sequence or u64-range nonce */
-const nonceSchema = z
-  .number()
-  .int()
-  .nonnegative('Nonce must be a non-negative integer');
+const nonceSchema = z.number().int().nonnegative('Nonce must be a non-negative integer');
 
 // ─── /relay/execute ──────────────────────────────────────────────────────────
 
@@ -81,9 +78,7 @@ export const relayAddSessionKeyRequestSchema = z.object({
   /** Owner signature authorising the operation */
   signature: signatureSchema,
   /** Canonical signing payload */
-  signaturePayload: z
-    .string()
-    .regex(/^[0-9a-fA-F]+$/, 'Must be hex-encoded'),
+  signaturePayload: z.string().regex(/^[0-9a-fA-F]+$/, 'Must be hex-encoded'),
 });
 
 export type RelayAddSessionKeyRequest = z.infer<typeof relayAddSessionKeyRequestSchema>;
@@ -98,9 +93,7 @@ export const relayRevokeSessionKeyRequestSchema = z.object({
   accountAddress: stellarPublicKeySchema,
   sessionPublicKey: sessionPublicKeySchema,
   signature: signatureSchema,
-  signaturePayload: z
-    .string()
-    .regex(/^[0-9a-fA-F]+$/, 'Must be hex-encoded'),
+  signaturePayload: z.string().regex(/^[0-9a-fA-F]+$/, 'Must be hex-encoded'),
 });
 
 export type RelayRevokeSessionKeyRequest = z.infer<typeof relayRevokeSessionKeyRequestSchema>;
