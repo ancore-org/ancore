@@ -7,7 +7,7 @@ jest.mock('../bridge', () => ({
   sendExternalRequest: (...args: unknown[]) => sendExternalRequest(...args),
 }));
 
-import { connect, getAddress, getNetwork, isConnected } from '../index';
+import { connect, getAddress, getNetwork, isConnected, requestSessionKey } from '../index';
 
 describe('wallet-api public methods', () => {
   beforeEach(() => {
@@ -49,5 +49,26 @@ describe('wallet-api public methods', () => {
 
     await expect(isConnected()).resolves.toBe(true);
     expect(sendExternalRequest).toHaveBeenCalledWith(ExternalApiMethod.IS_CONNECTED);
+  });
+
+  it('requestSessionKey forwards policy to the extension bridge', async () => {
+    const policy = {
+      expiresAt: Date.now() + 86_400_000,
+      permissions: 1,
+      allowedContracts: ['CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA'],
+      maxAmountPerCall: '100',
+    };
+
+    sendExternalRequest.mockResolvedValue({
+      publicKey: 'GABC',
+      expiresAt: policy.expiresAt,
+    });
+
+    await expect(requestSessionKey(policy)).resolves.toEqual({
+      publicKey: 'GABC',
+      expiresAt: policy.expiresAt,
+    });
+
+    expect(sendExternalRequest).toHaveBeenCalledWith(ExternalApiMethod.REQUEST_SESSION_KEY, policy);
   });
 });

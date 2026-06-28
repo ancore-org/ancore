@@ -19,24 +19,25 @@ const createMockWalletKit = () => {
       } as SessionTypes.Struct;
     }),
     rejectSession: jest.fn().mockResolvedValue(undefined),
+    respondSessionRequest: jest.fn().mockResolvedValue(undefined),
     disconnectSession: jest.fn().mockImplementation(async (params: any) => {
       delete sessions[params.topic];
     }),
     getActiveSessions: jest.fn(() => sessions),
-    on: jest.fn((event: string, callback: () => void) => {
+    on: jest.fn((event: string, callback: (...args: unknown[]) => void) => {
       if (!listeners[event]) {
         listeners[event] = [];
       }
-      listeners[event].push(callback);
+      listeners[event].push(callback as () => void);
     }),
-    off: jest.fn((event: string, callback: () => void) => {
+    off: jest.fn((event: string, callback: (...args: unknown[]) => void) => {
       if (listeners[event]) {
         listeners[event] = listeners[event].filter((cb) => cb !== callback);
       }
     }),
     // Helper for tests to trigger events
-    triggerEvent: (event: string) => {
-      listeners[event]?.forEach((cb) => cb());
+    triggerEvent: (event: string, ...args: unknown[]) => {
+      listeners[event]?.forEach((cb) => (cb as (...a: unknown[]) => void)(...args));
     },
   };
 };
@@ -203,5 +204,44 @@ describe('WalletKitProvider', () => {
     render(<TestComponent />);
 
     expect(screen.getByText('Error Thrown')).toBeInTheDocument();
+  });
+
+  it('shows sign auth entry approval sheet on session_request', async () => {
+    const mockWalletKit = createMockWalletKit() as any;
+    const entryXdr = Buffer.from('invoke_transfer_CABCDEF').toString('base64');
+
+    mockWalletKit.getActiveSessions.mockReturnValue({
+      'topic-auth': {
+        topic: 'topic-auth',
+        peer: { metadata: { name: 'WC dApp', url: 'https://wc.example' } },
+        namespaces: {},
+      },
+    });
+
+    render(
+      <WalletKitProvider projectId="test-project-id" walletKitInstance={mockWalletKit}>
+        <div>child</div>
+      </WalletKitProvider>
+    );
+
+    mockWalletKit.triggerEvent('session_request', {
+      id: 42,
+      topic: 'topic-auth',
+      session: {
+        topic: 'topic-auth',
+        peer: { metadata: { name: 'WC dApp', url: 'https://wc.example' } },
+        namespaces: {},
+      },
+      params: {
+        request: {
+          method: 'stellar_signAuthEntry',
+          params: { authEntry: entryXdr },
+        },
+      },
+    });
+
+    await waitFor(() => {
+      expect(screen.getByTestId('sign-auth-entry-sheet')).toBeInTheDocument();
+    });
   });
 });

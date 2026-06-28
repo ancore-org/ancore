@@ -14,9 +14,15 @@ jest.mock('react-native-keychain', () => ({
 }), { virtual: true });
 
 describe('bootstrapMobileWallet', () => {
+  const baseEnv = {
+    ANCORE_ACCOUNT_CONTRACT_ID: 'CAAQCAIBAEAQCAIBAEAQCAIBAEAQCAIBAEAQCAIBAEAQCAIBAEAQC526',
+    EXPO_PUBLIC_INDEXER_URL: 'http://localhost:3000',
+    EXPO_PUBLIC_RELAYER_URL: 'http://localhost:3001',
+  };
+
   it('wires environment, SDK client, and read-only account state', () => {
     const bootstrap = bootstrapMobileWallet({
-      ANCORE_ACCOUNT_CONTRACT_ID: 'CAAQCAIBAEAQCAIBAEAQCAIBAEAQCAIBAEAQCAIBAEAQCAIBAEAQC526',
+      ...baseEnv,
       ANCORE_MOBILE_APP_NAME: 'Ancore Preview',
       ANCORE_MOBILE_READONLY_ACCOUNT_ID: 'alice',
       ANCORE_MOBILE_READONLY_ACCOUNT_ADDRESS: 'GABC123',

@@ -50,6 +50,9 @@ const METHOD_TO_MESSAGE_TYPE: Partial<Record<ExternalApiMethodName, MessageType>
   [ExternalApiMethod.IS_CONNECTED]: 'EXTERNAL_IS_CONNECTED',
   [ExternalApiMethod.GET_SMART_ACCOUNT]: 'EXTERNAL_GET_PUBLIC_KEY',
   [ExternalApiMethod.SIGN_TRANSACTION]: 'EXTERNAL_SIGN_TRANSACTION',
+  [ExternalApiMethod.SIGN_AUTH_ENTRY]: 'EXTERNAL_SIGN_TRANSACTION',
+  [ExternalApiMethod.SIGN_MESSAGE]: 'EXTERNAL_SIGN_TRANSACTION',
+  [ExternalApiMethod.REQUEST_SESSION_KEY]: 'EXTERNAL_SIGN_TRANSACTION',
 };
 
 // ── Response helpers ──────────────────────────────────────────────────────────
