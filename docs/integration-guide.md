@@ -1,28 +1,140 @@
-# Integration Guide
+# Ancore Integration Guide
+
+This document contains two main sections:
+1. **[dApp Integration Guide](#dapp-integration-guide)** — For external developers integrating `@ancore/wallet-api` in their dApps.
+2. **[Internal Integration Guide](#internal-integration-guide)** — For internal Ancore teams working on the extension, mobile wallet, or dashboard.
+
+---
+
+# dApp Integration Guide
+
+## Quick Start
+
+Integrating Ancore into your Stellar/Soroban dApp is designed to be as close to Freighter as possible, but with additional features for Account Abstraction (AA) and session keys.
+
+### 1. Installation
+Install the Ancore wallet API wrapper:
+```bash
+npm install @ancore/wallet-api
+```
+
+### 2. Connect Wallet
+Request permission to connect and retrieve the user's smart account address:
+```javascript
+import { connect, getAddress } from '@ancore/wallet-api';
+
+try {
+  // Requests connection
+  await connect();
+  const address = await getAddress();
+  console.log("Connected smart account address:", address);
+} catch (error) {
+  console.error("Connection failed", error);
+}
+```
+
+### 3. Sign a Transaction
+Sign a Stellar transaction envelope (XDR):
+```javascript
+import { signTransaction } from '@ancore/wallet-api';
+
+try {
+  const signedXdr = await signTransaction({
+    xdr: 'AAAAAgAAAAD...',
+    network: 'TESTNET',
+  });
+  console.log("Signed transaction XDR:", signedXdr);
+} catch (error) {
+  console.error("Signing rejected by user", error);
+}
+```
+
+---
+
+## Smart Account Differences (C-Address vs G-Address)
+
+Ancore is a smart contract wallet (Account Abstraction).
+- **C-Address**: The address returned by `getAddress()` is a contract address (starting with `C...`), unlike traditional Stellar accounts which start with `G...`.
+- **Targeting Payments**: When building payment operations targeting an Ancore account, use contract-compatible payment operations (e.g., Soroban token transfers) instead of classic Stellar asset transfers, or ensure your dApp supports contract destinations.
+
+---
+
+## Session Keys for Gasless/Promptless Transactions
+
+dApps can request a scoped session key to sign transactions in the background without prompting the user for every action.
+
+```javascript
+import { requestSessionKey } from '@ancore/wallet-api';
+
+try {
+  const session = await requestSessionKey({
+    allowlist: ['CB...contractAddress'],
+    methods: ['play_game'],
+    maxAmount: '50.0000000',
+    durationSeconds: 3600, // 1 hour session
+  });
+  
+  console.log("Active Session Key Public Key:", session.publicKey);
+} catch (error) {
+  console.error("Session key request denied", error);
+}
+```
+
+---
+
+## Smart Account Authorization (`signAuthEntry` / SEP-43)
+
+For Soroban-based smart contract authorization, use the SEP-43 signature delegation pattern:
+
+```javascript
+import { signAuthEntry } from '@ancore/wallet-api';
+
+const signedEntry = await signAuthEntry({
+  entry: authEntryXdr,
+  network: 'TESTNET',
+});
+```
+
+---
+
+## Error Handling
+
+The API throws typed errors representing specific user interactions or system boundaries:
+- `AncoreUserRejectedError`: The user declined the connection or transaction signature request.
+- `AncoreTimeoutError`: The signature request timed out.
+- `AncoreNotConnectedError`: Triggered when attempting to sign before calling `connect()`.
+
+```javascript
+import { signTransaction, AncoreUserRejectedError } from '@ancore/wallet-api';
+
+try {
+  await signTransaction({ xdr });
+} catch (err) {
+  if (err instanceof AncoreUserRejectedError) {
+    showUserToast("Signature declined by user.");
+  } else {
+    showUserToast("An unexpected error occurred.");
+  }
+}
+```
+
+---
+
+## Migration from Freighter
+
+Migrating from `@stellar/freighter-api` to `@ancore/wallet-api` requires changing the import source; the base method signatures are backward-compatible:
+
+```diff
+- import { connect, getAddress, signTransaction } from "@stellar/freighter-api";
++ import { connect, getAddress, signTransaction } from "@ancore/wallet-api";
+```
+
+---
+
+# Internal Integration Guide
 
 > Team guidelines for integrating with Ancore contract methods and SDK wrappers.  
 > Issue #287 — prevents integration drift across extension, mobile, and dashboard teams.  
-> Last updated: 2026-04-24
-
----
-
-## Purpose
-
-This guide establishes a shared process so that the extension, mobile, and
-dashboard teams use the same interface contracts, error handling patterns, and
-update workflow. It is the companion to the reference docs:
-
-| Document | What it covers |
-|----------|---------------|
-| [`api-reference.yaml`](./api-reference.yaml) | Machine-readable spec (source of truth) |
-| [`contract-methods.md`](./contract-methods.md) | Contract entrypoints, params, errors, events |
-| [`sdk-wrappers.md`](./sdk-wrappers.md) | SDK wrapper methods and error hierarchy |
-| [`examples/session-key-execute.md`](./examples/session-key-execute.md) | Session-key execute flow |
-| [`examples/send-payment.md`](./examples/send-payment.md) | Payment flow |
-| [`architecture/OVERVIEW.md#send-flow`](./architecture/OVERVIEW.md#send-flow) | End-to-end send sequence (extension → SDK → relayer → contract → Horizon) |
-| [`services/relayer/README.md`](../services/relayer/README.md) | Relayer API, error codes, and client handling guide |
-
----
 
 ## Package responsibilities
 
@@ -141,9 +253,6 @@ When a client calls the relayer (`POST /relay/execute` or `POST /relay/validate`
 failures are returned as a `422` response with a typed `error.code`. Clients **must** handle all
 codes explicitly — do not swallow or re-throw a bare `Error` without mapping it.
 
-> Full error-handling pseudocode is in [`services/relayer/README.md — Client handling guide`](../services/relayer/README.md#error-codes).
-> This section complements issue #573 (relayer OpenAPI alignment).
-
 ### Error code table
 
 | Code | HTTP status | Client action |
@@ -156,44 +265,6 @@ codes explicitly — do not swallow or re-throw a bare `Error` without mapping i
 | `UNAUTHORIZED` | 401 | Re-authenticate and obtain a new Bearer token |
 | `VALIDATION_ERROR` | 400 | Fix the request shape at the call site (programming error) |
 | `INTERNAL_ERROR` | 500 | Log and surface a generic retry message; do not expose internals |
-
-### Handling contract
-
-```typescript
-switch (relayError.code) {
-  case 'INVALID_SIGNATURE':
-    await resignAndRetry(request);
-    break;
-  case 'SESSION_KEY_EXPIRED':
-    promptReAuthentication();
-    break;
-  case 'NONCE_REPLAY':
-    await retryWithFreshNonce(request);
-    break;
-  case 'GAS_LIMIT_EXCEEDED':
-  case 'SIMULATION_FAILED':
-    showUserError('Transaction cannot be submitted. Check your inputs.');
-    break;
-  case 'UNAUTHORIZED':
-    redirectToLogin();
-    break;
-  case 'VALIDATION_ERROR':
-    // Programming error — fix the call site, not a user-facing issue.
-    throw relayError;
-  default:
-    showUserError('Something went wrong. Please try again.');
-}
-```
-
-### Cross-check script
-
-To verify that the codes documented here stay in sync with the relayer's TypeScript enum, run:
-
-```bash
-grep -r "RelayErrorCode\|error\.code" services/relayer/src/types --include="*.ts"
-```
-
-All codes listed in `RelayErrorCode` (in `services/relayer/src/types/`) must appear in the table above.
 
 ---
 
@@ -217,21 +288,9 @@ const invocation = client.addSessionKey({
 **Checking if a key is still active** (before using it)
 
 ```typescript
-// is_session_key_active and refresh_session_key_ttl are contract entrypoints
-// with no TypeScript wrapper in AccountContract. Invoke them via a raw simulation:
 const activeInvocation = contract.call('is_session_key_active', publicKeyScVal);
-// Or check expiry client-side from a stored SessionKey:
 const sessionKey = await contract.getSessionKey(publicKey, readOptions);
-const isActive = sessionKey !== null && sessionKey.expiresAt > Date.now(); // expiresAt is ms in TS types
-```
-
-**Refreshing storage TTL** (before Soroban evicts the entry)
-
-```typescript
-// refresh_session_key_ttl has no TypeScript wrapper in AccountContract.
-// Invoke it via the contract's call() method:
-const op = contract.call('refresh_session_key_ttl', publicKeyScVal);
-// Build and submit this operation (no owner auth required).
+const isActive = sessionKey !== null && sessionKey.expiresAt > Date.now();
 ```
 
 **Revoking a key**
@@ -240,71 +299,3 @@ const op = contract.call('refresh_session_key_ttl', publicKeyScVal);
 const invocation = client.revokeSessionKey({ publicKey: sessionKeyPublicKey });
 // Build and submit with owner signature
 ```
-
----
-
-## Keeping documentation in sync
-
-When you change a contract entrypoint or SDK method signature:
-
-1. Update `docs/api-reference.yaml` — this is the source of truth
-2. Update the relevant section in `contract-methods.md` or `sdk-wrappers.md`
-3. Update any affected examples in `docs/examples/`
-4. If it is a breaking change, open an RFC and bump the major version
-
-**Breaking change definition**
-
-- Removing or renaming a parameter
-- Changing a parameter type
-- Adding a required parameter
-- Changing a return type
-- Removing an error code
-
-Adding optional parameters or new error codes is non-breaking.
-
----
-
-## Team-specific notes
-
-### Extension wallet (`apps/extension-wallet`)
-
-- Session keys are stored in encrypted extension storage via `SecureStorageManager`
-- Sign auth entries through the background service message bus (see
-  [`examples/session-key-execute.md`](./examples/session-key-execute.md#extension-wallet-appsextension-wallet))
-- Use `chrome.runtime.sendMessage` for cross-context signing
-
-### Mobile wallet (`apps/mobile-wallet`)
-
-- Session keys are stored in the device keychain / secure enclave
-- Sign transactions using the platform keychain API
-- Handle `SimulationExpiredError` by prompting the user to retry — do not
-  silently swallow it
-
-### Web dashboard (`apps/web-dashboard`)
-
-- The dashboard may hold session keys in memory for the duration of a session
-- Clear keys on logout / tab close
-- Use `@ancore/crypto` signing utilities for in-browser key operations
-
----
-
-## Testnet vs Mainnet
-
-| Setting | Testnet | Mainnet |
-|---------|---------|---------|
-| Network passphrase | `Test SDF Network ; September 2015` | `Public Global Stellar Network ; September 2015` |
-| RPC URL | `https://soroban-testnet.stellar.org` | `https://soroban.stellar.org` |
-| Horizon URL | `https://horizon-testnet.stellar.org` | `https://horizon.stellar.org` |
-
-Always test on Testnet first. Contract IDs differ between networks — never
-hardcode a contract ID; read it from environment configuration.
-
----
-
-## Related
-
-- [Architecture overview](./architecture/OVERVIEW.md)
-- [Send flow sequence diagram](./architecture/OVERVIEW.md#send-flow) — extension wallet payment through SDK, relayer, account contract, and Horizon
-- [Security model](./security/THREAT_MODEL.md)
-- [Contributing guide](../CONTRIBUTING.md)
-- [RFC process](../RFC.md)

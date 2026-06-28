@@ -1,5 +1,5 @@
 import express, { Express, Request, Response } from 'express';
-import { intentSchema, HIGH_VALUE_PAYMENT_THRESHOLD } from './schemas/intent';
+import { intentSchema, HIGH_VALUE_PAYMENT_THRESHOLD, type Intent } from './schemas/intent';
 import { requestLogger } from './middleware/request-logger';
 import { scoreRisk } from './risk';
 
@@ -51,9 +51,15 @@ export function createApp(): Express {
       return res.status(400).json({ error: 'Invalid request' });
     }
     const isInvoice = typeof prompt === 'string' && prompt.toLowerCase().includes('invoice');
-    const draftIntent = isInvoice
-      ? { type: 'invoice' as const, requestedBy: accountId, amount: '10', asset: 'XLM' }
-      : { type: 'payment' as const, destination: 'G123', amount: '10', asset: 'XLM' };
+    const draftIntent: Intent = isInvoice
+      ? {
+          type: 'invoice',
+          amount: '10',
+          asset: 'XLM',
+          recipient: accountId,
+          dueDate: new Date().toISOString(),
+        }
+      : { type: 'payment', destination: 'G123', amount: '10', asset: 'XLM' };
     return res.status(200).json({
       status: 'draft',
       requiresConfirmation: true,

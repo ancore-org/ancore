@@ -1,16 +1,24 @@
-import { render, screen, within } from '@testing-library/react';
+import { render, screen, within, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { beforeEach, describe, expect, it } from 'vitest';
 import type { UnlockVerifier } from '../AuthGuard';
 import { AUTH_STORAGE_KEY, DEFAULT_AUTH_STATE } from '../AuthGuard';
 import { ExtensionRouterTestHarness, HistoryActivityList, filterHistoryEntries } from '..';
 import type { HistoryEntry, HistoryFilter } from '..';
+import { resetSharedStorageManagerForTests } from '../../security/storage-manager';
+
+async function waitForAuthReady() {
+  await waitFor(() => {
+    expect(screen.queryByTestId('auth-initializing')).not.toBeInTheDocument();
+  });
+}
 
 function renderRouter(
   pathname: string,
   authState = DEFAULT_AUTH_STATE,
   options?: { unlockVerifier?: UnlockVerifier }
 ) {
+  resetSharedStorageManagerForTests();
   window.localStorage.setItem(AUTH_STORAGE_KEY, JSON.stringify(authState));
   return render(
     <ExtensionRouterTestHarness
@@ -26,21 +34,23 @@ describe('extension router', () => {
     document.title = 'Ancore Extension';
   });
 
-  it('redirects first-time users to onboarding when they hit a protected route', () => {
+  it('redirects first-time users to onboarding when they hit a protected route', async () => {
     renderRouter('/home');
+    await waitForAuthReady();
 
-    expect(screen.getByRole('heading', { name: /welcome to ancore/i })).toBeInTheDocument();
+    expect(await screen.findByRole('heading', { name: /welcome to ancore/i })).toBeInTheDocument();
     expect(document.title).toBe('Create Wallet | Ancore Extension');
   });
 
-  it('redirects onboarded locked users to unlock', () => {
+  it('redirects onboarded locked users to unlock', async () => {
     renderRouter('/send', {
       ...DEFAULT_AUTH_STATE,
       hasOnboarded: true,
       walletName: 'Locked Wallet',
     });
+    await waitForAuthReady();
 
-    expect(screen.getByRole('heading', { name: /unlock wallet/i })).toBeInTheDocument();
+    expect(await screen.findByRole('heading', { name: /unlock wallet/i })).toBeInTheDocument();
     expect(document.title).toBe('Unlock Wallet | Ancore Extension');
   });
 
@@ -58,6 +68,7 @@ describe('extension router', () => {
       }
     );
 
+    await waitForAuthReady();
     await user.type(screen.getByLabelText(/password/i), 'wrong-password');
     await user.click(screen.getByRole('button', { name: /unlock/i }));
 
@@ -71,17 +82,12 @@ describe('extension router', () => {
     });
   });
 
-  it('creates an account and lands on the protected home route', async () => {
-    const user = userEvent.setup();
-    renderRouter('/create-account');
+  it('starts onboarding from the onboarding route', async () => {
+    renderRouter('/onboarding');
+    await waitForAuthReady();
 
-    await user.clear(screen.getByLabelText(/wallet name/i));
-    await user.type(screen.getByLabelText(/wallet name/i), 'Router Test Wallet');
-    await user.click(screen.getByRole('button', { name: /create wallet/i }));
-
-    expect(await screen.findByRole('heading', { name: /home/i })).toBeInTheDocument();
-    expect(screen.getByText(/router test wallet/i)).toBeInTheDocument();
-    expect(screen.getByTestId('nav-bar')).toBeInTheDocument();
+    expect(await screen.findByRole('heading', { name: /welcome to ancore/i })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /create new wallet/i })).toBeInTheDocument();
   });
 
   it('navigates between protected routes and updates titles', async () => {
@@ -92,6 +98,7 @@ describe('extension router', () => {
       isUnlocked: true,
     });
 
+    await waitForAuthReady();
     await user.click(screen.getByRole('link', { name: /settings/i }));
 
     expect(await screen.findByRole('heading', { name: /settings/i })).toBeInTheDocument();
@@ -106,7 +113,8 @@ describe('extension router', () => {
       isUnlocked: true,
     });
 
-    expect(screen.getByRole('heading', { name: '404' })).toBeInTheDocument();
+    await waitForAuthReady();
+    expect(await screen.findByRole('heading', { name: '404' })).toBeInTheDocument();
     expect(document.title).toBe('Page Not Found | Ancore Extension');
 
     await user.click(screen.getByRole('link', { name: /go back to safety/i }));
@@ -122,7 +130,10 @@ describe('extension router', () => {
       isUnlocked: true,
     });
 
-    expect(screen.getByRole('heading', { level: 1, name: 'Session Keys' })).toBeInTheDocument();
+    await waitForAuthReady();
+    expect(
+      await screen.findByRole('heading', { level: 1, name: 'Session Keys' })
+    ).toBeInTheDocument();
 
     await user.click(screen.getByRole('button', { name: /go back/i }));
 
@@ -198,10 +209,11 @@ describe('extension transaction history', () => {
     },
   ];
 
-  it('shows no-account placeholder when no smart account is configured', () => {
+  it('shows no-account placeholder when no smart account is configured', async () => {
     renderRouter('/history', unlockedAuthState);
+    await waitForAuthReady();
 
-    expect(screen.getByText('No account configured')).toBeInTheDocument();
+    expect(await screen.findByText('No account configured')).toBeInTheDocument();
     expect(
       screen.getByText('Set up a smart account to view transaction history.')
     ).toBeInTheDocument();

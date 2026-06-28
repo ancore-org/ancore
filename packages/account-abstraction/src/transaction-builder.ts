@@ -49,7 +49,6 @@ export interface RefreshSessionKeyTtlParams {
   ttlSeconds: number;
 }
 
-
 export class TransactionBuilder {
   private readonly source: string;
   private readonly accountContractId: string;

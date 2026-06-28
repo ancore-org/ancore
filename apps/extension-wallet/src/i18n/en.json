@@ -81,6 +81,19 @@
       "label": "About Ancore",
       "description": "Version, links & support"
     },
+    "connectedSites": {
+      "title": "Connected Sites",
+      "description": "Manage sites that have access to your wallet",
+      "section": "Security",
+      "back": "Go back",
+      "approvedOrigins": "Approved origins",
+      "disconnectAll": "Disconnect All",
+      "emptyTitle": "No connected sites",
+      "emptyDescription": "You haven't approved any sites to connect to this account on this network.",
+      "connectedAccount": "Connected account",
+      "connectedSince": "Connected since",
+      "revokeAccess": "Revoke access"
+    },
     "toastDemo": {
       "success": {
         "label": "Success Toast",

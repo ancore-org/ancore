@@ -58,7 +58,7 @@ export { MnemonicValidationError } from './mnemonic';
 export { deriveKeypairFromMnemonic } from './key-derivation';
 
 // Signing & Verification
-export { signTransaction, verifySignature } from './signing';
+export { signPayload, signTransaction, verifySignature } from './signing';
 
 // Constant-time comparison
 export { timingSafeEqual } from './timing-safe';

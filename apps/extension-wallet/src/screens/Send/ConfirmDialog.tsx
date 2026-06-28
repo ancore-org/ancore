@@ -1,5 +1,14 @@
 import { useState } from 'react';
-import { Button, Card, CardContent, CardHeader, CardTitle, PasswordInput, Dialog, DialogContent } from '@ancore/ui-kit';
+import {
+  Button,
+  Card,
+  CardContent,
+  CardHeader,
+  CardTitle,
+  PasswordInput,
+  Dialog,
+  DialogContent,
+} from '@ancore/ui-kit';
 import type { SendTransactionDraft } from '@/hooks/useSendTransaction';
 import { KeyRound, ArrowRight, ShieldCheck, Info } from 'lucide-react';
 
@@ -36,7 +45,12 @@ export function ConfirmDialog({
   };
 
   return (
-    <Dialog open={true} onOpenChange={(open) => { if (!open) onBack(); }}>
+    <Dialog
+      open={true}
+      onOpenChange={(open) => {
+        if (!open) onBack();
+      }}
+    >
       <DialogContent className="p-0 border-none bg-transparent shadow-none max-w-md w-full">
         <Card className="w-full max-w-md bg-slate-950 border-white/10 shadow-2xl overflow-hidden animate-in fade-in zoom-in-95 duration-300">
           <CardHeader className="bg-gradient-to-br from-amber-500/10 to-orange-500/5 pb-6 border-b border-white/5">
@@ -59,8 +73,8 @@ export function ConfirmDialog({
                   </>
                 ) : (
                   <>
-                    Sending <span className="text-white font-black">{transaction.amount} XLM</span> to
-                    recipient
+                    Sending <span className="text-white font-black">{transaction.amount} XLM</span>{' '}
+                    to recipient
                   </>
                 )}
               </p>
