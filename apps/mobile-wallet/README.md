@@ -34,16 +34,20 @@ pnpm dev
 
 ### Environment Variables
 
-```bash
-# Indexer Service - REST API for transaction history
-EXPO_PUBLIC_INDEXER_URL=http://localhost:3000
+All API URLs must be read from the centralized config module (`loadMobileWalletEnvironment` / `loadMobileWalletEnvironmentFromEnv`). Copy `.env.example` to `.env` and set:
 
-# Relayer Service - Transaction submission
+```bash
+# Required
+ANCORE_ACCOUNT_CONTRACT_ID=your_contract_id_here
+EXPO_PUBLIC_INDEXER_URL=http://localhost:3000
 EXPO_PUBLIC_RELAYER_URL=http://localhost:3001
 
-# AI Agent Service - Natural language intent parsing
+# Optional
 EXPO_PUBLIC_AI_AGENT_URL=http://localhost:3002
+WALLETCONNECT_PROJECT_ID=your_project_id_here
 ```
+
+Invalid URLs fail fast at bootstrap with a clear error message (parity with extension wallet startup validation).
 
 ## Transaction History
 
@@ -52,16 +56,19 @@ The mobile wallet uses a paginated transaction history hook that fetches data fr
 ### Usage Example
 
 ```typescript
+import { bootstrapMobileWallet } from '@ancore/mobile-wallet';
 import { createIndexerActivityAdapter } from './screens/history/indexerActivityAdapter';
 import { usePaginatedTransactionHistory } from './screens/history/usePaginatedTransactionHistory';
 
 function HistoryScreen() {
-  const accountId = 'GABC123...'; // Current user's account ID
+  const bootstrap = bootstrapMobileWallet({
+    ANCORE_ACCOUNT_CONTRACT_ID: process.env.ANCORE_ACCOUNT_CONTRACT_ID!,
+    EXPO_PUBLIC_INDEXER_URL: process.env.EXPO_PUBLIC_INDEXER_URL!,
+    EXPO_PUBLIC_RELAYER_URL: process.env.EXPO_PUBLIC_RELAYER_URL!,
+  });
 
-  const adapter = createIndexerActivityAdapter(
-    process.env.EXPO_PUBLIC_INDEXER_URL!,
-    accountId
-  );
+  const accountId = 'GABC123...';
+  const adapter = createIndexerActivityAdapter(bootstrap.environment.indexerUrl, accountId);
 
   const {
     items,
