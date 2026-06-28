@@ -8,7 +8,8 @@ import {
 
 // ─── Shared test fixtures ─────────────────────────────────────────────────────
 
-const VALID_STELLAR_ADDRESS = 'GAAZI4TCR3TY5OJHCTJC2A4QSY6CJWJH5IAJTGKIN2ER7LBNVKOCCWN';
+// G + 55 uppercase alphanumeric chars = valid Stellar address format
+const VALID_STELLAR_ADDRESS = 'G' + 'A'.repeat(55);
 const VALID_SESSION_PK = 'a'.repeat(64); // 64 hex chars
 const VALID_SIGNATURE = 'b'.repeat(128); // 128 hex chars
 const VALID_PAYLOAD = 'deadbeef';
@@ -91,14 +92,16 @@ describe('relayExecuteRequestSchema', () => {
 
   it('validation error includes field path', () => {
     const bad = { ...valid, accountAddress: 'bad' };
+    let caught: unknown;
     try {
       validateRequest(relayExecuteRequestSchema, bad);
-      fail('expected throw');
     } catch (err) {
-      const typed = err as ValidationErrorResponse;
-      expect(typed.error).toBe('VALIDATION_ERROR');
-      expect(typed.details.some((d) => d.field === 'accountAddress')).toBe(true);
+      caught = err;
     }
+    expect(caught).toBeDefined();
+    const typed = caught as ValidationErrorResponse;
+    expect(typed.error).toBe('VALIDATION_ERROR');
+    expect(typed.details.some((d) => d.field === 'accountAddress')).toBe(true);
   });
 });
 
