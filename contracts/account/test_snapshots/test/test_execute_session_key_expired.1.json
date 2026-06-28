@@ -33,7 +33,7 @@
               "function_name": "add_session_key",
               "args": [
                 {
-                  "bytes": "6e84dca566963c1acfbfed3ec7e354395261227b6dd49537dd2d54082f3b927b"
+                  "bytes": "b543b9c9824a3084ebc9a9ae3cefa53ae665ccae75f790cdbce8b7f51d7d6905"
                 },
                 {
                   "u64": 1100
@@ -44,6 +44,12 @@
                       "u32": 1
                     }
                   ]
+                },
+                "void",
+                "void",
+                "void",
+                {
+                  "u64": 0
                 }
               ]
             }
@@ -74,7 +80,7 @@
                   "symbol": "SessionKey"
                 },
                 {
-                  "bytes": "6e84dca566963c1acfbfed3ec7e354395261227b6dd49537dd2d54082f3b927b"
+                  "bytes": "b543b9c9824a3084ebc9a9ae3cefa53ae665ccae75f790cdbce8b7f51d7d6905"
                 }
               ]
             },
@@ -94,7 +100,7 @@
                       "symbol": "SessionKey"
                     },
                     {
-                      "bytes": "6e84dca566963c1acfbfed3ec7e354395261227b6dd49537dd2d54082f3b927b"
+                      "bytes": "b543b9c9824a3084ebc9a9ae3cefa53ae665ccae75f790cdbce8b7f51d7d6905"
                     }
                   ]
                 },
@@ -103,11 +109,29 @@
                   "map": [
                     {
                       "key": {
+                        "symbol": "allowed_contracts"
+                      },
+                      "val": "void"
+                    },
+                    {
+                      "key": {
+                        "symbol": "cumulative_limit"
+                      },
+                      "val": "void"
+                    },
+                    {
+                      "key": {
                         "symbol": "expires_at"
                       },
                       "val": {
                         "u64": 1100
                       }
+                    },
+                    {
+                      "key": {
+                        "symbol": "max_amount_per_call"
+                      },
+                      "val": "void"
                     },
                     {
                       "key": {
@@ -126,7 +150,34 @@
                         "symbol": "public_key"
                       },
                       "val": {
-                        "bytes": "6e84dca566963c1acfbfed3ec7e354395261227b6dd49537dd2d54082f3b927b"
+                        "bytes": "b543b9c9824a3084ebc9a9ae3cefa53ae665ccae75f790cdbce8b7f51d7d6905"
+                      }
+                    },
+                    {
+                      "key": {
+                        "symbol": "spend_window_seconds"
+                      },
+                      "val": {
+                        "u64": 0
+                      }
+                    },
+                    {
+                      "key": {
+                        "symbol": "spend_window_start"
+                      },
+                      "val": {
+                        "u64": 1000
+                      }
+                    },
+                    {
+                      "key": {
+                        "symbol": "spent_in_window"
+                      },
+                      "val": {
+                        "i128": {
+                          "hi": 0,
+                          "lo": 0
+                        }
                       }
                     }
                   ]
@@ -417,7 +468,7 @@
             "data": {
               "vec": [
                 {
-                  "bytes": "6e84dca566963c1acfbfed3ec7e354395261227b6dd49537dd2d54082f3b927b"
+                  "bytes": "b543b9c9824a3084ebc9a9ae3cefa53ae665ccae75f790cdbce8b7f51d7d6905"
                 },
                 {
                   "u64": 1100
@@ -428,6 +479,12 @@
                       "u32": 1
                     }
                   ]
+                },
+                "void",
+                "void",
+                "void",
+                {
+                  "u64": 0
                 }
               ]
             }
@@ -451,7 +508,7 @@
             "data": {
               "vec": [
                 {
-                  "bytes": "6e84dca566963c1acfbfed3ec7e354395261227b6dd49537dd2d54082f3b927b"
+                  "bytes": "b543b9c9824a3084ebc9a9ae3cefa53ae665ccae75f790cdbce8b7f51d7d6905"
                 },
                 {
                   "u64": 1100
@@ -510,7 +567,7 @@
                       "symbol": "SessionKey"
                     },
                     {
-                      "bytes": "6e84dca566963c1acfbfed3ec7e354395261227b6dd49537dd2d54082f3b927b"
+                      "bytes": "b543b9c9824a3084ebc9a9ae3cefa53ae665ccae75f790cdbce8b7f51d7d6905"
                     }
                   ]
                 },
@@ -527,10 +584,10 @@
                   "u64": 0
                 },
                 {
-                  "bytes": "6e84dca566963c1acfbfed3ec7e354395261227b6dd49537dd2d54082f3b927b"
+                  "bytes": "b543b9c9824a3084ebc9a9ae3cefa53ae665ccae75f790cdbce8b7f51d7d6905"
                 },
                 {
-                  "bytes": "0074bcb08290b85fc1b360c66e42c4ef8b3419924c89d9ae3009dddfdb35a84ddc4dfaf0760b9a40fccf4da394cedb6560abeacff949e73aa3011c3d0793f601"
+                  "bytes": "a40caf00466f6d47664e78b54e34ca05c1dce63ffc264ce4e13008047296b870342867b9a86d18848672b05e96256d02ad1b88a5d9e4b85bc32a8a74ce31f50a"
                 },
                 {
                   "bytes": "000000120000000100000000000000000000000000000000000000000000000000000000000000030000000f000000096765745f6e6f6e6365000000000000100000000100000000000000050000000000000000"
@@ -625,7 +682,7 @@
                           "symbol": "SessionKey"
                         },
                         {
-                          "bytes": "6e84dca566963c1acfbfed3ec7e354395261227b6dd49537dd2d54082f3b927b"
+                          "bytes": "b543b9c9824a3084ebc9a9ae3cefa53ae665ccae75f790cdbce8b7f51d7d6905"
                         }
                       ]
                     },
@@ -642,10 +699,10 @@
                       "u64": 0
                     },
                     {
-                      "bytes": "6e84dca566963c1acfbfed3ec7e354395261227b6dd49537dd2d54082f3b927b"
+                      "bytes": "b543b9c9824a3084ebc9a9ae3cefa53ae665ccae75f790cdbce8b7f51d7d6905"
                     },
                     {
-                      "bytes": "0074bcb08290b85fc1b360c66e42c4ef8b3419924c89d9ae3009dddfdb35a84ddc4dfaf0760b9a40fccf4da394cedb6560abeacff949e73aa3011c3d0793f601"
+                      "bytes": "a40caf00466f6d47664e78b54e34ca05c1dce63ffc264ce4e13008047296b870342867b9a86d18848672b05e96256d02ad1b88a5d9e4b85bc32a8a74ce31f50a"
                     },
                     {
                       "bytes": "000000120000000100000000000000000000000000000000000000000000000000000000000000030000000f000000096765745f6e6f6e6365000000000000100000000100000000000000050000000000000000"

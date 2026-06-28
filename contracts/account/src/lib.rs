@@ -23,7 +23,8 @@
 
 use soroban_sdk::xdr::ToXdr;
 use soroban_sdk::{
-    contract, contracterror, contractimpl, contracttype, Address, BytesN, Env, Symbol, Val, Vec,
+    contract, contracterror, contractimpl, contracttype, Address, BytesN, Env, Symbol, TryFromVal,
+    Val, Vec,
 };
 
 #[cfg(not(target_family = "wasm"))]
@@ -56,6 +57,10 @@ pub enum ContractError {
     SessionKeyExpirationInPast = 15,
     /// Arithmetic overflow occurred
     ArithmeticOverflow = 16,
+    /// Session key spend limit exceeded (per-call or cumulative window)
+    ExceededSpendLimit = 17,
+    /// Invalid spend policy configuration at session key registration
+    InvalidSpendPolicy = 18,
 }
 
 /// Event topic naming convention
@@ -114,6 +119,16 @@ pub struct SessionKey {
     /// Optional contract allowlist — None means unrestricted (any contract may be called).
     /// When Some, the `to` address in execute() must be in this list.
     pub allowed_contracts: Option<Vec<Address>>,
+    /// Maximum spend amount per individual execute() call (None = unlimited).
+    pub max_amount_per_call: Option<i128>,
+    /// Maximum cumulative spend within the active window (None = unlimited).
+    pub cumulative_limit: Option<i128>,
+    /// Ledger timestamp when the current spend window started.
+    pub spend_window_start: u64,
+    /// Duration of the cumulative spend window in seconds (0 when cumulative_limit is None).
+    pub spend_window_seconds: u64,
+    /// Amount spent in the current window.
+    pub spent_in_window: i128,
 }
 
 #[contracttype]
@@ -250,6 +265,11 @@ impl AncoreAccount {
             return Err(ContractError::InvalidNonce);
         }
 
+        let session_pk_for_spend = match &caller {
+            CallerIdentity::SessionKey(pk) => Some(pk.clone()),
+            _ => None,
+        };
+
         match caller {
             // Owner auth path: reject any session-key auth parameters.
             CallerIdentity::Owner => {
@@ -274,8 +294,6 @@ impl AncoreAccount {
                 }
 
                 // Issue #188: Enforce explicit execute permission for session-key path
-                // Session keys must have PERMISSION_EXECUTE bit set to authorize transactions.
-                // This prevents unauthorized transaction invocation via scoped session keys.
                 if !session.permissions.contains(PERMISSION_EXECUTE) {
                     return Err(ContractError::InsufficientPermission);
                 }
@@ -286,6 +304,9 @@ impl AncoreAccount {
                         return Err(ContractError::InsufficientPermission);
                     }
                 }
+
+                // Issue #832: Enforce per-call and cumulative spend limits (check only)
+                Self::check_spend_limits(&env, &session, &args)?;
 
                 let sig = signature.ok_or(ContractError::InvalidSignature)?;
                 let payload = signature_payload.ok_or(ContractError::InvalidSignature)?;
@@ -344,7 +365,18 @@ impl AncoreAccount {
             let _: Val = env.invoke_contract(&module, &validate_fn, module_args);
         }
 
-        let result: Val = env.invoke_contract(&to, &function, args);
+        let result: Val = env.invoke_contract(&to, &function, args.clone());
+
+        if let Some(session_pk) = session_pk_for_spend {
+            if let Some(mut session) = Self::get_session_key(env.clone(), session_pk.clone()) {
+                Self::apply_spend_usage(&env, &mut session, &args)?;
+                if session.cumulative_limit.is_some() {
+                    env.storage()
+                        .persistent()
+                        .set(&DataKey::SessionKey(session_pk), &session);
+                }
+            }
+        }
 
         Ok(result)
     }
@@ -356,10 +388,15 @@ impl AncoreAccount {
         expires_at: u64,
         permissions: Vec<u32>,
         allowed_contracts: Option<Vec<Address>>,
+        max_amount_per_call: Option<i128>,
+        cumulative_limit: Option<i128>,
+        spend_window_seconds: u64,
     ) -> Result<(), ContractError> {
         if expires_at == 0 {
             return Err(ContractError::InvalidExpiration);
         }
+
+        Self::validate_spend_policy(&max_amount_per_call, &cumulative_limit, spend_window_seconds)?;
 
         let owner = Self::get_owner(env.clone())?;
         owner.require_auth();
@@ -398,6 +435,11 @@ impl AncoreAccount {
             expires_at: expires_at_secs,
             permissions,
             allowed_contracts,
+            max_amount_per_call,
+            cumulative_limit,
+            spend_window_start: current_timestamp,
+            spend_window_seconds,
+            spent_in_window: 0,
         };
 
         env.storage()
@@ -727,6 +769,105 @@ impl AncoreAccount {
         payload.append(&nonce.to_xdr(env));
         payload
     }
+
+    fn validate_spend_policy(
+        max_amount_per_call: &Option<i128>,
+        cumulative_limit: &Option<i128>,
+        spend_window_seconds: u64,
+    ) -> Result<(), ContractError> {
+        if let Some(limit) = max_amount_per_call {
+            if *limit <= 0 {
+                return Err(ContractError::InvalidSpendPolicy);
+            }
+        }
+
+        if let Some(limit) = cumulative_limit {
+            if *limit <= 0 || spend_window_seconds == 0 {
+                return Err(ContractError::InvalidSpendPolicy);
+            }
+        }
+
+        if spend_window_seconds > 0 && cumulative_limit.is_none() {
+            return Err(ContractError::InvalidSpendPolicy);
+        }
+
+        Ok(())
+    }
+
+    fn extract_spend_amount(env: &Env, args: &Vec<Val>) -> Option<i128> {
+        for index in 0..args.len() {
+            let value = args.get(index).unwrap();
+            if let Ok(amount) = i128::try_from_val(env, &value) {
+                if amount > 0 {
+                    return Some(amount);
+                }
+            }
+        }
+        None
+    }
+
+    fn check_spend_limits(
+        env: &Env,
+        session: &SessionKey,
+        args: &Vec<Val>,
+    ) -> Result<(), ContractError> {
+        let amount = match Self::extract_spend_amount(env, args) {
+            Some(value) => value,
+            None => return Ok(()),
+        };
+
+        if let Some(limit) = session.max_amount_per_call {
+            if amount > limit {
+                return Err(ContractError::ExceededSpendLimit);
+            }
+        }
+
+        if let Some(cumulative_limit) = session.cumulative_limit {
+            let now = env.ledger().timestamp();
+            let mut spent = session.spent_in_window;
+            let window_start = session.spend_window_start;
+
+            if now > window_start.saturating_add(session.spend_window_seconds) {
+                spent = 0;
+            }
+
+            let next_spent = spent
+                .checked_add(amount)
+                .ok_or(ContractError::ArithmeticOverflow)?;
+
+            if next_spent > cumulative_limit {
+                return Err(ContractError::ExceededSpendLimit);
+            }
+        }
+
+        Ok(())
+    }
+
+    fn apply_spend_usage(
+        env: &Env,
+        session: &mut SessionKey,
+        args: &Vec<Val>,
+    ) -> Result<(), ContractError> {
+        let amount = match Self::extract_spend_amount(env, args) {
+            Some(value) => value,
+            None => return Ok(()),
+        };
+
+        if let Some(_cumulative_limit) = session.cumulative_limit {
+            let now = env.ledger().timestamp();
+            if now > session.spend_window_start.saturating_add(session.spend_window_seconds) {
+                session.spend_window_start = now;
+                session.spent_in_window = 0;
+            }
+
+            session.spent_in_window = session
+                .spent_in_window
+                .checked_add(amount)
+                .ok_or(ContractError::ArithmeticOverflow)?;
+        }
+
+        Ok(())
+    }
 }
 
 #[cfg(test)]
@@ -736,7 +877,7 @@ mod test {
     use rand::rngs::OsRng;
     use soroban_sdk::{
         testutils::{Address as _, Events, Ledger},
-        Address, Bytes, Env,
+        Address, Bytes, Env, IntoVal, Val,
     };
 
     fn sign_payload(
@@ -833,7 +974,7 @@ mod test {
         let expires_at = 1000u64;
         let permissions = Vec::new(&env);
 
-        client.add_session_key(&session_pk, &expires_at, &permissions, &None);
+        client.add_session_key(&session_pk, &expires_at, &permissions, &None, &None, &None, &0u64);
 
         let session_key = client.get_session_key(&session_pk);
         assert!(session_key.is_some());
@@ -854,7 +995,7 @@ mod test {
         let expires_at = 1000u64;
         let permissions = Vec::new(&env);
 
-        client.add_session_key(&session_pk, &expires_at, &permissions, &None);
+        client.add_session_key(&session_pk, &expires_at, &permissions, &None, &None, &None, &0u64);
 
         let events_list = env.events().all();
         assert!(events_list.len() >= 2);
@@ -888,7 +1029,7 @@ mod test {
         // Before adding: should be false
         assert!(!client.has_session_key(&session_pk));
 
-        client.add_session_key(&session_pk, &expires_at, &permissions, &None);
+        client.add_session_key(&session_pk, &expires_at, &permissions, &None, &None, &None, &0u64);
 
         // After adding: should be true
         assert!(client.has_session_key(&session_pk));
@@ -924,7 +1065,7 @@ mod test {
         let expires_at = 1000u64;
         let permissions = Vec::new(&env);
 
-        client.add_session_key(&session_pk, &expires_at, &permissions, &None);
+        client.add_session_key(&session_pk, &expires_at, &permissions, &None, &None, &None, &0u64);
         assert!(client.has_session_key(&session_pk));
 
         client.revoke_session_key(&session_pk);
@@ -946,7 +1087,7 @@ mod test {
         let expires_at = 1000u64;
         let permissions = Vec::new(&env);
 
-        client.add_session_key(&session_pk, &expires_at, &permissions, &None);
+        client.add_session_key(&session_pk, &expires_at, &permissions, &None, &None, &None, &0u64);
         assert!(client.get_session_key(&session_pk).is_some());
 
         client.revoke_session_key(&session_pk);
@@ -968,7 +1109,7 @@ mod test {
         let expires_at = 1000u64;
         let permissions = Vec::new(&env);
 
-        client.add_session_key(&session_pk, &expires_at, &permissions, &None);
+        client.add_session_key(&session_pk, &expires_at, &permissions, &None, &None, &None, &0u64);
         client.revoke_session_key(&session_pk);
 
         let events_list = env.events().all();
@@ -1117,7 +1258,7 @@ mod test {
         let expires_at = env.ledger().timestamp() + 10000;
         let permissions = Vec::new(&env);
 
-        client.add_session_key(&session_pk, &expires_at, &permissions, &None);
+        client.add_session_key(&session_pk, &expires_at, &permissions, &None, &None, &None, &0u64);
         client.refresh_session_key_ttl(&session_pk);
 
         let session_key = client.get_session_key(&session_pk);
@@ -1198,7 +1339,7 @@ mod test {
         let mut permissions = Vec::new(&env);
         permissions.push_back(PERMISSION_EXECUTE);
 
-        client.add_session_key(&session_pk, &expires_at, &permissions, &None);
+        client.add_session_key(&session_pk, &expires_at, &permissions, &None, &None, &None, &0u64);
 
         let callee_id = env.register_contract(None, AncoreAccount);
         let function = soroban_sdk::symbol_short!("get_nonce");
@@ -1240,7 +1381,7 @@ mod test {
         let mut permissions = Vec::new(&env);
         permissions.push_back(PERMISSION_EXECUTE);
 
-        client.add_session_key(&session_pk, &expires_at, &permissions, &None);
+        client.add_session_key(&session_pk, &expires_at, &permissions, &None, &None, &None, &0u64);
 
         env.ledger().set_timestamp(expires_at + 1);
 
@@ -1379,7 +1520,7 @@ mod test {
         let expires_at = env.ledger().timestamp() + 10_000;
         let mut permissions = Vec::new(&env);
         permissions.push_back(PERMISSION_EXECUTE);
-        client.add_session_key(&session_pk, &expires_at, &permissions, &None);
+        client.add_session_key(&session_pk, &expires_at, &permissions, &None, &None, &None, &0u64);
 
         let callee_id = env.register_contract(None, AncoreAccount);
         let function = soroban_sdk::symbol_short!("get_nonce");
@@ -1502,7 +1643,7 @@ mod test {
         let mut permissions = Vec::new(&env);
         permissions.push_back(3);
 
-        let result = client.try_add_session_key(&session_pk, &expires_at, &permissions, &None);
+        let result = client.try_add_session_key(&session_pk, &expires_at, &permissions, &None, &None, &None, &0u64);
         assert_eq!(result, Err(Ok(ContractError::InsufficientPermission)));
     }
 
@@ -1524,7 +1665,7 @@ mod test {
         permissions.push_back(1);
         permissions.push_back(1);
 
-        let result = client.try_add_session_key(&session_pk, &expires_at, &permissions, &None);
+        let result = client.try_add_session_key(&session_pk, &expires_at, &permissions, &None, &None, &None, &0u64);
         assert_eq!(result, Err(Ok(ContractError::InsufficientPermission)));
     }
 
@@ -1545,7 +1686,7 @@ mod test {
         permissions.push_back(PERMISSION_EXECUTE);
 
         // allowed_contracts = None means unrestricted
-        client.add_session_key(&session_pk, &expires_at, &permissions, &None);
+        client.add_session_key(&session_pk, &expires_at, &permissions, &None, &None, &None, &0u64);
 
         let key = client.get_session_key(&session_pk).unwrap();
         assert!(key.allowed_contracts.is_none());
@@ -1571,7 +1712,7 @@ mod test {
         let mut allowlist = Vec::new(&env);
         allowlist.push_back(allowed_addr.clone());
 
-        client.add_session_key(&session_pk, &expires_at, &permissions, &Some(allowlist));
+        client.add_session_key(&session_pk, &expires_at, &permissions, &Some(allowlist), &None, &None, &0u64);
 
         let key = client.get_session_key(&session_pk).unwrap();
         assert!(key.allowed_contracts.is_some());
@@ -1596,7 +1737,7 @@ mod test {
         let mut permissions = Vec::new(&env);
         permissions.push_back(PERMISSION_EXECUTE);
 
-        client.add_session_key(&session_pk, &expires_at, &permissions, &None);
+        client.add_session_key(&session_pk, &expires_at, &permissions, &None, &None, &None, &0u64);
 
         // Update allowlist post-creation
         let new_addr = Address::generate(&env);
@@ -1667,5 +1808,152 @@ mod test {
 
         client.unregister_module(&module_addr);
         assert_eq!(client.get_modules().len(), 0);
+    }
+
+    #[test]
+    fn test_add_session_key_rejects_invalid_spend_policy() {
+        let env = Env::default();
+        let contract_id = env.register_contract(None, AncoreAccount);
+        let client = AncoreAccountClient::new(&env, &contract_id);
+
+        let owner = Address::generate(&env);
+        init(&env, &client, &owner);
+        env.mock_all_auths();
+
+        let session_pk = BytesN::from_array(&env, &[20u8; 32]);
+        let expires_at = 1000u64;
+        let mut permissions = Vec::new(&env);
+        permissions.push_back(PERMISSION_EXECUTE);
+
+        let result = client.try_add_session_key(
+            &session_pk,
+            &expires_at,
+            &permissions,
+            &None,
+            &Some(0i128),
+            &None,
+            &0u64,
+        );
+        assert_eq!(result, Err(Ok(ContractError::InvalidSpendPolicy)));
+
+        let result = client.try_add_session_key(
+            &session_pk,
+            &expires_at,
+            &permissions,
+            &None,
+            &None,
+            &Some(100i128),
+            &0u64,
+        );
+        assert_eq!(result, Err(Ok(ContractError::InvalidSpendPolicy)));
+    }
+
+    #[test]
+    fn test_execute_session_key_exceeds_per_call_limit() {
+        let env = Env::default();
+        let contract_id = env.register_contract(None, AncoreAccount);
+        let client = AncoreAccountClient::new(&env, &contract_id);
+
+        let owner = Address::generate(&env);
+        init(&env, &client, &owner);
+        env.mock_all_auths();
+
+        env.ledger().set_timestamp(1_000);
+
+        let mut csprng = OsRng;
+        let signing_key = SigningKey::generate(&mut csprng);
+        let session_pk = BytesN::from_array(&env, &signing_key.verifying_key().to_bytes());
+
+        let expires_at = env.ledger().timestamp() + 10_000;
+        let mut permissions = Vec::new(&env);
+        permissions.push_back(PERMISSION_EXECUTE);
+
+        client.add_session_key(
+            &session_pk,
+            &expires_at,
+            &permissions,
+            &None,
+            &Some(50i128),
+            &None,
+            &0u64,
+        );
+
+        let callee_id = env.register_contract(None, AncoreAccount);
+        let function = soroban_sdk::symbol_short!("get_nonce");
+        let mut args: Vec<Val> = Vec::new(&env);
+        args.push_back(100i128.into_val(&env));
+
+        let (sig, payload) = sign_payload(&env, &signing_key, &callee_id, &function, &args, 0);
+
+        let result = client.try_execute(
+            &CallerIdentity::SessionKey(session_pk.clone()),
+            &callee_id,
+            &function,
+            &args,
+            &0u64,
+            &Some(session_pk),
+            &Some(sig),
+            &Some(payload),
+        );
+
+        assert!(matches!(
+            result,
+            Err(Ok(ContractError::ExceededSpendLimit))
+        ));
+        assert_eq!(client.get_nonce(), 0);
+    }
+
+    #[test]
+    fn test_execute_session_key_exceeds_cumulative_limit() {
+        let env = Env::default();
+        let contract_id = env.register_contract(None, AncoreAccount);
+        let client = AncoreAccountClient::new(&env, &contract_id);
+
+        let owner = Address::generate(&env);
+        init(&env, &client, &owner);
+        env.mock_all_auths();
+
+        env.ledger().set_timestamp(1_000);
+
+        let mut csprng = OsRng;
+        let signing_key = SigningKey::generate(&mut csprng);
+        let session_pk = BytesN::from_array(&env, &signing_key.verifying_key().to_bytes());
+
+        let expires_at = env.ledger().timestamp() + 10_000;
+        let mut permissions = Vec::new(&env);
+        permissions.push_back(PERMISSION_EXECUTE);
+
+        client.add_session_key(
+            &session_pk,
+            &expires_at,
+            &permissions,
+            &None,
+            &None,
+            &Some(100i128),
+            &3600u64,
+        );
+
+        let callee_id = env.register_contract(None, AncoreAccount);
+        let function = soroban_sdk::symbol_short!("get_nonce");
+
+        let mut args: Vec<Val> = Vec::new(&env);
+        args.push_back(150i128.into_val(&env));
+        let (sig, payload) = sign_payload(&env, &signing_key, &callee_id, &function, &args, 0);
+        let result = client.try_execute(
+            &CallerIdentity::SessionKey(session_pk.clone()),
+            &callee_id,
+            &function,
+            &args,
+            &0u64,
+            &Some(session_pk),
+            &Some(sig),
+            &Some(payload),
+        );
+
+        assert!(matches!(
+            result,
+            Err(Ok(ContractError::ExceededSpendLimit))
+        ));
+        assert_eq!(client.get_nonce(), 0);
     }
 }

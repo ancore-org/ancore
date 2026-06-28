@@ -41,7 +41,12 @@
                 {
                   "vec": []
                 },
-                "void"
+                "void",
+                "void",
+                "void",
+                {
+                  "u64": 0
+                }
               ]
             }
           },
@@ -125,11 +130,23 @@
                     },
                     {
                       "key": {
+                        "symbol": "cumulative_limit"
+                      },
+                      "val": "void"
+                    },
+                    {
+                      "key": {
                         "symbol": "expires_at"
                       },
                       "val": {
                         "u64": 10000
                       }
+                    },
+                    {
+                      "key": {
+                        "symbol": "max_amount_per_call"
+                      },
+                      "val": "void"
                     },
                     {
                       "key": {
@@ -145,6 +162,33 @@
                       },
                       "val": {
                         "bytes": "0101010101010101010101010101010101010101010101010101010101010101"
+                      }
+                    },
+                    {
+                      "key": {
+                        "symbol": "spend_window_seconds"
+                      },
+                      "val": {
+                        "u64": 0
+                      }
+                    },
+                    {
+                      "key": {
+                        "symbol": "spend_window_start"
+                      },
+                      "val": {
+                        "u64": 0
+                      }
+                    },
+                    {
+                      "key": {
+                        "symbol": "spent_in_window"
+                      },
+                      "val": {
+                        "i128": {
+                          "hi": 0,
+                          "lo": 0
+                        }
                       }
                     }
                   ]
@@ -444,7 +488,12 @@
                 {
                   "vec": []
                 },
-                "void"
+                "void",
+                "void",
+                "void",
+                {
+                  "u64": 0
+                }
               ]
             }
           }
@@ -625,11 +674,23 @@
                 },
                 {
                   "key": {
+                    "symbol": "cumulative_limit"
+                  },
+                  "val": "void"
+                },
+                {
+                  "key": {
                     "symbol": "expires_at"
                   },
                   "val": {
                     "u64": 10000
                   }
+                },
+                {
+                  "key": {
+                    "symbol": "max_amount_per_call"
+                  },
+                  "val": "void"
                 },
                 {
                   "key": {
@@ -645,6 +706,33 @@
                   },
                   "val": {
                     "bytes": "0101010101010101010101010101010101010101010101010101010101010101"
+                  }
+                },
+                {
+                  "key": {
+                    "symbol": "spend_window_seconds"
+                  },
+                  "val": {
+                    "u64": 0
+                  }
+                },
+                {
+                  "key": {
+                    "symbol": "spend_window_start"
+                  },
+                  "val": {
+                    "u64": 0
+                  }
+                },
+                {
+                  "key": {
+                    "symbol": "spent_in_window"
+                  },
+                  "val": {
+                    "i128": {
+                      "hi": 0,
+                      "lo": 0
+                    }
                   }
                 }
               ]
