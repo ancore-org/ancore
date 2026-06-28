@@ -1,6 +1,6 @@
 import { SignTransactionApprovalScreen } from './SignTransactionApprovalScreen';
 
-type ApprovalRoute = 'grant-access' | 'sign-transaction' | 'sign-auth-entry';
+type ApprovalRoute = 'grant-access' | 'sign-transaction' | 'sign-auth-entry' | 'request-session-key';
 
 const routeCopy: Record<ApprovalRoute, { title: string; subtitle: string; description: string }> = {
   'grant-access': {
@@ -21,11 +21,23 @@ const routeCopy: Record<ApprovalRoute, { title: string; subtitle: string; descri
     description:
       'A dApp is requesting to sign an authorization entry. Approve only if you trust the source.',
   },
+  'request-session-key': {
+    title: 'Session Key Request',
+    subtitle: 'Review scoped session key permissions',
+    description:
+      'A dApp is requesting a session key with specific permissions, contract allowlist, and spend limits.',
+  },
 };
 
 function getApprovalRoute(params: URLSearchParams): ApprovalRoute {
   const route = params.get('route');
-  if (route === 'grant-access' || route === 'sign-auth-entry') return route;
+  if (
+    route === 'grant-access' ||
+    route === 'sign-auth-entry' ||
+    route === 'request-session-key'
+  ) {
+    return route;
+  }
   return 'sign-transaction';
 }
 

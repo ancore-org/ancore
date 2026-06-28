@@ -7,7 +7,7 @@ type ChromeSidePanel = {
   open(options: { tabId?: number; windowId?: number }): Promise<void>;
 };
 
-type ApprovalRoute = 'grant-access' | 'sign-transaction' | 'sign-auth-entry';
+type ApprovalRoute = 'grant-access' | 'sign-transaction' | 'sign-auth-entry' | 'request-session-key';
 type ApprovalUxPreference = 'sidePanel' | 'popup';
 
 const DEFAULT_APPROVAL_UX: ApprovalUxPreference = 'sidePanel';

@@ -13,6 +13,8 @@ import type {
   GetSmartAccountResult,
   GetPublicKeyResult,
   SignTransactionResult,
+  RequestSessionKeyResult,
+  SessionKeyPolicy,
 } from '@ancore/types';
 import { ExternalApiMethodName as MethodName } from '@ancore/types';
 import { NETWORK_PASSPHRASES } from '@ancore/wallet-shared';
@@ -223,6 +225,57 @@ export async function handleSignMessage(
   // For MVP, return a mock signature
   return {
     signature: 'mock_signature_' + Date.now(),
+  };
+}
+
+function generateSessionKeyPair(): { publicKey: string; secretKey: string } {
+  const alphabet = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ234567';
+  let publicKey = 'G';
+  const bytes = new Uint8Array(55);
+  crypto.getRandomValues(bytes);
+  for (const b of bytes) publicKey += alphabet[b % alphabet.length];
+
+  let secretKey = 'S';
+  const secretBytes = new Uint8Array(55);
+  crypto.getRandomValues(secretBytes);
+  for (const b of secretBytes) secretKey += alphabet[b % alphabet.length];
+
+  return { publicKey, secretKey };
+}
+
+/**
+ * requestSessionKey handler (#873)
+ * Enqueues approval for dApp session key policy; returns key material on approval (MVP mock on-chain).
+ */
+export async function handleRequestSessionKey(
+  ctx: ExternalHandlerContext
+): Promise<RequestSessionKeyResult> {
+  const { origin, params, requestId } = ctx;
+  const policy = params as SessionKeyPolicy;
+
+  if (!policy?.expiresAt || policy.expiresAt <= Date.now()) {
+    throw new Error('Session key policy must include a future expiresAt timestamp.');
+  }
+
+  if (typeof policy.permissions !== 'number') {
+    throw new Error('Session key policy must include permissions.');
+  }
+
+  const { network, smartAccountId } = resolveWalletContext(params);
+
+  const allowed = await isAllowed(network, smartAccountId, origin);
+  if (!allowed) {
+    throw new Error('Origin not allowed. Call requestAccess first.');
+  }
+
+  enqueueApproval(requestId, origin, MethodName.REQUEST_SESSION_KEY, params);
+  void openApprovalWindow(requestId, 'request-session-key');
+
+  const { publicKey } = generateSessionKeyPair();
+
+  return {
+    publicKey,
+    expiresAt: policy.expiresAt,
   };
 }
 

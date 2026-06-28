@@ -6,6 +6,7 @@
  */
 
 import { ExternalApiMethod } from '@ancore/wallet-shared';
+import type { RequestSessionKeyResult, SessionKeyPolicy } from '@ancore/types';
 import { sendExternalRequest } from './bridge';
 
 /** Stellar networks exposed to dApps via getNetwork(). */
@@ -132,5 +133,20 @@ export async function signMessage(params: {
 }): Promise<{ signedMessage: string }> {
   return sendExternalRequest(ExternalApiMethod.SIGN_MESSAGE, params);
 }
+
+/**
+ * Request a scoped session key from the user's smart account.
+ * Opens an approval screen showing duration, allowed contracts, and spend limits.
+ */
+export async function requestSessionKey(
+  policy: SessionKeyPolicy
+): Promise<RequestSessionKeyResult> {
+  return sendExternalRequest<RequestSessionKeyResult>(
+    ExternalApiMethod.REQUEST_SESSION_KEY,
+    policy
+  );
+}
+
+export type { SessionKeyPolicy, RequestSessionKeyResult } from '@ancore/types';
 
 export { WalletApiError, WalletNotInstalledError } from './bridge';
