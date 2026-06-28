@@ -24,6 +24,21 @@ function toMessageBytes(message: SignableValue): Uint8Array {
  * @returns The produced signature as a Uint8Array.
  * @throws Error if tx is not a supported transaction type.
  */
+export async function signPayload(
+  message: SignableValue,
+  keypair: SignableKeypair
+): Promise<Uint8Array> {
+  let kp: Keypair;
+
+  try {
+    kp = typeof keypair === 'string' ? Keypair.fromSecret(keypair) : keypair;
+  } catch {
+    throw new Error('Invalid secret key or keypair provided for signing.');
+  }
+
+  return Uint8Array.from(kp.sign(toMessageBytes(message) as unknown as Buffer));
+}
+
 export async function signTransaction(
   tx: Transaction | FeeBumpTransaction,
   keypair: SignableKeypair

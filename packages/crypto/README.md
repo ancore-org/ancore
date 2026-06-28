@@ -51,3 +51,19 @@ Only accepts 12-word mnemonics (unlike `validateMnemonicStrength` which also acc
 ### `generateMnemonic(): string`
 
 Generates a cryptographically secure 12-word BIP39 mnemonic using 128 bits of entropy.
+
+## Stellar signing test vectors
+
+Ed25519 payload signing is guarded by Stellar SDK-aligned fixtures in
+`src/__tests__/vectors/stellar-ed25519-signing.json`. The vector suite covers empty, one-byte,
+31-byte, 32-byte, 64-byte, and larger payloads used by intent signing so curve or encoding changes
+fail loudly.
+
+To add a vector from the upstream SDK:
+
+1. Use only a disposable `Keypair.random()` test key.
+2. Run `pnpm --dir packages/crypto exec node scripts/generate-signing-vectors.mjs` or sign exact UTF-8 payload bytes with `keypair.sign(Buffer.from(payload, 'utf8'))`.
+3. Commit the payload, public key, test secret seed, and hex signature in the JSON fixture.
+4. Run `pnpm --dir packages/crypto test -- signing-vectors.test.ts` before opening a PR.
+
+Never commit production secrets or user-derived seeds.
