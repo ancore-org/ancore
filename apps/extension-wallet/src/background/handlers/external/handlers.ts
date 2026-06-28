@@ -8,13 +8,44 @@ import type {
   ExternalHandlerContext,
   RequestAccessResult,
   GetAddressResult,
+  GetNetworkResult,
+  IsConnectedResult,
   GetSmartAccountResult,
+  GetPublicKeyResult,
   SignTransactionResult,
 } from '@ancore/types';
 import { ExternalApiMethodName as MethodName } from '@ancore/types';
+import { NETWORK_PASSPHRASES } from '@ancore/wallet-shared';
 import { isAllowed, addToAllowlist } from './allowlist';
 import { enqueueApproval } from './response-queue';
 import { openApprovalWindow } from '../../approval-window';
+import { getSettingsState } from '@/stores/settings';
+
+/** chrome.storage.local key for the deployed smart-account C-address. */
+const CONTRACT_ADDRESS_KEY = 'ancore_contract_address';
+
+async function readFromChromeLocal(key: string): Promise<string | null> {
+  const chromeRef = (globalThis as { chrome?: any }).chrome;
+  if (chromeRef?.storage?.local) {
+    return new Promise((resolve) => {
+      chromeRef.storage.local.get(key, (result: Record<string, unknown>) => {
+        const value = result[key];
+        resolve(typeof value === 'string' ? value : null);
+      });
+    });
+  }
+  return localStorage.getItem(key);
+}
+
+const DEFAULT_MOCK_SMART_ACCOUNT_ID = 'CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA';
+
+function resolveWalletContext(params: unknown): { network: string; smartAccountId: string } {
+  const typedParams = params as { network?: string; smartAccountId?: string };
+  return {
+    network: typedParams.network || 'testnet',
+    smartAccountId: typedParams.smartAccountId || DEFAULT_MOCK_SMART_ACCOUNT_ID,
+  };
+}
 
 /**
  * requestAccess handler
@@ -24,28 +55,26 @@ export async function handleRequestAccess(
   ctx: ExternalHandlerContext
 ): Promise<RequestAccessResult> {
   const { origin, params } = ctx;
-  const typedParams = params as { network?: string; smartAccountId?: string };
+  const { network, smartAccountId } = resolveWalletContext(params);
 
-  // For MVP, we'll use a default network and mock smart account ID
-  // In production, these would come from the wallet state
-  const network = typedParams.network || 'testnet';
-  const smartAccountId =
-    typedParams.smartAccountId || 'CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA';
-
-  // Check if already allowed
   const allowed = await isAllowed(network, smartAccountId, origin);
   if (allowed) {
     return { smartAccountId, network };
   }
 
-  // Enqueue for approval (in production, this would open a popup)
   enqueueApproval(ctx.requestId, origin, MethodName.REQUEST_ACCESS, params);
 
+  // Open approval UX before the MVP auto-approval path.
+  void openApprovalWindow(ctx.requestId, 'grant-access');
+
   // For MVP, auto-approve (in production, wait for user approval)
+
   await addToAllowlist(network, smartAccountId, origin);
 
   return { smartAccountId, network };
 }
+
+export const handleConnect = handleRequestAccess;
 
 /**
  * getAddress handler
@@ -53,23 +82,25 @@ export async function handleRequestAccess(
  */
 export async function handleGetAddress(ctx: ExternalHandlerContext): Promise<GetAddressResult> {
   const { origin, params } = ctx;
-  const typedParams = params as { network?: string; smartAccountId?: string };
+  const { network, smartAccountId } = resolveWalletContext(params);
 
-  const network = typedParams.network || 'testnet';
-  const smartAccountId =
-    typedParams.smartAccountId || 'CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA';
-
-  // Check allowlist
   const allowed = await isAllowed(network, smartAccountId, origin);
   if (!allowed) {
     throw new Error('Origin not allowed. Call requestAccess first.');
   }
 
-  // Return smart account address (C-address)
   return {
     address: smartAccountId,
     network,
   };
+}
+
+export async function handleIsConnected(ctx: ExternalHandlerContext): Promise<IsConnectedResult> {
+  const { origin, params } = ctx;
+  const { network, smartAccountId } = resolveWalletContext(params);
+  const connected = await isAllowed(network, smartAccountId, origin);
+
+  return { connected };
 }
 
 /**
@@ -157,6 +188,9 @@ export async function handleSignAuthEntry(
   // Enqueue for approval
   enqueueApproval(requestId, origin, MethodName.SIGN_AUTH_ENTRY, params);
 
+  // Open approval window (side panel on Chrome 116+, popup fallback)
+  void openApprovalWindow(requestId, 'sign-auth-entry');
+
   // For MVP, return a mock signed auth entry
   return {
     signedAuthEntry: typedParams.authEntry || 'AAAAAgAAAAA=',
@@ -190,4 +224,47 @@ export async function handleSignMessage(
   return {
     signature: 'mock_signature_' + Date.now(),
   };
+}
+
+/**
+ * getPublicKey handler (#809)
+ * Reads the deployed smart-account C-address from chrome.storage.local and
+ * returns it as the wallet's public key. Requires prior requestAccess approval.
+ */
+export async function handleGetPublicKey(ctx: ExternalHandlerContext): Promise<GetPublicKeyResult> {
+  const { origin } = ctx;
+
+  const publicKey = await readFromChromeLocal(CONTRACT_ADDRESS_KEY);
+  if (!publicKey) {
+    throw new Error('Wallet not set up. Complete onboarding first.');
+  }
+
+  const { network } = getSettingsState();
+  const allowed = await isAllowed(network, publicKey, origin);
+  if (!allowed) {
+    throw new Error('Origin not allowed. Call requestAccess first.');
+  }
+
+  return { publicKey };
+}
+
+/**
+ * getNetwork handler (#809)
+ * Returns the active Stellar network and its passphrase.
+ * Requires prior requestAccess approval.
+ */
+export async function handleGetNetwork(ctx: ExternalHandlerContext): Promise<GetNetworkResult> {
+  const { origin } = ctx;
+
+  const publicKey = await readFromChromeLocal(CONTRACT_ADDRESS_KEY);
+  const { network } = getSettingsState();
+
+  const smartAccountId = publicKey ?? 'CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA';
+  const allowed = await isAllowed(network, smartAccountId, origin);
+  if (!allowed) {
+    throw new Error('Origin not allowed. Call requestAccess first.');
+  }
+
+  const networkPassphrase = NETWORK_PASSPHRASES[network] ?? NETWORK_PASSPHRASES['testnet'];
+  return { network, networkPassphrase };
 }

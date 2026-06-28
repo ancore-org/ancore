@@ -35,9 +35,18 @@ pub const CURSOR_STALE_THRESHOLD_SECONDS: i64 = 300;
 pub fn init_prometheus_metrics() {
     describe_gauge!("indexer_lag_blocks", "Number of ledgers behind chain head");
     describe_gauge!("indexer_lag_seconds", "Estimated seconds behind chain head");
-    describe_gauge!("indexer_ingest_lag_ledgers", "Number of ledgers between cursor and network head");
-    describe_histogram!("indexer_ingest_records_per_second", "Ingestion throughput in records per second");
-    describe_histogram!("indexer_ingest_batch_duration_seconds", "Duration of ingest batch processing");
+    describe_gauge!(
+        "indexer_ingest_lag_ledgers",
+        "Number of ledgers between cursor and network head"
+    );
+    describe_histogram!(
+        "indexer_ingest_records_per_second",
+        "Ingestion throughput in records per second"
+    );
+    describe_histogram!(
+        "indexer_ingest_batch_duration_seconds",
+        "Duration of ingest batch processing"
+    );
 }
 
 /// Record lag metrics for Prometheus export.
@@ -52,7 +61,12 @@ pub fn record_lag(lag_blocks: i64, lag_seconds: i64) {
 /// Record ingest worker metrics for Prometheus export.
 ///
 /// Records throughput histogram and lag gauge from ingest worker operations.
-pub fn record_ingest_metrics(records_per_second: f64, lag_ledgers: i64, batch_duration_seconds: f64) {
+#[allow(dead_code)] // exercised by integration tests; ingest worker wiring lands separately
+pub fn record_ingest_metrics(
+    records_per_second: f64,
+    lag_ledgers: i64,
+    batch_duration_seconds: f64,
+) {
     histogram!("indexer_ingest_records_per_second").record(records_per_second);
     gauge!("indexer_ingest_lag_ledgers").set(lag_ledgers as f64);
     histogram!("indexer_ingest_batch_duration_seconds").record(batch_duration_seconds);

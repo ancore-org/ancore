@@ -1,0 +1,136 @@
+{
+  "common": {
+    "cancel": "Cancel",
+    "confirm": "Confirm",
+    "continue": "Continue",
+    "back": "Back",
+    "close": "Close",
+    "copy": "Copy",
+    "copied": "Copied!",
+    "loading": "Loading…",
+    "error": "Error",
+    "save": "Save",
+    "done": "Done",
+    "next": "Next",
+    "skip": "Skip"
+  },
+  "onboarding": {
+    "welcome": {
+      "title": "Welcome to Ancore",
+      "beforeYouStart": "Before you start",
+      "getStarted": "Get Started"
+    },
+    "password": {
+      "title": "Create Your Password",
+      "passwordLabel": "Password",
+      "passwordPlaceholder": "Enter your password",
+      "confirmLabel": "Confirm Password",
+      "confirmPlaceholder": "Confirm your password",
+      "strengthLabel": "Strength",
+      "mismatch": "Passwords do not match",
+      "match": "Passwords match",
+      "noRecovery": "Can't recover your password",
+      "minLength": "Min. 8 characters"
+    },
+    "mnemonic": {
+      "title": "Your Recovery Phrase",
+      "warning": "Write down these words in the exact order and store them somewhere safe.",
+      "copied": "Phrase copied"
+    },
+    "verifyMnemonic": {
+      "title": "Verify Recovery Phrase",
+      "instruction": "Select the words in the correct order to verify your recovery phrase."
+    },
+    "success": {
+      "title": "Wallet Ready!",
+      "description": "Your Ancore wallet is set up. Start exploring Stellar."
+    }
+  },
+  "unlock": {
+    "title": "Wallet Locked",
+    "subtitle": "Enter your password to unlock",
+    "passwordPlaceholder": "Password",
+    "unlockButton": "Unlock"
+  },
+  "home": {
+    "balance": "Balance",
+    "send": "Send",
+    "receive": "Receive",
+    "history": "History",
+    "noTransactions": "No transactions yet"
+  },
+  "send": {
+    "title": "Send",
+    "recipientLabel": "Recipient",
+    "recipientPlaceholder": "G…",
+    "amountLabel": "Amount",
+    "amountPlaceholder": "0.00",
+    "memoLabel": "Memo (optional)",
+    "review": "Review",
+    "confirm": "Confirm & Send",
+    "success": "Transaction Sent",
+    "failed": "Transaction Failed",
+    "transactionHash": "Transaction Hash"
+  },
+  "receive": {
+    "title": "Receive",
+    "yourAddress": "Your Address",
+    "scanQr": "Scan QR code to send funds to this address",
+    "copyAddress": "Copy Address"
+  },
+  "settings": {
+    "title": "Settings",
+    "subtitle": "Manage your wallet preferences",
+    "walletName": "My Ancore Wallet",
+    "groups": {
+      "network": "Network",
+      "display": "Display",
+      "security": "Security",
+      "about": "About",
+      "notifications": "Notifications"
+    },
+    "network": {
+      "title": "Network",
+      "switchToMainnet": "Switch to Mainnet?",
+      "switchNetwork": "Switch Network"
+    },
+    "display": {
+      "title": "Display",
+      "theme": "Theme",
+      "layoutDensity": "Layout density"
+    },
+    "security": {
+      "title": "Security",
+      "exportRecoveryPhrase": "Export Recovery Phrase",
+      "exportPrivateKey": "Export Private Key",
+      "sensitiveInformation": "Sensitive Information",
+      "currentPasswordPlaceholder": "Enter current password",
+      "newPasswordPlaceholder": "Min. 8 characters",
+      "repeatPasswordPlaceholder": "Repeat new password",
+      "passwordUpdated": "Password Updated"
+    },
+    "about": {
+      "title": "About",
+      "appName": "Ancore Wallet",
+      "description": "Account abstraction for Stellar",
+      "license": "Apache-2.0 OR MIT",
+      "builtWith": "Built with"
+    },
+    "language": {
+      "title": "Language",
+      "select": "Select language"
+    }
+  },
+  "sessionKeys": {
+    "title": "Session Keys",
+    "noKeys": "No session keys yet",
+    "addKey": "Add Session Key",
+    "revoke": "Revoke"
+  },
+  "errors": {
+    "generic": "Something went wrong. Please try again.",
+    "networkError": "Network error. Check your connection.",
+    "invalidAddress": "Invalid Stellar address",
+    "insufficientFunds": "Insufficient funds"
+  }
+}

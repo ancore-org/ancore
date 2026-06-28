@@ -30,6 +30,7 @@ import { SendScreen as SendFlowScreen } from '../screens/Send/SendScreen';
 import { ScheduledTransfersScreen } from '../screens/ScheduledTransfers/ScheduledTransfersScreen';
 import { SessionKeysScreen } from '../screens/SessionKeys/SessionKeysScreen';
 import { useDashboardSettingsStore } from '../state/dashboard-settings';
+import { useTelemetrySettingsSync } from '../hooks/useTelemetrySettingsSync';
 import { EmptyTransactions } from '../components/EmptyTransactions';
 import { ErrorBoundary } from '../components/ErrorBoundary/ErrorBoundary';
 import { useAccountStore } from '../stores/account';
@@ -195,43 +196,6 @@ function SecondaryLink({ to, children }: { to: string; children: React.ReactNode
   );
 }
 
-// Demo CreateAccountScreen preserved only for local development with VITE_DEMO_ROUTER=true
-function DemoCreateAccountScreen() {
-  const navigate = useNavigate();
-  const { completeOnboarding } = useExtensionAuth();
-  const [walletName, setWalletName] = React.useState('My Ancore Wallet');
-
-  function handleCreate(event: React.FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-    completeOnboarding(walletName);
-    navigate('/home', { replace: true });
-  }
-
-  return (
-    <PageScaffold
-      backTo="/welcome"
-      eyebrow="Demo only"
-      title="Create account (demo)"
-      description="This demo path is only available in development with VITE_DEMO_ROUTER=true."
-    >
-      <Card title="Wallet profile" description="Pick a name for the local demo wallet session.">
-        <form className="space-y-4" onSubmit={handleCreate}>
-          <label className="block text-sm font-medium text-foreground">
-            Wallet name
-            <input
-              className="mt-2 w-full rounded-xl border border-border bg-background px-3 py-3 text-sm outline-none ring-0 transition focus:border-primary"
-              onChange={(event) => setWalletName(event.target.value)}
-              placeholder="My Ancore Wallet"
-              value={walletName}
-            />
-          </label>
-          <PrimaryButton type="submit">Create wallet (demo)</PrimaryButton>
-        </form>
-      </Card>
-    </PageScaffold>
-  );
-}
-
 function UnlockScreen() {
   const navigate = useNavigate();
   const location = useLocation();
@@ -285,13 +249,6 @@ function UnlockScreen() {
           </PrimaryButton>
         </form>
       </Card>
-      <button
-        className="w-full text-center text-sm font-medium text-muted-foreground transition hover:text-foreground"
-        onClick={resetWallet}
-        type="button"
-      >
-        Reset demo wallet
-      </button>
     </PageScaffold>
   );
 }
@@ -783,11 +740,17 @@ function NotFoundScreen() {
   );
 }
 
+function TelemetrySettingsSync() {
+  useTelemetrySettingsSync();
+  return null;
+}
+
 export function ExtensionRouterContent() {
   const navigate = useNavigate();
 
   return (
     <PopupFrame>
+      <TelemetrySettingsSync />
       <TitleSync />
       <ErrorBoundary
         onGoHome={() => navigate('/home', { replace: true })}
@@ -805,17 +768,7 @@ export function ExtensionRouterContent() {
             }
             path="/onboarding/*"
           />
-          {/* Demo create-account path — dev only */}
-          {import.meta.env.DEV && (
-            <Route
-              element={
-                <PublicOnlyGuard mode="onboarding">
-                  <DemoCreateAccountScreen />
-                </PublicOnlyGuard>
-              }
-              path="/create-account"
-            />
-          )}
+
           {/* Smart-account deploy harness (#768) — dev only, excluded from prod build */}
           {import.meta.env.DEV && <Route element={<DeployTestScreen />} path="/deploy-test" />}
           <Route

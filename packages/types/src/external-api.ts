@@ -11,8 +11,12 @@
  */
 export enum ExternalApiMethodName {
   REQUEST_ACCESS = 'requestAccess',
+  CONNECT = 'connect',
   GET_ADDRESS = 'getAddress',
+  GET_NETWORK = 'getNetwork',
+  IS_CONNECTED = 'isConnected',
   GET_SMART_ACCOUNT = 'getSmartAccount',
+  GET_PUBLIC_KEY = 'getPublicKey',
   SIGN_TRANSACTION = 'signTransaction',
   SIGN_AUTH_ENTRY = 'signAuthEntry',
   SIGN_MESSAGE = 'signMessage',
@@ -102,6 +106,21 @@ export interface GetAddressResult {
 }
 
 /**
+ * Result from getNetwork handler.
+ */
+export interface GetNetworkResult {
+  readonly network: string;
+  readonly networkPassphrase: string;
+}
+
+/**
+ * Result from isConnected handler.
+ */
+export interface IsConnectedResult {
+  readonly connected: boolean;
+}
+
+/**
  * Result from getSmartAccount handler.
  */
 export interface GetSmartAccountResult {
@@ -129,4 +148,12 @@ export interface SignAuthEntryResult {
  */
 export interface SignMessageResult {
   readonly signature: string;
+}
+
+/**
+ * Result from getPublicKey handler.
+ * Returns the deployed smart-account C-address as the wallet's public identity.
+ */
+export interface GetPublicKeyResult {
+  readonly publicKey: string;
 }

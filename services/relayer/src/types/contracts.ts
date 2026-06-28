@@ -6,7 +6,12 @@
  */
 
 import type { RelayExecuteRequest } from './requests';
-import type { RelayExecuteResponse, ValidationResult, HealthResponse } from './responses';
+import type {
+  RelayExecuteResponse,
+  ValidationResult,
+  HealthResponse,
+  DependencyStatus,
+} from './responses';
 
 /** Result of submitting a signed transaction to Stellar/Soroban */
 export interface TransactionSubmissionResult {

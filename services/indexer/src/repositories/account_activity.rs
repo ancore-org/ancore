@@ -37,6 +37,7 @@ pub struct ActivityRecord {
 /// | `"native"`       | `"XLM"`    | `None`        |
 /// | `"USDC:GABC..."` | `"USDC"`   | `Some("GABC...")`|
 /// | `None`           | `None`     | `None`        |
+#[allow(dead_code)] // exercised by integration tests; ingest wiring lands separately
 pub fn normalize_asset(asset: Option<&str>) -> (Option<String>, Option<String>) {
     match asset {
         None => (None, None),
@@ -53,6 +54,7 @@ pub fn normalize_asset(asset: Option<&str>) -> (Option<String>, Option<String>) 
 
 /// Parameters for inserting a new activity record.
 #[derive(Debug, Clone)]
+#[allow(dead_code)] // exercised by integration tests; ingest wiring lands separately
 pub struct InsertActivity {
     pub account_id: String,
     pub activity_type: String,
@@ -67,6 +69,7 @@ pub struct InsertActivity {
 
 /// Insert a single activity record, deriving `asset_code`/`asset_issuer`
 /// from the raw `asset` string via [`normalize_asset`].
+#[allow(dead_code)] // exercised by integration tests; ingest wiring lands separately
 pub async fn insert_activity(db: &PgPool, params: &InsertActivity) -> Result<Uuid> {
     let (asset_code, asset_issuer) = normalize_asset(params.asset.as_deref());
 
@@ -279,7 +282,10 @@ pub async fn get_account_activity(
     };
 
     let items: Vec<ActivityRecord> = if has_next_page {
-        rows[..effective_limit as usize].iter().map(map_row).collect()
+        rows[..effective_limit as usize]
+            .iter()
+            .map(map_row)
+            .collect()
     } else {
         rows.iter().map(map_row).collect()
     };

@@ -37,3 +37,19 @@ export async function getNonce(
   const result = await contract.getNonce(options);
   return result;
 }
+
+/**
+ * Get the current version of an account abstraction contract.
+ * Returns 0 if the version key is absent (contract not yet initialized).
+ *
+ * @param contractId - The contract ID of the account abstraction contract
+ * @param options - Server and source account for simulation
+ * @returns The current version as a number
+ */
+export async function getVersion(
+  contractId: string,
+  options: AccountContractReadOptions
+): Promise<number> {
+  const contract = new AccountContract(contractId);
+  return contract.getVersion(options);
+}

@@ -35,6 +35,13 @@ export interface DraftInvoiceIntent {
 
 export type DraftIntent = DraftPaymentIntent | DraftInvoiceIntent;
 
+export type RiskLevel = 'low' | 'medium' | 'high';
+
+export interface RiskScore {
+  level: RiskLevel;
+  reasons: string[];
+}
+
 export interface DraftIntentResponse {
   /** Always "draft" — this intent requires explicit user confirmation before execution */
   status: 'draft';
@@ -43,4 +50,6 @@ export interface DraftIntentResponse {
   summary: string;
   /** Guardrail confirmation: service never executes autonomously */
   requiresConfirmation: true;
+  /** Risk assessment — wallet UI uses this to prompt extra confirmation for medium/high */
+  risk: RiskScore;
 }

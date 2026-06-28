@@ -5,6 +5,7 @@ import { z } from 'zod';
 import { RelayService } from './services/relayService';
 import { createStellarSubmitterFromEnv } from './services/stellarSubmitter';
 import { createAuthMiddleware } from './middleware/auth';
+import { createAccountRateLimiterMiddleware } from './middleware/accountRateLimiter';
 import { createIdempotencyMiddleware } from './middleware/idempotency';
 import { createPayloadGuardMiddleware } from './middleware/payloadGuard';
 import { createRequestLoggerMiddleware } from './middleware/requestLogger';
@@ -138,6 +139,9 @@ export function createApp(
     },
   });
 
+  // Per-account rate limiting for relay execute: 30 req/min per account (independent of IP limiter above)
+  const accountLimiter = createAccountRateLimiterMiddleware();
+
   // Rate limiting for status
   const statusLimiter = rateLimit({
     windowMs: 15 * 60 * 1000, // 15 minutes
@@ -182,7 +186,15 @@ export function createApp(
 
   const validateScheduledTransfer = validateBody(createScheduledTransferSchema);
 
-  app.post('/relay/execute', auth, relayLimiter, validate, idempotency, executeHandler);
+  app.post(
+    '/relay/execute',
+    auth,
+    relayLimiter,
+    accountLimiter,
+    validate,
+    idempotency,
+    executeHandler
+  );
   app.post('/relay/validate', auth, relayLimiter, validate, validateHandler);
   app.get('/relay/status', statusLimiter, (_req, res) => res.json(relayService.health()));
   app.get('/health', healthHandler);

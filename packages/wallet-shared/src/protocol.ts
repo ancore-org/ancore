@@ -26,7 +26,10 @@ export const WALLET_API_SOURCE = 'ancore-wallet-api@1' as const;
  */
 export const ExternalApiMethod = {
   REQUEST_ACCESS: 'requestAccess',
+  CONNECT: 'connect',
   GET_ADDRESS: 'getAddress',
+  GET_NETWORK: 'getNetwork',
+  IS_CONNECTED: 'isConnected',
   GET_SMART_ACCOUNT: 'getSmartAccount',
   SIGN_TRANSACTION: 'signTransaction',
   SIGN_AUTH_ENTRY: 'signAuthEntry',

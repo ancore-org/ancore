@@ -17,6 +17,7 @@
     "test:e2e": "playwright test --config=tests/playwright.config.ts",
     "test:e2e:smoke": "playwright test --config=tests/playwright.config.ts --grep @smoke",
     "test:e2e:smoke:debug": "playwright test --config=tests/playwright.config.ts --grep @smoke --headed --workers=1 --project=chromium --trace=on",
+    "test:e2e:visual": "playwright test --config=tests/playwright.visual.config.ts",
     "test:e2e:ui": "playwright test --config=tests/playwright.config.ts --ui",
     "analyze": "node scripts/analyze-bundle.js",
     "check:csp": "node scripts/check-csp.js"
@@ -33,6 +34,7 @@
     "date-fns": "^4.1.0",
     "i18next": "^24.2.3",
     "lucide-react": "^0.344.0",
+    "qrcode": "^1.5.4",
     "qrcode.react": "^4.2.0",
     "react": "^18.3.1",
     "react-dom": "^18.3.1",
@@ -49,6 +51,7 @@
     "@testing-library/react": "^14.0.0",
     "@testing-library/user-event": "^14.5.0",
     "@types/node": "^25.5.0",
+    "@types/qrcode": "^1.5.5",
     "@types/react": "^18.3.0",
     "@types/react-dom": "^18.3.0",
     "@types/webextension-polyfill": "^0.12.5",

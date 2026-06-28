@@ -181,13 +181,13 @@ const transaction = await builder.build();
 
 ### Error Types
 
-| Error                        | Code                 | When                                          |
-| ---------------------------- | -------------------- | --------------------------------------------- |
-| `BuilderValidationError`     | `BUILDER_VALIDATION` | Invalid params or no operations               |
-| `SimulationFailedError`      | `SIMULATION_FAILED`  | Soroban simulation returned an error          |
-| `SimulationExpiredError`     | `SIMULATION_EXPIRED` | Simulation result requires ledger restoration |
-| `TransactionSubmissionError` | `SUBMISSION_FAILED`  | Network submission failed                     |
-| `StrKeyValidationError`      | `INVALID_G_KEY` / `INVALID_C_KEY` | Invalid Stellar StrKey (G... public key / C... contract id)
+| Error                        | Code                              | When                                                        |
+| ---------------------------- | --------------------------------- | ----------------------------------------------------------- |
+| `BuilderValidationError`     | `BUILDER_VALIDATION`              | Invalid params or no operations                             |
+| `SimulationFailedError`      | `SIMULATION_FAILED`               | Soroban simulation returned an error                        |
+| `SimulationExpiredError`     | `SIMULATION_EXPIRED`              | Simulation result requires ledger restoration               |
+| `TransactionSubmissionError` | `SUBMISSION_FAILED`               | Network submission failed                                   |
+| `StrKeyValidationError`      | `INVALID_G_KEY` / `INVALID_C_KEY` | Invalid Stellar StrKey (G... public key / C... contract id) |
 
 ### Contract Parameter Helpers
 

@@ -19,13 +19,18 @@ describe('RelayService health check with signature service', () => {
 
     mockSubmitter = {
       submitSignedTransaction: jest.fn(),
+      simulateAndAssembleTransaction: jest
+        .fn()
+        .mockResolvedValue({ assembledXdr: 'xdr', gasUsed: 0 }),
       isHealthy: jest.fn().mockResolvedValue({ healthy: true, latencyMs: 50 }),
     };
   });
 
   describe('signature service status', () => {
     it('reports ok when signature service is healthy', async () => {
-      mockSignatureService.isHealthy = jest.fn().mockResolvedValue({ healthy: true, latencyMs: 10 });
+      mockSignatureService.isHealthy = jest
+        .fn()
+        .mockResolvedValue({ healthy: true, latencyMs: 10 });
 
       const service = new RelayService(mockSignatureService, queue, store, mockSubmitter);
       const status = await service.checkSignatureServiceHealth();
@@ -35,7 +40,9 @@ describe('RelayService health check with signature service', () => {
     });
 
     it('reports degraded when signature service is down', async () => {
-      mockSignatureService.isHealthy = jest.fn().mockResolvedValue({ healthy: false, latencyMs: 100 });
+      mockSignatureService.isHealthy = jest
+        .fn()
+        .mockResolvedValue({ healthy: false, latencyMs: 100 });
 
       const service = new RelayService(mockSignatureService, queue, store, mockSubmitter);
       const status = await service.checkSignatureServiceHealth();
@@ -46,9 +53,11 @@ describe('RelayService health check with signature service', () => {
     });
 
     it('reports degraded when signature service health check times out', async () => {
-      mockSignatureService.isHealthy = jest.fn().mockImplementation(
-        () => new Promise((resolve) => setTimeout(() => resolve({ healthy: true }), 10000))
-      );
+      mockSignatureService.isHealthy = jest
+        .fn()
+        .mockImplementation(
+          () => new Promise((resolve) => setTimeout(() => resolve({ healthy: true }), 10000))
+        );
 
       process.env.SIGNATURE_SERVICE_HEALTH_TIMEOUT_MS = '100';
 
@@ -93,7 +102,7 @@ describe('RelayService health check with signature service', () => {
 
       expect(health.status).toBe('ok');
       expect(health.dependencies?.signatureService).toBeDefined();
-      expect(health.dependencies?.signatureService.status).toBe('ok');
+      expect(health.dependencies?.signatureService?.status).toBe('ok');
     });
 
     it('returns degraded when signature service is unhealthy', () => {
@@ -113,7 +122,9 @@ describe('RelayService health check with signature service', () => {
     it('uses configurable timeout from environment', async () => {
       process.env.SIGNATURE_SERVICE_HEALTH_TIMEOUT_MS = '2000';
 
-      mockSignatureService.isHealthy = jest.fn().mockResolvedValue({ healthy: true, latencyMs: 50 });
+      mockSignatureService.isHealthy = jest
+        .fn()
+        .mockResolvedValue({ healthy: true, latencyMs: 50 });
 
       const service = new RelayService(mockSignatureService, queue, store, mockSubmitter);
       const status = await service.checkSignatureServiceHealth();

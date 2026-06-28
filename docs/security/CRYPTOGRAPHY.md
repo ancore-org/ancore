@@ -14,6 +14,7 @@ This document maps implemented cryptographic operations to audit-ready controls.
 | Mnemonic generation/validation | BIP39 | standard wordlist rules | `packages/crypto/src/mnemonic.ts` |
 | HD derivation | BIP44 path for Stellar | `m/44'/148'/0'/0/{index}` | `packages/crypto/src/key-derivation.ts` |
 | Randomness | WebCrypto CSPRNG | `crypto.getRandomValues` | crypto + storage modules |
+| Secret/signature byte comparison | Constant-time XOR loop | `Uint8Array` only; no early exit on length mismatch | `packages/crypto/src/timing-safe.ts` |
 
 ## 2) Cryptographic operations inventory
 
@@ -56,6 +57,7 @@ This document maps implemented cryptographic operations to audit-ready controls.
 - **AES-256-GCM only**: implemented in reviewed encryption paths.
 - **PBKDF2 at 100k iterations**: implemented.
 - **CSPRNG via WebCrypto**: implemented.
+- **Constant-time secret comparison**: use `timingSafeEqual` from `@ancore/crypto` for byte-level equality of secrets, MAC tags, and derived keys; never use `===` on secret bytes.
 - **No private key leakage in errors**: decryption errors are generic; continue enforcing no sensitive logs.
 
 ## 5) Cryptographic assumptions

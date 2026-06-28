@@ -191,7 +191,11 @@ import { StrKey } from '@stellar/stellar-sdk';
 export type StrKeyErrorCode = 'INVALID_G_KEY' | 'INVALID_C_KEY';
 
 export class StrKeyValidationError extends AncoreSdkError {
-  constructor(public readonly code: StrKeyErrorCode, message: string, public readonly input?: string) {
+  constructor(
+    public readonly code: StrKeyErrorCode,
+    message: string,
+    public readonly input?: string
+  ) {
     super(code, message);
     this.name = 'StrKeyValidationError';
     Object.setPrototypeOf(this, new.target.prototype);
@@ -204,7 +208,8 @@ export class StrKeyValidationError extends AncoreSdkError {
  */
 export function assertValidEd25519PublicKey(publicKey: string): void {
   if (typeof publicKey !== 'string' || !StrKey.isValidEd25519PublicKey(publicKey)) {
-    const snippet = typeof publicKey === 'string' ? publicKey.slice(0, 8) + '...' : String(publicKey);
+    const snippet =
+      typeof publicKey === 'string' ? publicKey.slice(0, 8) + '...' : String(publicKey);
     throw new StrKeyValidationError(
       'INVALID_G_KEY',
       `Invalid Ed25519 public key: expected G... format, got ${snippet}`,
@@ -219,7 +224,8 @@ export function assertValidEd25519PublicKey(publicKey: string): void {
  */
 export function assertValidContractId(contractId: string): void {
   if (typeof contractId !== 'string' || !StrKey.isValidContract(contractId)) {
-    const snippet = typeof contractId === 'string' ? contractId.slice(0, 8) + '...' : String(contractId);
+    const snippet =
+      typeof contractId === 'string' ? contractId.slice(0, 8) + '...' : String(contractId);
     throw new StrKeyValidationError(
       'INVALID_C_KEY',
       `Invalid contract id: expected C... format, got ${snippet}`,

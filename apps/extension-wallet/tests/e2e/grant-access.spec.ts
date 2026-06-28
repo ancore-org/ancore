@@ -11,7 +11,7 @@ const MOCK_DAPP_ORIGIN = 'https://app.example-dapp.test';
  * Full flow unblocks after #764 + #768.
  */
 test.describe('grant access', () => {
-  test.skip('inject mock requestAccess → approve → smart account id returned to dapp', async ({
+  test('inject mock requestAccess → approve → smart account id returned to dapp', async ({
     context,
     extensionUrl,
   }) => {

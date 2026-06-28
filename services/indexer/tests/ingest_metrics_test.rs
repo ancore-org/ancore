@@ -1,4 +1,4 @@
-use ancore_indexer::ingest::{IngestWorker, WorkerConfig, VecSource, MemorySink};
+use ancore_indexer::ingest::{IngestWorker, MemorySink, VecSource, WorkerConfig};
 use ancore_indexer::metrics::{init_prometheus_metrics, record_ingest_metrics};
 use ancore_indexer::schema::canonical::RawEvent;
 use chrono::Utc;

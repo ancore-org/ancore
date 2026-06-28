@@ -1,6 +1,7 @@
 import express, { Express, Request, Response } from 'express';
-import { intentSchema, HIGH_VALUE_PAYMENT_THRESHOLD } from './schemas/intent';
+import { intentSchema, HIGH_VALUE_PAYMENT_THRESHOLD, type Intent } from './schemas/intent';
 import { requestLogger } from './middleware/request-logger';
+import { scoreRisk } from './risk';
 
 const startTime = Date.now();
 
@@ -50,16 +51,21 @@ export function createApp(): Express {
       return res.status(400).json({ error: 'Invalid request' });
     }
     const isInvoice = typeof prompt === 'string' && prompt.toLowerCase().includes('invoice');
+    const draftIntent: Intent = isInvoice
+      ? {
+          type: 'invoice',
+          amount: '10',
+          asset: 'XLM',
+          recipient: accountId,
+          dueDate: new Date().toISOString(),
+        }
+      : { type: 'payment', destination: 'G123', amount: '10', asset: 'XLM' };
     return res.status(200).json({
       status: 'draft',
       requiresConfirmation: true,
       summary: isInvoice ? 'Drafted invoice intent' : 'Drafted payment intent',
-      intent: {
-        type: isInvoice ? 'invoice' : 'payment',
-        destination: 'G123',
-        amount: '10',
-        asset: 'XLM',
-      },
+      intent: draftIntent,
+      risk: scoreRisk(draftIntent),
     });
   });
 
@@ -83,16 +89,18 @@ export function createApp(): Express {
     const intent = parsed.data;
     let requiresConfirmation = false;
 
-    // Flag high-value payments for confirmation
     if (intent.type === 'payment') {
       const amount = parseFloat(intent.amount);
       requiresConfirmation = amount >= HIGH_VALUE_PAYMENT_THRESHOLD;
     }
 
+    const risk = scoreRisk(intent);
+
     return res.status(200).json({
       valid: true,
       intent: parsed.data,
       requiresConfirmation,
+      risk,
     });
   });
 

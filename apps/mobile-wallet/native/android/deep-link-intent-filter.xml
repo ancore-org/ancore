@@ -1,0 +1,10 @@
+<!--
+  Merge into the host app AndroidManifest.xml inside the main <activity> element
+  to register the ancore://wc deep link intent filter for WalletConnect pairing.
+-->
+<intent-filter>
+  <action android:name="android.intent.action.VIEW" />
+  <category android:name="android.intent.category.DEFAULT" />
+  <category android:name="android.intent.category.BROWSABLE" />
+  <data android:scheme="ancore" android:host="wc" />
+</intent-filter>

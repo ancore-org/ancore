@@ -65,7 +65,12 @@ describe('TransactionBuilder', () => {
 
     // @ts-expect-no-error private buildOperation for SCVal assertion
     const operation = builder['buildOperation'](builder['ops'][0]);
-    const invokeArgs = operation.body().invokeHostFunctionOp().hostFunction().invokeContract().args();
+    const invokeArgs = operation
+      .body()
+      .invokeHostFunctionOp()
+      .hostFunction()
+      .invokeContract()
+      .args();
     expect(invokeArgs[0].switch().name).toBe('scvBytes');
     expect(invokeArgs[0]).toEqual(publicKeyToBytes32ScVal(stellarPublicKey));
   });
@@ -75,9 +80,9 @@ describe('TransactionBuilder', () => {
     expect(() => builder.refreshSessionKeyTtl({ publicKey: '', ttlSeconds: 3600 })).toThrow(
       'refreshSessionKeyTtl requires a non-empty publicKey string'
     );
-    expect(() => builder.refreshSessionKeyTtl({ publicKey: validSessionKey, ttlSeconds: 0 })).toThrow(
-      'refreshSessionKeyTtl requires ttlSeconds to be greater than zero'
-    );
+    expect(() =>
+      builder.refreshSessionKeyTtl({ publicKey: validSessionKey, ttlSeconds: 0 })
+    ).toThrow('refreshSessionKeyTtl requires ttlSeconds to be greater than zero');
   });
 
   it('should execute contract operations', () => {
