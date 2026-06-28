@@ -2,7 +2,7 @@ import { NetworkError } from '@ancore/stellar';
 import { RelayService } from '../../src/services/relayService';
 import { JobQueue } from '../../src/queue/JobQueue';
 import { IdempotencyStore } from '../../src/store/idempotency';
-import { NonceStore } from '../../src/store/nonceStore';
+import { NonceStore, MemoryNonceStore } from '../../src/store/nonceStore';
 import type {
   SignatureServiceContract,
   RelayExecuteRequest,
@@ -76,7 +76,7 @@ describe('RelayService', () => {
     });
 
     it('returns NONCE_REPLAY if nonce is already seen in nonceStore', async () => {
-      const nonceStore = new NonceStore();
+      const nonceStore = new MemoryNonceStore();
       nonceStore.track(VALID_KEY, 1);
       const svc = new RelayService(
         makeSignatureService(true),
@@ -105,7 +105,7 @@ describe('RelayService', () => {
     });
 
     it('tracks nonce in nonceStore upon successful execution', async () => {
-      const nonceStore = new NonceStore();
+      const nonceStore = new MemoryNonceStore();
       const svc = new RelayService(
         makeSignatureService(true),
         undefined,

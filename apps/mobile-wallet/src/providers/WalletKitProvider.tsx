@@ -1,5 +1,6 @@
 import React, { createContext, useContext, useEffect, useState, ReactNode } from 'react';
 import { SessionTypes } from '@walletconnect/types';
+import { SessionApprovalSheet, SessionProposal } from '../components/SessionApprovalSheet';
 
 // Abstract WalletKit interface - to be implemented with actual @reown/walletkit API
 interface IWalletKit {
@@ -15,8 +16,8 @@ interface IWalletKit {
     reason: { code: number; message: string };
   }): Promise<void>;
   getActiveSessions(): SessionTypes.Struct[];
-  on(event: string, callback: () => void): void;
-  off(event: string, callback: () => void): void;
+  on(event: string, callback: (...args: unknown[]) => void): void;
+  off(event: string, callback: (...args: unknown[]) => void): void;
 }
 
 interface WalletConnectContextType {
@@ -30,6 +31,8 @@ interface WalletConnectContextType {
   rejectSession: (proposal: { id: number }) => Promise<void>;
   disconnectSession: (topic: string) => Promise<void>;
   isInitialized: boolean;
+  pendingProposal: SessionProposal | null;
+  clearPendingProposal: () => void;
 }
 
 const WalletConnectContext = createContext<WalletConnectContextType | null>(null);
@@ -48,6 +51,7 @@ export const WalletKitProvider: React.FC<WalletKitProviderProps> = ({
   const [walletKit] = useState<IWalletKit | null>(walletKitInstance || null);
   const [sessions, setSessions] = useState<SessionTypes.Struct[]>([]);
   const [isInitialized, setIsInitialized] = useState(false);
+  const [pendingProposal, setPendingProposal] = useState<SessionProposal | null>(null);
 
   useEffect(() => {
     // Skip initialization if walletKitInstance is provided (for testing)
@@ -171,6 +175,52 @@ export const WalletKitProvider: React.FC<WalletKitProviderProps> = ({
     }
   };
 
+  const clearPendingProposal = () => setPendingProposal(null);
+
+  // Subscribe to session_proposal events from WalletKit
+  useEffect(() => {
+    if (!walletKit || !isInitialized) return;
+
+    const handleSessionProposal = (...args: unknown[]) => {
+      setPendingProposal(args[0] as SessionProposal);
+    };
+
+    walletKit.on('session_proposal', handleSessionProposal);
+
+    return () => {
+      walletKit.off('session_proposal', handleSessionProposal);
+    };
+  }, [walletKit, isInitialized]);
+
+  // Auto-dismiss the sheet after 60 seconds if the user hasn't acted
+  useEffect(() => {
+    if (!pendingProposal) return;
+
+    const timer = setTimeout(() => {
+      setPendingProposal(null);
+    }, 60_000);
+
+    return () => clearTimeout(timer);
+  }, [pendingProposal]);
+
+  const handleSheetApprove = async () => {
+    if (!pendingProposal) return;
+    try {
+      await approveSession(pendingProposal);
+    } finally {
+      setPendingProposal(null);
+    }
+  };
+
+  const handleSheetReject = async () => {
+    if (!pendingProposal) return;
+    try {
+      await rejectSession({ id: pendingProposal.id });
+    } finally {
+      setPendingProposal(null);
+    }
+  };
+
   const value: WalletConnectContextType = {
     walletKit,
     sessions,
@@ -179,9 +229,22 @@ export const WalletKitProvider: React.FC<WalletKitProviderProps> = ({
     rejectSession,
     disconnectSession,
     isInitialized,
+    pendingProposal,
+    clearPendingProposal,
   };
 
-  return <WalletConnectContext.Provider value={value}>{children}</WalletConnectContext.Provider>;
+  return (
+    <WalletConnectContext.Provider value={value}>
+      {children}
+      {pendingProposal && (
+        <SessionApprovalSheet
+          proposal={pendingProposal}
+          onApprove={handleSheetApprove}
+          onReject={handleSheetReject}
+        />
+      )}
+    </WalletConnectContext.Provider>
+  );
 };
 
 export const useWalletConnect = (): WalletConnectContextType => {

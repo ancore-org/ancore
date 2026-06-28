@@ -72,6 +72,30 @@ describe('POST /relay/execute', () => {
     expect(res.body.gasUsed).toBe(0);
   });
 
+  it('422 with NONCE_REPLAY error when submitting the same nonce twice', async () => {
+    // We pass makeApp which instantiates a MemoryNonceStore internally inside createApp
+    const app = makeApp(true, undefined, undefined, { useMockSubmission: true });
+    
+    // First request should succeed
+    const res1 = await request(app)
+      .post('/relay/execute')
+      .set('Authorization', 'Bearer token')
+      .send(validBody);
+
+    expect(res1.status).toBe(200);
+    expect(res1.body.success).toBe(true);
+
+    // Second request with same sessionKey and nonce should fail
+    const res2 = await request(app)
+      .post('/relay/execute')
+      .set('Authorization', 'Bearer token')
+      .send(validBody);
+
+    expect(res2.status).toBe(422);
+    expect(res2.body.success).toBe(false);
+    expect(res2.body.error.code).toBe('NONCE_REPLAY');
+  });
+
   it('200 with network transaction hash when submitter is wired', async () => {
     const submitter = makeMockSubmitter();
     const res = await request(makeApp(true, undefined, submitter))

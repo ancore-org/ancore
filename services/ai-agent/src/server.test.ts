@@ -166,6 +166,7 @@ describe('enforceNoAutonomousExecution', () => {
     requiresConfirmation: true,
     summary: 'test',
     intent: { type: 'payment', destination: 'G123', amount: '10', asset: 'XLM' },
+    risk: { level: 'low', reasons: [] },
   };
 
   it('does not throw for a valid draft response', () => {

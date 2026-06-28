@@ -1,4 +1,17 @@
-import { bootstrapMobileWallet } from '../bootstrap';
+import { bootstrapMobileWallet, type MobileWalletBootstrap } from '../bootstrap';
+
+jest.mock('react-native', () => ({
+  AppState: {
+    currentState: 'active',
+    addEventListener: jest.fn(),
+  },
+}), { virtual: true });
+
+jest.mock('react-native-keychain', () => ({
+  getGenericPassword: jest.fn(),
+  setGenericPassword: jest.fn(),
+  resetGenericPassword: jest.fn(),
+}), { virtual: true });
 
 describe('bootstrapMobileWallet', () => {
   it('wires environment, SDK client, and read-only account state', () => {

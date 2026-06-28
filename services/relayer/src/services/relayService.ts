@@ -1,4 +1,5 @@
 import { randomBytes } from 'crypto';
+import { trace } from '@opentelemetry/api';
 import { validateTransferPolicy } from '@ancore/types';
 import type { JobQueue } from '../queue/JobQueue';
 import type { IdempotencyStore } from '../store/idempotency';
@@ -13,6 +14,8 @@ import type {
   ValidationResult,
   HealthResponse,
   DependencyStatus,
+  RelayErrorCode,
+  RelayError,
 } from '../types';
 import { mapSimulationError } from './mapSimulationError';
 import { mapSubmissionError } from './mapSubmissionError';
@@ -24,6 +27,8 @@ const startTime = Date.now();
 function mockTxId(): string {
   return randomBytes(32).toString('hex').toUpperCase();
 }
+
+const tracer = trace.getTracer('ancore-relayer');
 
 function isMockSubmissionEnabled(options?: RelayServiceOptions): boolean {
   return options?.useMockSubmission === true || process.env.RELAYER_USE_MOCK_SUBMISSION === 'true';
@@ -53,50 +58,57 @@ export class RelayService implements RelayServiceContract {
   }
 
   async validateRelay(request: RelayExecuteRequest): Promise<ValidationResult> {
-    const keyError = this.validateSessionKey(request.sessionKey);
-    if (keyError) return { valid: false, error: { code: 'INVALID_SIGNATURE', message: keyError } };
+    return tracer.startActiveSpan('relayer.validate', async (span): Promise<ValidationResult> => {
+      span.setAttribute('session_key_id', request.sessionKey);
+      span.setAttribute('nonce', request.nonce);
 
-    if (request.nonce < 0) {
-      return {
-        valid: false,
-        error: { code: 'NONCE_REPLAY', message: 'Nonce must be non-negative' },
-      };
-    }
-
-    if (this.nonceStore) {
       try {
-        this.nonceStore.assertFresh(request.sessionKey, request.nonce);
-      } catch (err) {
-        const message = err instanceof Error ? err.message : 'Nonce already used';
-        return {
-          valid: false,
-          error: { code: 'NONCE_REPLAY', message },
-        };
+        const keyError = this.validateSessionKey(request.sessionKey);
+        if (keyError) {
+          const error: RelayError = { code: 'INVALID_SIGNATURE', message: keyError };
+          return { valid: false, error };
+        }
+
+        if (request.nonce < 0) {
+          const error: RelayError = { code: 'NONCE_REPLAY', message: 'Nonce must be non-negative' };
+          return { valid: false, error };
+        }
+
+        if (this.nonceStore) {
+          try {
+            await this.nonceStore.assertFresh(request.sessionKey, request.nonce);
+          } catch (err) {
+            const message = err instanceof Error ? err.message : 'Nonce already used';
+            const error: RelayError = { code: 'NONCE_REPLAY', message };
+            return { valid: false, error };
+          }
+        }
+
+        const payload = this.canonicalPayload(request);
+        const ok = this.signatureService.verify(request.sessionKey, payload, request.signature);
+        if (!ok) {
+          return {
+            valid: false,
+            error: { code: 'INVALID_SIGNATURE', message: 'Signature verification failed' },
+          };
+        }
+
+        if (request.transferPolicy) {
+          const { policy, amount, todayTotal } = request.transferPolicy;
+          const policyResult = validateTransferPolicy(amount, todayTotal, policy);
+          if (policyResult.action === 'block') {
+            return {
+              valid: false,
+              error: { code: 'TRANSFER_LIMIT_EXCEEDED', message: policyResult.message },
+            };
+          }
+        }
+
+        return { valid: true };
+      } finally {
+        span.end();
       }
-    }
-
-    const payload = this.canonicalPayload(request);
-    const ok = this.signatureService.verify(request.sessionKey, payload, request.signature);
-    if (!ok) {
-      return {
-        valid: false,
-        error: { code: 'INVALID_SIGNATURE', message: 'Signature verification failed' },
-      };
-    }
-
-    // Validate transfer policy if provided
-    if (request.transferPolicy) {
-      const { policy, amount, todayTotal } = request.transferPolicy;
-      const policyResult = validateTransferPolicy(amount, todayTotal, policy);
-      if (policyResult.action === 'block') {
-        return {
-          valid: false,
-          error: { code: 'TRANSFER_LIMIT_EXCEEDED', message: policyResult.message },
-        };
-      }
-    }
-
-    return { valid: true };
+    });
   }
 
   async executeRelay(request: RelayExecuteRequest): Promise<RelayExecuteResponse> {
@@ -106,7 +118,7 @@ export class RelayService implements RelayServiceContract {
     }
 
     if (this.nonceStore) {
-      this.nonceStore.track(request.sessionKey, request.nonce);
+      await this.nonceStore.track(request.sessionKey, request.nonce);
     }
 
     if (this.useMockSubmission) {
@@ -137,9 +149,22 @@ export class RelayService implements RelayServiceContract {
     }
 
     try {
-      const { assembledXdr, gasUsed } =
-        await this.transactionSubmitter.simulateAndAssembleTransaction(signedXdr);
-      const result = await this.transactionSubmitter.submitSignedTransaction(assembledXdr);
+      const { assembledXdr, gasUsed } = await tracer.startActiveSpan('relayer.simulate', async (span) => {
+        try {
+          return await this.transactionSubmitter!.simulateAndAssembleTransaction(signedXdr);
+        } finally {
+          span.end();
+        }
+      });
+
+      const result = await tracer.startActiveSpan('relayer.submit', async (span) => {
+        try {
+          return await this.transactionSubmitter!.submitSignedTransaction(assembledXdr);
+        } finally {
+          span.end();
+        }
+      });
+
       return {
         success: true,
         transactionId: result.transactionHash,

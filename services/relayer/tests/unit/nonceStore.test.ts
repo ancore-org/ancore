@@ -1,8 +1,8 @@
-import { NonceStore } from '../../src/store/nonceStore';
+import { MemoryNonceStore } from '../../src/store/nonceStore';
 
 describe('NonceStore', () => {
   it('allows fresh nonces and tracks them', () => {
-    const store = new NonceStore();
+    const store = new MemoryNonceStore();
     const key = 'session-1';
 
     expect(() => store.assertFresh(key, 100)).not.toThrow();
@@ -13,7 +13,7 @@ describe('NonceStore', () => {
   });
 
   it('keeps track of nonces per session key independently', () => {
-    const store = new NonceStore();
+    const store = new MemoryNonceStore();
     const key1 = 'session-1';
     const key2 = 'session-2';
 
@@ -23,7 +23,7 @@ describe('NonceStore', () => {
   });
 
   it('evicts expired nonces based on TTL', async () => {
-    const store = new NonceStore(50); // 50ms TTL
+    const store = new MemoryNonceStore(50); // 50ms TTL
     const key = 'session-1';
 
     store.track(key, 100);
@@ -38,7 +38,7 @@ describe('NonceStore', () => {
   });
 
   it('clears expired nonces for all session keys', async () => {
-    const store = new NonceStore(50);
+    const store = new MemoryNonceStore(50);
     const key1 = 'session-1';
     const key2 = 'session-2';
 
