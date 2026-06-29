@@ -1,4 +1,4 @@
-import ReactNativeBiometrics, { BiometryTypes } from 'react-native-biometrics';
+import ReactNativeBiometrics from 'react-native-biometrics';
 import type { IBiometricAuthService } from './hooks/useBiometricUnlock';
 import type { BiometricFailureReason } from './biometric-lockout.types';
 
@@ -24,7 +24,7 @@ export class NativeBiometricAdapter implements IBiometricAuthService {
     errorCode?: BiometricFailureReason;
   }> {
     try {
-      const { available, biometryType } = await this.rnBiometrics.isSensorAvailable();
+      const { available } = await this.rnBiometrics.isSensorAvailable();
       if (!available) {
         return { success: false, errorCode: 'BIOMETRIC_NOT_AVAILABLE' };
       }
@@ -51,7 +51,7 @@ export class NativeBiometricAdapter implements IBiometricAuthService {
 
       return { success: false, errorCode: 'USER_CANCEL' };
     } catch (err: unknown) {
-      if (err instanceof Error && err.message && err.message.includes('User cancelled')) {
+
         return { success: false, errorCode: 'USER_CANCEL' };
       }
       return { success: false, errorCode: 'AUTHENTICATION_FAILED' };
