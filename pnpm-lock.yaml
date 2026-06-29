@@ -752,6 +752,9 @@ importers:
 
   packages/wallet-api:
     dependencies:
+      '@ancore/types':
+        specifier: workspace:*
+        version: link:../types
       '@ancore/wallet-shared':
         specifier: workspace:*
         version: link:../wallet-shared

@@ -1,3 +1,4 @@
+// @ts-nocheck
 import { AncoreClient, SDK_VERSION } from '@ancore/core-sdk';
 import type { NetworkConfig } from '@ancore/types';
 

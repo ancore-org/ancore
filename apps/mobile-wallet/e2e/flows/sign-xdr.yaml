@@ -1,0 +1,9 @@
+appId: com.ancore.mobile
+---
+- launchApp
+- runFlow:
+    file: walletconnect-pair.yaml
+- runScript: send-mock-signxdr-request.js
+- assertVisible: "Approve Transaction"
+- tapOn: "Approve"
+- assertVisible: "Transaction Signed"

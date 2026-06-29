@@ -1821,14 +1821,14 @@ mod test {
         let client = AncoreAccountClient::new(&env, &contract_id);
 
         let owner = Address::generate(&env);
-        client.initialize(&owner);
         env.mock_all_auths();
+        client.initialize(&owner);
 
         let session_pk = BytesN::from_array(&env, &[10u8; 32]);
         let permissions = Vec::new(&env);
 
         // add → assert present
-        client.add_session_key(&session_pk, &9999u64, &permissions, &None);
+        client.add_session_key(&session_pk, &9999u64, &permissions, &None, &None, &None, &0u64);
         assert!(client.has_session_key(&session_pk));
 
         // revoke → assert absent
@@ -1836,7 +1836,7 @@ mod test {
         assert!(!client.has_session_key(&session_pk));
 
         // re-add same key → assert present again with new expiry
-        client.add_session_key(&session_pk, &19999u64, &permissions, &None);
+        client.add_session_key(&session_pk, &19999u64, &permissions, &None, &None, &None, &0u64);
         assert!(client.has_session_key(&session_pk));
 
         let sk = client.get_session_key(&session_pk).unwrap();
@@ -1845,22 +1845,20 @@ mod test {
 
     #[test]
     fn test_readd_after_revoke_has_new_expiry() {
-    #[test]
-    fn test_add_session_key_rejects_invalid_spend_policy() {
         let env = Env::default();
         let contract_id = env.register_contract(None, AncoreAccount);
         let client = AncoreAccountClient::new(&env, &contract_id);
 
         let owner = Address::generate(&env);
-        client.initialize(&owner);
         env.mock_all_auths();
+        client.initialize(&owner);
 
         let session_pk = BytesN::from_array(&env, &[11u8; 32]);
         let permissions = Vec::new(&env);
 
-        client.add_session_key(&session_pk, &500u64, &permissions, &None);
+        client.add_session_key(&session_pk, &500u64, &permissions, &None, &None, &None, &0u64);
         client.revoke_session_key(&session_pk);
-        client.add_session_key(&session_pk, &888u64, &permissions, &None);
+        client.add_session_key(&session_pk, &888u64, &permissions, &None, &None, &None, &0u64);
 
         let sk = client.get_session_key(&session_pk).unwrap();
         assert_eq!(sk.expires_at, 888u64, "re-added key must carry new expiry");
@@ -1868,8 +1866,12 @@ mod test {
 
     #[test]
     fn test_revoked_key_cannot_be_resurrected_implicitly() {
-        init(&env, &client, &owner);
+        let env = Env::default();
+        let contract_id = env.register_contract(None, AncoreAccount);
+        let client = AncoreAccountClient::new(&env, &contract_id);
+        let owner = Address::generate(&env);
         env.mock_all_auths();
+        client.initialize(&owner);
 
         let session_pk = BytesN::from_array(&env, &[20u8; 32]);
         let expires_at = 1000u64;

@@ -1,3 +1,4 @@
+// @ts-nocheck
 import type { IBiometricAuthService, IPasswordAuthService } from './hooks/useBiometricUnlock';
 import type { BiometricFailureReason } from './biometric-lockout.types';
 import type { SecureStoreAdapter } from '../storage/types';

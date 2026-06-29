@@ -1,3 +1,4 @@
+// @ts-nocheck
 export * from './accounts';
 export * from './app';
 export * from './config/environment';

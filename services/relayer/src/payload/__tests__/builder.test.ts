@@ -135,7 +135,9 @@ describe('buildCanonicalPayload', () => {
         operation: 'relay_execute',
       };
 
-      expect(buildCanonicalPayload(ordered)).toBe(buildCanonicalPayload(shuffled as unknown as CanonicalPayloadInput));
+      expect(buildCanonicalPayload(ordered)).toBe(
+        buildCanonicalPayload(shuffled as unknown as CanonicalPayloadInput)
+      );
     });
   });
 

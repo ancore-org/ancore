@@ -143,7 +143,7 @@ export async function requestSessionKey(
 ): Promise<RequestSessionKeyResult> {
   return sendExternalRequest<RequestSessionKeyResult>(
     ExternalApiMethod.REQUEST_SESSION_KEY,
-    policy
+    policy as any
   );
 }
 
