@@ -33,7 +33,7 @@
               "function_name": "add_session_key",
               "args": [
                 {
-                  "bytes": "ddaa732245a9712887d7f74a611e48eb9c6d19f16cb7802e37e78a72a9c07c14"
+                  "bytes": "b6b85fbfc12955ed3227981f8336fedc288df54d0ced0cc64b23a87077c8e8ec"
                 },
                 {
                   "u64": 10000
@@ -44,7 +44,8 @@
                       "u32": 1
                     }
                   ]
-                }
+                },
+                "void"
               ]
             }
           },
@@ -74,7 +75,7 @@
                   "symbol": "SessionKey"
                 },
                 {
-                  "bytes": "ddaa732245a9712887d7f74a611e48eb9c6d19f16cb7802e37e78a72a9c07c14"
+                  "bytes": "b6b85fbfc12955ed3227981f8336fedc288df54d0ced0cc64b23a87077c8e8ec"
                 }
               ]
             },
@@ -94,13 +95,19 @@
                       "symbol": "SessionKey"
                     },
                     {
-                      "bytes": "ddaa732245a9712887d7f74a611e48eb9c6d19f16cb7802e37e78a72a9c07c14"
+                      "bytes": "b6b85fbfc12955ed3227981f8336fedc288df54d0ced0cc64b23a87077c8e8ec"
                     }
                   ]
                 },
                 "durability": "persistent",
                 "val": {
                   "map": [
+                    {
+                      "key": {
+                        "symbol": "allowed_contracts"
+                      },
+                      "val": "void"
+                    },
                     {
                       "key": {
                         "symbol": "expires_at"
@@ -126,7 +133,7 @@
                         "symbol": "public_key"
                       },
                       "val": {
-                        "bytes": "ddaa732245a9712887d7f74a611e48eb9c6d19f16cb7802e37e78a72a9c07c14"
+                        "bytes": "b6b85fbfc12955ed3227981f8336fedc288df54d0ced0cc64b23a87077c8e8ec"
                       }
                     }
                   ]
@@ -417,7 +424,7 @@
             "data": {
               "vec": [
                 {
-                  "bytes": "ddaa732245a9712887d7f74a611e48eb9c6d19f16cb7802e37e78a72a9c07c14"
+                  "bytes": "b6b85fbfc12955ed3227981f8336fedc288df54d0ced0cc64b23a87077c8e8ec"
                 },
                 {
                   "u64": 10000
@@ -428,7 +435,8 @@
                       "u32": 1
                     }
                   ]
-                }
+                },
+                "void"
               ]
             }
           }
@@ -451,7 +459,7 @@
             "data": {
               "vec": [
                 {
-                  "bytes": "ddaa732245a9712887d7f74a611e48eb9c6d19f16cb7802e37e78a72a9c07c14"
+                  "bytes": "b6b85fbfc12955ed3227981f8336fedc288df54d0ced0cc64b23a87077c8e8ec"
                 },
                 {
                   "u64": 10000
@@ -510,7 +518,7 @@
                       "symbol": "SessionKey"
                     },
                     {
-                      "bytes": "ddaa732245a9712887d7f74a611e48eb9c6d19f16cb7802e37e78a72a9c07c14"
+                      "bytes": "b6b85fbfc12955ed3227981f8336fedc288df54d0ced0cc64b23a87077c8e8ec"
                     }
                   ]
                 },
@@ -527,10 +535,10 @@
                   "u64": 0
                 },
                 {
-                  "bytes": "ddaa732245a9712887d7f74a611e48eb9c6d19f16cb7802e37e78a72a9c07c14"
+                  "bytes": "b6b85fbfc12955ed3227981f8336fedc288df54d0ced0cc64b23a87077c8e8ec"
                 },
                 {
-                  "bytes": "7201c4553f365bcec49bc151dbbea63483d5cca899356b725ec0feedd420b7197e093ba6e5aead5805f19c99c606bc2d29175cfe792146d9fb64a0b4b47d5b0d"
+                  "bytes": "9b073bddfcc5a5d9c686860792a5f322fa848defbe1248b06d73ceed19fdd628d2ae7844d428d1d907755d35984a002a19470f4d9ce1e866e30cbd92bd370d0c"
                 },
                 {
                   "bytes": "000000120000000100000000000000000000000000000000000000000000000000000000000000030000000f000000096765745f6e6f6e6365000000000000100000000100000000000000050000000000000000"

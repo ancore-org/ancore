@@ -1,0 +1,9 @@
+appId: org.ancore.mobile
+---
+- launchApp
+- tapOn: 'Scan QR'
+- inputText: '\'
+- tapOn: 'Connect'
+- assertVisible: 'Approve Session'
+- tapOn: 'Approve'
+- assertVisible: 'Session Active'

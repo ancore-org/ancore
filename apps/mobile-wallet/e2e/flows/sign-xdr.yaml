@@ -1,0 +1,7 @@
+appId: org.ancore.mobile
+---
+- launchApp
+- tapOn: 'Trigger Sign Request'
+- assertVisible: 'Approve Transaction'
+- tapOn: 'Approve Transaction'
+- assertVisible: 'Transaction Sent'

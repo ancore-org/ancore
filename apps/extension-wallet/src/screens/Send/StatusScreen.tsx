@@ -49,6 +49,12 @@ const STATUS_CONFIG: Record<
     icon: <XCircle className="w-8 h-8 text-red-400" />,
     description: 'Transaction failed. This may be due to network congestion or invalid state.',
   },
+  timeout: {
+    label: 'Timeout',
+    color: 'amber',
+    icon: <Clock className="w-8 h-8 text-amber-400" />,
+    description: 'Transaction may still be pending. Please check the explorer.',
+  },
 };
 
 /**
@@ -74,6 +80,7 @@ export function StatusScreen({ txId, status, failedDraft, onClose, onRetry }: St
           'pb-8 border-b border-white/5',
           status === 'confirmed' && 'bg-emerald-500/5',
           status === 'failed' && 'bg-red-500/5',
+          status === 'timeout' && 'bg-amber-500/5',
           status === 'pending' && 'bg-cyan-500/5'
         )}
       >
@@ -91,6 +98,8 @@ export function StatusScreen({ txId, status, failedDraft, onClose, onRetry }: St
                 'bg-emerald-500/10 border-emerald-500/30 shadow-[0_0_40px_rgba(16,185,129,0.2)] scale-110',
               status === 'failed' &&
                 'bg-red-500/10 border-red-500/30 shadow-[0_0_40px_rgba(239,68,68,0.2)]',
+              status === 'timeout' &&
+                'bg-amber-500/10 border-amber-500/30 shadow-[0_0_40px_rgba(251,191,36,0.2)]',
               status === 'pending' &&
                 'bg-cyan-500/10 border-cyan-500/30 shadow-[0_0_40px_rgba(34,211,238,0.2)]'
             )}
@@ -105,6 +114,7 @@ export function StatusScreen({ txId, status, failedDraft, onClose, onRetry }: St
                 status === 'confirmed' &&
                   'bg-emerald-500/20 text-emerald-400 border-emerald-500/30',
                 status === 'failed' && 'bg-red-500/20 text-red-400 border-red-500/30',
+                status === 'timeout' && 'bg-amber-500/20 text-amber-400 border-amber-500/30',
                 status === 'pending' && 'bg-cyan-500/20 text-cyan-400 border-cyan-500/30'
               )}
               variant="outline"
@@ -112,7 +122,13 @@ export function StatusScreen({ txId, status, failedDraft, onClose, onRetry }: St
               {config.label}
             </Badge>
             <h3 className="text-white font-black text-xl uppercase tracking-wider">
-              {status === 'confirmed' ? 'Success' : status === 'failed' ? 'Failed' : 'Sending'}
+              {status === 'confirmed'
+                ? 'Success'
+                : status === 'failed'
+                  ? 'Failed'
+                  : status === 'timeout'
+                    ? 'Timeout'
+                    : 'Sending'}
             </h3>
             <p className="text-slate-400 text-xs font-medium leading-relaxed max-w-[240px] mx-auto">
               {config.description}

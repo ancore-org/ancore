@@ -8,7 +8,7 @@ type FlowStep = 'form' | 'status';
 interface SendFlowState {
   step: FlowStep;
   txId: string;
-  txStatus: 'idle' | 'pending' | 'confirmed' | 'failed';
+  txStatus: 'idle' | 'pending' | 'confirmed' | 'failed' | 'timeout';
   /** Persisted error message shown inline on the form after a failed retry */
   formError: string | null;
 }

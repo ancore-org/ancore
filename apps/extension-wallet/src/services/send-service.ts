@@ -8,7 +8,7 @@ import type {
 } from '../hooks/useSendTransaction';
 import type { StellarClient } from '@ancore/stellar';
 import { sendMessage } from '../messaging';
-import { resolveRelayerUrl } from '../config/urls';
+import { resolveRelayerUrl, resolveIndexerUrl } from '../config/urls';
 import { Account, Asset, Operation, TransactionBuilder } from '@stellar/stellar-sdk';
 import { getErrorUserMessage } from '../errors/error-handler';
 import { simulateTransaction as simulateSorobanTransaction } from './simulation-service';
@@ -120,7 +120,16 @@ export function createProductionSendService(options: ProductionSendServiceOption
     },
 
     async fetchTransactionStatus(txId: string): Promise<TxStatus> {
-      // In production, we might poll the transaction from Horizon or Indexer
+      try {
+        const indexerUrl = resolveIndexerUrl(environment);
+        const indexerRes = await fetch(`${indexerUrl}/activity/${txId}`);
+        if (indexerRes.ok) {
+          return 'confirmed';
+        }
+      } catch {
+        // Fallback to Horizon if indexer fetch fails
+      }
+
       try {
         const url = `${stellarClient.getRpcUrls()[0]?.replace('/soroban/rpc', '')}/transactions/${txId}`;
         const response = await fetch(url);

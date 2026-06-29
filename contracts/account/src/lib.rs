@@ -107,6 +107,14 @@ mod events {
 
 #[contracttype]
 #[derive(Clone, Debug, Eq, PartialEq)]
+pub struct SessionKeyV0 {
+    pub public_key: BytesN<32>,
+    pub expires_at: u64,
+    pub permissions: Vec<u32>,
+}
+
+#[contracttype]
+#[derive(Clone, Debug, Eq, PartialEq)]
 pub struct SessionKey {
     pub public_key: BytesN<32>,
     pub expires_at: u64,
@@ -583,13 +591,28 @@ impl AncoreAccount {
     /// # Security
     /// - Requires owner authorization
     /// - Migration version must be strictly increasing
-    pub fn migrate(env: Env, new_version: u32) -> Result<(), ContractError> {
+    pub fn migrate(env: Env, old_version: u32, session_keys: Vec<BytesN<32>>) -> Result<(), ContractError> {
         let owner = Self::get_owner(env.clone())?;
         owner.require_auth();
 
         let current_version = Self::get_version(env.clone());
+        let new_version = old_version + 1;
         if new_version <= current_version {
             return Err(ContractError::InvalidVersion);
+        }
+
+        if old_version == 0 {
+            for key in session_keys.iter() {
+                if let Some(v0) = env.storage().persistent().get::<_, SessionKeyV0>(&DataKey::SessionKey(key.clone())) {
+                    let v1 = SessionKey {
+                        public_key: v0.public_key,
+                        expires_at: v0.expires_at,
+                        permissions: v0.permissions,
+                        allowed_contracts: None,
+                    };
+                    env.storage().persistent().set(&DataKey::SessionKey(key.clone()), &v1);
+                }
+            }
         }
 
         env.storage()
@@ -1276,7 +1299,7 @@ mod test {
         assert_eq!(client.get_version(), 1);
 
         env.mock_all_auths();
-        client.migrate(&2u32);
+        client.migrate(&1u32, &Vec::new(&env));
 
         assert_eq!(client.get_version(), 2);
     }
@@ -1291,7 +1314,7 @@ mod test {
         init(&env, &client, &owner);
 
         env.mock_all_auths();
-        client.migrate(&2u32);
+        client.migrate(&1u32, &Vec::new(&env));
 
         let events_list = env.events().all();
         let migrated_event = events_list.iter().find(|(_, topics, _)| {
@@ -1320,10 +1343,10 @@ mod test {
 
         env.mock_all_auths();
         // Advance to version 2
-        client.migrate(&2u32);
+        client.migrate(&1u32, &Vec::new(&env));
 
         // Attempt to go back to version 1 — must fail with InvalidVersion (#8)
-        let result = client.try_migrate(&1u32);
+        let result = client.try_migrate(&0u32, &Vec::new(&env));
         assert_eq!(result, Err(Ok(ContractError::InvalidVersion)));
 
         // Version must remain at 2
@@ -1341,10 +1364,10 @@ mod test {
 
         env.mock_all_auths();
         // Advance to version 2
-        client.migrate(&2u32);
+        client.migrate(&1u32, &Vec::new(&env));
 
         // Attempt to migrate to the same version — must fail with InvalidVersion (#8)
-        let result = client.try_migrate(&2u32);
+        let result = client.try_migrate(&1u32, &Vec::new(&env));
         assert_eq!(result, Err(Ok(ContractError::InvalidVersion)));
 
         // Version must remain at 2

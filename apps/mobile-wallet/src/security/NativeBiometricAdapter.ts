@@ -1,4 +1,4 @@
-import ReactNativeBiometrics, { BiometryTypes } from 'react-native-biometrics';
+import ReactNativeBiometrics from 'react-native-biometrics';
 import type { IBiometricAuthService } from './hooks/useBiometricUnlock';
 import type { BiometricFailureReason } from './biometric-lockout.types';
 
@@ -24,7 +24,7 @@ export class NativeBiometricAdapter implements IBiometricAuthService {
     errorCode?: BiometricFailureReason;
   }> {
     try {
-      const { available, biometryType } = await this.rnBiometrics.isSensorAvailable();
+      const { available } = await this.rnBiometrics.isSensorAvailable();
       if (!available) {
         return { success: false, errorCode: 'BIOMETRIC_NOT_AVAILABLE' };
       }
@@ -33,7 +33,7 @@ export class NativeBiometricAdapter implements IBiometricAuthService {
       // But simplePrompt can also be used.
       // "Implement NativeBiometricAdapter that checks isSensorAvailable(), calls simplePrompt() for unlock
       // Store vault password encrypted behind biometric key: use createKeys() + createSignature() for verification"
-      
+
       const payload = 'ancore_vault_unlock_payload';
       const { keysExist } = await this.rnBiometrics.biometricKeysExist();
       if (!keysExist) {
@@ -50,8 +50,9 @@ export class NativeBiometricAdapter implements IBiometricAuthService {
       }
 
       return { success: false, errorCode: 'USER_CANCEL' };
-    } catch (err: any) {
-      if (err.message && err.message.includes('User cancelled')) {
+    } catch (err: unknown) {
+      const errorMessage = err instanceof Error ? err.message : String(err);
+      if (errorMessage.includes('User cancelled')) {
         return { success: false, errorCode: 'USER_CANCEL' };
       }
       return { success: false, errorCode: 'AUTHENTICATION_FAILED' };

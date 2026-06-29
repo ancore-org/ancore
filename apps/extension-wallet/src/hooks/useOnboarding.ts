@@ -13,16 +13,7 @@ import { getSharedStorageManager } from '@/security/storage-manager';
 /** chrome.storage.local key for the deployed smart-account C-address. */
 export const CONTRACT_ADDRESS_KEY = 'ancore_contract_address';
 
-async function persistContractAddress(contractId: string): Promise<void> {
-  const chromeRef = (globalThis as { chrome?: any }).chrome;
-  if (chromeRef?.storage?.local) {
-    await new Promise<void>((resolve) => {
-      chromeRef.storage.local.set({ [CONTRACT_ADDRESS_KEY]: contractId }, resolve);
-    });
-  } else {
-    localStorage.setItem(CONTRACT_ADDRESS_KEY, contractId);
-  }
-}
+// removed unused persistContractAddress
 
 /**
  * Onboarding step enum
@@ -94,11 +85,7 @@ const DEFAULT_STATE: OnboardingState = {
   isLoading: false,
 };
 
-/**
- * Storage keys for persistence
- */
-const WALLET_STATE_KEY = 'walletState';
-const ACCOUNTS_KEY = 'accounts';
+// Removed unused constants WALLET_STATE_KEY and ACCOUNTS_KEY
 
 /**
  * Options for {@link useOnboarding}. The deploy client is injectable so unit
@@ -277,20 +264,40 @@ export function useOnboarding(options: UseOnboardingOptions = {}) {
         mnemonic: state.mnemonic,
         password: state.password,
       });
-      const publicKey = wallet.publicKey;
+      let accountIndex = 0;
+      let foundContractId: string | null = null;
+      let publicKey = wallet.publicKey;
 
-      // Derive the owner keypair (BIP44 m/44'/148'/0'). Kept in a local
-      // variable only — never placed in React state — and cleared in finally.
+      for (let i = 0; i <= 5; i++) {
+        const kp = deriveKeypairFromMnemonic(state.mnemonic, i);
+        const pk = kp.publicKey();
+        const existing = await deployClient.getDeployedContractId(pk);
+        if (existing) {
+          accountIndex = i;
+          foundContractId = existing;
+          publicKey = pk;
+          break;
+        }
+      }
+
+      if (!foundContractId) {
+        // Default to 0 if not found
+        const kp = deriveKeypairFromMnemonic(state.mnemonic, 0);
+        publicKey = kp.publicKey();
+      }
+
       let signer: ReturnType<typeof deriveKeypairFromMnemonic> | null = deriveKeypairFromMnemonic(
         state.mnemonic,
-        0
+        accountIndex
       );
 
       try {
-        const { contractId, txHash } = await deployClient.deployAccount({
-          ownerPublicKey: publicKey,
-          signer,
-        });
+        const { contractId, txHash } = foundContractId
+          ? { contractId: foundContractId, txHash: undefined }
+          : await deployClient.deployAccount({
+              ownerPublicKey: publicKey,
+              signer,
+            });
 
         const alreadyDeployed = !txHash;
 

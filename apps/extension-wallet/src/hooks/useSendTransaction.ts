@@ -28,7 +28,7 @@ import { createProductionSendService } from '@/services/send-service';
 import { createStellarClient } from '@ancore/stellar';
 import { useAccountStore } from '@/stores/account';
 export type SendStep = 'form' | 'review' | 'confirm' | 'status' | 'scheduled';
-export type TxStatus = 'idle' | 'pending' | 'confirmed' | 'failed';
+export type TxStatus = 'idle' | 'pending' | 'confirmed' | 'failed' | 'timeout';
 export type TransferPolicyAction = 'allow' | 'step_up' | 'block';
 
 export interface SendFormValues {
@@ -109,7 +109,8 @@ export interface SetMaxAmountOptions {
 }
 
 const DEFAULT_BALANCE = 250;
-const DEFAULT_POLL_MS = 1000;
+const DEFAULT_POLL_MS = 2000;
+const MAX_POLL_MS = 30000;
 const DEFAULT_DAILY_LIMIT = 1000;
 const DEFAULT_STEP_UP_THRESHOLD = 250;
 
@@ -447,6 +448,7 @@ export function useSendTransaction(options: UseSendTransactionOptions = {}) {
         setStatus('pending');
         setStep('status');
 
+        const startTime = Date.now();
         pollRef.current = setInterval(async () => {
           const raw = await service.fetchTransactionStatus(submission.txId);
           const appStatus = mapRpcStatus(raw);
@@ -456,6 +458,9 @@ export function useSendTransaction(options: UseSendTransactionOptions = {}) {
             if (pollRef.current) {
               clearInterval(pollRef.current);
             }
+          } else if (Date.now() - startTime > MAX_POLL_MS) {
+            setStatus('timeout');
+            if (pollRef.current) clearInterval(pollRef.current);
           }
         }, pollIntervalMs);
       } finally {

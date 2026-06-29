@@ -51,6 +51,12 @@ importers:
         specifier: ^5.6.0
         version: 5.9.3
 
+  apps/e2e-mock-dapp:
+    dependencies:
+      express:
+        specifier: ^4.18.2
+        version: 4.22.2
+
   apps/extension-wallet:
     dependencies:
       '@ancore/account-abstraction':
@@ -12869,7 +12875,7 @@ snapshots:
 
   compressible@2.0.18:
     dependencies:
-      mime-db: 1.52.0
+      mime-db: 1.54.0
 
   compression@1.8.1:
     dependencies:
