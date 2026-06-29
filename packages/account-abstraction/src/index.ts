@@ -10,6 +10,7 @@ export { AccountContract } from './account-contract';
 export type { AccountContractReadOptions, InvocationArgs } from './account-contract';
 
 export { getOwner, getNonce, getVersion } from './get-owner-nonce';
+export { getSessionKey } from './get-session-key';
 
 export {
   AccountContractError,

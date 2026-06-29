@@ -30,6 +30,7 @@
     "@ancore/types": "workspace:*",
     "@ancore/ui-kit": "workspace:*",
     "@ancore/wallet-shared": "workspace:*",
+    "@blockaid/client": "^1.4.0",
     "@stellar/stellar-sdk": "^13.3.0",
     "date-fns": "^4.1.0",
     "i18next": "^24.2.3",

@@ -40,7 +40,9 @@
     "@ancore/account-abstraction": "workspace:*",
     "@ancore/crypto": "workspace:*",
     "@ancore/stellar": "workspace:*",
-    "@stellar/stellar-sdk": "^13.3.0"
+    "@stellar/stellar-sdk": "^13.3.0",
+    "@ledgerhq/hw-transport-webhid": "^6.29.3",
+    "@ledgerhq/hw-app-str": "^7.7.4"
   },
   "devDependencies": {
     "@eslint/js": "^9.0.0",

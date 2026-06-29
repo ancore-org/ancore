@@ -129,13 +129,13 @@ describe('buildCanonicalPayload', () => {
         nonce: 5,
       };
 
-      const shuffled: any = {
+      const shuffled: Record<string, unknown> = {
         nonce: 5,
         sessionKey: 'test123test123test123test123test123test123test123test123test123te',
         operation: 'relay_execute',
       };
 
-      expect(buildCanonicalPayload(ordered)).toBe(buildCanonicalPayload(shuffled));
+      expect(buildCanonicalPayload(ordered)).toBe(buildCanonicalPayload(shuffled as unknown as CanonicalPayloadInput));
     });
   });
 

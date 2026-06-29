@@ -1,6 +1,9 @@
 import { randomBytes } from 'crypto';
 import { trace } from '@opentelemetry/api';
 import { validateTransferPolicy } from '@ancore/types';
+import { getSessionKey } from '@ancore/account-abstraction';
+import { rpc, Networks } from '@stellar/stellar-sdk';
+import * as ed from '@noble/ed25519';
 import type { JobQueue } from '../queue/JobQueue';
 import type { IdempotencyStore } from '../store/idempotency';
 import { NonceStore } from '../store/nonceStore';
@@ -14,7 +17,6 @@ import type {
   ValidationResult,
   HealthResponse,
   DependencyStatus,
-  RelayErrorCode,
   RelayError,
 } from '../types';
 import { mapSimulationError } from './mapSimulationError';
@@ -85,7 +87,33 @@ export class RelayService implements RelayServiceContract {
         }
 
         const payload = this.canonicalPayload(request);
-        const ok = this.signatureService.verify(request.sessionKey, payload, request.signature);
+
+        try {
+          const targetContract = request.parameters.accountAddress as string;
+          const onChainKey = await getSessionKey(
+            targetContract,
+            request.sessionKey,
+            { 
+              server: new rpc.Server(process.env.RPC_URL || 'https://soroban-testnet.stellar.org'),
+              sourceAccount: targetContract,
+              networkPassphrase: process.env.NETWORK_PASSPHRASE || Networks.TESTNET
+            }
+          );
+          if (!onChainKey) {
+            return {
+              valid: false,
+              error: { code: 'INVALID_SIGNATURE', message: 'Session key not found on chain' },
+            };
+          }
+        } catch (e: unknown) {
+          // ignore or handle error if contract query fails
+        }
+
+        const ok = await ed.verify(
+          Buffer.from(request.signature, 'hex'),
+          Buffer.from(payload, 'hex'),
+          request.sessionKey
+        );
         if (!ok) {
           return {
             valid: false,
@@ -149,13 +177,16 @@ export class RelayService implements RelayServiceContract {
     }
 
     try {
-      const { assembledXdr, gasUsed } = await tracer.startActiveSpan('relayer.simulate', async (span) => {
-        try {
-          return await this.transactionSubmitter!.simulateAndAssembleTransaction(signedXdr);
-        } finally {
-          span.end();
+      const { assembledXdr, gasUsed } = await tracer.startActiveSpan(
+        'relayer.simulate',
+        async (span) => {
+          try {
+            return await this.transactionSubmitter!.simulateAndAssembleTransaction(signedXdr);
+          } finally {
+            span.end();
+          }
         }
-      });
+      );
 
       const result = await tracer.startActiveSpan('relayer.submit', async (span) => {
         try {

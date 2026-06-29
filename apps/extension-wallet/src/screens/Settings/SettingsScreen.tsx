@@ -1,17 +1,5 @@
 import { useTranslation } from 'react-i18next';
-import {
-  Globe,
-  Server,
-  Monitor,
-  PanelRight,
-  Lock,
-  Timer,
-  Key,
-  FileText,
-  Shield,
-  Info,
-  Bell,
-} from 'lucide-react';
+
 import { SettingsGroup, SettingItem } from '../../components/SettingsGroup';
 import { NetworkSettings } from './NetworkSettings';
 import { SecuritySettings } from './SecuritySettings';

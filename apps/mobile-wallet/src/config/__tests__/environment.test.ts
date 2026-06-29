@@ -1,9 +1,15 @@
 import { MobileWalletEnvironmentError, loadMobileWalletEnvironment } from '../environment';
 
 describe('loadMobileWalletEnvironment', () => {
+  const baseEnv = {
+    ANCORE_ACCOUNT_CONTRACT_ID: 'CAAQCAIBAEAQCAIBAEAQCAIBAEAQCAIBAEAQCAIBAEAQCAIBAEAQC526',
+    EXPO_PUBLIC_INDEXER_URL: 'http://localhost:3000',
+    EXPO_PUBLIC_RELAYER_URL: 'http://localhost:3001',
+  };
+
   it('loads defaults for the testnet mobile wallet environment', () => {
     const environment = loadMobileWalletEnvironment({
-      ANCORE_ACCOUNT_CONTRACT_ID: 'CAAQCAIBAEAQCAIBAEAQCAIBAEAQCAIBAEAQCAIBAEAQCAIBAEAQC526',
+      ...baseEnv,
       ANCORE_MOBILE_READONLY_ACCOUNT_ADDRESS: 'GABC123',
     });
 
@@ -12,6 +18,8 @@ describe('loadMobileWalletEnvironment', () => {
       appName: 'Ancore Mobile Wallet',
       network: 'testnet',
       rpcUrl: 'https://soroban-testnet.stellar.org',
+      indexerUrl: 'http://localhost:3000',
+      relayerUrl: 'http://localhost:3001',
       readOnlyAccountAddress: 'GABC123',
     });
   });
@@ -21,9 +29,18 @@ describe('loadMobileWalletEnvironment', () => {
     expect(() => loadMobileWalletEnvironment({})).toThrow('ANCORE_ACCOUNT_CONTRACT_ID is required');
   });
 
+  it('throws when service URLs are malformed', () => {
+    expect(() =>
+      loadMobileWalletEnvironment({
+        ...baseEnv,
+        EXPO_PUBLIC_INDEXER_URL: 'not-a-url',
+      })
+    ).toThrow('indexer URL is not a valid URL');
+  });
+
   it('loads futurenet defaults when requested', () => {
     const environment = loadMobileWalletEnvironment({
-      ANCORE_ACCOUNT_CONTRACT_ID: 'CAAQCAIBAEAQCAIBAEAQCAIBAEAQCAIBAEAQCAIBAEAQCAIBAEAQC526',
+      ...baseEnv,
       ANCORE_MOBILE_NETWORK: 'futurenet',
     });
 
@@ -37,7 +54,7 @@ describe('loadMobileWalletEnvironment', () => {
   it('throws when the requested network is unsupported', () => {
     expect(() =>
       loadMobileWalletEnvironment({
-        ANCORE_ACCOUNT_CONTRACT_ID: 'CAAQCAIBAEAQCAIBAEAQCAIBAEAQCAIBAEAQCAIBAEAQCAIBAEAQC526',
+        ...baseEnv,
         ANCORE_MOBILE_NETWORK: 'devnet',
       })
     ).toThrow('Unsupported ANCORE_MOBILE_NETWORK');

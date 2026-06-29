@@ -51,8 +51,7 @@ export class NativeBiometricAdapter implements IBiometricAuthService {
 
       return { success: false, errorCode: 'USER_CANCEL' };
     } catch (err: unknown) {
-      const errorMessage = err instanceof Error ? err.message : String(err);
-      if (errorMessage.includes('User cancelled')) {
+
         return { success: false, errorCode: 'USER_CANCEL' };
       }
       return { success: false, errorCode: 'AUTHENTICATION_FAILED' };

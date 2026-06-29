@@ -184,3 +184,4 @@ export {
   StorageError,
   StorageErrorCode,
 } from './storage/storage-adapter';
+export * from './signing/ledger-adapter';

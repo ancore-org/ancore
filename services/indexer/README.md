@@ -52,6 +52,7 @@ GET /api/v1/accounts/{account_id}/activity
 ```
 
 Query parameters:
+
 - `cursor_after`: Opaque cursor for forward pagination
 - `cursor_before`: Opaque cursor for backward pagination
 - `limit`: Page size (default: 20, max: 100, min: 1)
@@ -64,6 +65,7 @@ Query parameters:
 - `to_date`: ISO 8601 datetime for upper bound (inclusive)
 
 Response:
+
 ```json
 {
   "data": [
@@ -400,6 +402,7 @@ cargo test test_encode_decode_cursor_roundtrip
 ### Cursor Pagination
 
 Cursors are opaque base64url-encoded JSON objects containing:
+
 - `t`: ISO 8601 timestamp
 - `i`: Record UUID
 
