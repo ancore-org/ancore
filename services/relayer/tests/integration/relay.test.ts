@@ -75,7 +75,7 @@ describe('POST /relay/execute', () => {
   it('422 with NONCE_REPLAY error when submitting the same nonce twice', async () => {
     // We pass makeApp which instantiates a MemoryNonceStore internally inside createApp
     const app = makeApp(true, undefined, undefined, { useMockSubmission: true });
-    
+
     // First request should succeed
     const res1 = await request(app)
       .post('/relay/execute')

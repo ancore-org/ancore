@@ -1,6 +1,10 @@
 import { SignTransactionApprovalScreen } from './SignTransactionApprovalScreen';
 
-type ApprovalRoute = 'grant-access' | 'sign-transaction' | 'sign-auth-entry' | 'request-session-key';
+type ApprovalRoute =
+  | 'grant-access'
+  | 'sign-transaction'
+  | 'sign-auth-entry'
+  | 'request-session-key';
 
 const routeCopy: Record<ApprovalRoute, { title: string; subtitle: string; description: string }> = {
   'grant-access': {
@@ -31,11 +35,7 @@ const routeCopy: Record<ApprovalRoute, { title: string; subtitle: string; descri
 
 function getApprovalRoute(params: URLSearchParams): ApprovalRoute {
   const route = params.get('route');
-  if (
-    route === 'grant-access' ||
-    route === 'sign-auth-entry' ||
-    route === 'request-session-key'
-  ) {
+  if (route === 'grant-access' || route === 'sign-auth-entry' || route === 'request-session-key') {
     return route;
   }
   return 'sign-transaction';

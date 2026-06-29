@@ -36,6 +36,7 @@ curl http://localhost:8000/health
 ```
 
 Response:
+
 ```json
 {
   "status": "healthy",
@@ -93,6 +94,7 @@ curl "http://localhost:8000/api/v1/accounts/{account_id}/activity?limit=20"
 ```
 
 Response includes:
+
 ```json
 {
   "data": [...],
@@ -126,13 +128,13 @@ async function fetchAll(accountId) {
 
     const response = await fetch(url);
     const json = await response.json();
-    
+
     allRecords.push(...json.data);
-    
+
     if (!json.pagination.has_next_page) {
       break;
     }
-    
+
     cursor = json.pagination.next_cursor;
   }
 
@@ -157,6 +159,7 @@ curl "http://localhost:8000/api/v1/accounts/{account_id}/activity/types"
 ```
 
 Response:
+
 ```json
 {
   "data": ["payment", "transfer", "session_key_added", "relay_executed"]
@@ -167,18 +170,18 @@ Response:
 
 ## Query Parameters Reference
 
-| Parameter | Type | Example | Required |
-|-----------|------|---------|----------|
-| `limit` | int | `?limit=20` | No (default 20, max 100) |
-| `cursor_after` | string | `?cursor_after=...` | No |
-| `cursor_before` | string | `?cursor_before=...` | No |
-| `activity_type` | string | `?activity_type=payment` | No |
-| `asset` | string | `?asset=native` | No |
-| `counterparty` | string | `?counterparty=GXYZ...` | No |
-| `ledger_min` | int | `?ledger_min=1000` | No |
-| `ledger_max` | int | `?ledger_max=2000` | No |
-| `from_date` | ISO 8601 | `?from_date=2024-01-01T00:00:00Z` | No |
-| `to_date` | ISO 8601 | `?to_date=2024-01-31T23:59:59Z` | No |
+| Parameter       | Type     | Example                           | Required                 |
+| --------------- | -------- | --------------------------------- | ------------------------ |
+| `limit`         | int      | `?limit=20`                       | No (default 20, max 100) |
+| `cursor_after`  | string   | `?cursor_after=...`               | No                       |
+| `cursor_before` | string   | `?cursor_before=...`              | No                       |
+| `activity_type` | string   | `?activity_type=payment`          | No                       |
+| `asset`         | string   | `?asset=native`                   | No                       |
+| `counterparty`  | string   | `?counterparty=GXYZ...`           | No                       |
+| `ledger_min`    | int      | `?ledger_min=1000`                | No                       |
+| `ledger_max`    | int      | `?ledger_max=2000`                | No                       |
+| `from_date`     | ISO 8601 | `?from_date=2024-01-01T00:00:00Z` | No                       |
+| `to_date`       | ISO 8601 | `?to_date=2024-01-31T23:59:59Z`   | No                       |
 
 ---
 
@@ -197,13 +200,13 @@ All errors return a code you can handle:
 
 ### Common Error Codes
 
-| Code | Cause | HTTP Status |
-|------|-------|-------------|
-| `INVALID_FILTER` | Bad parameter value | 400 |
-| `INVALID_CURSOR` | Invalid cursor format | 400 |
-| `NOT_FOUND` | Record doesn't exist | 404 |
-| `QUERY_TIMEOUT` | Query took too long | 504 |
-| `DATABASE_ERROR` | Database connection issue | 500 |
+| Code             | Cause                     | HTTP Status |
+| ---------------- | ------------------------- | ----------- |
+| `INVALID_FILTER` | Bad parameter value       | 400         |
+| `INVALID_CURSOR` | Invalid cursor format     | 400         |
+| `NOT_FOUND`      | Record doesn't exist      | 404         |
+| `QUERY_TIMEOUT`  | Query took too long       | 504         |
+| `DATABASE_ERROR` | Database connection issue | 500         |
 
 ### Error Handling (JavaScript)
 
@@ -213,7 +216,7 @@ async function fetchActivity(accountId) {
 
   if (!response.ok) {
     const error = await response.json();
-    
+
     if (error.code === 'INVALID_FILTER') {
       console.error(`Validation error: ${error.message}`);
     } else if (error.code === 'QUERY_TIMEOUT') {
@@ -221,7 +224,7 @@ async function fetchActivity(accountId) {
     } else {
       console.error(`Error: ${error.message}`);
     }
-    
+
     return null;
   }
 
@@ -310,10 +313,10 @@ def get_recent_payments(account_id: str) -> list:
         "activity_type": "payment",
         "limit": 50,
     }
-    
+
     response = requests.get(url, params=params)
     response.raise_for_status()
-    
+
     data = response.json()
     return data["data"]
 
@@ -325,14 +328,11 @@ print(f"Got {len(payments)} recent payments")
 ### TypeScript
 
 ```typescript
-async function getActivityByType(
-  accountId: string,
-  activityType: string
-): Promise<any[]> {
+async function getActivityByType(accountId: string, activityType: string): Promise<any[]> {
   const response = await fetch(
     `http://localhost:8000/api/v1/accounts/${accountId}/activity?activity_type=${activityType}`
   );
-  
+
   if (!response.ok) {
     throw new Error(`API error: ${response.statusText}`);
   }
@@ -342,7 +342,7 @@ async function getActivityByType(
 }
 
 // Usage
-const transfers = await getActivityByType(accountId, "transfer");
+const transfers = await getActivityByType(accountId, 'transfer');
 ```
 
 ### cURL
@@ -399,6 +399,7 @@ Invalid: `invalid`, `GABC`, `123456`
 ## Support
 
 **Issue?** Check the error code and message:
+
 - `INVALID_FILTER` — Check parameter values
 - `INVALID_CURSOR` — Cursor expired, start fresh pagination
 - `QUERY_TIMEOUT` — Try narrower filters or smaller date range
@@ -411,17 +412,20 @@ Invalid: `invalid`, `GABC`, `123456`
 ## Key Concepts
 
 ### Cursor Pagination
+
 - More efficient than offset pagination
 - Handles concurrent data changes correctly
 - Cursors are opaque (don't parse them)
 - Cursors expire after session (don't cache them)
 
 ### Keyset Pagination
+
 - Uses `(created_at, id)` to uniquely identify position
 - Prevents duplicate/skipped records
 - Constant query cost (even for deep pagination)
 
 ### Account Scoping
+
 - All queries return only your account's data
 - Different accounts are completely isolated
 - You cannot see other accounts' activity

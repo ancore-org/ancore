@@ -27,7 +27,10 @@
     "express": "^4.18.2",
     "express-rate-limit": "^7.1.5",
     "pg": "^8.22.0",
-    "zod": "^3.22.4"
+    "zod": "^3.22.4",
+    "@ancore/core-sdk": "workspace:*",
+    "@ancore/account-abstraction": "workspace:*",
+    "@noble/ed25519": "^2.0.0"
   },
   "devDependencies": {
     "@types/cors": "^2.8.17",

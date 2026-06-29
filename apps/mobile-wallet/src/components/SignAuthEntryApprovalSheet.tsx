@@ -59,9 +59,10 @@ export const SignAuthEntryApprovalSheet: React.FC<SignAuthEntryApprovalSheetProp
   );
 };
 
-export function parseSignAuthEntryRequest(
-  event: Record<string, unknown>
-): { request: SignAuthEntryRequest; parsed: ParsedAuthEntry } {
+export function parseSignAuthEntryRequest(event: Record<string, unknown>): {
+  request: SignAuthEntryRequest;
+  parsed: ParsedAuthEntry;
+} {
   const id = Number(event.id);
   const topic = String(event.topic ?? '');
   const params = (event.params ?? {}) as { authEntry?: string; entryXdr?: string };

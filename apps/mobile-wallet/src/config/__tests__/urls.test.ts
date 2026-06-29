@@ -1,8 +1,4 @@
-import {
-  resolveServiceUrls,
-  validateServiceUrl,
-  validateServiceUrls,
-} from '../urls';
+import { resolveServiceUrls, validateServiceUrl, validateServiceUrls } from '../urls';
 
 describe('mobile service URL validation', () => {
   it('accepts valid http and https URLs', () => {

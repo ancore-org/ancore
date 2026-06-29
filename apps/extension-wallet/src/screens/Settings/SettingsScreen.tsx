@@ -1,7 +1,5 @@
-
-
-
 import { useTranslation } from 'react-i18next';
+import { Globe, Server, Monitor, PanelRight, Lock, Timer, Key, FileText, Shield, Info, Bell } from 'lucide-react';
 import { SettingsGroup, SettingItem } from '../../components/SettingsGroup';
 import { NetworkSettings } from './NetworkSettings';
 import { SecuritySettings } from './SecuritySettings';
@@ -210,7 +208,6 @@ export function SettingsScreen() {
             value={timeoutLabel}
             onClick={() => setView('security')}
           />
-          <SettingItem
           <SettingItem
             label={t('settings.security.exportPrivateKey.label')}
             description={t('settings.security.exportPrivateKey.description')}
