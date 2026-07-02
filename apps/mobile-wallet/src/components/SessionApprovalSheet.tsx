@@ -1,5 +1,11 @@
 import React from 'react';
 
+type NamespaceEntry = {
+  chains?: string[];
+  methods?: string[];
+  events?: string[];
+};
+
 export interface SessionProposal {
   id: number;
   params: {
@@ -11,14 +17,8 @@ export interface SessionProposal {
         icons: string[];
       };
     };
-    requiredNamespaces: Record<
-      string,
-      {
-        chains?: string[];
-        methods?: string[];
-        events?: string[];
-      }
-    >;
+    requiredNamespaces: Record<string, NamespaceEntry>;
+    optionalNamespaces?: Record<string, NamespaceEntry>;
   };
 }
 
@@ -33,11 +33,14 @@ export const SessionApprovalSheet: React.FC<SessionApprovalSheetProps> = ({
   onApprove,
   onReject,
 }) => {
-  const { proposer, requiredNamespaces } = proposal.params;
+  const { proposer, requiredNamespaces, optionalNamespaces } = proposal.params;
   const { metadata } = proposer;
 
-  // Extract requested methods from namespaces
-  const requestedMethods = Object.values(requiredNamespaces).flatMap((ns) => ns.methods || []);
+  // Extract requested methods from required and optional namespaces
+  const requestedMethods = [
+    ...Object.values(requiredNamespaces),
+    ...Object.values(optionalNamespaces ?? {}),
+  ].flatMap((ns) => ns.methods ?? []);
 
   return (
     <div className="session-approval-sheet">

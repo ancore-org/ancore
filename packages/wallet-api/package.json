@@ -29,6 +29,7 @@
   "author": "Ancore Contributors",
   "license": "Apache-2.0",
   "dependencies": {
+    "@ancore/types": "workspace:*",
     "@ancore/wallet-shared": "workspace:*"
   },
   "devDependencies": {

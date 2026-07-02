@@ -15,7 +15,7 @@
               "function_name": "add_session_key",
               "args": [
                 {
-                  "bytes": "2ba97b4da67f6ad0756f7c6a131d9935682294c177a415cf178e394260814b55"
+                  "bytes": "fe5fb98f7247c47e2b2d13fd70c404a2250add8bfe0d86c6adfa36060d24aee7"
                 },
                 {
                   "u64": 10000
@@ -56,7 +56,7 @@
                   "symbol": "SessionKey"
                 },
                 {
-                  "bytes": "2ba97b4da67f6ad0756f7c6a131d9935682294c177a415cf178e394260814b55"
+                  "bytes": "fe5fb98f7247c47e2b2d13fd70c404a2250add8bfe0d86c6adfa36060d24aee7"
                 }
               ]
             },
@@ -76,7 +76,7 @@
                       "symbol": "SessionKey"
                     },
                     {
-                      "bytes": "2ba97b4da67f6ad0756f7c6a131d9935682294c177a415cf178e394260814b55"
+                      "bytes": "fe5fb98f7247c47e2b2d13fd70c404a2250add8bfe0d86c6adfa36060d24aee7"
                     }
                   ]
                 },
@@ -108,7 +108,7 @@
                         "symbol": "public_key"
                       },
                       "val": {
-                        "bytes": "2ba97b4da67f6ad0756f7c6a131d9935682294c177a415cf178e394260814b55"
+                        "bytes": "fe5fb98f7247c47e2b2d13fd70c404a2250add8bfe0d86c6adfa36060d24aee7"
                       }
                     }
                   ]
@@ -366,7 +366,7 @@
             "data": {
               "vec": [
                 {
-                  "bytes": "2ba97b4da67f6ad0756f7c6a131d9935682294c177a415cf178e394260814b55"
+                  "bytes": "fe5fb98f7247c47e2b2d13fd70c404a2250add8bfe0d86c6adfa36060d24aee7"
                 },
                 {
                   "u64": 10000
@@ -400,7 +400,7 @@
             "data": {
               "vec": [
                 {
-                  "bytes": "2ba97b4da67f6ad0756f7c6a131d9935682294c177a415cf178e394260814b55"
+                  "bytes": "fe5fb98f7247c47e2b2d13fd70c404a2250add8bfe0d86c6adfa36060d24aee7"
                 },
                 {
                   "u64": 10000
@@ -459,7 +459,7 @@
                       "symbol": "SessionKey"
                     },
                     {
-                      "bytes": "2ba97b4da67f6ad0756f7c6a131d9935682294c177a415cf178e394260814b55"
+                      "bytes": "fe5fb98f7247c47e2b2d13fd70c404a2250add8bfe0d86c6adfa36060d24aee7"
                     }
                   ]
                 },
@@ -476,7 +476,7 @@
                   "u64": 0
                 },
                 {
-                  "bytes": "2ba97b4da67f6ad0756f7c6a131d9935682294c177a415cf178e394260814b55"
+                  "bytes": "fe5fb98f7247c47e2b2d13fd70c404a2250add8bfe0d86c6adfa36060d24aee7"
                 },
                 "void",
                 "void"
@@ -570,7 +570,7 @@
                           "symbol": "SessionKey"
                         },
                         {
-                          "bytes": "2ba97b4da67f6ad0756f7c6a131d9935682294c177a415cf178e394260814b55"
+                          "bytes": "fe5fb98f7247c47e2b2d13fd70c404a2250add8bfe0d86c6adfa36060d24aee7"
                         }
                       ]
                     },
@@ -587,7 +587,7 @@
                       "u64": 0
                     },
                     {
-                      "bytes": "2ba97b4da67f6ad0756f7c6a131d9935682294c177a415cf178e394260814b55"
+                      "bytes": "fe5fb98f7247c47e2b2d13fd70c404a2250add8bfe0d86c6adfa36060d24aee7"
                     },
                     "void",
                     "void"

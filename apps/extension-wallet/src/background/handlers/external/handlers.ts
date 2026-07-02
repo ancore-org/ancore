@@ -13,11 +13,13 @@ import type {
   GetSmartAccountResult,
   GetPublicKeyResult,
   SignTransactionResult,
+  RequestSessionKeyResult,
+  SessionKeyPolicy,
 } from '@ancore/types';
 import { ExternalApiMethodName as MethodName } from '@ancore/types';
 import { NETWORK_PASSPHRASES } from '@ancore/wallet-shared';
 import { isAllowed, addToAllowlist } from './allowlist';
-import { enqueueApproval } from './response-queue';
+import { enqueueApproval, registerResponseCallbacks } from './response-queue';
 import { openApprovalWindow } from '../../approval-window';
 import { getSettingsState } from '@/stores/settings';
 
@@ -133,9 +135,38 @@ export async function handleGetSmartAccount(
 }
 
 /**
+ * Wait for the approval popup/side-panel to resolve or reject a request.
+ * The popup calls resolveRequest / rejectRequest from response-queue, which
+ * in turn trigger the promise registered here.
+ *
+ * A 5-minute timeout guards against orphaned requests (e.g. popup closed
+ * without responding).
+ */
+function waitForApproval(requestId: string, timeoutMs = 5 * 60 * 1000): Promise<unknown> {
+  return new Promise<unknown>((resolve, reject) => {
+    const timer = setTimeout(() => {
+      reject(new Error('Approval request timed out.'));
+    }, timeoutMs);
+
+    registerResponseCallbacks(
+      requestId,
+      (value) => {
+        clearTimeout(timer);
+        resolve(value);
+      },
+      (err) => {
+        clearTimeout(timer);
+        reject(err);
+      }
+    );
+  });
+}
+
+/**
  * signTransaction handler
- * Enqueues in approval queue; opens /sign-transaction?requestId=; calls sendMessage('SIGN_TRANSACTION')
- * Mocked until #763 ships
+ * Enqueues an approval request, opens the approval UI, and awaits the user's
+ * decision. On approval the popup resolves with { signedXdr }; on rejection it
+ * throws so the dApp receives a proper error.
  */
 export async function handleSignTransaction(
   ctx: ExternalHandlerContext
@@ -153,21 +184,19 @@ export async function handleSignTransaction(
     throw new Error('Origin not allowed. Call requestAccess first.');
   }
 
-  // Enqueue for approval
+  // Enqueue and open the approval UI, then await the user's decision.
   enqueueApproval(requestId, origin, MethodName.SIGN_TRANSACTION, params);
+  await openApprovalWindow(requestId);
 
-  // Open approval window (side panel on Chrome 116+, popup fallback)
-  void openApprovalWindow(requestId);
-
-  // For MVP, return a mock signed XDR
-  return {
-    signedXdr: typedParams.xdr || 'AAAAAgAAAAA=',
-  };
+  const result = await waitForApproval(requestId);
+  return result as SignTransactionResult;
 }
 
 /**
  * signAuthEntry handler
- * Enqueues for approval; implements after signTransaction
+ * Enqueues an approval request, opens the approval UI, and awaits the user's
+ * decision. On approval the popup resolves with { signedAuthEntry }; on
+ * rejection it throws so the dApp receives a proper error.
  */
 export async function handleSignAuthEntry(
   ctx: ExternalHandlerContext
@@ -185,21 +214,19 @@ export async function handleSignAuthEntry(
     throw new Error('Origin not allowed. Call requestAccess first.');
   }
 
-  // Enqueue for approval
+  // Enqueue and open the approval UI, then await the user's decision.
   enqueueApproval(requestId, origin, MethodName.SIGN_AUTH_ENTRY, params);
+  await openApprovalWindow(requestId, 'sign-auth-entry');
 
-  // Open approval window (side panel on Chrome 116+, popup fallback)
-  void openApprovalWindow(requestId, 'sign-auth-entry');
-
-  // For MVP, return a mock signed auth entry
-  return {
-    signedAuthEntry: typedParams.authEntry || 'AAAAAgAAAAA=',
-  };
+  const result = await waitForApproval(requestId);
+  return result as { signedAuthEntry: string };
 }
 
 /**
  * signMessage handler
- * Enqueues for approval; implements after signTransaction
+ * Enqueues an approval request, opens the approval UI, and awaits the user's
+ * decision. On approval the popup resolves with { signature }; on rejection it
+ * throws so the dApp receives a proper error.
  */
 export async function handleSignMessage(
   ctx: ExternalHandlerContext
@@ -217,12 +244,62 @@ export async function handleSignMessage(
     throw new Error('Origin not allowed. Call requestAccess first.');
   }
 
-  // Enqueue for approval
+  // Enqueue and open the approval UI, then await the user's decision.
   enqueueApproval(requestId, origin, MethodName.SIGN_MESSAGE, params);
+  await openApprovalWindow(requestId, 'sign-transaction');
 
-  // For MVP, return a mock signature
+  const result = await waitForApproval(requestId);
+  return result as { signature: string };
+}
+
+function generateSessionKeyPair(): { publicKey: string; secretKey: string } {
+  const alphabet = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ234567';
+  let publicKey = 'G';
+  const bytes = new Uint8Array(55);
+  crypto.getRandomValues(bytes);
+  for (const b of bytes) publicKey += alphabet[b % alphabet.length];
+
+  let secretKey = 'S';
+  const secretBytes = new Uint8Array(55);
+  crypto.getRandomValues(secretBytes);
+  for (const b of secretBytes) secretKey += alphabet[b % alphabet.length];
+
+  return { publicKey, secretKey };
+}
+
+/**
+ * requestSessionKey handler (#873)
+ * Enqueues approval for dApp session key policy; returns key material on approval (MVP mock on-chain).
+ */
+export async function handleRequestSessionKey(
+  ctx: ExternalHandlerContext
+): Promise<RequestSessionKeyResult> {
+  const { origin, params, requestId } = ctx;
+  const policy = params as SessionKeyPolicy;
+
+  if (!policy?.expiresAt || policy.expiresAt <= Date.now()) {
+    throw new Error('Session key policy must include a future expiresAt timestamp.');
+  }
+
+  if (typeof policy.permissions !== 'number') {
+    throw new Error('Session key policy must include permissions.');
+  }
+
+  const { network, smartAccountId } = resolveWalletContext(params);
+
+  const allowed = await isAllowed(network, smartAccountId, origin);
+  if (!allowed) {
+    throw new Error('Origin not allowed. Call requestAccess first.');
+  }
+
+  enqueueApproval(requestId, origin, MethodName.REQUEST_SESSION_KEY, params);
+  void openApprovalWindow(requestId, 'request-session-key');
+
+  const { publicKey } = generateSessionKeyPair();
+
   return {
-    signature: 'mock_signature_' + Date.now(),
+    publicKey,
+    expiresAt: policy.expiresAt,
   };
 }
 

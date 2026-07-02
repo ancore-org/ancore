@@ -90,6 +90,9 @@
     "apps/mobile-wallet/src/**/*.{ts,tsx,js,jsx}": [
       "pnpm --dir apps/mobile-wallet exec eslint --fix"
     ],
+    "apps/mobile-app/src/**/*.{ts,tsx,js,jsx}": [
+      "pnpm --dir apps/mobile-app exec eslint --fix"
+    ],
     "services/relayer/src/**/*.{ts,tsx,js,jsx}": [
       "pnpm --dir services/relayer exec eslint --fix"
     ]

@@ -20,6 +20,7 @@ export enum ExternalApiMethodName {
   SIGN_TRANSACTION = 'signTransaction',
   SIGN_AUTH_ENTRY = 'signAuthEntry',
   SIGN_MESSAGE = 'signMessage',
+  REQUEST_SESSION_KEY = 'requestSessionKey',
 }
 
 /**

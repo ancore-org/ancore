@@ -11,11 +11,13 @@
 import { registerHealthHandlers } from './health';
 import { registerLockUnlockHandlers } from './lock-unlock';
 import { registerWalletStateHandlers } from './wallet-state';
+import { registerSignTransactionHandlers } from './sign-transaction';
 
 export function registerInternalHandlers(): void {
   registerWalletStateHandlers();
   registerLockUnlockHandlers();
   registerHealthHandlers();
+  registerSignTransactionHandlers();
 }
 
 export { probeServicesOnStartup } from './health';

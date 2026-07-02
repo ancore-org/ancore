@@ -47,6 +47,7 @@ enum DataKey {
     Admin,
     Enabled,
     AllowedTarget(Address),
+    AllowedFunction(Address, Symbol),
 }
 
 mod events {
@@ -62,6 +63,10 @@ mod events {
 
     pub fn target_set(env: &Env) -> Symbol {
         Symbol::new(env, "target_set")
+    }
+
+    pub fn function_set(env: &Env) -> Symbol {
+        Symbol::new(env, "function_set")
     }
 }
 
@@ -132,6 +137,46 @@ impl TargetAllowlistModule {
             .has(&DataKey::AllowedTarget(target)))
     }
 
+    pub fn set_allowed_function(
+        env: Env,
+        target: Address,
+        function: Symbol,
+        allowed: bool,
+    ) -> Result<(), ValidationModuleError> {
+        require_admin(&env)?;
+
+        let key = DataKey::AllowedFunction(target.clone(), function.clone());
+        if allowed {
+            env.storage().persistent().set(&key, &true);
+            env.storage().persistent().extend_ttl(
+                &key,
+                ALLOWLIST_BUMP_THRESHOLD,
+                ALLOWLIST_BUMP_AMOUNT,
+            );
+        } else {
+            env.storage().persistent().remove(&key);
+        }
+        extend_instance_ttl(&env);
+
+        env.events()
+            .publish((events::function_set(&env),), (target, function, allowed));
+
+        Ok(())
+    }
+
+    pub fn is_allowed_function(
+        env: Env,
+        target: Address,
+        function: Symbol,
+    ) -> Result<bool, ValidationModuleError> {
+        ensure_initialized(&env)?;
+
+        Ok(env
+            .storage()
+            .persistent()
+            .has(&DataKey::AllowedFunction(target, function)))
+    }
+
     pub fn admin(env: Env) -> Result<Address, ValidationModuleError> {
         admin(&env)
     }
@@ -154,7 +199,13 @@ impl ValidationModuleInterface for TargetAllowlistModule {
         if env
             .storage()
             .persistent()
-            .has(&DataKey::AllowedTarget(context.target))
+            .has(&DataKey::AllowedTarget(context.target.clone()))
+        {
+            Ok(())
+        } else if env
+            .storage()
+            .persistent()
+            .has(&DataKey::AllowedFunction(context.target, context.function))
         {
             Ok(())
         } else {
@@ -231,6 +282,22 @@ mod tests {
 
         let result = client.try_initialize(&admin);
         assert_eq!(result, Err(Ok(ValidationModuleError::AlreadyInitialized)));
+    }
+
+    #[test]
+    fn validate_allows_configured_function() {
+        let env = Env::default();
+        env.mock_all_auths();
+        let contract_id = env.register_contract(None, TargetAllowlistModule);
+        let client = TargetAllowlistModuleClient::new(&env, &contract_id);
+        let admin = Address::generate(&env);
+        let target = Address::generate(&env);
+
+        client.initialize(&admin);
+        client.set_allowed_function(&target, &symbol_short!("execute"), &true);
+
+        assert!(client.is_allowed_function(&target, &symbol_short!("execute")));
+        assert_eq!(client.try_validate(&context(&env, target)), Ok(Ok(())));
     }
 
     #[test]

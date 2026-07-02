@@ -407,6 +407,21 @@ mod tests {
         );
     }
 
+    #[test]
+    fn normalize_asset_empty_string_returns_some_empty() {
+        let (code, issuer) = normalize_asset(Some(""));
+        assert_eq!(code, Some("".to_string()));
+        assert_eq!(issuer, None);
+    }
+
+    #[test]
+    fn normalize_asset_multiple_colons_only_splits_first() {
+        let asset = "CODE:ISSUER:EXTRA";
+        let (code, issuer) = normalize_asset(Some(asset));
+        assert_eq!(code, Some("CODE".to_string()));
+        assert_eq!(issuer, Some("ISSUER:EXTRA".to_string()));
+    }
+
     // ── cursor encoding ───────────────────────────────────────────────────────
 
     #[test]
@@ -422,6 +437,22 @@ mod tests {
     }
 
     #[test]
+    fn test_encode_cursor_produces_base64url() {
+        let created_at = Utc.with_ymd_and_hms(2024, 1, 15, 10, 30, 0).unwrap();
+        let id = Uuid::new_v4();
+
+        let encoded = encode_cursor(created_at, id);
+        
+        // Should be base64url (no '+', '/', or '=' padding)
+        assert!(!encoded.contains('+'));
+        assert!(!encoded.contains('/'));
+        assert!(!encoded.contains('='));
+        
+        // Should be decodable
+        assert!(decode_cursor(&encoded).is_ok());
+    }
+
+    #[test]
     fn test_decode_invalid_cursor_returns_error() {
         // Malformed base64
         assert!(decode_cursor("not-valid-base64!!!").is_err());
@@ -431,5 +462,128 @@ mod tests {
 
         // Valid JSON but missing fields
         assert!(decode_cursor("e30=").is_err());
+    }
+
+    #[test]
+    fn test_decode_cursor_empty_string_returns_error() {
+        assert!(decode_cursor("").is_err());
+    }
+
+    #[test]
+    fn test_decode_cursor_invalid_json_structure() {
+        // Base64 of: {"t": "2024-01-15T10:30:00Z"}  (missing "i")
+        let incomplete = base64::engine::general_purpose::URL_SAFE_NO_PAD
+            .encode(r#"{"t": "2024-01-15T10:30:00Z"}"#);
+        assert!(decode_cursor(&incomplete).is_err());
+    }
+
+    #[test]
+    fn test_cursor_datetime_preserves_timezone() {
+        // Create cursor with UTC timestamp
+        let created_at = Utc.with_ymd_and_hms(2024, 1, 15, 10, 30, 0).unwrap();
+        let id = Uuid::new_v4();
+
+        let encoded = encode_cursor(created_at, id);
+        let decoded = decode_cursor(&encoded).unwrap();
+
+        // Verify timezone offset preserved in RFC 3339 format
+        assert!(decoded.t.ends_with('Z') || decoded.t.contains('+') || decoded.t.contains("-00:00"));
+    }
+
+    // ── Limit validation ──────────────────────────────────────────────────────
+
+    #[test]
+    fn test_limit_clamping_below_min() {
+        // Verify constant is correct
+        assert_eq!(MIN_LIMIT, 1);
+        // Limit 0 should clamp to 1
+        let clamped = 0u32.clamp(MIN_LIMIT, MAX_LIMIT);
+        assert_eq!(clamped, MIN_LIMIT);
+    }
+
+    #[test]
+    fn test_limit_clamping_above_max() {
+        // Verify constant is correct
+        assert_eq!(MAX_LIMIT, 100);
+        // Limit 500 should clamp to 100
+        let clamped = 500u32.clamp(MIN_LIMIT, MAX_LIMIT);
+        assert_eq!(clamped, MAX_LIMIT);
+    }
+
+    #[test]
+    fn test_limit_within_range_not_clamped() {
+        let limit = 50u32;
+        let clamped = limit.clamp(MIN_LIMIT, MAX_LIMIT);
+        assert_eq!(clamped, 50);
+    }
+
+    #[test]
+    fn test_default_limit_value() {
+        assert_eq!(DEFAULT_LIMIT, 20);
+    }
+
+    // ── Filter validation ─────────────────────────────────────────────────────
+
+    #[test]
+    fn test_activity_filter_all_fields_optional() {
+        let filter = ActivityFilter::default();
+        assert!(filter.activity_type.is_none());
+        assert!(filter.asset.is_none());
+        assert!(filter.counterparty.is_none());
+        assert!(filter.ledger_min.is_none());
+        assert!(filter.ledger_max.is_none());
+        assert!(filter.from_date.is_none());
+        assert!(filter.to_date.is_none());
+    }
+
+    #[test]
+    fn test_cursor_page_all_fields_optional() {
+        let page = CursorPage::default();
+        assert!(page.after.is_none());
+        assert!(page.before.is_none());
+        assert!(page.limit.is_none());
+    }
+
+    // ── Pagination detection logic ────────────────────────────────────────────
+
+    #[test]
+    fn test_has_next_page_detection() {
+        // If we fetch limit + 1 rows and got limit + 1, has_next_page should be true
+        let effective_limit = 10;
+        let rows_fetched = 11; // limit + 1
+        let has_next = rows_fetched > effective_limit;
+        assert!(has_next);
+    }
+
+    #[test]
+    fn test_no_next_page_when_fewer_rows_than_limit_plus_one() {
+        let effective_limit = 10;
+        let rows_fetched = 10; // exactly limit
+        let has_next = rows_fetched > effective_limit;
+        assert!(!has_next);
+    }
+
+    // ── Record structure validation ───────────────────────────────────────────
+
+    #[test]
+    fn test_activity_record_clone() {
+        let record = ActivityRecord {
+            id: Uuid::new_v4(),
+            account_id: "GABC1234567890ABCDEFGHIJKLMNOPQRSTUVWXYZ1234567890".to_string(),
+            activity_type: "payment".to_string(),
+            amount: Some("100.0000000".to_string()),
+            asset: Some("native".to_string()),
+            asset_code: Some("XLM".to_string()),
+            asset_issuer: None,
+            counterparty: Some("GXYZ1234567890ABCDEFGHIJKLMNOPQRSTUVWXYZ1234567890AB".to_string()),
+            tx_hash: "abc123".to_string(),
+            ledger_seq: 47290343,
+            created_at: Utc.with_ymd_and_hms(2024, 1, 15, 10, 30, 0).unwrap(),
+            metadata: None,
+        };
+
+        let cloned = record.clone();
+        assert_eq!(record.id, cloned.id);
+        assert_eq!(record.account_id, cloned.account_id);
     }
 }

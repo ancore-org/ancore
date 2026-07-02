@@ -22,7 +22,7 @@ Cargo.lock
 # Testing
 coverage/
 .nyc_output/
-
+...
 # Environment
 .env
 .env*.local

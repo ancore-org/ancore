@@ -32,7 +32,7 @@ export function createRequestIdMiddleware(): RequestHandler {
     }
 
     // Expose on request and response header
-    (req as any).requestId = id;
+    Object.assign(req, { requestId: id });
     res.setHeader('X-Request-Id', id);
 
     next();

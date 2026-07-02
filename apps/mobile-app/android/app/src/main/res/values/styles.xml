@@ -1,0 +1,8 @@
+<resources>
+    <style name="AppTheme" parent="Theme.AppCompat.DayNight.NoActionBar">
+        <item name="android:editTextBackground">@android:color/transparent</item>
+        <item name="android:windowBackground">@color/primary_dark</item>
+    </style>
+
+    <color name="primary_dark">#FF000000</color>
+</resources>

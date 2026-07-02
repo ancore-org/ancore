@@ -1,0 +1,48 @@
+# Dependencies
+node_modules/
+
+# React Native
+.expo/
+*.hbc
+*.jsbundle
+
+# iOS
+ios/Pods/
+ios/build/
+ios/*.xcworkspace
+ios/.xcode.env.local
+*.ipa
+
+# Android
+android/.gradle/
+android/app/build/
+android/build/
+android/captures/
+android/local.properties
+*.apk
+*.aab
+
+# Environment
+.env
+.env*.local
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+.DS_Store
+
+# Build
+dist/
+build/
+*.tsbuildinfo
+
+# Testing
+coverage/
+
+# Metro
+.metro-health-check*
+
+# rn-nodeify
+shim.js

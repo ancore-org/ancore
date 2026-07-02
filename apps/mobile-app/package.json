@@ -1,0 +1,51 @@
+{
+  "name": "@ancore/mobile-app",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "start": "react-native start",
+    "ios": "react-native run-ios",
+    "android": "react-native run-android",
+    "build:ios": "react-native build-ios",
+    "build:android": "react-native build-android",
+    "lint": "eslint src/",
+    "test": "jest --config jest.config.cjs",
+    "postinstall": "rn-nodeify --install buffer,crypto,stream,events,process --hack"
+  },
+  "dependencies": {
+    "@ancore/mobile-wallet": "workspace:*",
+    "buffer": "^6.0.3",
+    "crypto": "^1.0.1",
+    "events": "^3.3.0",
+    "process": "^0.11.10",
+    "react": "^18.3.1",
+    "react-native": "^0.76.7",
+    "react-native-biometrics": "^3.0.1",
+    "react-native-keychain": "^10.0.0",
+    "react-native-safe-area-context": "^5.3.0",
+    "react-native-screens": "^4.10.0",
+    "stream": "^0.0.3",
+    "react-native-crypto": "^2.1.0",
+    "stream-browserify": "^1.0.0",
+    "readable-stream": "1.0.33",
+    "react-native-randombytes": "^3.0.0"
+  },
+  "devDependencies": {
+    "@babel/core": "^7.26.0",
+    "@babel/preset-env": "^7.26.0",
+    "@babel/runtime": "^7.26.0",
+    "@react-native/babel-preset": "^0.76.7",
+    "@react-native/metro-config": "^0.76.7",
+    "@react-native/typescript-config": "^0.76.7",
+    "@types/react": "^18.3.0",
+    "babel-jest": "^29.7.0",
+    "jest": "^29.7.0",
+    "metro-react-native-babel-preset": "^0.77.0",
+    "react-test-renderer": "^18.3.1",
+    "rn-nodeify": "^10.3.0",
+    "typescript": "^5.6.0"
+  },
+  "jest": {
+    "preset": "react-native"
+  }
+}
