@@ -1,6 +1,11 @@
 import { AccountContract, type InvocationArgs } from '@ancore/account-abstraction';
 
 import { addSessionKey, type AddSessionKeyParams, type SessionKeyWriter } from './add-session-key';
+import {
+  createWallet as createWalletOrchestration,
+  type CreateWalletParams,
+  type CreateWalletResult,
+} from './create-wallet';
 import { BuilderValidationError } from './errors';
 import {
   refreshSessionKeyTtl,
@@ -30,6 +35,24 @@ export class AncoreClient {
     }
 
     this.accountContract = new AccountContract(options.accountContractId);
+  }
+
+  /**
+   * Creates a new Ancore wallet by generating a fresh BIP39 mnemonic, deriving
+   * an Ed25519 keypair via BIP-44 HD derivation, and optionally encrypting the
+   * mnemonic with the provided password.
+   *
+   * @example
+   * ```typescript
+   * const client = new AncoreClient({ accountContractId: 'C...' });
+   * const wallet = await client.createWallet({ password: 'hunter2' });
+   * // wallet.publicKey  → G…  (safe to persist)
+   * // wallet.contractId → C…  (safe to persist)
+   * // wallet.encryptedMnemonic → persist this; do NOT persist wallet.secretKey
+   * ```
+   */
+  createWallet(params?: CreateWalletParams): Promise<CreateWalletResult> {
+    return createWalletOrchestration(params);
   }
 
   addSessionKey(params: AddSessionKeyParams): InvocationArgs {

@@ -16,6 +16,13 @@ export {
   type WalletMaterial,
 } from './wallet';
 
+// Create wallet orchestration (standalone + exposed via AncoreClient.createWallet)
+export {
+  createWallet as createWalletOrchestration,
+  type CreateWalletParams,
+  type CreateWalletResult,
+} from './create-wallet';
+
 // Client
 export { AncoreClient, type AncoreClientOptions } from './ancore-client';
 

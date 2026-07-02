@@ -15,6 +15,8 @@ module.exports = {
     '^@ancore/stellar/(.*)$': '<rootDir>/../stellar/src/$1',
     '^@ancore/types$': '<rootDir>/../types/src/index.ts',
     '^@ancore/types/(.*)$': '<rootDir>/../types/src/$1',
+    '^@ancore/crypto$': '<rootDir>/../crypto/src/index.ts',
+    '^@ancore/crypto/(.*)$': '<rootDir>/../crypto/src/$1',
   },
   collectCoverage: true,
   collectCoverageFrom: ['src/**/*.ts', '!src/**/__tests__/**', '!src/index.ts'],
