@@ -91,7 +91,9 @@ export class RelayService implements RelayServiceContract {
         try {
           const targetContract = request.parameters.accountAddress as string;
           const onChainKey = await getSessionKey(targetContract, request.sessionKey, {
-            server: new rpc.Server(process.env.RPC_URL || 'https://soroban-testnet.stellar.org') as any,
+            server: new rpc.Server(
+              process.env.RPC_URL || 'https://soroban-testnet.stellar.org'
+            ) as any,
             sourceAccount: targetContract,
             networkPassphrase: process.env.NETWORK_PASSPHRASE || Networks.TESTNET,
           });

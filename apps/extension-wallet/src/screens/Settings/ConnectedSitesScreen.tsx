@@ -1,5 +1,5 @@
 import * as React from 'react';
-import { Globe, Trash2, ArrowLeft, Shield } from 'lucide-react';
+import { Trash2, ArrowLeft, Shield } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { useAllowlistStore } from '../../stores/allowlist';
 import { useAccountStore } from '../../stores/account';
@@ -31,12 +31,28 @@ export function ConnectedSitesScreen({ onBack }: { onBack: () => void }) {
   const { t } = useTranslation();
   const { accounts, activeAccountId } = useAccountStore();
   const network = useSettingsStore((state) => state.network);
-  const { getConnectedSites, revoke, revokeAll } = useAllowlistStore();
+  const approvedSitesList = useAllowlistStore(
+    (state) => state.approvedSites[activeAccountId ?? '']?.[network] ?? []
+  );
+  const connectedSitesMeta = useAllowlistStore(
+    (state) => state.connectedSites[activeAccountId ?? '']?.[network] ?? {}
+  );
+  const { revoke, revokeAll } = useAllowlistStore();
 
-  const approvedSites = React.useMemo(() => {
-    if (!activeAccountId) return [];
-    return getConnectedSites(activeAccountId, network);
-  }, [activeAccountId, network, getConnectedSites]);
+  const approvedSites: ConnectedSiteRecord[] = React.useMemo(() => {
+    return approvedSitesList
+      .map((origin) => {
+        const existing = connectedSitesMeta[origin];
+        if (existing) return existing;
+        return {
+          origin,
+          accountId: activeAccountId ?? '',
+          network,
+          connectedAt: Date.now(),
+        };
+      })
+      .sort((a, b) => a.origin.localeCompare(b.origin));
+  }, [approvedSitesList, connectedSitesMeta, activeAccountId, network]);
 
   const activeAccount = React.useMemo(
     () => accounts.find((account) => account.id === activeAccountId),
