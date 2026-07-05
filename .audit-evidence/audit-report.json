@@ -1,0 +1,113 @@
+{
+  "timestamp": "2026-07-05T12:56:04.694Z",
+  "version": "1.0.0",
+  "checks": [
+    {
+      "name": "File exists: docs/security/THREAT_MODEL.md",
+      "description": "Threat model documentation",
+      "status": "PASS",
+      "timestamp": "2026-07-05T12:56:04.698Z"
+    },
+    {
+      "name": "File exists: docs/security/AUDIT_CHECKLIST.md",
+      "description": "Audit checklist",
+      "status": "PASS",
+      "timestamp": "2026-07-05T12:56:04.699Z"
+    },
+    {
+      "name": "File exists: docs/security/CRYPTOGRAPHY.md",
+      "description": "Cryptography details",
+      "status": "PASS",
+      "timestamp": "2026-07-05T12:56:04.699Z"
+    },
+    {
+      "name": "File exists: SECURITY.md",
+      "description": "Security policy",
+      "status": "PASS",
+      "timestamp": "2026-07-05T12:56:04.699Z"
+    },
+    {
+      "name": "dependency audit",
+      "description": "NPM dependency vulnerability scan",
+      "status": "FAIL",
+      "error": "Command failed: pnpm audit --audit-level=high",
+      "timestamp": "2026-07-05T12:56:28.900Z"
+    },
+    {
+      "name": "cargo audit",
+      "description": "Rust dependency vulnerability scan",
+      "status": "FAIL",
+      "error": "Command failed: cargo audit\n'cargo' is not recognized as an internal or external command,\r\noperable program or batch file.\r\n",
+      "timestamp": "2026-07-05T12:56:28.940Z"
+    },
+    {
+      "name": "unit tests",
+      "description": "Run unit tests with coverage",
+      "status": "FAIL",
+      "error": "Command failed: pnpm test -- --coverage\n ERROR  unexpected argument '--coverage' found\n\n  tip: to pass '--coverage' as a value, use '-- --coverage'\n\nUsage: turbo.exe run [OPTIONS] [TASKS]... [-- <PASS_THROUGH_ARGS>...]\n\nOptions:\n    --cache-dir <CACHE_DIR>\n    --concurrency <CONCURRENCY>\n    --continue[=<CONTINUE>]\n    --single-package\n    --framework-inference [<BOOL>]\n    --global-deps <GLOBAL_DEPS>\n    --env-mode [<ENV_MODE>]\n    --filter <FILTER>\n    --affected\n    --output-logs <OUTPUT_LOGS>\n    --log-order <LOG_ORDER>\n    --json\n    --log-file [<LOG_FILE>]\n    --only\n    --pkg-inference-root <PKG_INFERENCE_ROOT>\n    --log-prefix <LOG_PREFIX>\n    TASKS\n    PASS_THROUGH_ARGS\n    --cache <CACHE>\n    --force [<FORCE>]\n    --remote-only [<REMOTE_ONLY>]\n    --remote-cache-read-only [<REMOTE_CACHE_READ_ONLY>]\n    --no-cache <NO_CACHE>\n    --cache-workers <CACHE_WORKERS>\n    --dry-run [<DRY_RUN>]\n    --graph [<GRAPH>]\n    --daemon <DAEMON>\n    --no-daemon <NO_DAEMON>\n    --profile [<PROFILE>]\n    --anon-profile [<ANON_PROFILE>]\n    --summarize [<SUMMARIZE>]\n    --parallel <PARALLEL>\n\nFor more information, try '--help'.\n\n",
+      "timestamp": "2026-07-05T12:56:31.028Z"
+    },
+    {
+      "name": "lint",
+      "description": "Linting check",
+      "status": "FAIL",
+      "error": "Command failed: pnpm lint\n• turbo 2.9.15\n ERROR  @ancore/wallet-api#lint: command (C:\\Users\\Wittig_Lyon\\Desktop\\wae\\ancore\\packages\\wallet-api) C:\\Users\\Wittig_Lyon\\AppData\\Roaming\\npm\\pnpm.cmd run lint exited (1)\n ERROR  run failed: command  exited (1)\n",
+      "timestamp": "2026-07-05T12:57:09.660Z"
+    },
+    {
+      "name": "format check",
+      "description": "Code formatting check",
+      "status": "PASS",
+      "timestamp": "2026-07-05T12:57:28.526Z"
+    },
+    {
+      "name": "ts compilation",
+      "description": "TypeScript compilation check",
+      "status": "PASS",
+      "timestamp": "2026-07-05T12:57:30.228Z"
+    },
+    {
+      "name": "build",
+      "description": "Full build verification",
+      "status": "PASS",
+      "timestamp": "2026-07-05T12:58:24.630Z"
+    }
+  ],
+  "artifacts": [
+    {
+      "name": "package-lock",
+      "description": "Locked dependency versions",
+      "sourcePath": "pnpm-lock.yaml",
+      "location": "C:\\Users\\Wittig_Lyon\\Desktop\\wae\\ancore\\.audit-evidence\\package-lock",
+      "timestamp": "2026-07-05T12:58:24.641Z"
+    },
+    {
+      "name": "cargo-lock",
+      "description": "Rust dependency lock file",
+      "sourcePath": "contracts/Cargo.lock",
+      "location": "C:\\Users\\Wittig_Lyon\\Desktop\\wae\\ancore\\.audit-evidence\\cargo-lock",
+      "timestamp": "2026-07-05T12:58:24.647Z"
+    },
+    {
+      "name": "security-docs",
+      "description": "Security documentation",
+      "sourcePath": "docs/security/",
+      "location": "C:\\Users\\Wittig_Lyon\\Desktop\\wae\\ancore\\.audit-evidence\\security-docs",
+      "timestamp": "2026-07-05T12:58:24.662Z"
+    },
+    {
+      "name": "audit-checklist",
+      "description": "Audit checklist",
+      "sourcePath": "docs/security/AUDIT_CHECKLIST.md",
+      "location": "C:\\Users\\Wittig_Lyon\\Desktop\\wae\\ancore\\.audit-evidence\\audit-checklist",
+      "timestamp": "2026-07-05T12:58:24.663Z"
+    }
+  ],
+  "status": "FAIL",
+  "summary": {
+    "totalChecks": 11,
+    "passed": 7,
+    "failed": 4,
+    "passRate": "63.6"
+  }
+}
