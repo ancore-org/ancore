@@ -38,7 +38,7 @@
     "@types/jest": "^29.5.0"
   },
   "dependencies": {
-    "zod": "^3.22.0",
-    "@stellar/stellar-sdk": "^13.3.0"
+    "zod": "^4.4.3",
+    "@stellar/stellar-sdk": "^16.0.1"
   }
 }
