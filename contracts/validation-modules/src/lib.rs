@@ -196,16 +196,16 @@ impl ValidationModuleInterface for TargetAllowlistModule {
             return Err(ValidationModuleError::Disabled);
         }
 
-        if env
+        let target_allowed = env
             .storage()
             .persistent()
-            .has(&DataKey::AllowedTarget(context.target.clone()))
-        {
-            Ok(())
-        } else if env
-            .storage()
-            .persistent()
-            .has(&DataKey::AllowedFunction(context.target, context.function))
+            .has(&DataKey::AllowedTarget(context.target.clone()));
+
+        if target_allowed
+            || env
+                .storage()
+                .persistent()
+                .has(&DataKey::AllowedFunction(context.target, context.function))
         {
             Ok(())
         } else {

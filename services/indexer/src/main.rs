@@ -8,19 +8,14 @@ use tower_governor::GovernorLayer;
 use tower_http::cors::CorsLayer;
 use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
 
-mod api;
-mod error;
-mod metrics;
-mod repositories;
-mod schema;
-
 use ancore_indexer::ingest::CheckpointStore;
+use ancore_indexer::metrics;
 
-use api::account_activity;
-use api::contract_events;
-use api::health;
-use api::metrics::{metrics_handler, prometheus_metrics_handler};
-use api::statements;
+use ancore_indexer::api::account_activity;
+use ancore_indexer::api::contract_events;
+use ancore_indexer::api::health;
+use ancore_indexer::api::metrics::{metrics_handler, prometheus_metrics_handler};
+use ancore_indexer::api::statements;
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {

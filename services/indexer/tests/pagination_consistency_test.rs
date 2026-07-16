@@ -291,7 +291,7 @@ async fn test_pagination_one_more_than_limit() {
 
     assert_eq!(json["data"].as_array().unwrap().len(), 20);
     assert!(json["pagination"]["has_next_page"].as_bool().unwrap());
-    assert!(json["pagination"]["next_cursor"].is_some());
+    assert!(json["pagination"]["next_cursor"].as_str().is_some());
 }
 
 #[tokio::test]
