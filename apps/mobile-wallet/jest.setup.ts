@@ -18,3 +18,23 @@ jest.mock(
   }),
   { virtual: true }
 );
+
+// WalletConnect / Reown pull ESM-only deps that break Jest without a full RN transform.
+// Provide a virtual kit mock; individual suites can override.
+jest.mock(
+  '@reown/walletkit',
+  () => ({
+    WalletKit: {
+      init: jest.fn(async () => ({
+        on: jest.fn(),
+        off: jest.fn(),
+        pair: jest.fn(),
+        respondSessionRequest: jest.fn(),
+        rejectSession: jest.fn(),
+        approveSession: jest.fn(),
+        getActiveSessions: jest.fn(() => ({})),
+      })),
+    },
+  }),
+  { virtual: true }
+);

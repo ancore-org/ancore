@@ -1,10 +1,14 @@
 import * as React from 'react';
 import { Trash2, ArrowLeft, Shield } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
-import { useAllowlistStore } from '../../stores/allowlist';
+import { useAllowlistStore, type ConnectedSiteRecord } from '../../stores/allowlist';
 import { useAccountStore } from '../../stores/account';
 import { useSettingsStore } from '../../stores/settings';
 import { EmptyTransactions } from '../../components/EmptyTransactions';
+
+/** Stable empties so Zustand selectors do not allocate every snapshot (infinite re-render). */
+const EMPTY_APPROVED: string[] = [];
+const EMPTY_CONNECTED: Record<string, ConnectedSiteRecord> = {};
 
 function truncateAddress(address: string, chars = 8): string {
   if (address.length <= chars * 2) return address;
@@ -32,12 +36,13 @@ export function ConnectedSitesScreen({ onBack }: { onBack: () => void }) {
   const { accounts, activeAccountId } = useAccountStore();
   const network = useSettingsStore((state) => state.network);
   const approvedSitesList = useAllowlistStore(
-    (state) => state.approvedSites[activeAccountId ?? '']?.[network] ?? []
+    (state) => state.approvedSites[activeAccountId ?? '']?.[network] ?? EMPTY_APPROVED
   );
   const connectedSitesMeta = useAllowlistStore(
-    (state) => state.connectedSites[activeAccountId ?? '']?.[network] ?? {}
+    (state) => state.connectedSites[activeAccountId ?? '']?.[network] ?? EMPTY_CONNECTED
   );
-  const { revoke, revokeAll } = useAllowlistStore();
+  const revoke = useAllowlistStore((state) => state.revoke);
+  const revokeAll = useAllowlistStore((state) => state.revokeAll);
 
   const approvedSites: ConnectedSiteRecord[] = React.useMemo(() => {
     return approvedSitesList
