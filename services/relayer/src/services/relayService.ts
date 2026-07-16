@@ -3,10 +3,9 @@ import { trace } from '@opentelemetry/api';
 import { validateTransferPolicy } from '@ancore/types';
 import { getSessionKey } from '@ancore/account-abstraction';
 import { rpc, Networks } from '@stellar/stellar-sdk';
-import * as ed from '@noble/ed25519';
 import type { JobQueue } from '../queue/JobQueue';
 import type { IdempotencyStore } from '../store/idempotency';
-import { NonceStore } from '../store/nonceStore';
+import type { NonceStore } from '../store/nonceStore';
 import type {
   RelayServiceContract,
   SignatureServiceContract,
@@ -107,11 +106,9 @@ export class RelayService implements RelayServiceContract {
           // ignore or handle error if contract query fails
         }
 
-        const ok = await ed.verify(
-          Buffer.from(request.signature, 'hex'),
-          Buffer.from(payload, 'hex'),
-          request.sessionKey
-        );
+        // Prefer injected SignatureServiceContract so tests and production share one path.
+        // (Avoid direct @noble/ed25519 ESM import in this service — Jest + package dualism.)
+        const ok = this.signatureService.verify(request.sessionKey, payload, request.signature);
         if (!ok) {
           return {
             valid: false,
