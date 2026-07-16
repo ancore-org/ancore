@@ -2,36 +2,149 @@
 @tailwind components;
 @tailwind utilities;
 
-@layer base {
-  :root {
-    --background: 240 10% 97%;
-    --foreground: 224 71% 4%;
-    --card: 0 0% 100%;
-    --card-foreground: 224 71% 4%;
-    --popover: 0 0% 100%;
-    --popover-foreground: 224 71% 4%;
-    --primary: 262 83% 58%;
-    --primary-foreground: 210 40% 98%;
-    --secondary: 220 14% 96%;
-    --secondary-foreground: 220 9% 46%;
-    --muted: 220 14% 96%;
-    --muted-foreground: 220 9% 46%;
-    --accent: 262 83% 96%;
-    --accent-foreground: 262 83% 40%;
-    --destructive: 0 84% 60%;
-    --destructive-foreground: 0 0% 100%;
-    --border: 220 13% 91%;
-    --input: 220 13% 91%;
-    --ring: 262 83% 58%;
-    --radius: 0.75rem;
-  }
-}
+/*
+  Ancore Wallet visual system — consumer wallet bar (Rainbow-class).
+  Dark-first product UI: near-black canvas, elevated charcoal cards,
+  soft white pill CTAs, generous type, minimal chrome.
+*/
 
 @layer base {
+  :root {
+    /* Near-black canvas */
+    --background: 0 0% 4%;
+    --foreground: 0 0% 98%;
+
+    /* Elevated surfaces */
+    --card: 0 0% 10%;
+    --card-foreground: 0 0% 98%;
+    --popover: 0 0% 10%;
+    --popover-foreground: 0 0% 98%;
+
+    /* Stellar-tinted accent (kept, but secondary to monochrome chrome) */
+    --primary: 0 0% 100%;
+    --primary-foreground: 0 0% 4%;
+
+    --secondary: 0 0% 14%;
+    --secondary-foreground: 0 0% 96%;
+
+    --muted: 0 0% 14%;
+    --muted-foreground: 0 0% 55%;
+
+    --accent: 0 0% 16%;
+    --accent-foreground: 0 0% 98%;
+
+    --destructive: 0 72% 51%;
+    --destructive-foreground: 0 0% 100%;
+
+    --border: 0 0% 16%;
+    --input: 0 0% 16%;
+    --ring: 0 0% 90%;
+
+    /* Wallet-specific */
+    --surface-raised: 0 0% 12%;
+    --surface-sunken: 0 0% 7%;
+    --success: 142 71% 45%;
+    --warning: 38 92% 50%;
+    --info: 210 100% 56%;
+
+    --radius: 1.25rem;
+    --radius-pill: 9999px;
+  }
+
   * {
     @apply border-border box-border;
   }
+
+  html,
+  body,
+  #root {
+    @apply min-h-full;
+  }
+
   body {
     @apply bg-background text-foreground antialiased;
+    font-feature-settings:
+      'ss01' on,
+      'cv11' on;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  /* Popup chrome: mobile-wallet proportions */
+  #root {
+    max-width: 420px;
+    margin: 0 auto;
+  }
+}
+
+@layer components {
+  .wallet-sheet {
+    @apply flex min-h-screen flex-col bg-background text-foreground;
+  }
+
+  .wallet-header {
+    @apply flex items-center justify-between px-5 pb-2 pt-5;
+  }
+
+  .wallet-title {
+    @apply text-[22px] font-semibold tracking-tight text-foreground;
+  }
+
+  .wallet-icon-btn {
+    @apply inline-flex h-10 w-10 items-center justify-center rounded-full
+      text-foreground/90 transition-colors hover:bg-white/5 active:scale-95;
+  }
+
+  .wallet-card {
+    @apply rounded-[22px] bg-[hsl(var(--surface-raised))] p-4;
+  }
+
+  .wallet-card-inset {
+    @apply rounded-[22px] bg-[hsl(var(--surface-sunken))] p-4;
+  }
+
+  .wallet-pill-btn {
+    @apply flex h-14 w-full items-center justify-center rounded-full
+      bg-primary text-primary-foreground text-[16px] font-semibold
+      transition-all active:scale-[0.98]
+      disabled:cursor-not-allowed disabled:opacity-40;
+  }
+
+  .wallet-pill-btn-secondary {
+    @apply flex h-14 w-full items-center justify-center rounded-full
+      bg-[hsl(var(--surface-raised))] text-foreground text-[16px] font-semibold
+      transition-all hover:bg-white/10 active:scale-[0.98];
+  }
+
+  .wallet-option-row {
+    @apply flex w-full items-center gap-3.5 rounded-[20px] border border-border/60
+      bg-[hsl(var(--surface-raised))] px-4 py-4 text-left
+      transition-colors hover:bg-white/[0.06] active:scale-[0.99];
+  }
+
+  .wallet-option-icon {
+    @apply flex h-11 w-11 shrink-0 items-center justify-center rounded-full;
+  }
+
+  .wallet-muted {
+    @apply text-[hsl(var(--muted-foreground))];
+  }
+
+  .wallet-amount-display {
+    @apply text-center text-[56px] font-semibold leading-none tracking-tight tabular-nums;
+  }
+
+  .wallet-numpad-key {
+    @apply flex h-14 items-center justify-center text-[28px] font-normal
+      text-foreground transition-colors active:bg-white/5 rounded-2xl select-none;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
   }
 }

@@ -31,7 +31,9 @@
     "@ancore/ui-kit": "workspace:*",
     "@ancore/wallet-shared": "workspace:*",
     "@blockaid/client": "^1.4.0",
+    "@noble/hashes": "1",
     "@stellar/stellar-sdk": "^13.3.0",
+    "buffer": "6",
     "date-fns": "^4.1.0",
     "i18next": "^24.2.3",
     "lucide-react": "^0.344.0",
@@ -71,6 +73,7 @@
     "tailwindcss-animate": "^1.0.7",
     "typescript": "^5.6.0",
     "vite": "^5.4.0",
+    "vite-plugin-node-polyfills": "^0.28.0",
     "vitest": "^1.0.0"
   }
 }

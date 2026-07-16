@@ -31,7 +31,6 @@ function renderReceive(ui: React.ReactElement) {
   return render(<NotificationProvider>{ui}</NotificationProvider>);
 }
 
-// ─── Test suite ──────────────────────────────────────────────────────────────
 describe('ReceiveScreen', () => {
   describe('empty state', () => {
     it('renders empty state when no smartAccountId is provided', () => {
@@ -63,98 +62,65 @@ describe('ReceiveScreen', () => {
       );
     });
 
-    it('renders the contract ID label', () => {
-      renderReceive(<ReceiveScreen smartAccountId={SMART_ACCOUNT_ID} />);
-      expect(screen.getByText('Contract ID')).toBeInTheDocument();
+    it('renders wallet name and share action', () => {
+      renderReceive(<ReceiveScreen smartAccountId={SMART_ACCOUNT_ID} walletName="Ancore Wallet" />);
+      expect(screen.getByText('Ancore Wallet')).toBeInTheDocument();
+      expect(screen.getByRole('button', { name: /share address/i })).toBeInTheDocument();
     });
 
-    it('renders the owner public key when provided', () => {
+    it('renders owner public key hint when provided', () => {
       renderReceive(
         <ReceiveScreen smartAccountId={SMART_ACCOUNT_ID} ownerPublicKey={OWNER_PUBLIC_KEY} />
       );
-      expect(screen.getByText('Owner public key')).toBeInTheDocument();
+      expect(screen.getByText(/Owner key:/i)).toBeInTheDocument();
     });
 
     it('does not render owner public key when not provided', () => {
       renderReceive(<ReceiveScreen smartAccountId={SMART_ACCOUNT_ID} />);
-      expect(screen.queryByText('Owner public key')).not.toBeInTheDocument();
-    });
-  });
-
-  describe('network indicator', () => {
-    it('shows "Mainnet" badge by default', () => {
-      renderReceive(<ReceiveScreen smartAccountId={SMART_ACCOUNT_ID} />);
-      expect(screen.getByText('Mainnet')).toBeInTheDocument();
-    });
-
-    it('shows "Testnet" badge when network is testnet', () => {
-      renderReceive(<ReceiveScreen smartAccountId={SMART_ACCOUNT_ID} network="testnet" />);
-      expect(screen.getByText('Testnet')).toBeInTheDocument();
-    });
-
-    it('shows "Futurenet" badge when network is futurenet', () => {
-      renderReceive(<ReceiveScreen smartAccountId={SMART_ACCOUNT_ID} network="futurenet" />);
-      expect(screen.getByText('Futurenet')).toBeInTheDocument();
+      expect(screen.queryByText(/Owner key:/i)).not.toBeInTheDocument();
     });
   });
 
   describe('navigation', () => {
-    it('calls onBack when the back button is clicked', async () => {
+    it('calls onBack when the close button is clicked', async () => {
       const user = userEvent.setup();
       const handleBack = vi.fn();
       renderReceive(<ReceiveScreen smartAccountId={SMART_ACCOUNT_ID} onBack={handleBack} />);
 
-      await user.click(screen.getByRole('button', { name: /go back/i }));
+      await user.click(screen.getByRole('button', { name: /close/i }));
 
       expect(handleBack).toHaveBeenCalledTimes(1);
     });
 
-    it('does not render back button when onBack is not provided', () => {
+    it('does not render close button when onBack is not provided', () => {
       renderReceive(<ReceiveScreen smartAccountId={SMART_ACCOUNT_ID} />);
-      expect(screen.queryByRole('button', { name: /go back/i })).not.toBeInTheDocument();
+      expect(screen.queryByRole('button', { name: /close/i })).not.toBeInTheDocument();
     });
   });
 
   describe('copy addresses', () => {
-    it('copies the smart account ID to the clipboard when copy button is clicked', async () => {
+    it('copies the smart account ID when copy address is clicked', async () => {
       const user = userEvent.setup();
       const writeText = vi.spyOn(navigator.clipboard, 'writeText');
       writeText.mockResolvedValue(undefined);
 
       renderReceive(<ReceiveScreen smartAccountId={SMART_ACCOUNT_ID} />);
 
-      const copyBtns = screen.getAllByRole('button', { name: /copy address/i });
-      await user.click(copyBtns[0]);
+      await user.click(screen.getByRole('button', { name: /copy address/i }));
 
       expect(writeText).toHaveBeenCalledWith(SMART_ACCOUNT_ID);
     });
 
-    it('copies the owner public key when its copy button is clicked', async () => {
-      const user = userEvent.setup();
-      const writeText = vi.spyOn(navigator.clipboard, 'writeText');
-      writeText.mockResolvedValue(undefined);
-
-      renderReceive(
-        <ReceiveScreen smartAccountId={SMART_ACCOUNT_ID} ownerPublicKey={OWNER_PUBLIC_KEY} />
-      );
-
-      const copyBtns = screen.getAllByRole('button', { name: /copy address/i });
-      await user.click(copyBtns[1]);
-
-      expect(writeText).toHaveBeenCalledWith(OWNER_PUBLIC_KEY);
-    });
-
-    it('shows success toast after copying smart account ID', async () => {
+    it('shows copied feedback after copying', async () => {
       const user = userEvent.setup();
       vi.spyOn(navigator.clipboard, 'writeText').mockResolvedValue(undefined);
 
       renderReceive(<ReceiveScreen smartAccountId={SMART_ACCOUNT_ID} />);
 
-      const copyBtns = screen.getAllByRole('button', { name: /copy address/i });
-      await user.click(copyBtns[0]);
+      await user.click(screen.getByRole('button', { name: /copy address/i }));
 
       await waitFor(() => {
-        expect(screen.getByText('Address copied')).toBeInTheDocument();
+        expect(screen.getByText('Copied')).toBeInTheDocument();
       });
     });
   });
@@ -185,9 +151,9 @@ describe('ReceiveScreen', () => {
   });
 
   describe('download QR', () => {
-    it('renders a download QR code button', () => {
+    it('renders a download QR control', () => {
       renderReceive(<ReceiveScreen smartAccountId={SMART_ACCOUNT_ID} />);
-      expect(screen.getByRole('button', { name: /download qr code/i })).toBeInTheDocument();
+      expect(screen.getByRole('button', { name: /download qr/i })).toBeInTheDocument();
     });
   });
 });

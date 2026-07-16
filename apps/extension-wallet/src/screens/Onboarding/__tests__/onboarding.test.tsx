@@ -18,36 +18,43 @@ Object.defineProperty(navigator, 'clipboard', {
 });
 
 describe('WelcomeScreen', () => {
-  it('renders welcome message and features', () => {
+  it('renders setup chooser options', () => {
     const onNext = vi.fn();
-    render(<WelcomeScreen onNext={onNext} />);
+    render(<WelcomeScreen onNext={onNext} onImport={vi.fn()} />);
 
-    expect(screen.getByText('Welcome to Ancore')).toBeInTheDocument();
-    expect(screen.getByText('Create New Wallet')).toBeInTheDocument();
-    expect(screen.getByText('Secure')).toBeInTheDocument();
-    expect(screen.getByText('Smart Accounts')).toBeInTheDocument();
+    expect(screen.getByText('Set up your wallet')).toBeInTheDocument();
+    expect(screen.getByText('Create new wallet')).toBeInTheDocument();
+    expect(screen.getByText('Import')).toBeInTheDocument();
   });
 
-  it('calls onNext when create wallet button is clicked', () => {
+  it('calls onNext when create wallet is clicked', () => {
     const onNext = vi.fn();
-    render(<WelcomeScreen onNext={onNext} />);
+    render(<WelcomeScreen onNext={onNext} onImport={vi.fn()} />);
 
-    fireEvent.click(screen.getByText('Create New Wallet'));
+    fireEvent.click(screen.getByText('Create new wallet'));
     expect(onNext).toHaveBeenCalledTimes(1);
   });
 
-  it('shows back button when onBack is provided', () => {
+  it('calls onImport when import is clicked', () => {
+    const onImport = vi.fn();
+    render(<WelcomeScreen onNext={vi.fn()} onImport={onImport} />);
+
+    fireEvent.click(screen.getByText('Import'));
+    expect(onImport).toHaveBeenCalledTimes(1);
+  });
+
+  it('shows close control when onBack is provided', () => {
     const onBack = vi.fn();
     render(<WelcomeScreen onNext={vi.fn()} onBack={onBack} />);
 
-    fireEvent.click(screen.getByText('Back'));
+    fireEvent.click(screen.getByRole('button', { name: /close/i }));
     expect(onBack).toHaveBeenCalledTimes(1);
   });
 
-  it('shows security warning for recovery phrase', () => {
-    render(<WelcomeScreen onNext={vi.fn()} />);
+  it('mentions recovery phrase for import path', () => {
+    render(<WelcomeScreen onNext={vi.fn()} onImport={vi.fn()} />);
 
-    expect(screen.getByText(/recovery phrase/)).toBeInTheDocument();
+    expect(screen.getAllByText(/recovery phrase/i).length).toBeGreaterThan(0);
   });
 });
 

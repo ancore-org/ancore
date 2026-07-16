@@ -1,6 +1,7 @@
 import * as React from 'react';
 import {
   BrowserRouter,
+  HashRouter,
   Link,
   MemoryRouter,
   Navigate,
@@ -799,14 +800,19 @@ export function ExtensionRouterContent() {
 }
 
 export function ExtensionRouter() {
+  // Vite multi-page dev serves the popup at /src/popup/index.html, so path-based
+  // BrowserRouter would 404 every app route. HashRouter works in browser preview;
+  // real extension popup still works (hash or path both fine for in-popup nav).
+  const Router = import.meta.env.DEV ? HashRouter : BrowserRouter;
+
   return (
-    <BrowserRouter>
+    <Router>
       <NotificationProvider>
         <ExtensionAuthProvider>
           <ExtensionRouterContent />
         </ExtensionAuthProvider>
       </NotificationProvider>
-    </BrowserRouter>
+    </Router>
   );
 }
 

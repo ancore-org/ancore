@@ -12,8 +12,8 @@ test.describe('Extension release-candidate smoke @smoke', () => {
     await waitForAppReady(page);
 
     await page.waitForURL(/\/onboarding/, { timeout: 15_000 });
-    await expect(page.getByRole('heading', { name: /Welcome to Ancore/i })).toBeVisible();
-    await page.getByRole('button', { name: /Create New Wallet/i }).click();
+    await expect(page.getByRole('heading', { name: /Set up your wallet/i })).toBeVisible();
+    await page.getByRole('button', { name: /Create new wallet/i }).click();
     await expect(page.getByRole('button', { name: /I've Saved My Recovery Phrase/i })).toBeVisible({
       timeout: 20_000,
     });

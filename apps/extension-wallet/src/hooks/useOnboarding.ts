@@ -178,16 +178,21 @@ export function useOnboarding(options: UseOnboardingOptions = {}) {
    * Generate a new mnemonic
    */
   const generateMnemonicHandler = useCallback(async () => {
+    setState((prev: OnboardingState) => ({ ...prev, isLoading: true, error: null }));
     try {
       const wallet = await createWallet();
       setState((prev: OnboardingState) => ({
         ...prev,
         mnemonic: wallet.mnemonic,
         step: 'generate',
+        isLoading: false,
+        error: null,
       }));
     } catch (error) {
+      console.error('[onboarding] createWallet failed', error);
       setState((prev: OnboardingState) => ({
         ...prev,
+        isLoading: false,
         error: error instanceof Error ? error.message : 'Failed to generate mnemonic',
       }));
     }

@@ -235,7 +235,15 @@ export function OnboardingFlow() {
   }, [step, deployStatus, isLoading, handleDeploy]);
 
   if (step === 'welcome') {
-    return <WelcomeScreen onNext={handleStartCreate} onBack={undefined} />;
+    return (
+      <WelcomeScreen
+        onNext={handleStartCreate}
+        onImport={handleStartImport}
+        onBack={undefined}
+        error={error}
+        isLoading={isLoading}
+      />
+    );
   }
 
   // Import path — shown before password step when flowMode is 'import'

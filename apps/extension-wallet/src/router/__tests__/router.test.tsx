@@ -38,7 +38,7 @@ describe('extension router', () => {
     renderRouter('/home');
     await waitForAuthReady();
 
-    expect(await screen.findByRole('heading', { name: /welcome to ancore/i })).toBeInTheDocument();
+    expect(await screen.findByRole('heading', { name: /set up your wallet/i })).toBeInTheDocument();
     expect(document.title).toBe('Create Wallet | Ancore Extension');
   });
 
@@ -86,7 +86,7 @@ describe('extension router', () => {
     renderRouter('/onboarding');
     await waitForAuthReady();
 
-    expect(await screen.findByRole('heading', { name: /welcome to ancore/i })).toBeInTheDocument();
+    expect(await screen.findByRole('heading', { name: /set up your wallet/i })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: /create new wallet/i })).toBeInTheDocument();
   });
 

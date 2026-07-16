@@ -17,8 +17,8 @@ describe('Onboarding E2E Flow', () => {
     const onWelcomeNext = vi.fn();
     const { unmount: u1 } = render(<WelcomeScreen onNext={onWelcomeNext} />);
 
-    expect(screen.getByText(/Welcome to Ancore/i)).toBeInTheDocument();
-    fireEvent.click(screen.getByRole('button', { name: /Create New Wallet/i }));
+    expect(screen.getByText(/Set up your wallet/i)).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: /Create new wallet/i }));
     expect(onWelcomeNext).toHaveBeenCalled();
     u1();
 
