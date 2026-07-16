@@ -205,6 +205,17 @@ make build
 make help
 ```
 
+### Before opening a PR
+
+Run the exact checks CI runs, in the exact directories CI runs them in — see
+[AGENTS.md § Before you push](AGENTS.md#before-you-push--run-what-ci-runs). This matters more than it
+sounds: `contracts/` and `services/indexer/` are separate Rust workspaces with their own
+`cargo fmt`/`cargo clippy` gates, and TypeScript/JS formatting, linting, and building are three
+separate CI jobs that each fail independently. AGENTS.md also documents the specific failure patterns
+(dependency declarations for stub files, Vite/Vitest config conflicts, duplicate Rust module trees)
+that have caused repeat CI breaks in this repo — read it before your first PR, whether you're a human
+or an AI agent.
+
 ## Security Boundaries
 
 Contributions are subject to different review processes based on the security level of the code:
