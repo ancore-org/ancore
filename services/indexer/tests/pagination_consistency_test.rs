@@ -3,7 +3,6 @@
 /// These tests verify that the cursor-based pagination implementation
 /// handles edge cases correctly, maintains consistency across pagination requests,
 /// and properly detects next/previous page availability.
-
 use axum::{
     body::{Body, Bytes},
     http::{Request, StatusCode},
@@ -143,7 +142,9 @@ async fn test_pagination_no_record_duplication_forward() {
             collected_ids.push(id_str.to_string());
         }
 
-        cursor = json["pagination"]["next_cursor"].as_str().map(|s| s.to_string());
+        cursor = json["pagination"]["next_cursor"]
+            .as_str()
+            .map(|s| s.to_string());
 
         if !json["pagination"]["has_next_page"].as_bool().unwrap() {
             break;
@@ -151,7 +152,10 @@ async fn test_pagination_no_record_duplication_forward() {
     }
 
     // Verify no duplicates
-    let unique_count = collected_ids.iter().collect::<std::collections::HashSet<_>>().len();
+    let unique_count = collected_ids
+        .iter()
+        .collect::<std::collections::HashSet<_>>()
+        .len();
     assert_eq!(
         collected_ids.len(),
         unique_count,
@@ -159,7 +163,12 @@ async fn test_pagination_no_record_duplication_forward() {
     );
 
     // Verify we got all records
-    assert_eq!(collected_ids.len(), 30, "Expected 30 records, got {}", collected_ids.len());
+    assert_eq!(
+        collected_ids.len(),
+        30,
+        "Expected 30 records, got {}",
+        collected_ids.len()
+    );
 }
 
 #[tokio::test]
@@ -219,7 +228,10 @@ async fn test_pagination_exactly_limit_records() {
     let response = app
         .oneshot(
             Request::builder()
-                .uri(&format!("/api/v1/accounts/{}/activity?limit=20", account_id))
+                .uri(&format!(
+                    "/api/v1/accounts/{}/activity?limit=20",
+                    account_id
+                ))
                 .body(Body::empty())
                 .unwrap(),
         )
@@ -262,7 +274,10 @@ async fn test_pagination_one_more_than_limit() {
     let response = app
         .oneshot(
             Request::builder()
-                .uri(&format!("/api/v1/accounts/{}/activity?limit=20", account_id))
+                .uri(&format!(
+                    "/api/v1/accounts/{}/activity?limit=20",
+                    account_id
+                ))
                 .body(Body::empty())
                 .unwrap(),
         )
@@ -342,7 +357,10 @@ async fn test_pagination_backward_with_cursor_before() {
     let prev_cursor = json2["pagination"]["prev_cursor"].as_str();
 
     // Go back to previous page using prev_cursor
-    assert!(prev_cursor.is_some(), "prev_cursor should be present on page 2");
+    assert!(
+        prev_cursor.is_some(),
+        "prev_cursor should be present on page 2"
+    );
     let prev_cursor = prev_cursor.unwrap();
 
     let response3 = app
@@ -385,8 +403,22 @@ async fn test_filter_activity_type_and_asset() {
 
     // Insert mixed records
     insert_test_activity(&pool, account_id, "payment", 100, base_time).await;
-    insert_test_activity(&pool, account_id, "trade", 101, base_time + chrono::Duration::hours(1)).await;
-    insert_test_activity(&pool, account_id, "payment", 102, base_time + chrono::Duration::hours(2)).await;
+    insert_test_activity(
+        &pool,
+        account_id,
+        "trade",
+        101,
+        base_time + chrono::Duration::hours(1),
+    )
+    .await;
+    insert_test_activity(
+        &pool,
+        account_id,
+        "payment",
+        102,
+        base_time + chrono::Duration::hours(2),
+    )
+    .await;
 
     let uri = format!(
         "/api/v1/accounts/{}/activity?activity_type=payment",
@@ -674,7 +706,10 @@ async fn test_limit_max_boundary() {
     let response = app
         .oneshot(
             Request::builder()
-                .uri(&format!("/api/v1/accounts/{}/activity?limit=100", account_id))
+                .uri(&format!(
+                    "/api/v1/accounts/{}/activity?limit=100",
+                    account_id
+                ))
                 .body(Body::empty())
                 .unwrap(),
         )
@@ -716,7 +751,10 @@ async fn test_limit_exceeds_max_clamped() {
     let response = app
         .oneshot(
             Request::builder()
-                .uri(&format!("/api/v1/accounts/{}/activity?limit=500", account_id))
+                .uri(&format!(
+                    "/api/v1/accounts/{}/activity?limit=500",
+                    account_id
+                ))
                 .body(Body::empty())
                 .unwrap(),
         )

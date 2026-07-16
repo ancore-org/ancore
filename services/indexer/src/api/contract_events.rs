@@ -7,9 +7,7 @@ use sqlx::PgPool;
 use uuid::Uuid;
 
 use crate::error::Result;
-use crate::schema::contract_event::{
-    ContractEvent, ContractEventFilter,
-};
+use crate::schema::contract_event::{ContractEvent, ContractEventFilter};
 
 /// Query parameters for contract events list endpoint.
 #[derive(Debug, Deserialize)]
@@ -65,11 +63,13 @@ pub async fn list_handler(
         offset: params.offset,
     };
 
-    let events =
-        crate::repositories::contract_events::get_contract_events(&db, &filter).await?;
+    let events = crate::repositories::contract_events::get_contract_events(&db, &filter).await?;
 
     let count = events.len();
-    Ok(Json(ContractEventsListResponse { data: events, count }))
+    Ok(Json(ContractEventsListResponse {
+        data: events,
+        count,
+    }))
 }
 
 /// Get a single contract event by ID.
@@ -82,8 +82,7 @@ pub async fn get_by_id_handler(
     })?;
 
     let event =
-        crate::repositories::contract_events::get_contract_event_by_id(&db, &event_uuid)
-            .await?;
+        crate::repositories::contract_events::get_contract_event_by_id(&db, &event_uuid).await?;
 
     match event {
         Some(record) => Ok(Json(ContractEventResponse { data: record })),
@@ -97,9 +96,7 @@ pub async fn list_types_handler(
     Query(params): Query<ListContractEventsQuery>,
 ) -> Result<Json<ContractEventTypesResponse>> {
     let contract_address = params.contract.ok_or_else(|| {
-        crate::error::ApiError::InvalidFilter(
-            "contract query parameter is required".to_string(),
-        )
+        crate::error::ApiError::InvalidFilter("contract query parameter is required".to_string())
     })?;
 
     let types =

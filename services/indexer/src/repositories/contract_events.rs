@@ -8,10 +8,7 @@ const DEFAULT_LIMIT: u32 = 50;
 const MAX_LIMIT: u32 = 200;
 
 /// Insert a single contract event record.
-pub async fn insert_contract_event(
-    db: &PgPool,
-    params: &InsertContractEvent,
-) -> Result<Uuid> {
+pub async fn insert_contract_event(db: &PgPool, params: &InsertContractEvent) -> Result<Uuid> {
     let id = Uuid::new_v4();
     sqlx::query(
         "INSERT INTO contract_events \
@@ -36,10 +33,7 @@ pub async fn get_contract_events(
     db: &PgPool,
     filter: &ContractEventFilter,
 ) -> Result<Vec<ContractEvent>> {
-    let limit = filter
-        .limit
-        .unwrap_or(DEFAULT_LIMIT)
-        .clamp(1, MAX_LIMIT) as i64;
+    let limit = filter.limit.unwrap_or(DEFAULT_LIMIT).clamp(1, MAX_LIMIT) as i64;
 
     let mut query = sqlx::query_builder::QueryBuilder::new(
         "SELECT id, contract_address, event_type, ledger_seq, timestamp, tx_hash, data \
@@ -117,10 +111,7 @@ pub async fn get_contract_event_by_id(
 }
 
 /// Get distinct event types for a contract address.
-pub async fn get_contract_event_types(
-    db: &PgPool,
-    contract_address: &str,
-) -> Result<Vec<String>> {
+pub async fn get_contract_event_types(db: &PgPool, contract_address: &str) -> Result<Vec<String>> {
     let rows = sqlx::query(
         "SELECT DISTINCT event_type FROM contract_events \
          WHERE contract_address = $1 ORDER BY event_type",

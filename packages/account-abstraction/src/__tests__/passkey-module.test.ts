@@ -31,10 +31,8 @@ import {
  */
 function buildSpki(x: Uint8Array, y: Uint8Array): ArrayBuffer {
   const header = new Uint8Array([
-    0x30, 0x59, 0x30, 0x13,
-    0x06, 0x07, 0x2a, 0x86, 0x48, 0xce, 0x3d, 0x02, 0x01,
-    0x06, 0x08, 0x2a, 0x86, 0x48, 0xce, 0x3d, 0x03, 0x01, 0x07,
-    0x03, 0x42, 0x00, 0x04,
+    0x30, 0x59, 0x30, 0x13, 0x06, 0x07, 0x2a, 0x86, 0x48, 0xce, 0x3d, 0x02, 0x01, 0x06, 0x08, 0x2a,
+    0x86, 0x48, 0xce, 0x3d, 0x03, 0x01, 0x07, 0x03, 0x42, 0x00, 0x04,
   ]);
   const out = new Uint8Array(header.length + 64);
   out.set(header);
@@ -50,10 +48,7 @@ function buildSpki(x: Uint8Array, y: Uint8Array): ArrayBuffer {
 function buildDerSig(r: Uint8Array, s: Uint8Array, padR = false, padS = false): ArrayBuffer {
   const rBytes = padR ? new Uint8Array([0x00, ...r]) : r;
   const sBytes = padS ? new Uint8Array([0x00, ...s]) : s;
-  const inner = new Uint8Array([
-    0x02, rBytes.length, ...rBytes,
-    0x02, sBytes.length, ...sBytes,
-  ]);
+  const inner = new Uint8Array([0x02, rBytes.length, ...rBytes, 0x02, sBytes.length, ...sBytes]);
   return new Uint8Array([0x30, inner.length, ...inner]).buffer;
 }
 
@@ -68,12 +63,14 @@ const mockS = new Uint8Array(32).fill(0x22);
 const mockAuthData = new Uint8Array([0xde, 0xad, 0xbe, 0xef]);
 const mockClientDataJSON = new Uint8Array(new TextEncoder().encode('{"type":"webauthn.get"}'));
 
-function makeRegistrationCredential(overrides: Partial<{ spki: ArrayBuffer | null; rawId: ArrayBuffer }> = {}) {
+function makeRegistrationCredential(
+  overrides: Partial<{ spki: ArrayBuffer | null; rawId: ArrayBuffer }> = {}
+) {
   return {
     type: 'public-key',
     rawId: overrides.rawId ?? mockRawId.buffer,
     response: {
-      getPublicKey: () => overrides.spki !== undefined ? overrides.spki : buildSpki(mockX, mockY),
+      getPublicKey: () => (overrides.spki !== undefined ? overrides.spki : buildSpki(mockX, mockY)),
     },
   };
 }
@@ -373,7 +370,9 @@ describe('signRelayPayload', () => {
       writable: true,
     });
 
-    await expect(signRelayPayload(unsignedPayload, 'AQID')).rejects.toThrow(PasskeyNotSupportedError);
+    await expect(signRelayPayload(unsignedPayload, 'AQID')).rejects.toThrow(
+      PasskeyNotSupportedError
+    );
 
     Object.defineProperty(globalThis, 'navigator', {
       value: original,

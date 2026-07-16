@@ -442,12 +442,12 @@ mod tests {
         let id = Uuid::new_v4();
 
         let encoded = encode_cursor(created_at, id);
-        
+
         // Should be base64url (no '+', '/', or '=' padding)
         assert!(!encoded.contains('+'));
         assert!(!encoded.contains('/'));
         assert!(!encoded.contains('='));
-        
+
         // Should be decodable
         assert!(decode_cursor(&encoded).is_ok());
     }
@@ -487,7 +487,9 @@ mod tests {
         let decoded = decode_cursor(&encoded).unwrap();
 
         // Verify timezone offset preserved in RFC 3339 format
-        assert!(decoded.t.ends_with('Z') || decoded.t.contains('+') || decoded.t.contains("-00:00"));
+        assert!(
+            decoded.t.ends_with('Z') || decoded.t.contains('+') || decoded.t.contains("-00:00")
+        );
     }
 
     // ── Limit validation ──────────────────────────────────────────────────────
