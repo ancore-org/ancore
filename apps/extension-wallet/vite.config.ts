@@ -57,6 +57,11 @@ export default defineConfig({
     global: 'globalThis',
   },
   optimizeDeps: {
+    // Force eager pre-bundling so these are ready before the first request that
+    // needs them (e.g. clicking "Create wallet"). Left to lazy/on-demand discovery,
+    // Vite can serve that first request mid-optimization and throw "Buffer is not
+    // defined" from the not-yet-patched bip39 chunk.
+    include: ['bip39', '@noble/hashes/hmac', '@noble/hashes/sha2', 'buffer'],
     exclude: ['ed25519-hd-key', '@ledgerhq/hw-transport-webhid'],
     esbuildOptions: {
       define: {

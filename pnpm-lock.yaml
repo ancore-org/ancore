@@ -83,6 +83,9 @@ importers:
       '@stellar/stellar-sdk':
         specifier: ^13.3.0
         version: 13.3.0
+      bip39:
+        specifier: ^3.1.0
+        version: 3.1.0
       buffer:
         specifier: '6'
         version: 6.0.3
@@ -389,6 +392,9 @@ importers:
       '@noble/hashes':
         specifier: '1'
         version: 1.8.0
+      bip39:
+        specifier: ^3.1.0
+        version: 3.1.0
       buffer:
         specifier: '6'
         version: 6.0.3

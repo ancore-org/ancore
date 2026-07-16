@@ -33,6 +33,7 @@
     "@blockaid/client": "^1.4.0",
     "@noble/hashes": "1",
     "@stellar/stellar-sdk": "^13.3.0",
+    "bip39": "^3.1.0",
     "buffer": "6",
     "date-fns": "^4.1.0",
     "i18next": "^24.2.3",

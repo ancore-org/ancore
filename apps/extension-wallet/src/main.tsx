@@ -1,3 +1,4 @@
+import './polyfills';
 import React from 'react';
 import ReactDOM from 'react-dom/client';
 import { NotificationProvider } from '@ancore/ui-kit';
