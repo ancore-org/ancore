@@ -23,7 +23,8 @@ This is a monorepo containing:
 ancore/
 ├── apps/                     # User-facing applications
 │   ├── extension-wallet/     # Browser extension wallet
-│   ├── mobile-wallet/        # React Native mobile app
+│   ├── mobile-wallet/        # React Native mobile library
+│   ├── mobile-app/           # RN host app scaffold (ios/android)
 │   └── web-dashboard/        # Web-based account management
 │
 ├── packages/                 # Public SDKs and libraries
@@ -33,6 +34,8 @@ ancore/
 │   ├── crypto/               # Cryptographic utilities
 │   ├── ui-kit/               # Shared UI components
 │   ├── types/                # Shared TypeScript types
+│   ├── wallet-shared/        # dApp protocol, networks, allowlist keys
+│   ├── wallet-api/           # npm SDK for dApps (@ancore/wallet-api)
 │   └── test-fixtures/        # Shared test fixtures for apps and services
 │
 ├── contracts/                # Soroban smart contracts

@@ -145,6 +145,14 @@ function fromBase64Url(b64url: string): Uint8Array {
   return bytes;
 }
 
+/**
+ * Copy into a standalone ArrayBuffer for WebAuthn `BufferSource` params.
+ * Avoids TS 5.9+ incompatibility between `Uint8Array<ArrayBufferLike>` and `BufferSource`.
+ */
+function toBufferSource(bytes: Uint8Array): ArrayBuffer {
+  return bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength) as ArrayBuffer;
+}
+
 /** Encode bytes to a lowercase hex string. */
 function toHex(bytes: Uint8Array): string {
   return Array.from(bytes, (b) => b.toString(16).padStart(2, '0')).join('');
@@ -270,13 +278,14 @@ export async function registerPasskey(
   } = options;
 
   const challenge = globalThis.crypto.getRandomValues(new Uint8Array(32));
+  const userId = new TextEncoder().encode(accountAddress);
 
   const creationOptions: CredentialCreationOptions = {
     publicKey: {
-      challenge,
+      challenge: toBufferSource(challenge),
       rp: { name: rpName, ...(rpId !== undefined && { id: rpId }) },
       user: {
-        id: new TextEncoder().encode(accountAddress),
+        id: toBufferSource(userId),
         name: userName,
         displayName: userName,
       },
@@ -355,12 +364,12 @@ export async function signRelayPayload(
 
   const requestOptions: CredentialRequestOptions = {
     publicKey: {
-      challenge,
+      challenge: toBufferSource(challenge),
       timeout,
       allowCredentials: [
         {
           type: 'public-key',
-          id: credentialIdBytes,
+          id: toBufferSource(credentialIdBytes),
           ...(transports !== undefined && { transports }),
         },
       ],

@@ -44,25 +44,19 @@ module.exports = [
         ecmaVersion: 2020,
         sourceType: 'module',
       },
+      // Browser + Node: PasskeyModule uses WebAuthn DOM APIs; rest of package is Node-friendly.
       globals: {
-        describe: 'readonly',
-        it: 'readonly',
-        expect: 'readonly',
-        beforeEach: 'readonly',
-        afterEach: 'readonly',
-        beforeAll: 'readonly',
-        afterAll: 'readonly',
-        jest: 'readonly',
-        Buffer: 'readonly',
-        console: 'readonly',
+        ...globals.browser,
+        ...globals.node,
+        ...jestGlobals,
+        ...nodeGlobals,
       },
-    },
-    plugins: {
-      '@typescript-eslint': tseslint,
     },
     plugins: { '@typescript-eslint': tseslint },
     rules: {
       ...tseslint.configs.recommended.rules,
+      // TypeScript resolves symbols/types; no-undef false-positives on DOM lib types.
+      'no-undef': 'off',
       '@typescript-eslint/no-unused-vars': ['warn', { argsIgnorePattern: '^_' }],
     },
   },

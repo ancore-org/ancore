@@ -53,6 +53,9 @@ temp/
 __pycache__/
 *.py[cod]
 
+# Generated security-audit evidence (see tools/security-audit.js)
+.audit-evidence/
+
 # Secrets
 *.key
 *.pem

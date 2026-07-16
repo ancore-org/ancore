@@ -46,7 +46,8 @@ The main architecture modules are organized as a monorepo. This tree intentional
 ancore/
 ├── apps/                     # User-facing applications
 │   ├── extension-wallet/     # Browser extension wallet
-│   ├── mobile-wallet/        # React Native mobile app
+│   ├── mobile-wallet/        # React Native mobile library
+│   ├── mobile-app/           # RN host app scaffold (ios/android)
 │   └── web-dashboard/        # Web-based account management
 │
 ├── packages/                 # Public SDKs and libraries
@@ -56,8 +57,8 @@ ancore/
 │   ├── crypto/               # Cryptographic utilities
 │   ├── ui-kit/               # Shared UI components
 │   ├── types/                # Shared TypeScript types
-│   ├── wallet-shared/      # dApp protocol, networks, allowlist keys
-│   ├── wallet-api/         # npm SDK for dApps (@ancore/wallet-api)
+│   ├── wallet-shared/        # dApp protocol, networks, allowlist keys
+│   ├── wallet-api/           # npm SDK for dApps (@ancore/wallet-api)
 │   └── test-fixtures/        # Shared test fixtures for apps and services
 │
 ├── contracts/                # Soroban smart contracts
@@ -256,22 +257,24 @@ Optional relayer network for:
 
 ## Implementation Status
 
+> **Last verified:** 2026-07-16 against current `main`. Prefer this table over older roadmap checkmarks until `docs/ROADMAP.md` is fully re-synced.
+
 | Component | Status | Notes |
 |-----------|--------|-------|
-| Smart account contract | ✅ Implemented | Audit pending — not production-ready |
-| Session keys (contract) | ✅ Implemented | Permission scoping (#831, #832) in progress |
-| AA SDK (TypeScript) | ✅ Implemented | relay-payload, transaction-builder, xdr-utils |
-| Extension vault + lock | ✅ Implemented | AES-GCM, PBKDF2, inactivity lock |
-| Extension onboarding | ⚠️ Demo path only | Real keygen (#815), contract deploy (#817) needed |
-| Extension send flow | ⚠️ Mock only | Real sign + relayer submit (#820) needed |
-| Extension dApp API | ❌ Stub | Content script (#808), wallet-api (#827) needed |
-| Approval UX routes | ❌ Missing | grant-access (#810), sign-transaction (#767) needed |
-| WebAuthn / Passkey | ❌ Not started | Design doc (#869), PasskeyModule (#859) planned |
-| Relayer security | ❌ Stub | Ed25519 verify (#854), nonce DB (#853) needed |
-| AI agent LLM | ❌ No LLM | Claude Haiku wiring (#836) planned |
-| Mobile WalletConnect | ❌ Not initialized | WalletKit init (#839) needed |
-| Mobile native apps | ❌ Library only | iOS (#848), Android (#849) planned |
-| Indexer contract events | ❌ Missing | Soroban event decoder (#856) planned |
+| Smart account contract | ✅ Implemented | Core account + session keys; external audit still required for mainnet |
+| Session keys (contract) | ✅ Implemented | `allowed_contracts` / spend limits / validation-module hooks landed; UI wiring still partial |
+| AA SDK (TypeScript) | ✅ Implemented | AccountContract, execute, relay-payload, transaction-builder, PasskeyModule |
+| Extension vault + lock | ✅ Implemented | AES-GCM, PBKDF2, inactivity lock, unlock rate limit |
+| Extension onboarding | 🔄 Partial | Vault-backed `OnboardingFlow` + deploy path exist; dual/demo unlock residual remains |
+| Extension send flow | 🔄 Partial | Production `SendService` + background `SIGN_TRANSACTION`; fee estimate simplified; e2e testnet path not fully gated |
+| Extension dApp API | 🔄 Partial | Content script, `@ancore/wallet-api`, allowlist, grant-access, sign handlers present; some MVP mocks remain |
+| Approval UX routes | ✅ Implemented | grant-access / sign / session-key approval + side panel setting |
+| WebAuthn / Passkey | 🔄 SDK present | `PasskeyModule` in account-abstraction; full onboarding UX not productized |
+| Relayer security | 🔄 Partial | Real submit path + optional mock via `RELAYER_USE_MOCK_SUBMISSION`; rate limiting present |
+| AI agent LLM | ⚠️ Draft MVP | Health + draft-intent only; no autonomous execution |
+| Mobile WalletConnect | 🔄 Partial | Deep link / handlers scaffolded; mobile sign service still mock |
+| Mobile native apps | 🔄 Scaffold | `mobile-wallet` library + `mobile-app` RN host (ios/android); not store-ready |
+| Indexer contract events | 🔄 Partial | Contract events API / activity endpoints present; keep hardening vs product docs |
 
 ## Roadmap Summary
 

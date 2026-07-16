@@ -2,10 +2,10 @@
 
 > **Purpose:** Learn from [Freighter extension](https://github.com/stellar/freighter) and [Freighter Mobile](https://github.com/stellar/freighter-mobile) — SDF’s production Stellar wallets — and document what Ancore should adopt, what it already does well, and what is incorrectly or incompletely implemented today.
 >
-> **Last reviewed:** 2026-06-16  
+> **Last reviewed:** 2026-07-16 (status pass; detail sections below may still lag)  
 > **Freighter extension reference:** v5.42.x (`master`)  
 > **Freighter mobile reference:** v1.19.x (`main`)  
-> **Ancore reference:** `apps/extension-wallet`, `apps/mobile-wallet`, `packages/core-sdk`
+> **Ancore reference:** `apps/extension-wallet`, `apps/mobile-wallet`, `apps/mobile-app`, `packages/core-sdk`
 
 ---
 
@@ -14,11 +14,11 @@
 | Dimension | Freighter (prod) | Ancore (today) |
 |-----------|------------------|----------------|
 | **Account model** | Classic Stellar accounts (G-address) + Soroban | **Smart account (Soroban contract)** + session keys — different product layer |
-| **Extension dApp API** | `@stellar/freighter-api` + content script | **Missing** — no content script, no injected API |
-| **Signing** | Background-only; real XDR sign + Horizon/RPC submit | **Mostly mock/demo** in send path; partial session-key contract ops |
-| **Mobile maturity** | Full RN app, stores, WC v2, Maestro e2e | **Library shell** — vault/history scaffold, no full app store release |
+| **Extension dApp API** | `@stellar/freighter-api` + content script | **Partial** — content script + `@ancore/wallet-api` + allowlist/approval; some MVP mocks remain |
+| **Signing** | Background-only; real XDR sign + Horizon/RPC submit | **Partial** — background `SIGN_TRANSACTION` + production SendService; fee/e2e gaps; demo residual |
+| **Mobile maturity** | Full RN app, stores, WC v2, Maestro e2e | **Library + host scaffold** (`mobile-app`); WC handlers still mock-signed |
 | **Backend** | Freighter backend V1/V2 (balances, sim, discovery) | Ancore relayer + indexer (different architecture) |
-| **Security extras** | Blockaid, allowlist, side panel, 24h session | CSP, rate-limited unlock, transfer policy — **no tx scanning, no site allowlist** |
+| **Security extras** | Blockaid, allowlist, side panel, 24h session | CSP, rate-limited unlock, transfer policy, site allowlist present; Blockaid / full parity still incomplete |
 
 **Strategic note:** Ancore is not a Freighter clone — it adds **account abstraction** (session keys, smart account contract, relayer). Freighter patterns still apply for **wallet UX, security, dApp connectivity, and release engineering**. Adopt Freighter’s *standards*; keep Ancore’s *AA differentiation*.
 
