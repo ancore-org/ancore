@@ -1,3 +1,10 @@
 {
-  "advisories": []
+  "advisories": [
+    {
+      "id": "1123525",
+      "issue": "https://github.com/ancore-org/ancore/issues/977",
+      "justification": "vite: server.fs.deny bypass on Windows alternate paths. Dev-server-only issue, not present in production builds; the fix requires a Vite 5->6 major upgrade across every app in the monorepo (no 5.x backport exists). Tracked for that migration.",
+      "expires": "2026-10-15T00:00:00.000Z"
+    }
+  ]
 }
