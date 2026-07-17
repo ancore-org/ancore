@@ -12,12 +12,12 @@ doctest = false
 soroban-sdk.workspace = true
 
 [target.'cfg(not(target_family = "wasm"))'.dependencies]
-ed25519-dalek = "2.1.1"
+ed25519-dalek = "3.0.0"
 
 [dev-dependencies]
 soroban-sdk = { workspace = true, features = ["testutils"] }
-ed25519-dalek = { version = "2.1.0", features = ["rand_core"] }
-rand = "0.8.5"
+ed25519-dalek = { version = "3.0.0", features = ["rand_core"] }
+rand = "0.10.2"
 
 [features]
 testutils = ["soroban-sdk/testutils"]
