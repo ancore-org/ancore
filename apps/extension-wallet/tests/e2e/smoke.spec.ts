@@ -46,8 +46,8 @@ test.describe('Extension release-candidate smoke @smoke', () => {
 
     await page.getByRole('link', { name: /Send funds/i }).click();
     await expect(page).toHaveURL(/\/send/);
-    await expect(page.getByLabel('Recipient')).toBeVisible();
-    await expect(page.getByLabel('Amount')).toBeVisible();
+    await expect(page.getByLabel('To')).toBeVisible();
+    await expect(page.getByRole('button', { name: /Use Max/i })).toBeVisible();
 
     await navigateTo(page, '/home');
     await page.getByRole('link', { name: /Receive funds/i }).click();
@@ -65,12 +65,14 @@ test.describe('Extension release-candidate smoke @smoke', () => {
     await seedWallet('onboarded-unlocked');
     await navigateTo(page, '/session-keys');
 
-    await expect(page.getByRole('heading', { name: 'Session Keys' })).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'Session Keys', exact: true })).toBeVisible();
     await expect(page.getByText('Active Keys')).toBeVisible();
-    await expect(page.getByRole('button', { name: /Add session key/i })).toBeVisible();
+    await expect(page.getByRole('button', { name: /Add session key/i }).first()).toBeVisible();
 
     await clearWallet();
-    await page.goto('/session-keys', { waitUntil: 'domcontentloaded' });
+    // reload (not goto) — the page is already on this exact URL, so a goto to the
+    // same hash is a same-document no-op and never re-runs clearWallet's init script.
+    await page.reload({ waitUntil: 'domcontentloaded' });
     await waitForAppReady(page);
     await expect(page).not.toHaveURL(/\/session-keys$/);
   });

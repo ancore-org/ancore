@@ -131,6 +131,9 @@ export async function waitForAppReady(page: Page): Promise<void> {
 }
 
 export async function navigateTo(page: Page, path: string): Promise<void> {
-  await page.goto(path, { waitUntil: 'domcontentloaded' });
+  // The app uses HashRouter in dev (see router/index.tsx), so app routes live
+  // under the URL hash — a plain pathname navigation never reaches them and
+  // silently falls back to whatever route has no hash (e.g. /home).
+  await page.goto(`/#${path}`, { waitUntil: 'domcontentloaded' });
   await waitForAppReady(page);
 }
