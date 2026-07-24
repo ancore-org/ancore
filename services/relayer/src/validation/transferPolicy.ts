@@ -1,5 +1,6 @@
 import { validateTransferPolicy, type TransferPolicy } from '@ancore/types';
 import type { RelayError } from '../types';
+import { transferPolicyBlockCode } from '../types/errorCodes';
 
 export interface TransferValidationContext {
   amount: number;
@@ -26,7 +27,11 @@ export function validateTransferPolicyConstraints(
     return {
       valid: false,
       error: {
-        code: 'TRANSFER_LIMIT_EXCEEDED',
+        code: transferPolicyBlockCode(
+          context.amount,
+          context.todayTotal,
+          context.policy.dailyLimit
+        ),
         message: result.message,
       },
     };

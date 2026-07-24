@@ -2,15 +2,10 @@
  * Typed response interfaces for the Relayer Service.
  */
 
-export type RelayErrorCode =
-  | 'INVALID_SIGNATURE'
-  | 'SESSION_KEY_EXPIRED'
-  | 'NONCE_REPLAY'
-  | 'GAS_LIMIT_EXCEEDED'
-  | 'SIMULATION_FAILED'
-  | 'TRANSFER_LIMIT_EXCEEDED'
-  | 'UNAUTHORIZED'
-  | 'INTERNAL_ERROR';
+import type { RelayErrorCode } from './errorCodes';
+
+export { RelayErrorCodes, transferPolicyBlockCode } from './errorCodes';
+export type { RelayErrorCode };
 
 export interface RelayError {
   code: RelayErrorCode;

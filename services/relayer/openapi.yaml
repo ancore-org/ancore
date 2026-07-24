@@ -502,6 +502,9 @@ components:
             - NONCE_REPLAY
             - GAS_LIMIT_EXCEEDED
             - SIMULATION_FAILED
+            - TRANSFER_LIMIT_EXCEEDED
+            - POLICY_DENIED
+            - RPC_DOWN
             - UNAUTHORIZED
             - INTERNAL_ERROR
           description: Machine-readable error code

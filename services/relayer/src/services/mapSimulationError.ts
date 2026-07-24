@@ -1,4 +1,5 @@
 import type { RelayError } from '../types';
+import { RelayErrorCodes } from '../types/errorCodes';
 
 /**
  * Map Soroban simulation failures to typed relay errors.
@@ -21,7 +22,7 @@ export function mapSimulationError(error: unknown): RelayError | null {
     haystack.includes('budget exceeded') ||
     haystack.includes('out of gas')
   ) {
-    return { code: 'GAS_LIMIT_EXCEEDED', message };
+    return { code: RelayErrorCodes.GAS_LIMIT_EXCEEDED, message };
   }
 
   if (
@@ -31,7 +32,7 @@ export function mapSimulationError(error: unknown): RelayError | null {
     haystack.includes('invokehostfunction') ||
     haystack.includes('insufficient balance')
   ) {
-    return { code: 'SIMULATION_FAILED', message };
+    return { code: RelayErrorCodes.SIMULATION_FAILED, message };
   }
 
   return null;

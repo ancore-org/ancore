@@ -91,6 +91,36 @@ describe('RelayService', () => {
       expect(result.error?.code).toBe('NONCE_REPLAY');
       expect(result.error?.message).toBe('Nonce already used');
     });
+
+    it('returns TRANSFER_LIMIT_EXCEEDED when the daily limit is breached', async () => {
+      const svc = new RelayService(makeSignatureService(true));
+      const result = await svc.validateRelay(
+        makeRequest({
+          transferPolicy: {
+            policy: { dailyLimit: 100, stepUpThreshold: 250 },
+            amount: 60,
+            todayTotal: 50,
+          },
+        })
+      );
+      expect(result.valid).toBe(false);
+      expect(result.error?.code).toBe('TRANSFER_LIMIT_EXCEEDED');
+    });
+
+    it('returns POLICY_DENIED for policy blocks that are not limit breaches', async () => {
+      const svc = new RelayService(makeSignatureService(true));
+      const result = await svc.validateRelay(
+        makeRequest({
+          transferPolicy: {
+            policy: { dailyLimit: 100, stepUpThreshold: 50 },
+            amount: 0,
+            todayTotal: 0,
+          },
+        })
+      );
+      expect(result.valid).toBe(false);
+      expect(result.error?.code).toBe('POLICY_DENIED');
+    });
   });
 
   describe('executeRelay', () => {
@@ -154,7 +184,7 @@ describe('RelayService', () => {
       expect(result.gasUsed).toBe(0);
     });
 
-    it('maps submitter network errors to typed relay errors', async () => {
+    it('maps submitter network errors to RPC_DOWN', async () => {
       const submitter = makeSubmitter({
         submitSignedTransaction: jest.fn().mockRejectedValue(new NetworkError('Horizon down')),
       });
@@ -164,7 +194,7 @@ describe('RelayService', () => {
       );
 
       expect(result.success).toBe(false);
-      expect(result.error?.code).toBe('INTERNAL_ERROR');
+      expect(result.error?.code).toBe('RPC_DOWN');
       expect(result.error?.message).toBe('Horizon down');
     });
 

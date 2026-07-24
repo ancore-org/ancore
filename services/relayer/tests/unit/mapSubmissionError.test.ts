@@ -26,11 +26,22 @@ describe('mapSubmissionError', () => {
     });
   });
 
-  it('maps network errors to INTERNAL_ERROR', () => {
+  it('maps network errors to RPC_DOWN', () => {
     const error = new NetworkError('Horizon unreachable');
     expect(mapSubmissionError(error)).toEqual({
-      code: 'INTERNAL_ERROR',
+      code: 'RPC_DOWN',
       message: 'Horizon unreachable',
+    });
+  });
+
+  it('maps network-shaped generic errors to RPC_DOWN', () => {
+    expect(mapSubmissionError(new Error('fetch failed'))).toEqual({
+      code: 'RPC_DOWN',
+      message: 'fetch failed',
+    });
+    expect(mapSubmissionError(new Error('connect ECONNREFUSED 127.0.0.1:8000'))).toEqual({
+      code: 'RPC_DOWN',
+      message: 'connect ECONNREFUSED 127.0.0.1:8000',
     });
   });
 
