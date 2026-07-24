@@ -2469,4 +2469,56 @@ mod test {
         client.remove_owner(&owner3);
         assert_eq!(client.get_threshold(), Some(2));
     }
+
+    #[test]
+    fn test_register_multiple_modules() {
+        let env = Env::default();
+        let contract_id = env.register_contract(None, AncoreAccount);
+        let client = AncoreAccountClient::new(&env, &contract_id);
+
+        let owner = Address::generate(&env);
+        init(&env, &client, &owner);
+        env.mock_all_auths();
+
+        let module1 = Address::generate(&env);
+        let module2 = Address::generate(&env);
+
+        client.register_module(&module1);
+        client.register_module(&module2);
+
+        let modules = client.get_modules();
+        assert_eq!(modules.len(), 2);
+        assert!(modules.contains(&module1));
+        assert!(modules.contains(&module2));
+    }
+
+    #[test]
+    fn test_unregister_nonexistent_module_is_noop() {
+        let env = Env::default();
+        let contract_id = env.register_contract(None, AncoreAccount);
+        let client = AncoreAccountClient::new(&env, &contract_id);
+
+        let owner = Address::generate(&env);
+        init(&env, &client, &owner);
+        env.mock_all_auths();
+
+        let module = Address::generate(&env);
+        client.unregister_module(&module);
+
+        assert_eq!(client.get_modules().len(), 0);
+    }
+
+    #[test]
+    fn test_get_modules_empty_by_default() {
+        let env = Env::default();
+        let contract_id = env.register_contract(None, AncoreAccount);
+        let client = AncoreAccountClient::new(&env, &contract_id);
+
+        let owner = Address::generate(&env);
+        init(&env, &client, &owner);
+        env.mock_all_auths();
+
+        let modules = client.get_modules();
+        assert_eq!(modules.len(), 0);
+    }
 }
