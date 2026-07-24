@@ -1,0 +1,37 @@
+name: Contract Fuzzing
+
+on:
+  schedule:
+    - cron: '23 3 * * *' # Nightly
+  workflow_dispatch:
+
+jobs:
+  fuzz:
+    name: cargo-fuzz ${{ matrix.target }}
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        target: [execute_args, add_session_key, spend_limits]
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install nightly toolchain
+        uses: dtolnay/rust-toolchain@nightly
+
+      - name: Install cargo-fuzz
+        run: cargo install --locked cargo-fuzz
+
+      - name: Fuzz for 15 minutes
+        working-directory: contracts/account
+        run: >-
+          cargo fuzz run ${{ matrix.target }} --
+          -max_total_time=900 -timeout=30 -rss_limit_mb=4096
+
+      - name: Upload crash artifacts
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: fuzz-crashes-${{ matrix.target }}
+          path: contracts/account/fuzz/artifacts/${{ matrix.target }}/
+          if-no-files-found: ignore

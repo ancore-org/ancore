@@ -17,6 +17,7 @@ storybook-static/
 target/
 Cargo.lock
 !contracts/Cargo.lock
+!contracts/account/fuzz/Cargo.lock
 **/*.rs.bk
 
 # Testing
@@ -86,3 +87,6 @@ implementation.md
 submission_details.md
 brief.md
 checks.md
+
+# Randomized proptest/cargo-fuzz snapshots change every run
+contracts/account/test_snapshots/property_tests/

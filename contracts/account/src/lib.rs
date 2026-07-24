@@ -2164,3 +2164,6 @@ mod test {
         assert_eq!(client.get_nonce(), 0);
     }
 }
+
+#[cfg(test)]
+mod property_tests;

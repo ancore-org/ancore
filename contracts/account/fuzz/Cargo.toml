@@ -1,0 +1,38 @@
+[package]
+name = "ancore-account-fuzz"
+version = "0.0.0"
+publish = false
+edition = "2021"
+
+[package.metadata]
+cargo-fuzz = true
+
+[workspace]
+
+[dependencies]
+libfuzzer-sys = "0.4"
+arbitrary = { version = "1", features = ["derive"] }
+soroban-sdk = { version = "21.7.0", features = ["testutils"] }
+ed25519-dalek = { version = "=2.2.0", features = ["rand_core"] }
+rand = "0.8.5"
+
+[dependencies.ancore-account]
+path = ".."
+
+[[bin]]
+name = "execute_args"
+path = "fuzz_targets/execute_args.rs"
+test = false
+doc = false
+
+[[bin]]
+name = "add_session_key"
+path = "fuzz_targets/add_session_key.rs"
+test = false
+doc = false
+
+[[bin]]
+name = "spend_limits"
+path = "fuzz_targets/spend_limits.rs"
+test = false
+doc = false

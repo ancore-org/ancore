@@ -128,6 +128,13 @@ Inner contract calls are dispatched using `env.invoke_contract(&to, &function, a
 - Since Soroban runs contract invocations in isolated VMs, the target contract cannot read or modify the account contract's storage directly.
 - The custom authorization verification path does not call `require_auth` on the session key inside the Soroban Auth Manager, meaning the session key's signature cannot be hijacked or forwarded to authenticate actions on other contracts that call back into the account contract.
 
+### 3. Continuous Fuzz Coverage
+The invariants in this section (nonce monotonicity, spend-limit enforcement,
+typed-error behavior of `add_session_key`) are continuously re-verified by
+the property suite and cargo-fuzz harness described in
+[fuzzing.md](./fuzzing.md); findings from that harness are triaged back into
+this audit process.
+
 ---
 
 ## Conclusion
