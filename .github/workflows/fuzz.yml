@@ -5,6 +5,9 @@ on:
     - cron: '23 3 * * *' # Nightly
   workflow_dispatch:
 
+permissions:
+  contents: read
+
 jobs:
   fuzz:
     name: cargo-fuzz ${{ matrix.target }}
@@ -15,6 +18,8 @@ jobs:
         target: [execute_args, add_session_key, spend_limits]
     steps:
       - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
 
       - name: Install nightly toolchain
         uses: dtolnay/rust-toolchain@nightly
