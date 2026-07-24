@@ -61,6 +61,8 @@ pub enum ContractError {
     ExceededSpendLimit = 17,
     /// Invalid spend policy configuration at session key registration
     InvalidSpendPolicy = 18,
+    /// Invalid threshold or owner configuration
+    InvalidThreshold = 19,
 }
 
 /// Event topic naming convention
@@ -108,6 +110,24 @@ mod events {
     pub fn session_key_ttl_refreshed(env: &Env) -> Symbol {
         Symbol::new(env, "session_key_ttl_refreshed")
     }
+
+    /// Event emitted when an owner is added.
+    /// Data: (new_owner: Address)
+    pub fn owner_added(env: &Env) -> Symbol {
+        Symbol::new(env, "owner_added")
+    }
+
+    /// Event emitted when an owner is removed.
+    /// Data: (removed_owner: Address)
+    pub fn owner_removed(env: &Env) -> Symbol {
+        Symbol::new(env, "owner_removed")
+    }
+
+    /// Event emitted when the threshold is changed.
+    /// Data: (new_threshold: u32)
+    pub fn threshold_changed(env: &Env) -> Symbol {
+        Symbol::new(env, "threshold_changed")
+    }
 }
 
 #[contracttype]
@@ -138,6 +158,12 @@ pub enum DataKey {
     SessionKey(BytesN<32>),
     Version,
     ValidationModules,
+    /// Multi-owner: list of all owners
+    Owners,
+    /// Multi-owner: required number of confirmations
+    Threshold,
+    /// Multi-owner: pending owner additions (address -> expiry timestamp)
+    PendingOwner(Address),
 }
 
 /// Caller authorization path for [`AncoreAccount::execute`].
@@ -585,6 +611,183 @@ impl AncoreAccount {
             .instance()
             .get(&DataKey::ValidationModules)
             .unwrap_or_else(|| Vec::new(&env))
+    }
+
+    // ─── Multi-owner threshold authorization ────────────────────────────────
+
+    /// Initialize multi-owner mode with a list of owners and threshold.
+    /// This migrates from single-owner to multi-owner mode.
+    /// Can only be called once; subsequent calls return AlreadyInitialized.
+    pub fn initialize_multi_owner(
+        env: Env,
+        owners: Vec<Address>,
+        threshold: u32,
+    ) -> Result<(), ContractError> {
+        if env.storage().instance().has(&DataKey::Owners) {
+            return Err(ContractError::AlreadyInitialized);
+        }
+
+        let owner = Self::get_owner(env.clone())?;
+        owner.require_auth();
+
+        if owners.is_empty() {
+            return Err(ContractError::InvalidThreshold);
+        }
+        if threshold == 0 || threshold > owners.len() {
+            return Err(ContractError::InvalidThreshold);
+        }
+
+        // Ensure all owners are unique
+        let mut seen = Vec::new(&env);
+        for o in owners.iter() {
+            if seen.contains(o.clone()) {
+                return Err(ContractError::InvalidThreshold);
+            }
+            seen.push_back(o);
+        }
+
+        env.storage().instance().set(&DataKey::Owners, &owners);
+        env.storage()
+            .instance()
+            .set(&DataKey::Threshold, &threshold);
+
+        env.storage()
+            .instance()
+            .extend_ttl(INSTANCE_BUMP_THRESHOLD, INSTANCE_BUMP_AMOUNT);
+
+        Ok(())
+    }
+
+    /// Get the list of owners.
+    pub fn get_owners(env: Env) -> Vec<Address> {
+        env.storage()
+            .instance()
+            .get(&DataKey::Owners)
+            .unwrap_or_else(|| Vec::new(&env))
+    }
+
+    /// Get the current threshold.
+    pub fn get_threshold(env: Env) -> Option<u32> {
+        env.storage().instance().get(&DataKey::Threshold)
+    }
+
+    /// Add an owner (requires existing owner auth).
+    /// The new owner is added immediately; threshold is not auto-adjusted.
+    pub fn add_owner(env: Env, new_owner: Address) -> Result<(), ContractError> {
+        let owner = Self::get_owner(env.clone())?;
+        owner.require_auth();
+
+        let mut owners: Vec<Address> = env
+            .storage()
+            .instance()
+            .get(&DataKey::Owners)
+            .unwrap_or_else(|| {
+                let mut v = Vec::new(&env);
+                v.push_back(owner);
+                v
+            });
+
+        if owners.contains(new_owner.clone()) {
+            return Err(ContractError::InvalidThreshold);
+        }
+
+        owners.push_back(new_owner.clone());
+        env.storage().instance().set(&DataKey::Owners, &owners);
+
+        env.storage()
+            .instance()
+            .extend_ttl(INSTANCE_BUMP_THRESHOLD, INSTANCE_BUMP_AMOUNT);
+
+        env.events()
+            .publish((events::owner_added(&env),), new_owner);
+
+        Ok(())
+    }
+
+    /// Remove an owner (requires existing owner auth).
+    /// Cannot remove the last owner. Threshold is auto-adjusted if it exceeds new count.
+    pub fn remove_owner(env: Env, owner_to_remove: Address) -> Result<(), ContractError> {
+        let owner = Self::get_owner(env.clone())?;
+        owner.require_auth();
+
+        let owners: Vec<Address> = env
+            .storage()
+            .instance()
+            .get(&DataKey::Owners)
+            .unwrap_or_else(|| {
+                let mut v = Vec::new(&env);
+                v.push_back(owner);
+                v
+            });
+
+        if !owners.contains(owner_to_remove.clone()) {
+            return Err(ContractError::InvalidThreshold);
+        }
+        if owners.len() <= 1 {
+            return Err(ContractError::InvalidThreshold);
+        }
+
+        let mut updated = Vec::new(&env);
+        for o in owners.iter() {
+            if o != owner_to_remove {
+                updated.push_back(o);
+            }
+        }
+
+        env.storage().instance().set(&DataKey::Owners, &updated);
+
+        // Auto-adjust threshold if it exceeds new owner count
+        if let Some(mut threshold) = Self::get_threshold(env.clone()) {
+            if threshold > updated.len() {
+                threshold = updated.len();
+                env.storage()
+                    .instance()
+                    .set(&DataKey::Threshold, &threshold);
+            }
+        }
+
+        env.storage()
+            .instance()
+            .extend_ttl(INSTANCE_BUMP_THRESHOLD, INSTANCE_BUMP_AMOUNT);
+
+        env.events()
+            .publish((events::owner_removed(&env),), owner_to_remove);
+
+        Ok(())
+    }
+
+    /// Set the threshold (requires existing owner auth).
+    /// Threshold must be > 0 and <= number of owners.
+    pub fn set_threshold(env: Env, new_threshold: u32) -> Result<(), ContractError> {
+        let owner = Self::get_owner(env.clone())?;
+        owner.require_auth();
+
+        let owners: Vec<Address> = env
+            .storage()
+            .instance()
+            .get(&DataKey::Owners)
+            .unwrap_or_else(|| {
+                let mut v = Vec::new(&env);
+                v.push_back(owner);
+                v
+            });
+
+        if new_threshold == 0 || new_threshold > owners.len() {
+            return Err(ContractError::InvalidThreshold);
+        }
+
+        env.storage()
+            .instance()
+            .set(&DataKey::Threshold, &new_threshold);
+
+        env.storage()
+            .instance()
+            .extend_ttl(INSTANCE_BUMP_THRESHOLD, INSTANCE_BUMP_AMOUNT);
+
+        env.events()
+            .publish((events::threshold_changed(&env),), new_threshold);
+
+        Ok(())
     }
 
     /// Upgrade the contract's WASM logic
@@ -2162,5 +2365,105 @@ mod test {
 
         assert!(matches!(result, Err(Ok(ContractError::ExceededSpendLimit))));
         assert_eq!(client.get_nonce(), 0);
+    }
+
+    #[test]
+    fn test_initialize_multi_owner() {
+        let env = Env::default();
+        let contract_id = env.register_contract(None, AncoreAccount);
+        let client = AncoreAccountClient::new(&env, &contract_id);
+
+        let owner = Address::generate(&env);
+        init(&env, &client, &owner);
+        env.mock_all_auths();
+
+        let owner2 = Address::generate(&env);
+        let owner3 = Address::generate(&env);
+        let mut owners = Vec::new(&env);
+        owners.push_back(owner.clone());
+        owners.push_back(owner2.clone());
+        owners.push_back(owner3.clone());
+
+        client.initialize_multi_owner(&owners, &2);
+
+        assert_eq!(client.get_owners().len(), 3);
+        assert_eq!(client.get_threshold(), Some(2));
+    }
+
+    #[test]
+    fn test_add_and_remove_owner() {
+        let env = Env::default();
+        let contract_id = env.register_contract(None, AncoreAccount);
+        let client = AncoreAccountClient::new(&env, &contract_id);
+
+        let owner = Address::generate(&env);
+        init(&env, &client, &owner);
+        env.mock_all_auths();
+
+        let owner2 = Address::generate(&env);
+        let owner3 = Address::generate(&env);
+        let mut owners = Vec::new(&env);
+        owners.push_back(owner.clone());
+        owners.push_back(owner2.clone());
+
+        client.initialize_multi_owner(&owners, &1);
+        assert_eq!(client.get_owners().len(), 2);
+
+        client.add_owner(&owner3);
+        assert_eq!(client.get_owners().len(), 3);
+
+        client.remove_owner(&owner2);
+        assert_eq!(client.get_owners().len(), 2);
+    }
+
+    #[test]
+    fn test_set_threshold() {
+        let env = Env::default();
+        let contract_id = env.register_contract(None, AncoreAccount);
+        let client = AncoreAccountClient::new(&env, &contract_id);
+
+        let owner = Address::generate(&env);
+        init(&env, &client, &owner);
+        env.mock_all_auths();
+
+        let owner2 = Address::generate(&env);
+        let owner3 = Address::generate(&env);
+        let mut owners = Vec::new(&env);
+        owners.push_back(owner.clone());
+        owners.push_back(owner2.clone());
+        owners.push_back(owner3.clone());
+
+        client.initialize_multi_owner(&owners, &1);
+        assert_eq!(client.get_threshold(), Some(1));
+
+        client.set_threshold(&2);
+        assert_eq!(client.get_threshold(), Some(2));
+
+        client.set_threshold(&3);
+        assert_eq!(client.get_threshold(), Some(3));
+    }
+
+    #[test]
+    fn test_remove_owner_auto_adjusts_threshold() {
+        let env = Env::default();
+        let contract_id = env.register_contract(None, AncoreAccount);
+        let client = AncoreAccountClient::new(&env, &contract_id);
+
+        let owner = Address::generate(&env);
+        init(&env, &client, &owner);
+        env.mock_all_auths();
+
+        let owner2 = Address::generate(&env);
+        let owner3 = Address::generate(&env);
+        let mut owners = Vec::new(&env);
+        owners.push_back(owner.clone());
+        owners.push_back(owner2.clone());
+        owners.push_back(owner3.clone());
+
+        client.initialize_multi_owner(&owners, &3);
+        assert_eq!(client.get_threshold(), Some(3));
+
+        client.remove_owner(&owner3);
+        assert_eq!(client.get_threshold(), Some(2));
     }
 }
