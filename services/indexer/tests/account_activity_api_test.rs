@@ -257,7 +257,42 @@ async fn integration_test_invalid_cursor_returns_400() {
     let body = response_body_bytes(response).await;
     let json: serde_json::Value = serde_json::from_slice(&body).unwrap();
 
-    assert_eq!(json["error"], "invalid_cursor");
+    assert_eq!(json["code"], "INVALID_CURSOR");
+}
+
+#[tokio::test]
+#[ignore]
+async fn integration_test_wellformed_cursor_with_garbage_fields_returns_400() {
+    let (app, _pool) = setup_test_app().await;
+
+    let account_id = "GABC1234567890ABCDEFGHIJKLMNOPQRSTUVWXYZ1234567890";
+
+    // Valid base64 + valid JSON shape, but `t` is not a timestamp and `i` is
+    // not a UUID. This used to pass cursor decoding and 500 on the Postgres
+    // (created_at, id) comparison.
+    use base64::Engine as _;
+    let cursor = base64::engine::general_purpose::URL_SAFE_NO_PAD
+        .encode(r#"{"t": "not-a-timestamp", "i": "not-a-uuid"}"#);
+
+    let response = app
+        .oneshot(
+            Request::builder()
+                .uri(&format!(
+                    "/api/v1/accounts/{}/activity?cursor_after={}",
+                    account_id, cursor
+                ))
+                .body(Body::empty())
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+
+    assert_eq!(response.status(), StatusCode::BAD_REQUEST);
+
+    let body = response_body_bytes(response).await;
+    let json: serde_json::Value = serde_json::from_slice(&body).unwrap();
+
+    assert_eq!(json["code"], "INVALID_CURSOR");
 }
 
 #[tokio::test]
@@ -285,7 +320,7 @@ async fn integration_test_both_cursors_returns_400() {
     let body = response_body_bytes(response).await;
     let json: serde_json::Value = serde_json::from_slice(&body).unwrap();
 
-    assert_eq!(json["error"], "invalid_filter");
+    assert_eq!(json["code"], "INVALID_FILTER");
 }
 
 #[tokio::test]

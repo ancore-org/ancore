@@ -128,18 +128,19 @@ pub struct PageResult<T> {
     pub prev_cursor: Option<String>,
 }
 
-/// Decoded cursor structure
+/// Decoded cursor structure. `t` and `i` are validated at decode time so a
+/// malformed cursor can never reach the query builder and surface as a 500.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 struct DecodedCursor {
-    t: String, // ISO8601 timestamp
-    i: String, // UUID as string
+    t: DateTime<Utc>, // keyset timestamp, RFC3339 on the wire
+    i: Uuid,          // keyset tie-breaker id
 }
 
 /// Encode cursor from created_at and id
 fn encode_cursor(created_at: DateTime<Utc>, id: Uuid) -> String {
     let cursor = DecodedCursor {
-        t: created_at.to_rfc3339(),
-        i: id.to_string(),
+        t: created_at,
+        i: id,
     };
     let json = serde_json::to_string(&cursor).expect("Failed to serialize cursor");
     base64::engine::general_purpose::URL_SAFE_NO_PAD.encode(json)
@@ -154,6 +155,8 @@ fn decode_cursor(cursor: &str) -> Result<DecodedCursor> {
     let json_str = std::str::from_utf8(&decoded)
         .map_err(|_| ApiError::InvalidCursor("Invalid UTF-8".to_string()))?;
 
+    // serde_json validates the full shape here: `t` must parse as an RFC3339
+    // timestamp and `i` as a UUID, otherwise decoding fails with a 400.
     let cursor_obj: DecodedCursor = serde_json::from_str(json_str)
         .map_err(|_| ApiError::InvalidCursor("Invalid JSON structure".to_string()))?;
 
@@ -201,21 +204,15 @@ pub async fn get_account_activity(
     // Apply cursor condition (keyset pagination)
     if let Some(ref decoded) = decoded_after {
         query.push(" AND (created_at, id) < (");
-        query.push_bind(decoded.t.clone());
+        query.push_bind(decoded.t);
         query.push(", ");
-        query.push_bind(
-            Uuid::parse_str(&decoded.i)
-                .map_err(|_| ApiError::InvalidCursor("Invalid UUID in cursor".to_string()))?,
-        );
+        query.push_bind(decoded.i);
         query.push(")");
     } else if let Some(ref decoded) = decoded_before {
         query.push(" AND (created_at, id) > (");
-        query.push_bind(decoded.t.clone());
+        query.push_bind(decoded.t);
         query.push(", ");
-        query.push_bind(
-            Uuid::parse_str(&decoded.i)
-                .map_err(|_| ApiError::InvalidCursor("Invalid UUID in cursor".to_string()))?,
-        );
+        query.push_bind(decoded.i);
         query.push(")");
     }
 
@@ -432,8 +429,8 @@ mod tests {
         let encoded = encode_cursor(created_at, id);
         let decoded = decode_cursor(&encoded).unwrap();
 
-        assert_eq!(decoded.t, created_at.to_rfc3339());
-        assert_eq!(decoded.i, id.to_string());
+        assert_eq!(decoded.t, created_at);
+        assert_eq!(decoded.i, id);
     }
 
     #[test]
@@ -486,10 +483,44 @@ mod tests {
         let encoded = encode_cursor(created_at, id);
         let decoded = decode_cursor(&encoded).unwrap();
 
-        // Verify timezone offset preserved in RFC 3339 format
-        assert!(
-            decoded.t.ends_with('Z') || decoded.t.contains('+') || decoded.t.contains("-00:00")
+        // Decoded value must round-trip to the exact same instant
+        assert_eq!(decoded.t, created_at);
+        let wire = decoded.t.to_rfc3339();
+        assert!(wire.ends_with('Z') || wire.contains('+') || wire.contains("-00:00"));
+    }
+
+    #[test]
+    fn test_decode_cursor_garbage_timestamp_returns_error() {
+        // Valid base64 + valid JSON shape, but `t` is not a timestamp. This
+        // used to pass decode and 500 on the Postgres comparison.
+        let garbage = base64::engine::general_purpose::URL_SAFE_NO_PAD
+            .encode(r#"{"t": "not-a-timestamp", "i": "550e8400-e29b-41d4-a716-446655440000"}"#);
+        assert!(decode_cursor(&garbage).is_err());
+
+        // Timestamp-shaped string with impossible values
+        let impossible = base64::engine::general_purpose::URL_SAFE_NO_PAD.encode(
+            r#"{"t": "2024-13-99T99:99:99Z", "i": "550e8400-e29b-41d4-a716-446655440000"}"#,
         );
+        assert!(decode_cursor(&impossible).is_err());
+    }
+
+    #[test]
+    fn test_decode_cursor_garbage_uuid_returns_error() {
+        // Valid base64 + valid JSON + valid timestamp, but `i` is not a UUID.
+        let garbage = base64::engine::general_purpose::URL_SAFE_NO_PAD
+            .encode(r#"{"t": "2024-01-15T10:30:00Z", "i": "not-a-uuid"}"#);
+        assert!(decode_cursor(&garbage).is_err());
+    }
+
+    #[test]
+    fn test_decode_cursor_accepts_offset_timestamps() {
+        // Clients may echo back a cursor serialized with a non-Z offset.
+        let offset = base64::engine::general_purpose::URL_SAFE_NO_PAD.encode(
+            r#"{"t": "2024-01-15T12:30:00+02:00", "i": "550e8400-e29b-41d4-a716-446655440000"}"#,
+        );
+        let decoded = decode_cursor(&offset).unwrap();
+        let expected = Utc.with_ymd_and_hms(2024, 1, 15, 10, 30, 0).unwrap();
+        assert_eq!(decoded.t, expected);
     }
 
     // ── Limit validation ──────────────────────────────────────────────────────
