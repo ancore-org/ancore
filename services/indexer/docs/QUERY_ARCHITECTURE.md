@@ -481,6 +481,9 @@ RUST_LOG=info,ancore_indexer=debug
 
 The `/health` endpoint exposes:
 - Indexer lag (blocks and estimated seconds)
+- Schema migration status (`schema_version`, `migrations_applied`,
+  `migrations_pending`) read from the `schema_migrations` table; the fields
+  are null and status is "degraded" until migration 005 has run
 - Database connectivity
 - Service availability
 
