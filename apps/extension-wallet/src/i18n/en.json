@@ -69,6 +69,29 @@
         "description": "Reveal your 12-word mnemonic"
       }
     },
+    "hardware": {
+      "label": "Hardware wallet",
+      "menuDescription": "Pair a Ledger and prefer on-device signing",
+      "title": "Hardware wallet",
+      "description": "Approve classic and owner-key operations on a Ledger so the seed never leaves the device. Session-key AA signing stays in the software vault.",
+      "webhidUnsupported": "WebHID is not available in this browser. Use Chrome or Edge with the unpacked extension build.",
+      "signerPreference": "Signer preference",
+      "software": "Software vault",
+      "ledger": "Ledger",
+      "ledgerActive": "Ledger",
+      "ownerOpsOnly": "Ledger signs owner / G-address ops only. Session keys continue to use the software vault.",
+      "accountIndex": "BIP-44 account index",
+      "pathHint": "Derivation path {{path}}",
+      "connect": "Connect Ledger",
+      "confirmOnDevice": "Confirm on your Ledger device…",
+      "paired": "Device paired",
+      "pairedDevice": "Paired device",
+      "address": "Address",
+      "path": "Path",
+      "appVersion": "App version",
+      "disconnect": "Forget device",
+      "invalidIndex": "Account index must be a non-negative integer"
+    },
     "privacy": {
       "telemetry": {
         "label": "Usage analytics",

@@ -31,6 +31,8 @@
     "@ancore/ui-kit": "workspace:*",
     "@ancore/wallet-shared": "workspace:*",
     "@blockaid/client": "^1.4.0",
+    "@ledgerhq/hw-app-str": "^7.7.4",
+    "@ledgerhq/hw-transport-webhid": "^6.29.3",
     "@noble/hashes": "1",
     "@stellar/stellar-sdk": "^13.3.0",
     "bip39": "^3.1.0",

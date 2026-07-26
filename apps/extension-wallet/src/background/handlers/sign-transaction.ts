@@ -5,6 +5,33 @@ import { getSigningKeypair } from '../signing-key';
 import { getSettingsState } from '@/stores/settings';
 import { NETWORK_PASSPHRASES, type StellarNetwork } from '@ancore/wallet-shared';
 
+const HARDWARE_STORE_KEY = 'ancore_hardware_wallet';
+
+interface PersistedHardwareState {
+  state?: {
+    signerMode?: 'software' | 'ledger';
+    ledgerPublicKey?: string;
+  };
+}
+
+async function isHardwareSignerPreferred(): Promise<boolean> {
+  try {
+    const chromeRef = (globalThis as { chrome?: typeof chrome }).chrome;
+    if (chromeRef?.storage?.local) {
+      const result = await new Promise<Record<string, unknown>>((resolve) => {
+        chromeRef.storage!.local.get(HARDWARE_STORE_KEY, resolve);
+      });
+      const raw = result[HARDWARE_STORE_KEY];
+      if (typeof raw !== 'string') return false;
+      const parsed = JSON.parse(raw) as PersistedHardwareState;
+      return parsed.state?.signerMode === 'ledger' && Boolean(parsed.state?.ledgerPublicKey);
+    }
+  } catch {
+    // Fall through to software signing.
+  }
+  return false;
+}
+
 export function registerSignTransactionHandlers(): void {
   registerHandler('SIGN_TRANSACTION', async ({ xdr, networkPassphrase }) => {
     if (!isBackgroundSessionUnlocked()) {
@@ -18,6 +45,16 @@ export function registerSignTransactionHandlers(): void {
     const expectedPassphrase = networkPassphrase ?? defaultPassphrase;
     if (activePassphrase && expectedPassphrase !== activePassphrase) {
       throw new Error('Network passphrase mismatch');
+    }
+
+    // Never export the software seed when Ledger is the preferred signer.
+    // WebHID signing must happen in the popup / approval document.
+    if (await isHardwareSignerPreferred()) {
+      return {
+        requiresHardware: true as const,
+        xdr,
+        networkPassphrase: expectedPassphrase,
+      };
     }
 
     const kp = await getSigningKeypair();

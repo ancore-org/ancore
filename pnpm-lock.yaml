@@ -80,6 +80,12 @@ importers:
       '@blockaid/client':
         specifier: ^1.4.0
         version: 1.4.0
+      '@ledgerhq/hw-app-str':
+        specifier: ^7.7.4
+        version: 7.7.4
+      '@ledgerhq/hw-transport-webhid':
+        specifier: ^6.29.3
+        version: 6.35.4
       '@noble/hashes':
         specifier: '1'
         version: 1.8.0
