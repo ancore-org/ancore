@@ -24,7 +24,7 @@ for (const entry of allowlist.advisories ?? []) {
 
 const audit = spawnSync('pnpm', ['audit', '--audit-level=high', '--json'], {
   encoding: 'utf8',
-  maxBuffer: 20 * 1024 * 1024
+  maxBuffer: 20 * 1024 * 1024,
 });
 if (audit.status === 0) {
   process.exit(0);
