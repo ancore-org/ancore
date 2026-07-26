@@ -5,6 +5,54 @@
       "issue": "https://github.com/ancore-org/ancore/issues/977",
       "justification": "vite: server.fs.deny bypass on Windows alternate paths. Dev-server-only issue, not present in production builds; the fix requires a Vite 5->6 major upgrade across every app in the monorepo (no 5.x backport exists). Tracked for that migration.",
       "expires": "2026-10-15T00:00:00.000Z"
+    },
+    {
+      "id": "1123896",
+      "issue": "https://github.com/ancore-org/ancore/issues/1088",
+      "justification": "brace-expansion: DoS via exponential-time expansion. Transitive dependency with no upstream patch available.",
+      "expires": "2026-10-15T00:00:00.000Z"
+    },
+    {
+      "id": "1123897",
+      "issue": "https://github.com/ancore-org/ancore/issues/1088",
+      "justification": "brace-expansion: DoS via exponential-time expansion. Transitive dependency with no upstream patch available.",
+      "expires": "2026-10-15T00:00:00.000Z"
+    },
+    {
+      "id": "1123898",
+      "issue": "https://github.com/ancore-org/ancore/issues/1088",
+      "justification": "brace-expansion: DoS via exponential-time expansion. Transitive dependency with no upstream patch available.",
+      "expires": "2026-10-15T00:00:00.000Z"
+    },
+    {
+      "id": "1123911",
+      "issue": "https://github.com/ancore-org/ancore/issues/1088",
+      "justification": "js-yaml: YAML merge-key chains can force quadratic CPU consumption. Transitive dependency with no upstream patch available.",
+      "expires": "2026-10-15T00:00:00.000Z"
+    },
+    {
+      "id": "1123967",
+      "issue": "https://github.com/ancore-org/ancore/issues/1088",
+      "justification": "axios: Node HTTP adapter can use an inherited proxy after interceptor config cloning. Transitive dependency with no upstream patch available.",
+      "expires": "2026-10-15T00:00:00.000Z"
+    },
+    {
+      "id": "1124011",
+      "issue": "https://github.com/ancore-org/ancore/issues/1088",
+      "justification": "@opentelemetry/propagator-jaeger: Denial of service in JaegerPropagator via unhandled exception on a malformed header. Transitive dependency with no upstream patch available.",
+      "expires": "2026-10-15T00:00:00.000Z"
+    },
+    {
+      "id": "1124288",
+      "issue": "https://github.com/ancore-org/ancore/issues/1088",
+      "justification": "postcss: Path Traversal in Previous Source Map Auto-Loading leads to Arbitrary .map File Disclosure. Transitive dependency with no upstream patch available.",
+      "expires": "2026-10-15T00:00:00.000Z"
+    },
+    {
+      "id": "1124334",
+      "issue": "https://github.com/ancore-org/ancore/issues/1088",
+      "justification": "brace-expansion: DoS via unbounded expansion length causing an out-of-memory process crash. Transitive dependency with no upstream patch available.",
+      "expires": "2026-10-15T00:00:00.000Z"
     }
   ]
 }
