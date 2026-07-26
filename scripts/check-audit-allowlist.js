@@ -22,14 +22,25 @@ for (const entry of allowlist.advisories ?? []) {
   }
 }
 
-const audit = spawnSync('pnpm', ['audit', '--audit-level=high', '--json'], { encoding: 'utf8' });
+const audit = spawnSync('pnpm', ['audit', '--audit-level=high', '--json'], {
+  encoding: 'utf8',
+  maxBuffer: 20 * 1024 * 1024
+});
 if (audit.status === 0) {
   process.exit(0);
 }
 
+const rawAuditOutput = (audit.stdout || '').trim();
+const jsonStartIndex = rawAuditOutput.indexOf('{');
+const jsonEndIndex = rawAuditOutput.lastIndexOf('}');
+const auditJsonOutput =
+  jsonStartIndex >= 0 && jsonEndIndex >= jsonStartIndex
+    ? rawAuditOutput.slice(jsonStartIndex, jsonEndIndex + 1)
+    : rawAuditOutput;
+
 let report;
 try {
-  report = JSON.parse(audit.stdout || '{}');
+  report = JSON.parse(auditJsonOutput || '{}');
 } catch (error) {
   console.error('Unable to parse pnpm audit JSON output.');
   console.error(audit.stdout || audit.stderr);
