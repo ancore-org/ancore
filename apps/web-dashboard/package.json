@@ -12,9 +12,12 @@
   },
   "dependencies": {
     "@ancore/core-sdk": "workspace:*",
+    "@ancore/stellar": "workspace:*",
     "@ancore/types": "workspace:*",
     "@ancore/ui-kit": "workspace:*",
+    "@ancore/wallet-api": "workspace:*",
     "@noble/hashes": "1",
+    "@stellar/stellar-sdk": "^13.3.0",
     "bip39": "^3.1.0",
     "buffer": "6",
     "lucide-react": "^0.462.0",

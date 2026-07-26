@@ -1,12 +1,18 @@
-import { useState, useCallback } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import {
   isUsernameHandle,
   normalizeUsernameHandle,
   type HandleResolver,
   type ResolvedHandle,
 } from '@ancore/types';
-import type { Transaction } from '../types/dashboard';
+import type { Transaction, TransactionStatus, SignMethod } from '../types/dashboard';
 import { resolveHandle as defaultResolveHandle } from '../services/handle-resolver';
+import type { SendStrategy, SendResult } from '../services/send-service';
+import { pollTransactionConfirmation, type TransactionPollStatus } from '../services/tx-polling';
+
+// ---------------------------------------------------------------------------
+// Types
+// ---------------------------------------------------------------------------
 
 export interface SendTransactionParams {
   recipient: string;
@@ -21,7 +27,22 @@ export interface ResolvedSendRecipient {
 
 export interface UseSendTransactionOptions {
   resolveHandle?: HandleResolver;
+  /** Real send strategy — when omitted or null, falls back to demo mock. */
+  sendStrategy?: SendStrategy | null;
+  /** Polling interval for confirmation. Default: 5000ms. */
+  pollIntervalMs?: number;
+  /** Max polling attempts. Default: 60. */
+  pollMaxAttempts?: number;
+  /** Network for Horizon polling. Default: 'testnet'. */
+  network?: 'testnet' | 'mainnet' | 'futurenet' | 'local';
+  /**
+   * Force demo mode (mock send). When true, ignores sendStrategy
+   * and uses setTimeout simulation. Default: false.
+   */
+  demoMode?: boolean;
+  /** Legacy: delay before "submitting". Only used in demo mode. */
   submitDelayMs?: number;
+  /** Legacy: delay before "confirmed". Only used in demo mode. */
   confirmationDelayMs?: number;
 }
 
@@ -32,7 +53,16 @@ interface SendTransactionState {
   resolvedRecipient: ResolvedSendRecipient | null;
 }
 
+interface PollController {
+  stop: () => void;
+  result: Promise<TransactionPollStatus>;
+}
+
 const HANDLE_NOT_FOUND_MESSAGE = 'Handle not found';
+
+// ---------------------------------------------------------------------------
+// Validation
+// ---------------------------------------------------------------------------
 
 function validateRecipientInput(recipient: string): string | undefined {
   const trimmed = recipient.trim();
@@ -73,11 +103,42 @@ export async function resolveSendRecipient(
   return { input: trimmed, accountAddress: resolved.accountAddress, handle: resolved };
 }
 
+// ---------------------------------------------------------------------------
+// Demo mode (mock)
+// ---------------------------------------------------------------------------
+
+async function demoSend(
+  _params: SendTransactionParams,
+  submitDelayMs: number,
+  confirmationDelayMs: number
+): Promise<SendResult> {
+  await new Promise((resolve) => setTimeout(resolve, submitDelayMs));
+  await new Promise((resolve) => setTimeout(resolve, confirmationDelayMs));
+  return {
+    status: 'submitted',
+    hash: `demo-${Date.now()}-${Math.random().toString(36).slice(2)}`,
+  };
+}
+
+// ---------------------------------------------------------------------------
+// Hook
+// ---------------------------------------------------------------------------
+
 /**
  * Hook to handle sending transactions with optimistic updates.
- * Immediately shows a pending transaction while the blockchain confirms.
+ * Supports real blockchain submission via SendStrategy or demo mode fallback.
  */
 export const useSendTransaction = (options: UseSendTransactionOptions = {}) => {
+  const {
+    sendStrategy = null,
+    demoMode = false,
+    pollIntervalMs = 5000,
+    pollMaxAttempts = 60,
+    network = 'testnet',
+    submitDelayMs = 1000,
+    confirmationDelayMs = 2000,
+  } = options;
+
   const [state, setState] = useState<SendTransactionState>({
     loading: false,
     error: null,
@@ -86,13 +147,24 @@ export const useSendTransaction = (options: UseSendTransactionOptions = {}) => {
   });
 
   const [optimisticTransaction, setOptimisticTransaction] = useState<Transaction | null>(null);
+  const pollRef = useRef<PollController | null>(null);
+
+  // Cleanup polling on unmount
+  useEffect(() => {
+    return () => {
+      pollRef.current?.stop();
+    };
+  }, []);
 
   /**
    * Sends a transaction and optimistically adds it to the transaction list.
-   * The transaction starts in 'pending' status until blockchain confirmation.
    */
   const sendTransaction = useCallback(
     async (params: SendTransactionParams) => {
+      // Abort any existing poll
+      pollRef.current?.stop();
+      pollRef.current = null;
+
       setState({ loading: true, error: null, recipientError: null, resolvedRecipient: null });
 
       try {
@@ -101,41 +173,86 @@ export const useSendTransaction = (options: UseSendTransactionOptions = {}) => {
           options.resolveHandle ?? defaultResolveHandle
         );
 
-        // Create optimistic transaction immediately
+        const useDemo = demoMode || !sendStrategy;
+        const signMethod: SignMethod = useDemo
+          ? 'wallet-api'
+          : sendStrategy!.name === 'wallet-api'
+            ? 'wallet-api'
+            : 'relayer';
+
+        // Create optimistic transaction
         const optimisticTx: Transaction = {
           id: `optimistic-${Date.now()}-${Math.random()}`,
           type: 'send',
           amount: params.amount,
           timestamp: new Date(),
-          status: 'pending',
+          status: 'submitting',
           counterparty: resolvedRecipient.accountAddress,
+          signMethod,
         };
 
         setOptimisticTransaction(optimisticTx);
-
         setState({ loading: true, error: null, recipientError: null, resolvedRecipient });
 
-        // Simulate blockchain submission (in production, call real API)
-        // This would call sendPayment from @ancore/core-sdk
-        await new Promise((resolve) => setTimeout(resolve, options.submitDelayMs ?? 1000));
+        let sendResult: SendResult;
 
-        // In a real implementation, would wait for blockchain confirmation
-        // For now, mark as confirmed after delay
-        await new Promise((resolve) => setTimeout(resolve, options.confirmationDelayMs ?? 2000));
+        if (useDemo) {
+          sendResult = await demoSend(params, submitDelayMs, confirmationDelayMs);
+        } else {
+          sendResult = await sendStrategy!.send({
+            recipient: resolvedRecipient.accountAddress,
+            amount: String(params.amount),
+          });
+        }
 
-        // Update optimistic transaction to confirmed
-        setOptimisticTransaction({
-          ...optimisticTx,
-          status: 'confirmed',
-          id: `confirmed-${Date.now()}`,
-        });
+        if (useDemo) {
+          // Demo mode: go straight to confirmed
+          setOptimisticTransaction({
+            ...optimisticTx,
+            status: 'confirmed',
+            id: `confirmed-${Date.now()}`,
+            hash: sendResult.hash,
+          });
+          setState({ loading: false, error: null, recipientError: null, resolvedRecipient });
+        } else {
+          // Real mode: set to pending (submitted but awaiting on-chain confirmation)
+          setOptimisticTransaction({
+            ...optimisticTx,
+            status: 'pending',
+            hash: sendResult.hash,
+          });
+          setState({ loading: false, error: null, recipientError: null, resolvedRecipient });
 
-        setState({ loading: false, error: null, recipientError: null, resolvedRecipient });
+          const controller = startPolling(sendResult.hash, {
+            intervalMs: pollIntervalMs,
+            maxAttempts: pollMaxAttempts,
+            network,
+            isRelayerJob: sendResult.status === 'pending',
+          });
+          pollRef.current = controller;
+
+          // Wait for confirmation asynchronously (don't block UI)
+          void controller.result.then((pollStatus) => {
+            setOptimisticTransaction((prev) => {
+              if (!prev || prev.hash !== sendResult.hash) return prev;
+              return {
+                ...prev,
+                status: mapPollStatus(pollStatus.status),
+                id: `${pollStatus.status}-${Date.now()}`,
+                error:
+                  pollStatus.status === 'failed'
+                    ? (pollStatus.error ?? 'Transaction failed')
+                    : undefined,
+              };
+            });
+            pollRef.current = null;
+          });
+        }
+
         return optimisticTx;
       } catch (err) {
         const error = err instanceof Error ? err : new Error('Failed to send transaction');
 
-        // Keep optimistic transaction visible but mark failure scenario
         setOptimisticTransaction(null);
 
         const recipientError =
@@ -150,20 +267,27 @@ export const useSendTransaction = (options: UseSendTransactionOptions = {}) => {
         throw error;
       }
     },
-    [options.confirmationDelayMs, options.resolveHandle, options.submitDelayMs]
+    [
+      demoMode,
+      options.resolveHandle,
+      pollIntervalMs,
+      pollMaxAttempts,
+      sendStrategy,
+      submitDelayMs,
+      confirmationDelayMs,
+      network,
+    ]
   );
 
-  /**
-   * Clears the optimistic transaction (e.g., on navigation or manual clearing).
-   */
   const clearOptimistic = useCallback(() => {
+    pollRef.current?.stop();
+    pollRef.current = null;
     setOptimisticTransaction(null);
   }, []);
 
-  /**
-   * Rolls back the optimistic update in case of failure.
-   */
   const rollback = useCallback(() => {
+    pollRef.current?.stop();
+    pollRef.current = null;
     setOptimisticTransaction(null);
     setState({ loading: false, error: null, recipientError: null, resolvedRecipient: null });
   }, []);
@@ -179,3 +303,68 @@ export const useSendTransaction = (options: UseSendTransactionOptions = {}) => {
     resolvedRecipient: state.resolvedRecipient,
   };
 };
+
+// ---------------------------------------------------------------------------
+// Internal helpers
+// ---------------------------------------------------------------------------
+
+function startPolling(
+  hash: string,
+  options: {
+    intervalMs: number;
+    maxAttempts: number;
+    network: string;
+    isRelayerJob: boolean;
+  }
+): PollController {
+  let stopped = false;
+  let resolveResult!: (value: TransactionPollStatus) => void;
+
+  const result = new Promise<TransactionPollStatus>((resolve) => {
+    resolveResult = resolve;
+  });
+
+  void (async () => {
+    for (let attempt = 0; attempt < options.maxAttempts && !stopped; attempt++) {
+      try {
+        const pollResult = await pollTransactionConfirmation(hash, {
+          intervalMs: options.intervalMs,
+          maxAttempts: 1,
+          network: options.network as 'testnet' | 'mainnet' | 'futurenet' | 'local',
+          isRelayerJob: options.isRelayerJob,
+        });
+
+        if (pollResult.status.status === 'confirmed' || pollResult.status.status === 'failed') {
+          resolveResult(pollResult.status);
+          return;
+        }
+      } catch {
+        // Continue polling on error
+      }
+
+      if (attempt < options.maxAttempts - 1 && !stopped) {
+        await new Promise((r) => setTimeout(r, options.intervalMs));
+      }
+    }
+
+    resolveResult({ status: 'failed', error: 'Polling timed out' });
+  })();
+
+  return {
+    stop: () => {
+      stopped = true;
+    },
+    result,
+  };
+}
+
+function mapPollStatus(status: TransactionPollStatus['status']): TransactionStatus {
+  switch (status) {
+    case 'confirmed':
+      return 'confirmed';
+    case 'failed':
+      return 'failed';
+    case 'pending':
+      return 'pending';
+  }
+}
