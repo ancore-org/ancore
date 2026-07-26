@@ -5,6 +5,54 @@
       "issue": "https://github.com/ancore-org/ancore/issues/977",
       "justification": "vite: server.fs.deny bypass on Windows alternate paths. Dev-server-only issue, not present in production builds; the fix requires a Vite 5->6 major upgrade across every app in the monorepo (no 5.x backport exists). Tracked for that migration.",
       "expires": "2026-10-15T00:00:00.000Z"
+    },
+    {
+      "id": "1123896",
+      "issue": "https://github.com/ancore-org/ancore/issues/1085",
+      "justification": "brace-expansion advisory affecting transitive dependency chains; remediation requires coordinated dependency upgrades across multiple workspaces.",
+      "expires": "2026-10-26T00:00:00.000Z"
+    },
+    {
+      "id": "1123897",
+      "issue": "https://github.com/ancore-org/ancore/issues/1085",
+      "justification": "brace-expansion advisory affecting transitive dependency chains; remediation requires coordinated dependency upgrades across multiple workspaces.",
+      "expires": "2026-10-26T00:00:00.000Z"
+    },
+    {
+      "id": "1123898",
+      "issue": "https://github.com/ancore-org/ancore/issues/1085",
+      "justification": "brace-expansion advisory affecting transitive dependency chains; remediation requires coordinated dependency upgrades across multiple workspaces.",
+      "expires": "2026-10-26T00:00:00.000Z"
+    },
+    {
+      "id": "1123911",
+      "issue": "https://github.com/ancore-org/ancore/issues/1085",
+      "justification": "js-yaml advisory is currently transitive; fixing requires dependency updates in upstream toolchain packages.",
+      "expires": "2026-10-26T00:00:00.000Z"
+    },
+    {
+      "id": "1123967",
+      "issue": "https://github.com/ancore-org/ancore/issues/1085",
+      "justification": "axios advisory is currently transitive; coordinated package updates are needed to move all dependents to patched versions.",
+      "expires": "2026-10-26T00:00:00.000Z"
+    },
+    {
+      "id": "1124011",
+      "issue": "https://github.com/ancore-org/ancore/issues/1085",
+      "justification": "@opentelemetry/propagator-jaeger advisory is transitive and requires dependency graph updates across services.",
+      "expires": "2026-10-26T00:00:00.000Z"
+    },
+    {
+      "id": "1124288",
+      "issue": "https://github.com/ancore-org/ancore/issues/1085",
+      "justification": "postcss advisory is transitive in build tooling dependencies; remediation requires broader package upgrades.",
+      "expires": "2026-10-26T00:00:00.000Z"
+    },
+    {
+      "id": "1124334",
+      "issue": "https://github.com/ancore-org/ancore/issues/1085",
+      "justification": "brace-expansion advisory affecting transitive dependency chains; remediation requires coordinated dependency upgrades across multiple workspaces.",
+      "expires": "2026-10-26T00:00:00.000Z"
     }
   ]
 }
