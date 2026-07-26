@@ -64,6 +64,7 @@
 |----------|---------|
 | [Extension target architecture](architecture/WALLET_EXTENSION.md) | Freighter-informed extension design |
 | [Freighter comparison (extension + mobile)](wallets/FREIGHTER_COMPARISON.md) | Production wallet patterns — adoption checklist |
+| [Ledger WebHID signing](wallets/LEDGER.md) | Hardware owner-key signing, limits vs session keys |
 | [AGENTS.md](../AGENTS.md) | Monorepo agent guide |
 | [AI intents](ai/intents.md) | Draft intent types for the AI agent MVP |
 | [Indexer events](indexer/contract-events.md) | Contract events indexed by the indexer service |

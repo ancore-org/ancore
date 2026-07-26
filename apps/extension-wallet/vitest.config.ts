@@ -40,6 +40,7 @@ export default defineConfig({
       ),
       '@ancore/wallet-shared': path.resolve(rootDir, '../../packages/wallet-shared/src/index.ts'),
       '@ancore/stellar': path.resolve(rootDir, '../../packages/stellar/src/index.ts'),
+      '@ledgerhq/hw-transport-webhid': path.resolve(rootDir, './src/stubs/ledger-transport.ts'),
     },
   },
 });

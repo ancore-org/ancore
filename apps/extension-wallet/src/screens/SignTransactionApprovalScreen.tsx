@@ -1,5 +1,6 @@
 import React from 'react';
 import { useSearchParams } from 'react-router-dom';
+import { useHardwareWalletStore } from '@/stores/hardware-wallet';
 
 function useRequestId(propsRequestId?: string): string | null {
   const [searchParams] = useSearchParams();
@@ -25,14 +26,22 @@ export function SignTransactionApprovalScreen({
   const requestId = useRequestId(propRequestId);
   const [done, setDone] = React.useState(false);
   const [submitting, setSubmitting] = React.useState(false);
+  const [devicePrompt, setDevicePrompt] = React.useState(false);
+  const signerMode = useHardwareWalletStore((s) => s.signerMode);
+  const ledgerPublicKey = useHardwareWalletStore((s) => s.ledgerPublicKey);
+  const hardwarePreferred = signerMode === 'ledger' && Boolean(ledgerPublicKey);
 
   function sendToBackground(action: 'approve' | 'reject') {
     if (!requestId) return;
     setSubmitting(true);
+    if (action === 'approve' && hardwarePreferred) {
+      setDevicePrompt(true);
+    }
     chrome.runtime.sendMessage(
       { type: action === 'approve' ? 'APPROVE_SIGN_REQUEST' : 'REJECT_SIGN_REQUEST', requestId },
       () => {
         setSubmitting(false);
+        setDevicePrompt(false);
         setDone(true);
       }
     );
@@ -71,6 +80,16 @@ export function SignTransactionApprovalScreen({
           <h2 className="text-sm font-semibold text-foreground">Request</h2>
           <p className="mt-2 text-sm text-muted-foreground">ID: {requestId}</p>
           <p className="text-sm text-muted-foreground">{description}</p>
+          {hardwarePreferred && (
+            <p className="mt-3 rounded-lg bg-muted px-3 py-2 text-sm text-foreground">
+              Ledger signing is enabled. Confirm the transaction on your device after approving.
+            </p>
+          )}
+          {devicePrompt && (
+            <p className="mt-2 text-sm font-medium text-primary" role="status">
+              Waiting for Ledger confirmation…
+            </p>
+          )}
         </section>
         <div className="flex gap-3">
           <button
@@ -87,7 +106,7 @@ export function SignTransactionApprovalScreen({
             onClick={() => sendToBackground('approve')}
             type="button"
           >
-            Approve
+            {hardwarePreferred ? 'Approve on Ledger' : 'Approve'}
           </button>
         </div>
       </main>
