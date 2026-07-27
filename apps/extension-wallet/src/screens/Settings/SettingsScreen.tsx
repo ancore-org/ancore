@@ -12,6 +12,7 @@ import {
   Shield,
   Info,
   Bell,
+  QrCode,
 } from 'lucide-react';
 import { SettingsGroup, SettingItem } from '../../components/SettingsGroup';
 import { NetworkSettings } from './NetworkSettings';
@@ -20,6 +21,8 @@ import { AboutScreen } from './AboutScreen';
 import { EnvironmentSettings } from './EnvironmentSettings';
 import { DisplaySettings } from './DisplaySettings';
 import { ConnectedSitesScreen } from './ConnectedSitesScreen';
+import { AccountQrScreen } from './AccountQrScreen';
+import { useAccountStore } from '../../stores/account';
 import { useSettings } from '../../hooks/useSettings';
 import { DASHBOARD_SETTINGS_STORAGE_KEY } from '../../state/dashboard-settings';
 import { useToast } from '@ancore/ui-kit';
@@ -40,11 +43,14 @@ type SettingsView =
   | 'environment'
   | 'display'
   | 'about'
-  | 'connected-sites';
+  | 'connected-sites'
+  | 'account-qr';
 
 export function SettingsScreen() {
   const { t } = useTranslation();
   const { settings, updateSettings } = useSettings();
+  const accounts = useAccountStore((state) => state.accounts);
+  const activeAccountId = useAccountStore((state) => state.activeAccountId);
   const runtimeTheme = useSettingsStore((state) => state.theme);
   const setRuntimeTheme = useSettingsStore((state) => state.setTheme);
   const setRuntimeNetwork = useSettingsStore((state) => state.setNetwork);
@@ -60,6 +66,11 @@ export function SettingsScreen() {
   const telemetryOptIn = useSettingsStore((state) => state.telemetryOptIn);
   const setTelemetryOptIn = useSettingsStore((state) => state.setTelemetryOptIn);
   const [view, setView] = React.useState<SettingsView>('root');
+
+  // Prefer the deployed smart-account contract id — that is the address funds
+  // are sent to — falling back to the owner public key before deployment.
+  const activeAccount = accounts.find((a) => a.id === activeAccountId) ?? accounts[0];
+  const receiveAddress = activeAccount?.contractId ?? activeAccount?.address ?? null;
 
   React.useEffect(() => {
     if (typeof chrome === 'undefined') return;
@@ -131,6 +142,10 @@ export function SettingsScreen() {
     return <ConnectedSitesScreen onBack={() => setView('root')} />;
   }
 
+  if (view === 'account-qr') {
+    return <AccountQrScreen address={receiveAddress} onBack={() => setView('root')} />;
+  }
+
   const networkLabel = getNetworkLabel(settings.network, t);
   const timeoutLabel = getAutoLockLabel(settings.autoLockTimeout, t);
   const environmentLabel = getEnvironmentLabel(settings.environment, t);
@@ -167,6 +182,15 @@ export function SettingsScreen() {
 
       {/* Settings groups */}
       <div className="flex-1 space-y-5 p-4 -mt-3 rounded-t-2xl bg-background">
+        <SettingsGroup title={t('settings.groups.account')}>
+          <SettingItem
+            label={t('settings.accountQr.label')}
+            description={t('settings.accountQr.description')}
+            icon={<QrCode className="h-4 w-4" />}
+            onClick={() => setView('account-qr')}
+          />
+        </SettingsGroup>
+
         <SettingsGroup title={t('settings.groups.network')}>
           <SettingItem
             label={t('settings.network.label')}

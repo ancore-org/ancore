@@ -6,13 +6,26 @@
       "name": "My Ancore Wallet",
       "address": "GBXXX...YYYY"
     },
+    "accountQr": {
+      "label": "Address QR Code",
+      "description": "Download a shareable QR of your public address",
+      "title": "Address QR",
+      "downloadPng": "Download PNG",
+      "downloading": "Preparing…",
+      "downloadFailed": "Could not generate the QR image. Try again.",
+      "copyAddress": "Copy address",
+      "unavailable": "No account address yet. Complete onboarding to get one.",
+      "safetyTitle": "Public address only",
+      "safetyBody": "This QR contains only your public receive address. Your private key and recovery phrase are never exported here."
+    },
     "groups": {
       "network": "Network",
       "display": "Display",
       "security": "Security",
       "privacy": "Privacy",
       "about": "About",
-      "notificationsDemo": "Notifications (Demo)"
+      "notificationsDemo": "Notifications (Demo)",
+      "account": "Account"
     },
     "network": {
       "label": "Network",

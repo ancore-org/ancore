@@ -87,7 +87,20 @@
       "display": "Exibição",
       "security": "Segurança",
       "about": "Sobre",
-      "notifications": "Notificações"
+      "notifications": "Notificações",
+      "account": "Conta"
+    },
+    "accountQr": {
+      "label": "QR do endereço",
+      "description": "Baixe um QR compartilhável do seu endereço público",
+      "title": "QR do endereço",
+      "downloadPng": "Baixar PNG",
+      "downloading": "Preparando…",
+      "downloadFailed": "Não foi possível gerar a imagem do QR. Tente novamente.",
+      "copyAddress": "Copiar endereço",
+      "unavailable": "Ainda não há endereço de conta. Conclua a integração para obter um.",
+      "safetyTitle": "Apenas endereço público",
+      "safetyBody": "Este QR contém apenas seu endereço público de recebimento. Sua chave privada e frase de recuperação nunca são exportadas aqui."
     },
     "network": {
       "title": "Rede",
