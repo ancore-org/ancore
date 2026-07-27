@@ -31,6 +31,24 @@ export function SignTransactionApprovalScreen({
   const ledgerPublicKey = useHardwareWalletStore((s) => s.ledgerPublicKey);
   const hardwarePreferred = signerMode === 'ledger' && Boolean(ledgerPublicKey);
 
+  const approveRef = React.useRef<HTMLButtonElement>(null);
+
+  // Auto-focus primary action on mount
+  React.useEffect(() => {
+    approveRef.current?.focus();
+  }, []);
+
+  // Escape → reject (no-op while submitting to avoid double-send)
+  React.useEffect(() => {
+    function onKeyDown(e: KeyboardEvent) {
+      if (e.key === 'Escape' && !submitting) {
+        sendToBackground('reject');
+      }
+    }
+    window.addEventListener('keydown', onKeyDown);
+    return () => window.removeEventListener('keydown', onKeyDown);
+  }, [submitting]); // eslint-disable-line react-hooks/exhaustive-deps
+
   function sendToBackground(action: 'approve' | 'reject') {
     if (!requestId) return;
     setSubmitting(true);
@@ -101,6 +119,7 @@ export function SignTransactionApprovalScreen({
             Reject
           </button>
           <button
+            ref={approveRef}
             className="flex-1 rounded-xl bg-primary px-4 py-3 text-sm font-semibold text-primary-foreground transition hover:opacity-90 disabled:opacity-50"
             disabled={submitting}
             onClick={() => sendToBackground('approve')}
