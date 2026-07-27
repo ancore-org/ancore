@@ -5,6 +5,12 @@
       "issue": "https://github.com/ancore-org/ancore/issues/977",
       "justification": "vite: server.fs.deny bypass on Windows alternate paths. Dev-server-only issue, not present in production builds; the fix requires a Vite 5->6 major upgrade across every app in the monorepo (no 5.x backport exists). Tracked for that migration.",
       "expires": "2026-10-15T00:00:00.000Z"
+    },
+    {
+      "id": "1124334",
+      "issue": "https://github.com/ancore-org/ancore/issues/1090",
+      "justification": "brace-expansion GHSA-mh99-v99m-4gvg uses vulnerable_versions <=5.0.7, which falsely matches 1.x/2.x. v5 is overridden to 5.0.8; 1.x/2.x are on patched 1.1.16/2.1.2 for the related DoS advisories.",
+      "expires": "2026-10-27T00:00:00.000Z"
     }
   ]
 }

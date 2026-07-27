@@ -22,7 +22,18 @@ for (const entry of allowlist.advisories ?? []) {
   }
 }
 
-const audit = spawnSync('pnpm', ['audit', '--audit-level=high', '--json'], { encoding: 'utf8' });
+// Large monorepo trees produce multi-MB audit JSON. Node's default maxBuffer (1 MiB)
+// truncates stdout mid-object and makes JSON.parse fail ("Unable to parse…").
+const audit = spawnSync('pnpm', ['audit', '--audit-level=high', '--json'], {
+  encoding: 'utf8',
+  maxBuffer: 64 * 1024 * 1024,
+  // Windows needs a shell to resolve the pnpm.cmd shim from PATH.
+  shell: process.platform === 'win32',
+});
+if (audit.error) {
+  console.error('Failed to run pnpm audit:', audit.error.message);
+  process.exit(1);
+}
 if (audit.status === 0) {
   process.exit(0);
 }
@@ -32,7 +43,13 @@ try {
   report = JSON.parse(audit.stdout || '{}');
 } catch (error) {
   console.error('Unable to parse pnpm audit JSON output.');
-  console.error(audit.stdout || audit.stderr);
+  console.error(error instanceof Error ? error.message : error);
+  console.error(
+    `stdout bytes: ${(audit.stdout || '').length}, stderr bytes: ${(audit.stderr || '').length}`
+  );
+  if (audit.stderr) {
+    console.error(audit.stderr.slice(0, 2000));
+  }
   process.exit(1);
 }
 
