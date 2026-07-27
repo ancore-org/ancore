@@ -4,6 +4,7 @@
 
 export { SmartAccountSchema, AccountMetadataSchema } from './smart-account';
 export { SessionKeySchema } from './session-key';
+export { SessionKeyPolicySchema } from './session-key-policy';
 export { UserOperationSchema, TransactionResultSchema } from './user-operation';
 export { WalletStateSchema } from './wallet';
 export {

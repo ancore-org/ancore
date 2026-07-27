@@ -53,7 +53,7 @@ export function createProductionSendService(options: ProductionSendServiceOption
       return {
         baseFee: '0.0000100',
         totalFee: '0.0000100',
-        network: stellarClient.getNetwork() as any,
+        network: stellarClient.getNetwork(),
       };
     },
 

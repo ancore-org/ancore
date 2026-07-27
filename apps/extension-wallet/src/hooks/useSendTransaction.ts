@@ -42,7 +42,7 @@ export interface SendFormValues {
 export interface FeeEstimate {
   baseFee: string;
   totalFee: string;
-  network: 'mainnet' | 'testnet' | 'futurenet';
+  network: 'mainnet' | 'testnet' | 'futurenet' | 'local';
 }
 
 export interface SendTransactionDraft extends SendFormValues {
