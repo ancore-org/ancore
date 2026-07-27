@@ -45,13 +45,13 @@ describe('POST /agent/draft-intent', () => {
   it('returns 400 when prompt is missing', async () => {
     const res = await request(app).post('/agent/draft-intent').send({ accountId: 'GABC123' });
     expect(res.status).toBe(400);
-    expect(res.body.error).toBe('Invalid request');
+    expect(res.body.error).toBe('Invalid request: prompt and accountId required');
   });
 
   it('returns 400 when accountId is missing', async () => {
     const res = await request(app).post('/agent/draft-intent').send({ prompt: 'Send 10 XLM' });
     expect(res.status).toBe(400);
-    expect(res.body.error).toBe('Invalid request');
+    expect(res.body.error).toBe('Invalid request: prompt and accountId required');
   });
 
   it('returns 400 when body is empty', async () => {
