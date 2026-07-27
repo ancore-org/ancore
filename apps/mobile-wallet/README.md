@@ -1,6 +1,11 @@
 # Ancore Mobile Wallet
 
-React Native mobile wallet application for the Ancore ecosystem.
+`@ancore/mobile-wallet` is a **TypeScript library** — screens, hooks, security
+primitives, and storage adapters for the Ancore mobile wallet. It is built
+with `tsc`, has no dev server, and is not runnable on its own. The runnable
+React Native app that embeds this library lives at
+[`apps/mobile-app`](../mobile-app) (`OnboardingNavigator` from this package
+is its entry screen).
 
 **Agent / contributor guide:** [AGENTS.md](./AGENTS.md) (modeled on [Freighter Mobile AGENTS.md](https://github.com/stellar/freighter-mobile/blob/main/AGENTS.md)).
 
@@ -9,43 +14,66 @@ React Native mobile wallet application for the Ancore ecosystem.
 - **Account Management**: Create, import, and recover Stellar accounts
 - **Transaction History**: Paginated transaction history with indexer integration
 - **Secure Storage**: Encrypted key storage with biometric authentication
+- **WalletConnect v2**: Session approval and Stellar RPC handling via `@reown/walletkit`
 - **Natural Language Transactions**: AI-powered intent parsing for intuitive transfers
 
-## Setup
+## What this package exports
+
+See [`src/index.ts`](./src/index.ts) for the full surface. The main groups:
+
+| Export area                                        | Examples                                                            |
+| ---------------------------------------------------- | --------------------------------------------------------------------- |
+| Navigation                                          | `OnboardingNavigator`, `OnboardingNavigatorTestHarness`              |
+| Screens                                             | `HistoryScreen`, `WCPairingScreen`                                   |
+| Config                                              | `loadMobileWalletEnvironment`, `loadMobileWalletEnvironmentFromEnv`, `resolveServiceUrls` |
+| Security                                            | Biometric adapters, `MobileSecureVault`, lockout manager (`./src/security`) |
+| Storage                                             | Keychain-backed secure store adapter (`./src/storage`)               |
+| WalletConnect                                       | `WalletKitProvider`, `useWalletConnect`, `createStellarRpcHandlers`, `SessionApprovalSheet`, `SignAuthEntryApprovalSheet` |
+| Accounts / SDK                                      | `./src/accounts`, `./src/sdk`                                        |
+
+Host apps (currently `apps/mobile-app`) import from `@ancore/mobile-wallet`
+and provide the React Native shell, native modules, and build config.
+
+## Setup (building/testing the library)
 
 ### Prerequisites
 
-- Node.js 18+
-- Expo CLI
-- iOS Simulator (macOS) or Android Emulator
+- Node.js 20+
+- pnpm 9 (via `corepack`)
 
 ### Installation
 
 ```bash
-# Install dependencies
-pnpm install
+# From the monorepo root
+corepack pnpm install
 
-# Copy environment variables
-cp .env.example .env
+# Build the library (tsc -> dist/)
+corepack pnpm --filter @ancore/mobile-wallet build
 
-# Start development server
-pnpm dev
+# Watch mode
+corepack pnpm --filter @ancore/mobile-wallet dev
 ```
 
-### Environment Variables
+There is no `.env` file for this package — it takes configuration as a plain
+object, not by reading environment files (see below).
 
-All API URLs must be read from the centralized config module (`loadMobileWalletEnvironment` / `loadMobileWalletEnvironmentFromEnv`). Copy `.env.example` to `.env` and set:
+## Running the app
+
+This package cannot be run by itself. To launch the wallet on a simulator/emulator, use the `apps/mobile-app` host app — see [apps/mobile-app/README.md](../mobile-app/README.md) for prerequisites (Xcode/CocoaPods, Android Studio) and commands:
 
 ```bash
-# Required
-ANCORE_ACCOUNT_CONTRACT_ID=your_contract_id_here
-EXPO_PUBLIC_INDEXER_URL=http://localhost:3000
-EXPO_PUBLIC_RELAYER_URL=http://localhost:3001
-
-# Optional
-EXPO_PUBLIC_AI_AGENT_URL=http://localhost:3002
-WALLETCONNECT_PROJECT_ID=your_project_id_here
+corepack pnpm --filter @ancore/mobile-app ios
+corepack pnpm --filter @ancore/mobile-app android
 ```
+
+## Environment Variables
+
+This library does not read `.env` files directly. Config is loaded via
+`loadMobileWalletEnvironment` / `loadMobileWalletEnvironmentFromEnv`, which
+validate and normalize values passed in by the host app. `apps/mobile-app`
+owns the actual `.env` file — see [`apps/mobile-app/.env.example`](../mobile-app/.env.example)
+for the variables it injects (`ANCORE_ACCOUNT_CONTRACT_ID`, `ANCORE_INDEXER_URL`,
+`ANCORE_RELAYER_URL`, `WALLETCONNECT_PROJECT_ID`, etc).
 
 Invalid URLs fail fast at bootstrap with a clear error message (parity with extension wallet startup validation).
 
@@ -121,6 +149,7 @@ interface TransactionHistoryAdapter {
 - `onboarding/` - Wallet creation, import, and recovery flows
 - `history/` - Transaction history with pagination
 - `unlock/` - Biometric and PIN authentication
+- `walletconnect/` - WalletConnect pairing UI
 
 ### Services
 
@@ -128,19 +157,30 @@ interface TransactionHistoryAdapter {
 - `security/` - Encryption and authentication
 - `storage/` - Secure persistent storage (Keychain in production, in-memory under tests — see [docs/secure-storage.md](./docs/secure-storage.md))
 - `sdk/` - Stellar SDK integration
+- `providers/`, `walletconnect/` - WalletConnect v2 session and RPC handling
+- `components/` - Shared approval sheets (`SessionApprovalSheet`, `SignAuthEntryApprovalSheet`)
 
 ## Testing
 
 ```bash
-# Run all tests
+# Run all tests (Jest, with coverage)
 pnpm test
 
-# Run tests in watch mode
-pnpm test:watch
+# Lint
+pnpm lint
 
-# Run tests with coverage
-pnpm test:coverage
+# Build + test (matches CI)
+pnpm test:ci
 ```
+
+### End-to-end (Maestro)
+
+Maestro flows for onboarding, sign, and WalletConnect pairing live in
+[`e2e/flows`](./e2e/flows) and are driven against the `apps/mobile-app` host
+app via [`maestro.config.yaml`](./maestro.config.yaml). They are not yet
+wired into CI — see [`.github/workflows/mobile-e2e.yml`](../../.github/workflows/mobile-e2e.yml),
+which currently only reports that the flows are scaffolded and gated behind
+the corresponding mobile issues.
 
 ## License
 
