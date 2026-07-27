@@ -148,7 +148,9 @@ fn encode_cursor(created_at: DateTime<Utc>, id: Uuid) -> String {
 /// Decode cursor to extract created_at and id
 fn decode_cursor(cursor: &str) -> Result<DecodedCursor> {
     if cursor.trim().is_empty() {
-        return Err(ApiError::InvalidCursor("Cursor cannot be empty".to_string()));
+        return Err(ApiError::InvalidCursor(
+            "Cursor cannot be empty".to_string(),
+        ));
     }
 
     let decoded = base64::engine::general_purpose::URL_SAFE_NO_PAD
@@ -166,12 +168,16 @@ fn decode_cursor(cursor: &str) -> Result<DecodedCursor> {
 
     // Validate UUID format
     if Uuid::parse_str(&cursor_obj.i).is_err() {
-        return Err(ApiError::InvalidCursor("Invalid UUID in cursor".to_string()));
+        return Err(ApiError::InvalidCursor(
+            "Invalid UUID in cursor".to_string(),
+        ));
     }
 
     // Validate timestamp format
     if DateTime::parse_from_rfc3339(&cursor_obj.t).is_err() {
-        return Err(ApiError::InvalidCursor("Invalid timestamp format in cursor".to_string()));
+        return Err(ApiError::InvalidCursor(
+            "Invalid timestamp format in cursor".to_string(),
+        ));
     }
 
     Ok(cursor_obj)
