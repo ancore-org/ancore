@@ -95,24 +95,146 @@ if (await isConnected()) {
 
 ## Errors
 
-| Error                     | When                                                                  |
-| ------------------------- | --------------------------------------------------------------------- |
-| `WalletNotInstalledError` | Extension content script is not present on the page                   |
-| `WalletApiError`          | Background rejected the request or bridge timed out (default **30s**) |
+Every rejection from this package is a `WalletApiError` (or its `WalletNotInstalledError`
+subclass). There is no numeric error code — **the `message` string is the discriminator**, so the
+tables below list the exact strings the extension produces today.
+
+### Error classes
+
+| Class                     | `instanceof WalletApiError` | Thrown today?                                                                                                                                                                                   |
+| ------------------------- | --------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `WalletApiError`          | yes                         | Yes — every failure path below                                                                                                                                                                  |
+| `WalletNotInstalledError` | yes (it extends it)         | **Not yet.** Exported for `instanceof` narrowing; with no content script on the page the request currently fails as a timeout instead. See [detecting the extension](#detecting-the-extension). |
+
+Because `WalletNotInstalledError extends WalletApiError`, always check the **subclass first** in an
+`if / else if` chain.
+
+### Connect and read errors
+
+Raised by `connect()`, `requestAccess()`, `getAddress()`, `getNetwork()`, `isConnected()` and
+`getSmartAccount()`.
+
+| `error.message`                                 | Origin                    | What happened                                                                    | dApp should                                      |
+| ----------------------------------------------- | ------------------------- | -------------------------------------------------------------------------------- | ------------------------------------------------ |
+| `wallet-api requires a browser window`          | wallet-api bridge         | Called where `window` is undefined (SSR, Node, a worker)                         | Only call the SDK from client-side code          |
+| `Request timed out after 30000ms`               | wallet-api bridge         | No response within **30s** — usually no extension installed, or a stalled worker | Prompt to install the wallet, then offer a retry |
+| `Origin not allowed. Call requestAccess first.` | background handler        | Page origin is not on the allowlist for the active account                       | Call `connect()` / `requestAccess()`, then retry |
+| `Wallet not set up. Complete onboarding first.` | background handler        | Extension installed but onboarding never finished                                | Ask the user to finish wallet setup              |
+| `Invalid origin`                                | background service worker | Request arrived with a missing or non-string origin                              | Treat as a bug; do not retry                     |
+| `Origin mismatch`                               | background service worker | Sender origin does not match the claimed origin                                  | Treat as a bug; do not retry                     |
+| `Unknown method: <method>`                      | content script            | Method not recognised by this extension build                                    | Check the installed extension version            |
+| `Unknown external API method: <method>`         | background registry       | Method reached the background but has no handler                                 | Check the installed extension version            |
+| `Unexpected response from background`           | content script            | Background replied with a malformed envelope                                     | Retry once, then surface a generic failure       |
+| `Unknown wallet error`                          | wallet-api bridge         | Background reported failure with no message                                      | Surface a generic failure                        |
+
+### Signing errors
+
+Raised by `signTransaction()`, `signAuthEntry()`, `signMessage()` and `requestSessionKey()`. These
+open an approval screen, so they can also fail on the user's decision.
+
+| `error.message`                                                 | Origin             | What happened                                                     | dApp should                                                        |
+| --------------------------------------------------------------- | ------------------ | ----------------------------------------------------------------- | ------------------------------------------------------------------ |
+| `Origin not allowed. Call requestAccess first.`                 | background handler | Not allowlisted — checked **before** the approval UI opens        | Call `connect()` first                                             |
+| `User rejected the sign request`                                | approval UI        | User pressed **Reject**                                           | Cancel silently — this is a normal outcome, not an error to report |
+| `Approval request timed out.`                                   | background handler | No decision within **5 minutes** (e.g. the popup was closed)      | Offer a retry                                                      |
+| `Request timed out after 30000ms`                               | wallet-api bridge  | The bridge's own 30s budget elapsed first                         | See [timeouts](#two-timeouts-not-one)                              |
+| `Session key policy must include a future expiresAt timestamp.` | background handler | `requestSessionKey()` policy had a missing or past `expiresAt`    | Fix the policy — this is a caller bug                              |
+| `Session key policy must include permissions.`                  | background handler | `requestSessionKey()` policy had no numeric `permissions` bitmask | Fix the policy — this is a caller bug                              |
+
+### Two timeouts, not one
+
+The signing path has **two independent clocks**, and the shorter one wins:
+
+- the bridge rejects after **30s** (`Request timed out after 30000ms`);
+- the background gives the user **5 minutes** to approve (`Approval request timed out.`).
+
+A user who takes longer than 30 seconds to read an approval screen therefore sees the dApp give up
+while the extension is still waiting. Do not treat a bridge timeout as "the user declined" — if the
+approval is later accepted the transaction is still signed. Re-check state with `isConnected()` /
+`getAddress()` before retrying.
+
+### Handling errors
 
 ```typescript
-import { WalletApiError, WalletNotInstalledError } from '@ancore/wallet-api';
+import {
+  connect,
+  signTransaction,
+  WalletApiError,
+  WalletNotInstalledError,
+} from '@ancore/wallet-api';
 
-try {
-  await connect();
-} catch (err) {
+/** Map a wallet-api rejection to something worth showing a user. */
+function describe(err: unknown): { message: string; retryable: boolean } {
+  // Subclass first — WalletNotInstalledError is also a WalletApiError.
   if (err instanceof WalletNotInstalledError) {
-    // prompt user to install Ancore Wallet
-  } else if (err instanceof WalletApiError) {
-    // user rejected, timeout, or handler error
+    return { message: 'Install the Ancore Wallet extension to continue.', retryable: false };
+  }
+
+  if (!(err instanceof WalletApiError)) {
+    return { message: 'Something went wrong.', retryable: true };
+  }
+
+  if (err.message.startsWith('Origin not allowed')) {
+    return { message: 'Connect your wallet to this site first.', retryable: true };
+  }
+
+  if (err.message.startsWith('Wallet not set up')) {
+    return { message: 'Finish setting up your Ancore Wallet, then try again.', retryable: false };
+  }
+
+  if (err.message.includes('timed out')) {
+    return { message: 'The wallet did not respond in time.', retryable: true };
+  }
+
+  return { message: err.message, retryable: true };
+}
+
+async function signWithWallet(xdr: string) {
+  try {
+    await connect();
+    const { signedXdr } = await signTransaction({
+      xdr,
+      networkPassphrase: 'Test SDF Network ; September 2015',
+    });
+    return signedXdr;
+  } catch (err) {
+    // A rejected approval is a user choice, not a failure — bail out quietly.
+    if (err instanceof WalletApiError && err.message === 'User rejected the sign request') {
+      return null;
+    }
+
+    const { message, retryable } = describe(err);
+    showToast(message, { action: retryable ? 'Retry' : undefined });
+    throw err;
   }
 }
 ```
+
+### Detecting the extension
+
+`WalletNotInstalledError` is not thrown yet, so a page with no extension pays the full 30-second
+bridge timeout. Until the presence check lands, race the call against a short deadline of your own:
+
+```typescript
+import { isConnected, WalletApiError } from '@ancore/wallet-api';
+
+/** Resolves false when no extension answers within `ms`. */
+async function walletPresent(ms = 1000): Promise<boolean> {
+  const timeout = new Promise<false>((resolve) => setTimeout(() => resolve(false), ms));
+
+  try {
+    return await Promise.race([isConnected().then(() => true), timeout]);
+  } catch (err) {
+    if (err instanceof WalletApiError) return false;
+    throw err;
+  }
+}
+```
+
+> **Follow-up:** the hardened error surface — real `WalletNotInstalledError` throwing, a stable
+> machine-readable `code` on each error, and a playground to exercise every path — is tracked in
+> [issue #1009](https://github.com/ancore-org/ancore/issues/1009). Match on `message` only until
+> that lands, and keep the comparisons in one place so the migration to `code` is a single edit.
 
 ## Protocol
 
