@@ -216,6 +216,14 @@ separate CI jobs that each fail independently. AGENTS.md also documents the spec
 that have caused repeat CI breaks in this repo — read it before your first PR, whether you're a human
 or an AI agent.
 
+If your PR touches `.github/workflows/*.yml`, the CI job **Actionlint — Workflow YAML** runs
+[`actionlint`](https://github.com/rhysd/actionlint) against every workflow file and fails the build on
+invalid `if:` context references, non-existent step outputs, and bad action versions — the same class of
+schema problem that once broke `release.yml` silently for months (GitHub's UI just shows "This run likely
+failed because of a workflow file issue" with no job logs). Install it locally and run
+`actionlint .github/workflows/*.yml` (`brew install actionlint`) before pushing so you catch these before
+CI does.
+
 ## Security Boundaries
 
 Contributions are subject to different review processes based on the security level of the code:
