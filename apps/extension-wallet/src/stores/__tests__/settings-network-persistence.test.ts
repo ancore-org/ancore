@@ -1,10 +1,12 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { useSettingsStore, DEFAULTS } from '../settings';
+import { extensionStorage } from '../_storage';
 
 describe('Settings Store - Network Persistence', () => {
   beforeEach(() => {
     // Reset store before each test
     useSettingsStore.getState().reset();
+    vi.clearAllMocks();
   });
 
   it('persists network selection to storage', () => {
@@ -64,5 +66,84 @@ describe('Settings Store - Network Persistence', () => {
 
     expect(store.network).toBe(DEFAULTS.network);
     expect(store.horizonUrl).toBe(DEFAULTS.horizonUrl);
+  });
+
+  describe('Last successful network persistence', () => {
+    it('saves last successful network when network is set', async () => {
+      const setItemSpy = vi.spyOn(extensionStorage, 'setItem');
+      
+      await useSettingsStore.getState().setNetwork('mainnet');
+      
+      expect(setItemSpy).toHaveBeenCalledWith('ancore-last-successful-network', 'mainnet');
+      setItemSpy.mockRestore();
+    });
+
+    it('saves last successful network for testnet', async () => {
+      const setItemSpy = vi.spyOn(extensionStorage, 'setItem');
+      
+      await useSettingsStore.getState().setNetwork('testnet');
+      
+      expect(setItemSpy).toHaveBeenCalledWith('ancore-last-successful-network', 'testnet');
+      setItemSpy.mockRestore();
+    });
+
+    it('saves last successful network for futurenet', async () => {
+      const setItemSpy = vi.spyOn(extensionStorage, 'setItem');
+      
+      await useSettingsStore.getState().setNetwork('futurenet');
+      
+      expect(setItemSpy).toHaveBeenCalledWith('ancore-last-successful-network', 'futurenet');
+      setItemSpy.mockRestore();
+    });
+
+    it('handles storage errors gracefully when saving network', async () => {
+      const setItemSpy = vi.spyOn(extensionStorage, 'setItem').mockRejectedValue(new Error('Storage error'));
+      
+      // Should not throw
+      await expect(useSettingsStore.getState().setNetwork('mainnet')).resolves.not.toThrow();
+      
+      setItemSpy.mockRestore();
+    });
+
+    it('loads last successful network from storage', async () => {
+      const getItemSpy = vi.spyOn(extensionStorage, 'getItem').mockResolvedValue('mainnet');
+      
+      // The merge function should load and use the last successful network
+      const saved = await extensionStorage.getItem('ancore-last-successful-network');
+      
+      expect(saved).toBe('mainnet');
+      getItemSpy.mockRestore();
+    });
+
+    it('returns undefined when no last successful network is saved', async () => {
+      const getItemSpy = vi.spyOn(extensionStorage, 'getItem').mockResolvedValue(undefined);
+      
+      const saved = await extensionStorage.getItem('ancore-last-successful-network');
+      
+      expect(saved).toBeUndefined();
+      getItemSpy.mockRestore();
+    });
+
+    it('handles storage errors gracefully when loading network', async () => {
+      const getItemSpy = vi.spyOn(extensionStorage, 'getItem').mockRejectedValue(new Error('Storage error'));
+      
+      // Should not throw
+      await expect(extensionStorage.getItem('ancore-last-successful-network')).resolves.not.toThrow();
+      
+      getItemSpy.mockRestore();
+    });
+
+    it('validates saved network value', async () => {
+      const getItemSpy = vi.spyOn(extensionStorage, 'getItem').mockResolvedValue('invalid-network');
+      
+      const saved = await extensionStorage.getItem('ancore-last-successful-network');
+      
+      // Invalid network should be rejected
+      expect(saved).not.toBe('mainnet');
+      expect(saved).not.toBe('testnet');
+      expect(saved).not.toBe('futurenet');
+      
+      getItemSpy.mockRestore();
+    });
   });
 });

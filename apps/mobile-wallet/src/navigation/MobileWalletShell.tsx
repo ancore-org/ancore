@@ -12,6 +12,7 @@ interface Props {
   activeRoute: MobileWalletRoute;
   children: ReactNode;
   items?: NavigationItem[];
+  network?: string;
 }
 
 export const DEFAULT_MOBILE_WALLET_NAVIGATION: NavigationItem[] = [
@@ -20,16 +21,31 @@ export const DEFAULT_MOBILE_WALLET_NAVIGATION: NavigationItem[] = [
   { route: 'settings', label: 'Settings' },
 ];
 
+const NetworkBadge = ({ network }: { network: string }) => {
+  const isMainnet = network === 'mainnet';
+  const badgeColor = isMainnet ? 'bg-emerald-500' : 'bg-amber-500';
+  
+  return (
+    <span
+      className={`inline-flex items-center px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider text-white ${badgeColor}`}
+    >
+      {network}
+    </span>
+  );
+};
+
 export const MobileWalletShell = ({
   appName,
   activeRoute,
   children,
   items = DEFAULT_MOBILE_WALLET_NAVIGATION,
+  network,
 }: Props) => {
   return (
     <main aria-label={appName}>
-      <header>
+      <header className="flex items-center justify-between">
         <h1>{appName}</h1>
+        {network && <NetworkBadge network={network} />}
       </header>
       <nav aria-label="Mobile wallet navigation">
         <ul>
