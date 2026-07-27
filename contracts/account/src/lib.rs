@@ -5,14 +5,17 @@
 //!
 //! Core smart account contract implementing account abstraction for Stellar/Soroban.
 //!
-//! ## Security
-//! This contract is security-critical and must be audited before mainnet deployment.
+//! ## Security Warning
+//! **UNAUDITED & TESTNET-ONLY**
+//! This contract is in active development and has not been audited. It is intended for 
+//! testnet use only. Do not use in production or with real funds.
 //!
 //! ## Features
-//! - Signature validation
-//! - Session key support
+//! - Signature validation (Single Signer Ed25519)
+//! - Session key support (Scoped permissions, limits)
 //! - Upgradeable via proxy pattern
-//! - Multi-signature support
+//! - Multi-signature support (Planned - See #990)
+//! - Passkey support (Planned - See #971)
 //!
 //! ## Events
 //! This contract emits events for all state-changing operations to enable off-chain tracking:

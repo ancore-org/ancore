@@ -59,6 +59,9 @@ describe('account abstraction XDR helpers', () => {
       permissions: [0, 2],
     });
 
+    // Snapshot current arg order to make #962 changes deliberate
+    expect(encoded.map((arg) => arg.toXDR('base64'))).toMatchSnapshot();
+
     expect(decodeAddSessionKeyArgs(encoded)).toEqual({
       publicKey: OWNER_ADDRESS,
       expiresAt: 1700000000,

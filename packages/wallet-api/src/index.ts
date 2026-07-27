@@ -7,7 +7,7 @@
 
 import { ExternalApiMethod } from '@ancore/wallet-shared';
 import type { RequestSessionKeyResult, SessionKeyPolicy } from '@ancore/types';
-import { sendExternalRequest } from './bridge';
+import { sendExternalRequest, WalletApiError, WalletNotInstalledError } from './bridge';
 
 /** Stellar networks exposed to dApps via getNetwork(). */
 export type WalletNetwork = 'mainnet' | 'testnet';
@@ -77,13 +77,22 @@ export async function connect(): Promise<string> {
 
 /** Returns connected smart account C-address without prompting if already allowed. */
 export async function getAddress(): Promise<GetAddressResult> {
-  const result = await sendExternalRequest<BackgroundGetAddressResult>(
-    ExternalApiMethod.GET_ADDRESS
-  );
-  return {
-    smartAccountId: result.address,
-    ownerPublicKey: result.ownerPublicKey,
-  };
+  try {
+    const result = await sendExternalRequest<BackgroundGetAddressResult>(
+      ExternalApiMethod.GET_ADDRESS,
+      {},
+      500
+    );
+    return {
+      smartAccountId: result.address,
+      ownerPublicKey: result.ownerPublicKey,
+    };
+  } catch (error) {
+    if (error instanceof WalletApiError && error.message.includes('timed out')) {
+      throw new WalletNotInstalledError();
+    }
+    throw error;
+  }
 }
 
 /** Returns the wallet's active Stellar network. */
@@ -96,10 +105,19 @@ export async function getNetwork(): Promise<WalletNetwork> {
 
 /** Whether the current origin is allowlisted for the active account. */
 export async function isConnected(): Promise<boolean> {
-  const result = await sendExternalRequest<BackgroundIsConnectedResult>(
-    ExternalApiMethod.IS_CONNECTED
-  );
-  return result.connected;
+  try {
+    const result = await sendExternalRequest<BackgroundIsConnectedResult>(
+      ExternalApiMethod.IS_CONNECTED,
+      {},
+      500
+    );
+    return result.connected;
+  } catch (error) {
+    if (error instanceof WalletApiError && error.message.includes('timed out')) {
+      return false;
+    }
+    throw error;
+  }
 }
 
 /** Ancore-specific: full smart account metadata including deployment status. */
