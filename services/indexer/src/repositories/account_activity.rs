@@ -147,15 +147,32 @@ fn encode_cursor(created_at: DateTime<Utc>, id: Uuid) -> String {
 
 /// Decode cursor to extract created_at and id
 fn decode_cursor(cursor: &str) -> Result<DecodedCursor> {
+    if cursor.trim().is_empty() {
+        return Err(ApiError::InvalidCursor("Cursor cannot be empty".to_string()));
+    }
+
     let decoded = base64::engine::general_purpose::URL_SAFE_NO_PAD
         .decode(cursor)
+        .or_else(|_| base64::engine::general_purpose::URL_SAFE.decode(cursor))
+        .or_else(|_| base64::engine::general_purpose::STANDARD_NO_PAD.decode(cursor))
+        .or_else(|_| base64::engine::general_purpose::STANDARD.decode(cursor))
         .map_err(|_| ApiError::InvalidCursor("Invalid base64 encoding".to_string()))?;
 
     let json_str = std::str::from_utf8(&decoded)
-        .map_err(|_| ApiError::InvalidCursor("Invalid UTF-8".to_string()))?;
+        .map_err(|_| ApiError::InvalidCursor("Invalid UTF-8 sequence in cursor".to_string()))?;
 
     let cursor_obj: DecodedCursor = serde_json::from_str(json_str)
-        .map_err(|_| ApiError::InvalidCursor("Invalid JSON structure".to_string()))?;
+        .map_err(|_| ApiError::InvalidCursor("Invalid JSON structure in cursor".to_string()))?;
+
+    // Validate UUID format
+    if Uuid::parse_str(&cursor_obj.i).is_err() {
+        return Err(ApiError::InvalidCursor("Invalid UUID in cursor".to_string()));
+    }
+
+    // Validate timestamp format
+    if DateTime::parse_from_rfc3339(&cursor_obj.t).is_err() {
+        return Err(ApiError::InvalidCursor("Invalid timestamp format in cursor".to_string()));
+    }
 
     Ok(cursor_obj)
 }

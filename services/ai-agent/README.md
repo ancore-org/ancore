@@ -49,14 +49,89 @@ No authentication required.
 }
 ```
 
+### `POST /agent/draft-intent`
+
+Drafts financial action intents from natural language prompts. Rate-limited to 60 requests/minute and maximum prompt length of 2000 characters.
+
+**Request Body:**
+
+```json
+{
+  "prompt": "Send 10 XLM payment to Alice",
+  "accountId": "GA2C5RFPE6GCKMY3E5CCXBVOV2BLTCED63WBZ3XCABN35Y72EO6S2N3S"
+}
+```
+
+**Example `curl` Command:**
+
+```bash
+curl -X POST http://localhost:3001/agent/draft-intent \
+  -H "Content-Type: application/json" \
+  -d '{
+    "prompt": "Create an invoice for 10 XLM",
+    "accountId": "GA2C5RFPE6GCKMY3E5CCXBVOV2BLTCED63WBZ3XCABN35Y72EO6S2N3S"
+  }'
+```
+
+**Response `200` (Success):**
+
+```json
+{
+  "status": "draft",
+  "requiresConfirmation": true,
+  "summary": "Drafted invoice intent",
+  "intent": {
+    "type": "invoice",
+    "amount": "10",
+    "asset": "XLM",
+    "recipient": "GA2C5RFPE6GCKMY3E5CCXBVOV2BLTCED63WBZ3XCABN35Y72EO6S2N3S",
+    "dueDate": "2026-07-27T16:00:00.000Z"
+  },
+  "risk": {
+    "score": "low",
+    "flags": []
+  }
+}
+```
+
+**Response `413` (Payload Too Large):**
+
+```json
+{
+  "error": "Prompt exceeds maximum length limit of 2000 characters"
+}
+```
+
+**Response `429` (Rate Limited):**
+
+```json
+{
+  "error": "Too many draft-intent requests. Rate limit exceeded.",
+  "retryAfterSeconds": 45
+}
+```
+
 ### `POST /v1/intents/validate`
 
-Validates agent-extracted intents.
+Validates agent-extracted intents against strict Zod schemas without executing transactions.
 
 **Supported Intents:**
 
 1. **Payment Intent (`payment`):** Transfer funds. Requires `amount`, `asset` (`XLM` or `USDC`), and `destination`.
 2. **Invoice Intent (`invoice`):** Request invoice creation. Requires `amount`, `asset` (`XLM` or `USDC`), `recipient` (supports Unicode multilingual), and `dueDate` (valid parseable date).
+
+**Example `curl` Command:**
+
+```bash
+curl -X POST http://localhost:3001/v1/intents/validate \
+  -H "Content-Type: application/json" \
+  -d '{
+    "type": "payment",
+    "amount": "250.00",
+    "asset": "USDC",
+    "destination": "GA2C5RFPE6GCKMY3E5CCXBVOV2BLTCED63WBZ3XCABN35Y72EO6S2N3S"
+  }'
+```
 
 **Response `200` (Valid):**
 
@@ -64,22 +139,26 @@ Validates agent-extracted intents.
 {
   "valid": true,
   "intent": {
-    "type": "invoice",
-    "amount": "150.00",
+    "type": "payment",
+    "amount": "250.00",
     "asset": "USDC",
-    "recipient": "Alice",
-    "dueDate": "2026-12-31T23:59:59Z"
+    "destination": "GA2C5RFPE6GCKMY3E5CCXBVOV2BLTCED63WBZ3XCABN35Y72EO6S2N3S"
+  },
+  "requiresConfirmation": true,
+  "risk": {
+    "score": "medium",
+    "flags": ["high_value_transaction"]
   }
 }
 ```
 
-**Response `400` (Invalid):**
+**Response `400` (Invalid Schema):**
 
 ```json
 {
   "errors": {
     "fieldErrors": {
-      "dueDate": ["Required"]
+      "destination": ["Required"]
     }
   }
 }

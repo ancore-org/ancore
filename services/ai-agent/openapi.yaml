@@ -1,0 +1,100 @@
+openapi: 3.0.3
+info:
+  title: "@ancore/ai-agent Service API"
+  version: 0.1.0
+  description: API specification for AI Agent intent drafting, validation, and health monitoring.
+
+paths:
+  /health:
+    get:
+      summary: Health check endpoint
+      responses:
+        '200':
+          description: Service is healthy
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                    example: ok
+                  uptime:
+                    type: integer
+                    example: 120
+                  timestamp:
+                    type: string
+                    format: date-time
+                  service:
+                    type: string
+                    example: ai-agent
+                  version:
+                    type: string
+                    example: 0.1.0
+
+  /agent/draft-intent:
+    post:
+      summary: Draft intent from natural language prompt
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - prompt
+                - accountId
+              properties:
+                prompt:
+                  type: string
+                  maxLength: 2000
+                  example: Send 10 XLM payment to Alice
+                accountId:
+                  type: string
+                  maxLength: 128
+                  example: GA2C5RFPE6GCKMY3E5CCXBVOV2BLTCED63WBZ3XCABN35Y72EO6S2N3S
+      responses:
+        '200':
+          description: Intent successfully drafted
+        '400':
+          description: Invalid request parameters
+        '413':
+          description: Prompt exceeds maximum length limit
+        '429':
+          description: Rate limit exceeded
+
+  /v1/intents/validate:
+    post:
+      summary: Validate intent payload against Zod schema
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - type
+                - amount
+                - asset
+              properties:
+                type:
+                  type: string
+                  enum: [payment, invoice]
+                amount:
+                  type: string
+                  example: "100.00"
+                asset:
+                  type: string
+                  enum: [XLM, USDC]
+                destination:
+                  type: string
+                recipient:
+                  type: string
+                dueDate:
+                  type: string
+                  format: date-time
+      responses:
+        '200':
+          description: Intent is valid
+        '400':
+          description: Invalid intent schema
