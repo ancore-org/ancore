@@ -215,8 +215,43 @@ Sample response:
   "latest_indexed_ledger": 50123456,
   "chain_head": 50123456,
   "lag_blocks": 0,
-  "lag_seconds": 0
+  "lag_seconds": 0,
+  "schema_version": 5,
+  "expected_schema_version": 5,
+  "migration_status": "up_to_date",
+  "latest_migration": "create_schema_migrations_table",
+  "migration_applied_at": "2024-01-15T09:00:00Z",
+  "applied_migrations": 5
 }
+```
+
+### Health and migration status
+
+`/health` reports the live database schema alongside ledger lag so a deploy can
+verify the indexer is not serving mid-migrate.
+
+| Field | Meaning |
+| --- | --- |
+| `schema_version` | Highest version in the `schema_migrations` ledger. `null` when the ledger is missing or empty. |
+| `expected_schema_version` | Version this binary was compiled against (`EXPECTED_SCHEMA_VERSION`). |
+| `migration_status` | `up_to_date`, `pending`, `ahead`, or `unknown`. |
+| `latest_migration` | Name of the highest applied migration. |
+| `migration_applied_at` | When that migration ran. |
+| `applied_migrations` | Number of rows in the ledger. |
+
+`migration_status` values:
+
+- **`up_to_date`** — applied version matches the binary. Safe to serve.
+- **`pending`** — database is behind; migrations have not finished. Deploy is mid-migrate.
+- **`ahead`** — a newer indexer already migrated the database; this instance is stale and should be rolled forward.
+- **`unknown`** — the `schema_migrations` table is missing or empty. Either migrations have never run, or the database predates migration `005`.
+
+Anything other than `up_to_date` sets the top-level `status` to `degraded`, even
+when ledger lag is zero — gate rollouts on `status`, and read `migration_status`
+to tell a migration problem from a lag problem:
+
+```bash
+curl -sf localhost:3000/health | jq -e '.migration_status == "up_to_date"'
 ```
 
 ### Prometheus metrics
@@ -351,10 +386,18 @@ PROMETHEUS_PORT=9090 # Optional, defaults to 9090
 ### Running Migrations
 
 ```bash
-# Apply migrations
-psql $DATABASE_URL -f migrations/001_create_account_activity_table.sql
-psql $DATABASE_URL -f migrations/002_create_ingest_checkpoints_table.sql
+# Apply every migration in filename order
+for f in migrations/*.sql; do psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f "$f"; done
 ```
+
+Applied migrations are recorded in the `schema_migrations` ledger created by
+`005_create_schema_migrations_table.sql`. **Every new migration file must end
+with an `INSERT INTO schema_migrations (version, name) VALUES (…) ON CONFLICT
+(version) DO NOTHING;`** for its own version, and
+`EXPECTED_SCHEMA_VERSION` in `src/repositories/migrations.rs` must be bumped in
+the same commit. `GET /health` compares the two so a deploy can tell whether the
+indexer is serving a schema it was not built for — see
+[Health and migration status](#health-and-migration-status).
 
 ### Linting Migrations
 
