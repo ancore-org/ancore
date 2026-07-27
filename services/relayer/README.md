@@ -4,6 +4,52 @@ Transaction relay service for the Ancore account abstraction layer. Accepts sign
 
 ---
 
+## Quickstart
+
+Two ways to get a relayer answering on localhost. Full stack setup — Postgres, indexer, health
+checks, teardown, troubleshooting — lives in
+**[docs/development/local-services.md](../../docs/development/local-services.md)**.
+
+### Option A — Docker Compose (relayer + indexer + Postgres)
+
+Use this when you need the whole stack, e.g. to see relayed transactions appear in the indexer.
+
+```bash
+# From the repository root
+docker compose -f docker-compose.dev.yml up
+
+# Verify (compose maps the relayer to host port 3001)
+curl http://localhost:3001/relay/status
+```
+
+Teardown: `docker compose -f docker-compose.dev.yml down` (add `-v` to drop the Postgres volume).
+See [Local Services Setup → Quick Start](../../docs/development/local-services.md#quick-start).
+
+### Option B — pnpm only (relayer alone)
+
+Fastest loop when you are working on the relayer itself.
+
+```bash
+# From the repository root
+pnpm install
+pnpm --filter @ancore/relayer build
+
+# Dev-only: skip real Stellar submission, no RPC node needed. See "Mock mode" below.
+RELAYER_USE_MOCK_SUBMISSION=true pnpm --filter @ancore/relayer start
+
+# Verify (defaults to host port 3000)
+curl http://localhost:3000/relay/status
+```
+
+> **Port note:** the service listens on `PORT` (default `3000`) in both cases. Compose remaps it to
+> **3001** on the host so it does not collide with the indexer, which also uses `3000`. Point apps at
+> `http://localhost:3001` when using Compose and `http://localhost:3000` when running it directly.
+
+Wiring the wallets and dashboard to a local relayer:
+[Local Services Setup → Integration with Applications](../../docs/development/local-services.md#integration-with-applications).
+
+---
+
 ## Deployment Requirements
 
 | Requirement     | Value                            |
@@ -14,12 +60,63 @@ Transaction relay service for the Ancore account abstraction layer. Accepts sign
 
 ### Environment Variables
 
-| Variable              | Required | Description                                                          |
-| --------------------- | -------- | -------------------------------------------------------------------- |
-| `PORT`                | No       | HTTP listen port (default: `3000`)                                   |
-| `RELAYER_AUTH_SECRET` | No       | Bearer token secret required for protected `/relay` routes (JWT/API) |
+Every variable is optional — the service boots with the defaults below. Defaults are tuned for local
+development, so read the **Prod** column before deploying.
 
-> **MVP note:** Authentication and signature verification use stub implementations. Replace `stubAuthService` and `stubSignatureService` in `src/server.ts` before production deployment.
+**Server and auth**
+
+| Variable              | Default | Prod         | Description                                                                                                                                       |
+| --------------------- | ------- | ------------ | ------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `PORT`                | `3000`  | as needed    | HTTP listen port                                                                                                                                  |
+| `RELAYER_AUTH_SECRET` | _unset_ | **required** | Bearer token secret for protected `/relay` routes. **When unset the service falls back to a stub auth service that accepts any non-empty token.** |
+| `ALLOWED_ORIGINS`     | `*`     | **set it**   | Comma-separated CORS allowlist, e.g. `http://localhost:5173,https://app.example.com`                                                              |
+
+**Stellar network**
+
+| Variable                     | Default                               | Description                                                                                   |
+| ---------------------------- | ------------------------------------- | --------------------------------------------------------------------------------------------- |
+| `STELLAR_NETWORK`            | `testnet`                             | One of `testnet`, `mainnet`, `futurenet`, `local`. Unrecognised values fall back to `testnet` |
+| `STELLAR_NETWORK_PASSPHRASE` | derived from `STELLAR_NETWORK`        | Overrides the passphrase used by the transaction submitter                                    |
+| `RPC_URL`                    | `https://soroban-testnet.stellar.org` | Soroban RPC endpoint used for on-chain session-key lookups                                    |
+| `NETWORK_PASSPHRASE`         | `Test SDF Network ; September 2015`   | Passphrase used for those session-key lookups                                                 |
+
+**Limits and timers**
+
+| Variable                              | Default            | Description                                                               |
+| ------------------------------------- | ------------------ | ------------------------------------------------------------------------- |
+| `RELAY_RATE_LIMIT_RPM`                | `30`               | Per-**account** requests/minute on `/relay/execute` (429 + `Retry-After`) |
+| `RELAY_RATE_LIMIT_MAX`                | `50`               | Per-**caller/IP** requests per 15-minute window on `/relay/*`             |
+| `STATUS_RATE_LIMIT_MAX`               | `200`              | Per-IP requests per 15-minute window on `/relay/status`                   |
+| `RELAY_MAX_PAYLOAD_BYTES`             | `524288` (512 KiB) | Request bodies above this are rejected before JSON parsing                |
+| `SCHEDULER_POLL_INTERVAL_MS`          | `1000`             | Scheduled-transfer engine poll interval                                   |
+| `SIGNATURE_SERVICE_HEALTH_TIMEOUT_MS` | `5000`             | Timeout for the signature-service health probe                            |
+
+**Dev-only flags**
+
+| Variable                      | Default | Description                                                    |
+| ----------------------------- | ------- | -------------------------------------------------------------- |
+| `RELAYER_USE_MOCK_SUBMISSION` | _unset_ | Set to the exact string `true` to enable mock mode — see below |
+
+#### Mock mode — never enable outside local development
+
+`RELAYER_USE_MOCK_SUBMISSION=true` makes `/relay/execute` **skip Stellar entirely**. Signature,
+nonce, and rate-limit checks still run, but instead of building and submitting a transaction the
+service returns a randomly generated `transactionId` with `gasUsed: 0` — an id that corresponds to
+nothing on any network. `/relay/status` also reports RPC as healthy (`"Mock submission mode"`)
+without contacting a node, so a broken RPC configuration looks fine.
+
+That combination is exactly what you want for a fast local loop and exactly what you must not ship:
+callers receive `success: true` for payments that never happened, and the health endpoint will not
+tell you. Enable it only via a per-shell variable (as in [Option B](#option-b--pnpm-only-relayer-alone)),
+never in a committed `.env` or deployment manifest. Mock-flag hardening — refusing to start with
+mock mode on when `NODE_ENV=production`, and surfacing the flag in the status payload — is tracked in
+[issue #968](https://github.com/ancore-org/ancore/issues/968).
+
+The same warning applies to leaving `RELAYER_AUTH_SECRET` unset: the fallback stub auth service
+accepts **any** non-empty Bearer token.
+
+> **MVP note:** signature verification is real (`Ed25519SignatureService`), but nonce replay tracking
+> and gas enforcement are not production-complete — see [Security Model](#security-model).
 
 ---
 
@@ -316,6 +413,10 @@ pnpm --filter @ancore/relayer test
 # Start (development)
 pnpm --filter @ancore/relayer start
 ```
+
+For the full local stack (Postgres + indexer + relayer), env file setup, log tailing, and teardown,
+see [Local Services Setup](../../docs/development/local-services.md) — summarised in
+[Quickstart](#quickstart) above.
 
 ---
 
