@@ -8,6 +8,7 @@ import { Input } from '@ancore/ui-kit';
 import { Label } from '@ancore/ui-kit';
 import { createInvoiceSchema } from '@ancore/types';
 import type { CreateInvoiceInput } from '@ancore/types';
+import { stellarAddressError } from '../../lib/address-validation';
 
 interface CreateInvoiceProps {
   onSubmit: (data: CreateInvoiceInput) => Promise<void>;
@@ -26,6 +27,13 @@ export function CreateInvoice({ onSubmit, onCancel }: CreateInvoiceProps) {
     await onSubmit(data);
   };
 
+  // `createInvoiceSchema` only runs on submit, so surface the same format check
+  // inline while the user types. Invoices settle to a classic account, so C…
+  // contract addresses are not accepted here.
+  const recipientAddress = form.watch('recipientAddress') ?? '';
+  const recipientAddressError =
+    stellarAddressError(recipientAddress, { kinds: ['account'] }) ?? undefined;
+
   return (
     <Card>
       <CardHeader>
@@ -38,6 +46,7 @@ export function CreateInvoice({ onSubmit, onCancel }: CreateInvoiceProps) {
               name="recipientAddress"
               label="Recipient Address"
               placeholder="G..."
+              error={recipientAddressError}
               required
             />
 

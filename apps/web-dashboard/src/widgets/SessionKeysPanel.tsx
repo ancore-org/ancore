@@ -1,7 +1,8 @@
 import React from 'react';
 import { Badge, Card, CardContent, CardHeader, CardTitle, Skeleton } from '@ancore/ui-kit';
-import { AlertCircle, Key } from 'lucide-react';
+import { AlertCircle, Key, RefreshCw } from 'lucide-react';
 import { isSessionKeyActive } from '@ancore/core-sdk';
+import { WidgetErrorBoundary } from './WidgetErrorBoundary';
 
 export interface SessionKeySummary {
   publicKey: string;
@@ -17,6 +18,8 @@ export interface SessionKeysPanelProps {
   /** Override "now" (ms) for deterministic rendering / testnet mocks. */
   nowMs?: number;
   className?: string;
+  onRetry?: () => void;
+  shouldThrowOnError?: boolean;
 }
 
 function truncatePublicKey(pk: string): string {
@@ -38,7 +41,13 @@ export const SessionKeysPanel: React.FC<SessionKeysPanelProps> = ({
   error,
   nowMs,
   className = '',
+  onRetry,
+  shouldThrowOnError = false,
 }) => {
+  if (error && shouldThrowOnError) {
+    throw error;
+  }
+
   return (
     <Card className={`overflow-hidden ${className}`}>
       <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
@@ -53,11 +62,26 @@ export const SessionKeysPanel: React.FC<SessionKeysPanelProps> = ({
           </div>
         ) : error ? (
           <div
-            className="flex items-center space-x-2 text-destructive"
+            className="flex flex-col items-center justify-center p-4 text-center space-y-2 text-destructive"
             data-testid="session-keys-error"
           >
-            <AlertCircle className="h-4 w-4" />
-            <span className="text-xs font-medium">Unable to load session keys</span>
+            <div className="flex items-center space-x-2">
+              <AlertCircle className="h-4 w-4 text-red-500" />
+              <span className="text-xs font-medium text-red-800">
+                {error.message || 'Unable to load session keys'}
+              </span>
+            </div>
+            {onRetry && (
+              <button
+                type="button"
+                onClick={onRetry}
+                className="flex items-center gap-1 text-xs font-medium text-red-700 hover:text-red-900 bg-red-100 hover:bg-red-200 px-3 py-1.5 rounded-md transition-colors"
+                data-testid="session-keys-retry-button"
+              >
+                <RefreshCw className="h-3 w-3" />
+                Retry
+              </button>
+            )}
           </div>
         ) : !keys || keys.length === 0 ? (
           <p className="text-xs text-muted-foreground" data-testid="session-keys-empty">
@@ -92,4 +116,17 @@ export const SessionKeysPanel: React.FC<SessionKeysPanelProps> = ({
   );
 };
 
-export default SessionKeysPanel;
+/**
+ * SessionKeys widget wrapped in WidgetErrorBoundary for isolated error boundary + retry.
+ */
+export const SessionKeysWidget: React.FC<SessionKeysPanelProps> = (props) => {
+  return (
+    <WidgetErrorBoundary onReset={props.onRetry}>
+      <SessionKeysPanel {...props} shouldThrowOnError={true} />
+    </WidgetErrorBoundary>
+  );
+};
+
+export const SessionKeys = SessionKeysWidget;
+
+export default SessionKeys;

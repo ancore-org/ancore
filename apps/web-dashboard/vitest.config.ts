@@ -14,6 +14,13 @@ export default defineConfig({
         __dirname,
         '../../packages/account-abstraction/src/index.ts'
       ),
+      '@ancore/stellar': path.resolve(__dirname, '../../packages/stellar/src/index.ts'),
+      '@ancore/wallet-api': path.resolve(__dirname, '../../packages/wallet-api/src/index.ts'),
+      '@ancore/wallet-shared': path.resolve(__dirname, '../../packages/wallet-shared/src/index.ts'),
+      '@stellar/stellar-sdk': path.resolve(
+        __dirname,
+        '../../packages/stellar/node_modules/@stellar/stellar-sdk'
+      ),
       'ed25519-hd-key': path.resolve(__dirname, './src/stubs/ed25519-hd-key.ts'),
       '@ledgerhq/hw-transport-webhid': path.resolve(__dirname, './src/stubs/ledger-transport.ts'),
       buffer: 'buffer',

@@ -42,6 +42,10 @@ export default defineConfig({
         __dirname,
         '../../packages/account-abstraction/src/index.ts'
       ),
+      '@stellar/stellar-sdk': path.resolve(
+        __dirname,
+        '../../packages/stellar/node_modules/@stellar/stellar-sdk'
+      ),
       'ed25519-hd-key': path.resolve(__dirname, './src/stubs/ed25519-hd-key.ts'),
       '@ledgerhq/hw-transport-webhid': path.resolve(__dirname, './src/stubs/ledger-transport.ts'),
       buffer: 'buffer',

@@ -1,7 +1,11 @@
 import express, { Express, Request, Response } from 'express';
 import { intentSchema, HIGH_VALUE_PAYMENT_THRESHOLD, type Intent } from './schemas/intent';
 import { requestLogger } from './middleware/request-logger';
+import { draftIntentRateLimiter } from './middleware/rate-limiter';
 import { scoreRisk } from './risk';
+
+const MAX_PROMPT_LENGTH = 2000;
+const MAX_ACCOUNT_ID_LENGTH = 128;
 
 const startTime = Date.now();
 
@@ -45,12 +49,25 @@ export function createApp(): Express {
   });
 
   // ── Draft Intent endpoint ──────────────────────────────────────────────────
-  app.post('/agent/draft-intent', (req: Request, res: Response) => {
+  app.post('/agent/draft-intent', draftIntentRateLimiter, (req: Request, res: Response) => {
     const { prompt, accountId } = req.body;
-    if (!prompt || !accountId) {
-      return res.status(400).json({ error: 'Invalid request' });
+    if (!prompt || !accountId || typeof prompt !== 'string' || typeof accountId !== 'string') {
+      return res.status(400).json({ error: 'Invalid request: prompt and accountId required' });
     }
-    const isInvoice = typeof prompt === 'string' && prompt.toLowerCase().includes('invoice');
+
+    if (prompt.length > MAX_PROMPT_LENGTH) {
+      return res.status(413).json({
+        error: `Prompt exceeds maximum length limit of ${MAX_PROMPT_LENGTH} characters`,
+      });
+    }
+
+    if (accountId.length > MAX_ACCOUNT_ID_LENGTH) {
+      return res.status(400).json({
+        error: `accountId exceeds maximum length limit of ${MAX_ACCOUNT_ID_LENGTH} characters`,
+      });
+    }
+
+    const isInvoice = prompt.toLowerCase().includes('invoice');
     const draftIntent: Intent = isInvoice
       ? {
           type: 'invoice',

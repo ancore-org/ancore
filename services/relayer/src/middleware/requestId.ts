@@ -31,8 +31,9 @@ export function createRequestIdMiddleware(): RequestHandler {
       id = randomUUID();
     }
 
-    // Expose on request and response header
+    // Expose on request and response headers (both lower-case and canonical)
     Object.assign(req, { requestId: id });
+    res.setHeader('x-request-id', id);
     res.setHeader('X-Request-Id', id);
 
     next();

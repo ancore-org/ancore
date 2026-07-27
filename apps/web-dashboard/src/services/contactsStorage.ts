@@ -6,6 +6,7 @@
  * mocking React state.
  */
 
+import { isValidStellarAddress as isValidAddress } from '../lib/address-validation';
 import type { Contact, ContactPayload } from '../types/contacts';
 
 export const CONTACTS_STORAGE_KEY = 'ancore-dashboard-contacts';
@@ -21,9 +22,14 @@ export class DuplicateAliasError extends Error {
 
 // ── Validation helpers ────────────────────────────────────────────────────────
 
-/** Stellar public key: G + 55 uppercase alphanumeric chars */
+/**
+ * Stellar public key: `G` + 55 base32 chars.
+ *
+ * Contacts address classic accounts only, so this narrows the shared helper in
+ * `lib/address-validation` to the `account` kind.
+ */
 export function isValidStellarAddress(address: string): boolean {
-  return /^G[A-Z0-9]{55}$/.test(address);
+  return isValidAddress(address, ['account']);
 }
 
 /** Alias: 1–32 chars, letters/numbers/spaces/hyphens/underscores */

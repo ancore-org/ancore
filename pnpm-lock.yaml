@@ -399,15 +399,24 @@ importers:
       '@ancore/core-sdk':
         specifier: workspace:*
         version: link:../../packages/core-sdk
+      '@ancore/stellar':
+        specifier: workspace:*
+        version: link:../../packages/stellar
       '@ancore/types':
         specifier: workspace:*
         version: link:../../packages/types
       '@ancore/ui-kit':
         specifier: workspace:*
         version: link:../../packages/ui-kit
+      '@ancore/wallet-api':
+        specifier: workspace:*
+        version: link:../../packages/wallet-api
       '@noble/hashes':
         specifier: '1'
         version: 1.8.0
+      '@stellar/stellar-sdk':
+        specifier: ^13.3.0
+        version: 13.3.0
       bip39:
         specifier: ^3.1.0
         version: 3.1.0

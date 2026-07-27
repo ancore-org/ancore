@@ -77,6 +77,7 @@ export function createAccountRateLimiterMiddleware(options?: AccountRateLimiterO
     // v7's IP validation never fires.
     keyGenerator: deriveAccountKey,
     handler(_req: Request, res: Response) {
+      res.setHeader('Retry-After', '60');
       res.status(429).json({ error: 'RATE_LIMITED', retryAfter: 60 });
     },
   });

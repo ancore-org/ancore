@@ -241,6 +241,50 @@ describe('SplitBill create form — share validation', () => {
     expect(screen.getByRole('alert')).toHaveTextContent('All participants need an address.');
   });
 
+  it('rejects a malformed participant address with an inline error', async () => {
+    const user = userEvent.setup();
+    await openForm(user);
+
+    await user.type(within(participantList()).getByPlaceholderText('G...'), 'not-an-address');
+    await user.type(shareFields()[0], '40');
+    await submit(user);
+
+    expect(mockCreateBill).not.toHaveBeenCalled();
+    expect(screen.getByRole('alert')).toHaveTextContent(
+      'Fix the highlighted participant addresses.'
+    );
+    expect(within(participantList()).getByPlaceholderText('G...')).toHaveAttribute(
+      'aria-invalid',
+      'true'
+    );
+  });
+
+  it('rejects a malformed creator address before checking participants', async () => {
+    const user = userEvent.setup();
+    render(<SplitBillPage />);
+    await user.click(screen.getByRole('button', { name: /new bill/i }));
+    await user.type(screen.getByLabelText(/title/i), 'Dinner');
+    await user.type(screen.getByLabelText(/your address/i), 'GNOTVALID');
+    await submit(user);
+
+    expect(mockCreateBill).not.toHaveBeenCalled();
+    expect(screen.getByLabelText(/your address/i)).toHaveAttribute('aria-invalid', 'true');
+  });
+
+  it('accepts a C… smart-account address for a participant', async () => {
+    const user = userEvent.setup();
+    await openForm(user);
+
+    await user.type(
+      within(participantList()).getByPlaceholderText('G...'),
+      'CA3D5KRYM6CB7OWQ6TWYRR3Z4T7GNZLKERYNZGGA5SOAOPIFY6YQGAXE'
+    );
+    await user.type(shareFields()[0], '40');
+    await submit(user);
+
+    expect(mockCreateBill).toHaveBeenCalled();
+  });
+
   it('labels the share column by mode', async () => {
     const user = userEvent.setup();
     await openForm(user);

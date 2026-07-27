@@ -110,7 +110,8 @@ export function createApp(
     cors({
       origin: corsOrigins,
       methods: ['GET', 'POST', 'PATCH', 'OPTIONS'],
-      allowedHeaders: ['Authorization', 'Content-Type'],
+      allowedHeaders: ['Authorization', 'Content-Type', 'X-Request-Id', 'x-request-id'],
+      exposedHeaders: ['X-Request-Id', 'x-request-id'],
       credentials: true,
     })
   );
