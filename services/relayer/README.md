@@ -191,6 +191,7 @@ Health check. No authentication required.
 | `400`       | `VALIDATION_ERROR` — request body failed schema validation                                            |
 | `401`       | `UNAUTHORIZED` — missing or invalid Bearer token                                                      |
 | `422`       | `INVALID_SIGNATURE`, `SESSION_KEY_EXPIRED`, `NONCE_REPLAY`, `GAS_LIMIT_EXCEEDED`, `SIMULATION_FAILED` |
+| `429`       | `RATE_LIMITED` — request rate limit exceeded per account (includes `Retry-After` header)              |
 | `500`       | `INTERNAL_ERROR` — unexpected server-side error                                                       |
 
 **Client handling guide (TypeScript)**
@@ -271,7 +272,14 @@ The service rejects negative nonces at the validation layer. Full replay trackin
 
 ### Rate Limiting
 
-Not implemented in the MVP skeleton. Add an Express rate-limit middleware (e.g. `express-rate-limit`) in `src/server.ts` before exposing the service publicly.
+Per-account rate limiting is enforced via `createAccountRateLimiterMiddleware` (default: 30 requests/minute per account session key or address, configurable via `RELAY_RATE_LIMIT_RPM`).
+
+When an account exceeds its limit, the relayer returns `HTTP 429 Too Many Requests` with:
+
+- **Header:** `Retry-After: 60`
+- **Body:** `{ "error": "RATE_LIMITED", "retryAfter": 60 }`
+
+Note: uses in-memory store by default (unit-only unless a Redis store like `rate-limit-redis` is configured for multi-instance deployments).
 
 ### Gas Limit Enforcement
 

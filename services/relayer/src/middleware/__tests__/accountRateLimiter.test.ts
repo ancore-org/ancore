@@ -30,6 +30,26 @@ describe('createAccountRateLimiterMiddleware', () => {
     // 31st request must be rate-limited
     const limited = await request(app).post('/test').send(body);
     expect(limited.status).toBe(429);
+    expect(limited.get('Retry-After')).toBe('60');
+    expect(limited.body).toEqual({ error: 'RATE_LIMITED', retryAfter: 60 });
+  });
+
+  it('returns 429 with Retry-After header and body under low RPM config', async () => {
+    const LOW_RPM = 2;
+    const app = buildApp(LOW_RPM);
+    const body = { sessionKey: 'c'.repeat(64) };
+
+    // First 2 requests should succeed
+    for (let i = 0; i < LOW_RPM; i++) {
+      const res = await request(app).post('/test').send(body);
+      expect(res.status).toBe(200);
+    }
+
+    // 3rd request must return 429 with Retry-After header and error body
+    const limited = await request(app).post('/test').send(body);
+    expect(limited.status).toBe(429);
+    expect(limited.get('Retry-After')).toBe('60');
+    expect(limited.headers['retry-after']).toBe('60');
     expect(limited.body).toEqual({ error: 'RATE_LIMITED', retryAfter: 60 });
   });
 
