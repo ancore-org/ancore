@@ -7,8 +7,50 @@
       "expires": "2026-10-15T00:00:00.000Z"
     },
     {
+      "id": "1123896",
+      "issue": "https://github.com/ancore-org/ancore/issues/1085",
+      "justification": "brace-expansion advisory affecting transitive dependency chains; remediation requires coordinated dependency upgrades across multiple workspaces.",
+      "expires": "2026-10-26T00:00:00.000Z"
+    },
+    {
+      "id": "1123897",
+      "issue": "https://github.com/ancore-org/ancore/issues/1085",
+      "justification": "brace-expansion advisory affecting transitive dependency chains; remediation requires coordinated dependency upgrades across multiple workspaces.",
+      "expires": "2026-10-26T00:00:00.000Z"
+    },
+    {
+      "id": "1123898",
+      "issue": "https://github.com/ancore-org/ancore/issues/1085",
+      "justification": "brace-expansion advisory affecting transitive dependency chains; remediation requires coordinated dependency upgrades across multiple workspaces.",
+      "expires": "2026-10-26T00:00:00.000Z"
+    },
+    {
+      "id": "1123911",
+      "issue": "https://github.com/ancore-org/ancore/issues/1085",
+      "justification": "js-yaml advisory is currently transitive; fixing requires dependency updates in upstream toolchain packages.",
+      "expires": "2026-10-26T00:00:00.000Z"
+    },
+    {
+      "id": "1123967",
+      "issue": "https://github.com/ancore-org/ancore/issues/1085",
+      "justification": "axios advisory is currently transitive; coordinated package updates are needed to move all dependents to patched versions.",
+      "expires": "2026-10-26T00:00:00.000Z"
+    },
+    {
+      "id": "1124011",
+      "issue": "https://github.com/ancore-org/ancore/issues/1085",
+      "justification": "@opentelemetry/propagator-jaeger advisory is transitive and requires dependency graph updates across services.",
+      "expires": "2026-10-26T00:00:00.000Z"
+    },
+    {
+      "id": "1124288",
+      "issue": "https://github.com/ancore-org/ancore/issues/1085",
+      "justification": "postcss advisory is transitive in build tooling dependencies; remediation requires broader package upgrades.",
+      "expires": "2026-10-26T00:00:00.000Z"
+    },
+    {
       "id": "1124334",
-      "issue": "https://github.com/ancore-org/ancore/issues/1090",
+      "issue": "https://github.com/ancore-org/ancore/issues/1085",
       "justification": "brace-expansion GHSA-mh99-v99m-4gvg uses vulnerable_versions <=5.0.7, which falsely matches 1.x/2.x. v5 is overridden to 5.0.8; 1.x/2.x are on patched 1.1.16/2.1.2 for the related DoS advisories.",
       "expires": "2026-10-27T00:00:00.000Z"
     }

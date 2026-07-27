@@ -164,7 +164,7 @@ describe('RelayService', () => {
       );
 
       expect(result.success).toBe(false);
-      expect(result.error?.code).toBe('INTERNAL_ERROR');
+      expect(result.error?.code).toBe('RPC_DOWN');
       expect(result.error?.message).toBe('Horizon down');
     });
 

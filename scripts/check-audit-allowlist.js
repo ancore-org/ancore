@@ -38,9 +38,17 @@ if (audit.status === 0) {
   process.exit(0);
 }
 
+const rawAuditOutput = (audit.stdout || '').trim();
+const jsonStartIndex = rawAuditOutput.indexOf('{');
+const jsonEndIndex = rawAuditOutput.lastIndexOf('}');
+const auditJsonOutput =
+  jsonStartIndex >= 0 && jsonEndIndex >= jsonStartIndex
+    ? rawAuditOutput.slice(jsonStartIndex, jsonEndIndex + 1)
+    : rawAuditOutput;
+
 let report;
 try {
-  report = JSON.parse(audit.stdout || '{}');
+  report = JSON.parse(auditJsonOutput || '{}');
 } catch (error) {
   console.error('Unable to parse pnpm audit JSON output.');
   console.error(error instanceof Error ? error.message : error);

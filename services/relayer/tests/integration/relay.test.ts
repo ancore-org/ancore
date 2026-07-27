@@ -128,7 +128,7 @@ describe('POST /relay/execute', () => {
 
     expect(res.status).toBe(422);
     expect(res.body.success).toBe(false);
-    expect(res.body.error.code).toBe('INTERNAL_ERROR');
+    expect(res.body.error.code).toBe('RPC_DOWN');
     expect(res.body.error.message).toBe('Horizon unavailable');
   });
 

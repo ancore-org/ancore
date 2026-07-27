@@ -26,10 +26,10 @@ describe('mapSubmissionError', () => {
     });
   });
 
-  it('maps network errors to INTERNAL_ERROR', () => {
+  it('maps network errors to RPC_DOWN', () => {
     const error = new NetworkError('Horizon unreachable');
     expect(mapSubmissionError(error)).toEqual({
-      code: 'INTERNAL_ERROR',
+      code: 'RPC_DOWN',
       message: 'Horizon unreachable',
     });
   });

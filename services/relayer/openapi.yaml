@@ -358,6 +358,43 @@ components:
           minimum: 0
           description: Replay-protection nonce (non-negative integer)
           example: 1
+        transferPolicy:
+          $ref: '#/components/schemas/TransferPolicyContext'
+
+    TransferPolicyContext:
+      type: object
+      description: >-
+        Optional transfer-policy context. When present the relayer evaluates the
+        transfer against the policy and rejects blocked transfers with
+        `POLICY_DENIED`.
+      required:
+        - policy
+        - amount
+        - todayTotal
+      properties:
+        policy:
+          type: object
+          required:
+            - dailyLimit
+            - stepUpThreshold
+          properties:
+            dailyLimit:
+              type: number
+              minimum: 0
+              example: 1000
+            stepUpThreshold:
+              type: number
+              minimum: 0
+              description: Must be less than or equal to dailyLimit
+              example: 250
+        amount:
+          type: number
+          description: Amount of this transfer, in XLM
+          example: 50
+        todayTotal:
+          type: number
+          description: Total already transferred today, in XLM
+          example: 100
 
     RelayValidateRequest:
       type: object
@@ -502,13 +539,31 @@ components:
             - NONCE_REPLAY
             - GAS_LIMIT_EXCEEDED
             - SIMULATION_FAILED
+            - POLICY_DENIED
+            - RPC_DOWN
             - UNAUTHORIZED
             - INTERNAL_ERROR
-          description: Machine-readable error code
+            - TRANSFER_LIMIT_EXCEEDED
+          description: >-
+            Stable machine-readable error code. Clients MUST switch on this
+            field and MUST NOT parse `message`, which is free text and may
+            change between releases.
+
+            Codes:
+              * `INVALID_SIGNATURE` — signature verification failed, or the session key is malformed/unknown on chain.
+              * `SESSION_KEY_EXPIRED` — the session key exists but is past its expiry.
+              * `NONCE_REPLAY` — nonce is negative or already consumed by this session key.
+              * `GAS_LIMIT_EXCEEDED` — Soroban resource budget (fee, CPU, memory) exhausted.
+              * `SIMULATION_FAILED` — simulation or host-function invocation failed.
+              * `POLICY_DENIED` — a transfer policy rejected the request.
+              * `RPC_DOWN` — the upstream Horizon / Soroban RPC endpoint is unreachable.
+              * `UNAUTHORIZED` — caller is not authenticated or lacks permission.
+              * `INTERNAL_ERROR` — unclassified server-side failure. Treat unrecognised codes as this.
+              * `TRANSFER_LIMIT_EXCEEDED` — **deprecated**, superseded by `POLICY_DENIED`; no longer emitted.
           example: "INVALID_SIGNATURE"
         message:
           type: string
-          description: Human-readable error message
+          description: Human-readable error detail. Not part of the API contract.
           example: "Signature verification failed"
 
     ValidationErrorResponse:

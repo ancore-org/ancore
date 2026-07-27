@@ -50,6 +50,7 @@ if [[ "${SKIP_DOWN:-0}" != "1" ]]; then
   psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -c "
     DROP TABLE IF EXISTS account_activity CASCADE;
     DROP TABLE IF EXISTS ingest_checkpoints CASCADE;
+    DROP TABLE IF EXISTS schema_migrations CASCADE;
   "
   echo "==> Re-applying migrations after teardown"
   for file in "$MIGRATIONS_DIR"/*.sql; do
