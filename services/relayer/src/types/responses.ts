@@ -2,18 +2,15 @@
  * Typed response interfaces for the Relayer Service.
  */
 
-export type RelayErrorCode =
-  | 'INVALID_SIGNATURE'
-  | 'SESSION_KEY_EXPIRED'
-  | 'NONCE_REPLAY'
-  | 'GAS_LIMIT_EXCEEDED'
-  | 'SIMULATION_FAILED'
-  | 'TRANSFER_LIMIT_EXCEEDED'
-  | 'UNAUTHORIZED'
-  | 'INTERNAL_ERROR';
+import type { RelayErrorCode } from './errorCodes';
+
+export { RelayErrorCodes, RELAY_ERROR_CODES, isRelayErrorCode } from './errorCodes';
+export type { RelayErrorCode } from './errorCodes';
 
 export interface RelayError {
+  /** Stable machine-readable code — switch on this, never on `message`. */
   code: RelayErrorCode;
+  /** Human-readable detail. Free text; not part of the API contract. */
   message: string;
 }
 

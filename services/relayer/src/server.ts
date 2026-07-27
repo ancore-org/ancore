@@ -2,6 +2,7 @@ import express, { Express, Request, Response, NextFunction } from 'express';
 import cors from 'cors';
 import rateLimit from 'express-rate-limit';
 import { z } from 'zod';
+import { TransferPolicySchema } from '@ancore/types';
 import { RelayService } from './services/relayService';
 import { createStellarSubmitterFromEnv } from './services/stellarSubmitter';
 import { createAuthMiddleware } from './middleware/auth';
@@ -54,6 +55,15 @@ const relayRequestSchema = z.object({
     .length(128)
     .regex(/^[0-9a-fA-F]+$/),
   nonce: z.number().int().nonnegative(),
+  // Optional; zod strips unknown keys, so this must be declared for the
+  // service-level policy check (POLICY_DENIED) to be reachable over HTTP.
+  transferPolicy: z
+    .object({
+      policy: TransferPolicySchema,
+      amount: z.number(),
+      todayTotal: z.number(),
+    })
+    .optional(),
 });
 
 // ── Stub implementations (replace with real services) ─────────────────────────

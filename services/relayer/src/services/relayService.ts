@@ -18,6 +18,7 @@ import type {
   DependencyStatus,
   RelayError,
 } from '../types';
+import { RelayErrorCodes } from '../types';
 import { mapSimulationError } from './mapSimulationError';
 import { mapSubmissionError } from './mapSubmissionError';
 
@@ -66,12 +67,18 @@ export class RelayService implements RelayServiceContract {
       try {
         const keyError = this.validateSessionKey(request.sessionKey);
         if (keyError) {
-          const error: RelayError = { code: 'INVALID_SIGNATURE', message: keyError };
+          const error: RelayError = {
+            code: RelayErrorCodes.INVALID_SIGNATURE,
+            message: keyError,
+          };
           return { valid: false, error };
         }
 
         if (request.nonce < 0) {
-          const error: RelayError = { code: 'NONCE_REPLAY', message: 'Nonce must be non-negative' };
+          const error: RelayError = {
+            code: RelayErrorCodes.NONCE_REPLAY,
+            message: 'Nonce must be non-negative',
+          };
           return { valid: false, error };
         }
 
@@ -80,7 +87,7 @@ export class RelayService implements RelayServiceContract {
             await this.nonceStore.assertFresh(request.sessionKey, request.nonce);
           } catch (err) {
             const message = err instanceof Error ? err.message : 'Nonce already used';
-            const error: RelayError = { code: 'NONCE_REPLAY', message };
+            const error: RelayError = { code: RelayErrorCodes.NONCE_REPLAY, message };
             return { valid: false, error };
           }
         }
@@ -99,7 +106,10 @@ export class RelayService implements RelayServiceContract {
           if (!onChainKey) {
             return {
               valid: false,
-              error: { code: 'INVALID_SIGNATURE', message: 'Session key not found on chain' },
+              error: {
+                code: RelayErrorCodes.INVALID_SIGNATURE,
+                message: 'Session key not found on chain',
+              },
             };
           }
         } catch (e: unknown) {
@@ -112,7 +122,10 @@ export class RelayService implements RelayServiceContract {
         if (!ok) {
           return {
             valid: false,
-            error: { code: 'INVALID_SIGNATURE', message: 'Signature verification failed' },
+            error: {
+              code: RelayErrorCodes.INVALID_SIGNATURE,
+              message: 'Signature verification failed',
+            },
           };
         }
 
@@ -122,7 +135,7 @@ export class RelayService implements RelayServiceContract {
           if (policyResult.action === 'block') {
             return {
               valid: false,
-              error: { code: 'TRANSFER_LIMIT_EXCEEDED', message: policyResult.message },
+              error: { code: RelayErrorCodes.POLICY_DENIED, message: policyResult.message },
             };
           }
         }
@@ -152,7 +165,7 @@ export class RelayService implements RelayServiceContract {
       return {
         success: false,
         error: {
-          code: 'INTERNAL_ERROR',
+          code: RelayErrorCodes.INTERNAL_ERROR,
           message: 'Transaction submitter is not configured',
         },
         gasUsed: 0,
@@ -164,7 +177,7 @@ export class RelayService implements RelayServiceContract {
       return {
         success: false,
         error: {
-          code: 'INTERNAL_ERROR',
+          code: RelayErrorCodes.INTERNAL_ERROR,
           message: `Missing required parameter: ${SIGNED_TX_PARAMETER}`,
         },
         gasUsed: 0,
