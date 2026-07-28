@@ -113,14 +113,11 @@ describe('validateMnemonicStrength', () => {
   });
 
   it('throws INVALID_CHECKSUM for mnemonic with wrong checksum', () => {
-    const validMnemonic = bip39.generateMnemonic(128);
-    const words = validMnemonic.split(' ');
-    // Swap last two words to break checksum
-    const last = words[words.length - 1];
-    const secondLast = words[words.length - 2];
-    words[words.length - 1] = secondLast;
-    words[words.length - 2] = last;
-    const invalidMnemonic = words.join(' ');
+    // 12× "abandon" is a known invalid BIP39 phrase (valid words, bad checksum).
+    // Swapping the last two words of a random mnemonic is not reliable — it can
+    // still pass checksum by chance and flake CI.
+    const invalidMnemonic = Array(12).fill('abandon').join(' ');
+    expect(bip39.validateMnemonic(invalidMnemonic)).toBe(false);
 
     expect(() => validateMnemonicStrength(invalidMnemonic)).toThrow(MnemonicValidationError);
     try {

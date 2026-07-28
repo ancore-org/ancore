@@ -12,6 +12,7 @@ import {
   Shield,
   Info,
   Bell,
+  Usb,
   QrCode,
 } from 'lucide-react';
 import { SettingsGroup, SettingItem } from '../../components/SettingsGroup';
@@ -21,6 +22,7 @@ import { AboutScreen } from './AboutScreen';
 import { EnvironmentSettings } from './EnvironmentSettings';
 import { DisplaySettings } from './DisplaySettings';
 import { ConnectedSitesScreen } from './ConnectedSitesScreen';
+import { HardwareWalletSettings } from './HardwareWalletSettings';
 import { AccountQrScreen } from './AccountQrScreen';
 import { useAccountStore } from '../../stores/account';
 import { useSettings } from '../../hooks/useSettings';
@@ -28,6 +30,7 @@ import { DASHBOARD_SETTINGS_STORAGE_KEY } from '../../state/dashboard-settings';
 import { useToast } from '@ancore/ui-kit';
 import type { Network } from '@ancore/types';
 import { useSettingsStore } from '../../stores/settings';
+import { useHardwareWalletStore } from '../../stores/hardware-wallet';
 import {
   getAutoLockLabel,
   getDisplayLabel,
@@ -44,6 +47,7 @@ type SettingsView =
   | 'display'
   | 'about'
   | 'connected-sites'
+  | 'hardware-wallet'
   | 'account-qr';
 
 export function SettingsScreen() {
@@ -65,6 +69,8 @@ export function SettingsScreen() {
   const setEnableLockShortcut = useSettingsStore((state) => state.setEnableLockShortcut);
   const telemetryOptIn = useSettingsStore((state) => state.telemetryOptIn);
   const setTelemetryOptIn = useSettingsStore((state) => state.setTelemetryOptIn);
+  const ledgerSignerMode = useHardwareWalletStore((state) => state.signerMode);
+  const ledgerPublicKey = useHardwareWalletStore((state) => state.ledgerPublicKey);
   const [view, setView] = React.useState<SettingsView>('root');
 
   // Prefer the deployed smart-account contract id — that is the address funds
@@ -142,6 +148,10 @@ export function SettingsScreen() {
     return <ConnectedSitesScreen onBack={() => setView('root')} />;
   }
 
+  if (view === 'hardware-wallet') {
+    return <HardwareWalletSettings onBack={() => setView('root')} />;
+  }
+
   if (view === 'account-qr') {
     return <AccountQrScreen address={receiveAddress} onBack={() => setView('root')} />;
   }
@@ -155,6 +165,10 @@ export function SettingsScreen() {
     settings.approvalUx === 'sidePanel'
       ? t('settings.approvals.sidePanel')
       : t('settings.approvals.popup');
+  const hardwareValue =
+    ledgerSignerMode === 'ledger' && ledgerPublicKey
+      ? t('settings.hardware.ledgerActive')
+      : t('settings.hardware.software');
 
   return (
     <div className="flex flex-col min-h-screen bg-background">
@@ -221,6 +235,13 @@ export function SettingsScreen() {
         </SettingsGroup>
 
         <SettingsGroup title={t('settings.groups.security')}>
+          <SettingItem
+            label={t('settings.hardware.label')}
+            description={t('settings.hardware.menuDescription')}
+            icon={<Usb className="h-4 w-4" />}
+            value={hardwareValue}
+            onClick={() => setView('hardware-wallet')}
+          />
           <SettingItem
             label={t('settings.approvals.label')}
             description={t('settings.approvals.description')}

@@ -61,7 +61,7 @@ export function SendScreen({
     isMemoRequired(form.to).then((required) => {
       if (required && !form.note) {
         setMemoWarning(
-          'This address belongs to an exchange and requires a memo. Add a memo or funds may be lost.'
+          'This exchange requires a memo. Without it, your payment may not be credited to your account.'
         );
       }
     });

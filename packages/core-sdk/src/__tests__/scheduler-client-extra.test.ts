@@ -9,6 +9,7 @@ import {
   resolveRelayerBaseUrl,
   DEMO_ACCOUNT_ADDRESS,
   SCHEDULE_FREQUENCY_OPTIONS,
+  ConfigError,
 } from '../scheduler-client';
 
 describe('resolveRelayerBaseUrl', () => {
@@ -18,8 +19,26 @@ describe('resolveRelayerBaseUrl', () => {
     );
   });
 
-  it('falls back to localhost when no argument given', () => {
+  it('falls back to localhost when no argument given in non-production', () => {
+    const originalEnv = process.env.NODE_ENV;
+    process.env.NODE_ENV = 'development';
     expect(resolveRelayerBaseUrl()).toBe('http://localhost:3000');
+    process.env.NODE_ENV = originalEnv;
+  });
+
+  it('throws ConfigError when no argument given and VITE_RELAYER_URL is missing in production', () => {
+    const originalEnv = process.env.NODE_ENV;
+    const originalVite = process.env.VITE_RELAYER_URL;
+    process.env.NODE_ENV = 'production';
+    delete process.env.VITE_RELAYER_URL;
+
+    expect(() => resolveRelayerBaseUrl()).toThrow(
+      'VITE_RELAYER_URL is required in production environment'
+    );
+    expect(() => resolveRelayerBaseUrl()).toThrow(ConfigError);
+
+    process.env.NODE_ENV = originalEnv;
+    process.env.VITE_RELAYER_URL = originalVite;
   });
 });
 

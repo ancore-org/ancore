@@ -13,6 +13,9 @@ import { Account, Asset, Operation, TransactionBuilder } from '@stellar/stellar-
 import { getErrorUserMessage } from '../errors/error-handler';
 import { simulateTransaction as simulateSorobanTransaction } from './simulation-service';
 import type { StellarNetwork } from '@ancore/wallet-shared';
+import { getHardwareWalletState } from '../stores/hardware-wallet';
+import { formatLedgerError, signWithLedger } from '../security/ledger';
+
 export interface ProductionSendServiceOptions {
   stellarClient: StellarClient;
   accountAddress: string;
@@ -53,7 +56,7 @@ export function createProductionSendService(options: ProductionSendServiceOption
       return {
         baseFee: '0.0000100',
         totalFee: '0.0000100',
-        network: stellarClient.getNetwork() as any,
+        network: stellarClient.getNetwork(),
       };
     },
 
@@ -64,12 +67,31 @@ export function createProductionSendService(options: ProductionSendServiceOption
 
     async signTransaction(tx: SendTransactionDraft): Promise<string> {
       const unsignedXdr = await buildPaymentXdr(tx);
+      const networkPassphrase = stellarClient.getNetworkPassphrase();
+      const { signerMode, ledgerPublicKey } = getHardwareWalletState();
+
+      // Hardware path: sign in the popup (WebHID user gesture). Never export seed.
+      if (signerMode === 'ledger' && ledgerPublicKey) {
+        try {
+          return await signWithLedger(unsignedXdr, networkPassphrase);
+        } catch (err) {
+          throw new Error(formatLedgerError(err));
+        }
+      }
+
       const response = await sendMessage('SIGN_TRANSACTION', {
         xdr: unsignedXdr,
-        networkPassphrase: stellarClient.getNetworkPassphrase(),
+        networkPassphrase,
       });
       if ('error' in response) {
         throw new Error(response.error);
+      }
+      if ('requiresHardware' in response && response.requiresHardware) {
+        try {
+          return await signWithLedger(unsignedXdr, networkPassphrase);
+        } catch (err) {
+          throw new Error(formatLedgerError(err));
+        }
       }
       return response.signedXdr;
     },

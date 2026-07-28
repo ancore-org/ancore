@@ -137,6 +137,7 @@ export {
   defaultScheduleStartAt,
   SCHEDULE_FREQUENCY_OPTIONS,
   DEMO_ACCOUNT_ADDRESS,
+  ConfigError,
   type SchedulerClient,
   type SchedulerClientOptions,
 } from './scheduler-client';

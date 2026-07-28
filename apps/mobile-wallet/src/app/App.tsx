@@ -36,7 +36,11 @@ export const MobileWalletApp = ({ env }: Props) => {
   }
 
   return (
-    <MobileWalletShell appName={bootstrap.environment.appName} activeRoute="account">
+    <MobileWalletShell 
+      appName={bootstrap.environment.appName} 
+      activeRoute="account"
+      network={bootstrap.environment.network}
+    >
       <ReadOnlyAccountView
         account={bootstrap.account}
         accountContractId={bootstrap.sdk.accountContractId}

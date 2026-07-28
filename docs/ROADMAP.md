@@ -113,8 +113,8 @@
 | 5.5 | WebAuthn onboarding design RFC | #869 → #971 | 🔄 |
 | 5.6 | Session Keys UI wired to contract | #773 → #963 | 🔄 |
 | 5.7 | Core SDK: deployAndInitializeAccount helper | #861 | 🔄 |
-| 5.8 | Core SDK: Ledger hardware wallet adapter | #872 → #985 | 🔄 |
-| 5.9 | AI agent: Claude Haiku NL→intent parsing | #836 → #972 | 🔲 |
+| 5.8 | Core SDK + extension: Ledger WebHID signing E2E | #985 (was #872) | 🔄 |
+| 5.9 | AI agent: Claude Haiku NL→intent parsing | #836 | 🔲 |
 | 5.10 | AI agent: risk score field | #837 | ✅ |
 | 5.11 | Indexer: Soroban contract event decoder | #856 → #974 | 🔄 |
 | 5.12 | Indexer: session_key_events table + REST API | #857 → #974 | 🔄 |

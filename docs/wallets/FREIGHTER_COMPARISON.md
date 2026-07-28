@@ -243,7 +243,7 @@ Priority-ordered issues found in the Ancore codebase vs Freighter production bar
 | Issue | Evidence | Freighter has |
 |-------|----------|---------------|
 | Inline placeholder Session Keys in router | `router/index.tsx` vs `screens/SessionKeys/` | Dedicated management screens |
-| Hardware wallet support | — | Ledger via WebHID |
+| Hardware wallet support | Settings → Hardware wallet + `LedgerSigningAdapter` (WebHID) | Ledger via WebHID |
 | Swap / token management | — | Soroswap integration, addToken API |
 | Collectibles / NFTs | — | Backend v2 + handlers |
 | Side panel signing | — | Chrome sidePanel for MV3 |

@@ -23,6 +23,13 @@ export interface SchedulerClientOptions {
 const DEFAULT_RELAYER_URL = 'http://localhost:3000';
 const DEFAULT_AUTH_TOKEN = 'ancore-client-token';
 
+export class ConfigError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = 'ConfigError';
+  }
+}
+
 export function resolveRelayerBaseUrl(explicit?: string): string {
   if (explicit) {
     return explicit.replace(/\/$/, '');
@@ -30,6 +37,10 @@ export function resolveRelayerBaseUrl(explicit?: string): string {
 
   if (typeof process !== 'undefined' && process.env?.VITE_RELAYER_URL) {
     return process.env.VITE_RELAYER_URL.replace(/\/$/, '');
+  }
+
+  if (typeof process !== 'undefined' && process.env?.NODE_ENV === 'production') {
+    throw new ConfigError('VITE_RELAYER_URL is required in production environment');
   }
 
   return DEFAULT_RELAYER_URL;

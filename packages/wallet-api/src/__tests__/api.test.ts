@@ -8,6 +8,7 @@ jest.mock('../bridge', () => ({
 }));
 
 import { connect, getAddress, getNetwork, isConnected, requestSessionKey } from '../index';
+import { WalletApiError, WalletNotInstalledError } from '../bridge';
 
 describe('wallet-api public methods', () => {
   beforeEach(() => {
@@ -31,7 +32,7 @@ describe('wallet-api public methods', () => {
     });
 
     await expect(getAddress()).resolves.toEqual({ smartAccountId: 'CADDR123' });
-    expect(sendExternalRequest).toHaveBeenCalledWith(ExternalApiMethod.GET_ADDRESS);
+    expect(sendExternalRequest).toHaveBeenCalledWith(ExternalApiMethod.GET_ADDRESS, {}, 500);
   });
 
   it('getNetwork returns mainnet or testnet', async () => {
@@ -48,7 +49,17 @@ describe('wallet-api public methods', () => {
     sendExternalRequest.mockResolvedValue({ connected: true });
 
     await expect(isConnected()).resolves.toBe(true);
-    expect(sendExternalRequest).toHaveBeenCalledWith(ExternalApiMethod.IS_CONNECTED);
+    expect(sendExternalRequest).toHaveBeenCalledWith(ExternalApiMethod.IS_CONNECTED, {}, 500);
+  });
+
+  it('isConnected returns false on timeout (missing extension)', async () => {
+    sendExternalRequest.mockRejectedValue(new WalletApiError('Request timed out after 500ms'));
+    await expect(isConnected()).resolves.toBe(false);
+  });
+
+  it('getAddress throws WalletNotInstalledError on timeout', async () => {
+    sendExternalRequest.mockRejectedValue(new WalletApiError('Request timed out after 500ms'));
+    await expect(getAddress()).rejects.toThrow(WalletNotInstalledError);
   });
 
   it('requestSessionKey forwards policy to the extension bridge', async () => {
