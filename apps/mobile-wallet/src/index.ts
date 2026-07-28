@@ -2,12 +2,16 @@
 export * from './accounts';
 export * from './app';
 export * from './config/environment';
+export * from './config/remote-config';
+export * from './config/hooks/useAppGate';
 export * from './config/urls';
 export * from './linking';
 export * from './navigation';
 export * from './sdk';
 
 export { HistoryScreen } from './screens/history/HistoryScreen';
+export { ForceUpdateScreen } from './screens/gate/ForceUpdateScreen';
+export { MaintenanceScreen } from './screens/gate/MaintenanceScreen';
 
 export type {
   FetchTransactionPageParams,

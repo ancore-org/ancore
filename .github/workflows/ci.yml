@@ -176,6 +176,9 @@ jobs:
       - name: Check documented repository structure
         run: pnpm docs:check-structure
 
+      - name: Lint OpenAPI specs
+        run: pnpm docs:lint-openapi
+
   contracts:
     name: Contracts — Build & Test
     runs-on: ubuntu-latest
