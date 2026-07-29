@@ -1,30 +1,53 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import type { ScheduledTransfer, ScheduledTransferExecutionLog } from '@ancore/types';
 import {
-  DEMO_ACCOUNT_ADDRESS,
   getExtensionSchedulerClient,
   type SchedulerClient,
 } from '@/services/scheduler-client';
+import { useAccountStore } from '@/stores/account';
 
 const REFRESH_INTERVAL_MS = 15_000;
 
 export interface UseScheduledTransfersOptions {
+  /**
+   * Stellar address of the account whose transfers to load.
+   * Defaults to the currently active account in the extension wallet store.
+   * If no account is active, the hook returns an empty list instead of
+   * falling back to the demo/placeholder address.
+   */
   accountAddress?: string;
   client?: SchedulerClient;
   refreshIntervalMs?: number;
 }
 
 export function useScheduledTransfers(options: UseScheduledTransfersOptions = {}) {
-  const accountAddress = options.accountAddress ?? DEMO_ACCOUNT_ADDRESS;
+  // Resolve the vault address from the live account store when not explicitly
+  // provided by the caller.  This removes the DEMO_ACCOUNT_ADDRESS fallback
+  // that was used while the store was not yet wired up.
+  const activeAccountAddress = useAccountStore((state) => {
+    if (options.accountAddress) return null; // caller is explicit — skip store lookup
+    const active = state.accounts.find((a) => a.id === state.activeAccountId);
+    return active?.address ?? null;
+  });
+
+  const accountAddress = options.accountAddress ?? activeAccountAddress;
   const refreshIntervalMs = options.refreshIntervalMs ?? REFRESH_INTERVAL_MS;
   const client = useMemo(() => options.client ?? getExtensionSchedulerClient(), [options.client]);
 
   const [transfers, setTransfers] = useState<ScheduledTransfer[]>([]);
   const [executions, setExecutions] = useState<Record<string, ScheduledTransferExecutionLog[]>>({});
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(accountAddress !== null);
   const [error, setError] = useState<string | null>(null);
 
   const refresh = useCallback(async () => {
+    if (!accountAddress) {
+      // No active account — return empty state rather than erroring.
+      setTransfers([]);
+      setExecutions({});
+      setLoading(false);
+      return;
+    }
+
     setError(null);
 
     try {
@@ -77,6 +100,7 @@ export function useScheduledTransfers(options: UseScheduledTransfersOptions = {}
     executions,
     loading,
     error,
+    accountAddress,
     refresh,
     pauseTransfer,
     cancelTransfer,
