@@ -22,13 +22,13 @@ export function OnboardingEntryScreen({
       </header>
 
       <div className="space-y-3">
-        <button onClick={onCreate} type="button">
+        <button aria-label="Create a new wallet" onClick={onCreate} type="button">
           Create a new wallet
         </button>
-        <button onClick={onImport} type="button">
+        <button aria-label="Import an existing wallet" onClick={onImport} type="button">
           Import an existing wallet
         </button>
-        <button onClick={onRecover} type="button">
+        <button aria-label="Recover from backup" onClick={onRecover} type="button">
           Recover from backup
         </button>
       </div>

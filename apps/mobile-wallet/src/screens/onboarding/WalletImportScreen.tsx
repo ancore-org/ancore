@@ -57,13 +57,13 @@ export function WalletImportScreen({ onBack = noop, onCancel = noop, onContinue 
       )}
 
       <div className="flex gap-3">
-        <button onClick={onBack} type="button">
+        <button aria-label="Go back" onClick={onBack} type="button">
           Back
         </button>
-        <button onClick={onCancel} type="button">
+        <button aria-label="Cancel wallet import" onClick={onCancel} type="button">
           Cancel
         </button>
-        <button disabled={!hasEnoughWords} onClick={handleContinue} type="button">
+        <button aria-label="Continue wallet import" disabled={!hasEnoughWords} onClick={handleContinue} type="button">
           Continue
         </button>
       </div>
