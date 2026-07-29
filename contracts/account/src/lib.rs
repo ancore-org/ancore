@@ -350,7 +350,7 @@ impl AncoreAccount {
 
         // Call each registered validation module before executing the operation.
         // Modules expose `validate(to, function, args) -> Result<(), u32>`.
-        // Any module returning an error aborts execution with InsufficientPermission.
+        // Any module returning an error or panicking aborts execution with InsufficientPermission.
         let modules: Vec<Address> = env
             .storage()
             .instance()
@@ -362,10 +362,16 @@ impl AncoreAccount {
             let mut module_args: Vec<Val> = Vec::new(&env);
             module_args.push_back(to.clone().to_val());
             module_args.push_back(function.clone().to_val());
-            for arg in args.iter() {
-                module_args.push_back(arg);
+            module_args.push_back(args.clone().to_val());
+            let res = env.try_invoke_contract::<Val, soroban_sdk::InvokeError>(
+                &module,
+                &validate_fn,
+                module_args,
+            );
+            match res {
+                Ok(Ok(_)) => {}
+                _ => return Err(ContractError::InsufficientPermission),
             }
-            let _: Val = env.invoke_contract(&module, &validate_fn, module_args);
         }
 
         let result: Val = env.invoke_contract(&to, &function, args.clone());
@@ -529,6 +535,7 @@ impl AncoreAccount {
     ///
     /// The module must expose a `validate` function with signature
     /// `fn validate(to: Address, function: Symbol, args: Vec<Val>) -> Result<(), u32>`.
+    /// Execution is fail-closed: any module returning an `Err` or panicking causes `execute()` to abort with `ContractError::InsufficientPermission`.
     /// It is called before each `execute()` invocation.
     pub fn register_module(env: Env, module: Address) -> Result<(), ContractError> {
         let owner = Self::get_owner(env.clone())?;
@@ -2164,6 +2171,186 @@ mod test {
         );
 
         assert!(matches!(result, Err(Ok(ContractError::ExceededSpendLimit))));
+        assert_eq!(client.get_nonce(), 0);
+    }
+
+    // ─────────────────────────────────────────────────────────────────────────
+    // Validation module fail-closed handling tests (#1111)
+    // ─────────────────────────────────────────────────────────────────────────
+
+    mod mock_pass {
+        use super::*;
+
+        #[contract]
+        pub struct MockValidationModulePass;
+
+        #[contractimpl]
+        impl MockValidationModulePass {
+            pub fn validate(_env: Env, _to: Address, _function: Symbol, _args: Vec<Val>) -> Result<(), ContractError> {
+                Ok(())
+            }
+        }
+    }
+
+    mod mock_fail {
+        use super::*;
+
+        #[contract]
+        pub struct MockValidationModuleFailResult;
+
+        #[contractimpl]
+        impl MockValidationModuleFailResult {
+            pub fn validate(_env: Env, _to: Address, _function: Symbol, _args: Vec<Val>) -> Result<(), ContractError> {
+                Err(ContractError::Unauthorized)
+            }
+        }
+    }
+
+    mod mock_panic {
+        use super::*;
+
+        #[contract]
+        pub struct MockValidationModulePanic;
+
+        #[contractimpl]
+        impl MockValidationModulePanic {
+            pub fn validate(_env: Env, _to: Address, _function: Symbol, _args: Vec<Val>) -> Result<(), ContractError> {
+                panic!("module validation panic");
+            }
+        }
+    }
+
+    /// (a) A module that approves (returns Ok(())) permits execute() to proceed.
+    #[test]
+    fn test_validation_module_approves_execute() {
+        let env = Env::default();
+        let contract_id = env.register_contract(None, AncoreAccount);
+        let client = AncoreAccountClient::new(&env, &contract_id);
+
+        let owner = Address::generate(&env);
+        init(&env, &client, &owner);
+        env.mock_all_auths();
+
+        let pass_module_id = env.register_contract(None, mock_pass::MockValidationModulePass);
+        client.register_module(&pass_module_id);
+
+        let callee_id = env.register_contract(None, AncoreAccount);
+        let function = soroban_sdk::symbol_short!("get_nonce");
+        let args: Vec<Val> = Vec::new(&env);
+
+        let result = client.try_execute(
+            &CallerIdentity::Owner,
+            &callee_id,
+            &function,
+            &args,
+            &0u64,
+            &None,
+            &None,
+            &None,
+        );
+
+        assert!(result.is_ok());
+        assert_eq!(client.get_nonce(), 1);
+    }
+
+    /// (b) A module that rejects (returns Err) aborts execute() with InsufficientPermission.
+    #[test]
+    fn test_validation_module_rejects_execute() {
+        let env = Env::default();
+        let contract_id = env.register_contract(None, AncoreAccount);
+        let client = AncoreAccountClient::new(&env, &contract_id);
+
+        let owner = Address::generate(&env);
+        init(&env, &client, &owner);
+        env.mock_all_auths();
+
+        let fail_module_id = env.register_contract(None, mock_fail::MockValidationModuleFailResult);
+        client.register_module(&fail_module_id);
+
+        let callee_id = env.register_contract(None, AncoreAccount);
+        let function = soroban_sdk::symbol_short!("get_nonce");
+        let args: Vec<Val> = Vec::new(&env);
+
+        let result = client.try_execute(
+            &CallerIdentity::Owner,
+            &callee_id,
+            &function,
+            &args,
+            &0u64,
+            &None,
+            &None,
+            &None,
+        );
+
+        assert!(matches!(result, Err(Ok(ContractError::InsufficientPermission))));
+        assert_eq!(client.get_nonce(), 0);
+    }
+
+    /// (b2) A module that panics aborts execute() with InsufficientPermission.
+    #[test]
+    fn test_validation_module_panic_rejects_execute() {
+        let env = Env::default();
+        let contract_id = env.register_contract(None, AncoreAccount);
+        let client = AncoreAccountClient::new(&env, &contract_id);
+
+        let owner = Address::generate(&env);
+        init(&env, &client, &owner);
+        env.mock_all_auths();
+
+        let panic_module_id = env.register_contract(None, mock_panic::MockValidationModulePanic);
+        client.register_module(&panic_module_id);
+
+        let callee_id = env.register_contract(None, AncoreAccount);
+        let function = soroban_sdk::symbol_short!("get_nonce");
+        let args: Vec<Val> = Vec::new(&env);
+
+        let result = client.try_execute(
+            &CallerIdentity::Owner,
+            &callee_id,
+            &function,
+            &args,
+            &0u64,
+            &None,
+            &None,
+            &None,
+        );
+
+        assert!(matches!(result, Err(Ok(ContractError::InsufficientPermission))));
+        assert_eq!(client.get_nonce(), 0);
+    }
+
+    /// (c) Multiple modules registered where one approves and one rejects causes execute() to fail.
+    #[test]
+    fn test_multiple_validation_modules_one_rejects() {
+        let env = Env::default();
+        let contract_id = env.register_contract(None, AncoreAccount);
+        let client = AncoreAccountClient::new(&env, &contract_id);
+
+        let owner = Address::generate(&env);
+        init(&env, &client, &owner);
+        env.mock_all_auths();
+
+        let pass_module_id = env.register_contract(None, mock_pass::MockValidationModulePass);
+        let fail_module_id = env.register_contract(None, mock_fail::MockValidationModuleFailResult);
+        client.register_module(&pass_module_id);
+        client.register_module(&fail_module_id);
+
+        let callee_id = env.register_contract(None, AncoreAccount);
+        let function = soroban_sdk::symbol_short!("get_nonce");
+        let args: Vec<Val> = Vec::new(&env);
+
+        let result = client.try_execute(
+            &CallerIdentity::Owner,
+            &callee_id,
+            &function,
+            &args,
+            &0u64,
+            &None,
+            &None,
+            &None,
+        );
+
+        assert!(matches!(result, Err(Ok(ContractError::InsufficientPermission))));
         assert_eq!(client.get_nonce(), 0);
     }
 }
