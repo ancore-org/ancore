@@ -179,6 +179,9 @@ pub enum DataKey {
 pub enum CallerIdentity {
     Owner,
     SessionKey(BytesN<32>),
+    /// N-of-M multi-owner path: signers must be distinct owners totalling at least the
+    /// configured threshold. Each signer's `require_auth()` is invoked by the contract.
+    Quorum(Vec<Address>),
 }
 
 const DAY_IN_LEDGERS: u32 = 17280; // 24 hours * 60 min * 60 sec / 5 sec per ledger
@@ -307,6 +310,23 @@ impl AncoreAccount {
                 }
                 let owner = Self::get_owner(env.clone())?;
                 owner.require_auth();
+            }
+            // N-of-M quorum path: reject session-key auth parameters; require threshold signers.
+            CallerIdentity::Quorum(signers) => {
+                if session_pub_key.is_some() || signature.is_some() || signature_payload.is_some() {
+                    return Err(ContractError::InvalidCallerIdentity);
+                }
+                let owners: Vec<Address> = env
+                    .storage()
+                    .instance()
+                    .get(&DataKey::Owners)
+                    .ok_or(ContractError::NotInitialized)?;
+                let threshold: u32 = env
+                    .storage()
+                    .instance()
+                    .get(&DataKey::Threshold)
+                    .ok_or(ContractError::NotInitialized)?;
+                Self::require_multi_owner_quorum(&env, &owners, threshold, &signers)?;
             }
             CallerIdentity::SessionKey(expected_session_pk) => {
                 let session_pk = session_pub_key.ok_or(ContractError::InvalidCallerIdentity)?;
@@ -618,6 +638,31 @@ impl AncoreAccount {
 
     // ─── Multi-owner threshold authorization ────────────────────────────────
 
+    /// Verify that `signers` contains at least `threshold` distinct addresses that are
+    /// all present in `owners`, and call `require_auth()` on each distinct signer.
+    /// Returns `Unauthorized` if the quorum is not met.
+    fn require_multi_owner_quorum(
+        env: &Env,
+        owners: &Vec<Address>,
+        threshold: u32,
+        signers: &Vec<Address>,
+    ) -> Result<(), ContractError> {
+        let mut distinct: Vec<Address> = Vec::new(env);
+        for signer in signers.iter() {
+            if !owners.contains(signer.clone()) {
+                return Err(ContractError::Unauthorized);
+            }
+            if !distinct.contains(signer.clone()) {
+                distinct.push_back(signer.clone());
+                signer.require_auth();
+            }
+        }
+        if distinct.len() < threshold {
+            return Err(ContractError::Unauthorized);
+        }
+        Ok(())
+    }
+
     /// Initialize multi-owner mode with a list of owners and threshold.
     /// This migrates from single-owner to multi-owner mode.
     /// Can only be called once; subsequent calls return AlreadyInitialized.
@@ -674,21 +719,23 @@ impl AncoreAccount {
         env.storage().instance().get(&DataKey::Threshold)
     }
 
-    /// Add an owner (requires existing owner auth).
+    /// Add an owner (requires quorum of existing owners).
+    /// Multi-owner mode must already be initialized via `initialize_multi_owner`.
     /// The new owner is added immediately; threshold is not auto-adjusted.
-    pub fn add_owner(env: Env, new_owner: Address) -> Result<(), ContractError> {
-        let owner = Self::get_owner(env.clone())?;
-        owner.require_auth();
-
+    pub fn add_owner(env: Env, signers: Vec<Address>, new_owner: Address) -> Result<(), ContractError> {
         let mut owners: Vec<Address> = env
             .storage()
             .instance()
             .get(&DataKey::Owners)
-            .unwrap_or_else(|| {
-                let mut v = Vec::new(&env);
-                v.push_back(owner);
-                v
-            });
+            .ok_or(ContractError::NotInitialized)?;
+
+        let threshold: u32 = env
+            .storage()
+            .instance()
+            .get(&DataKey::Threshold)
+            .ok_or(ContractError::NotInitialized)?;
+
+        Self::require_multi_owner_quorum(&env, &owners, threshold, &signers)?;
 
         if owners.contains(new_owner.clone()) {
             return Err(ContractError::InvalidThreshold);
@@ -707,21 +754,23 @@ impl AncoreAccount {
         Ok(())
     }
 
-    /// Remove an owner (requires existing owner auth).
+    /// Remove an owner (requires quorum of existing owners).
+    /// Multi-owner mode must already be initialized via `initialize_multi_owner`.
     /// Cannot remove the last owner. Threshold is auto-adjusted if it exceeds new count.
-    pub fn remove_owner(env: Env, owner_to_remove: Address) -> Result<(), ContractError> {
-        let owner = Self::get_owner(env.clone())?;
-        owner.require_auth();
-
+    pub fn remove_owner(env: Env, signers: Vec<Address>, owner_to_remove: Address) -> Result<(), ContractError> {
         let owners: Vec<Address> = env
             .storage()
             .instance()
             .get(&DataKey::Owners)
-            .unwrap_or_else(|| {
-                let mut v = Vec::new(&env);
-                v.push_back(owner);
-                v
-            });
+            .ok_or(ContractError::NotInitialized)?;
+
+        let threshold: u32 = env
+            .storage()
+            .instance()
+            .get(&DataKey::Threshold)
+            .ok_or(ContractError::NotInitialized)?;
+
+        Self::require_multi_owner_quorum(&env, &owners, threshold, &signers)?;
 
         if !owners.contains(owner_to_remove.clone()) {
             return Err(ContractError::InvalidThreshold);
@@ -759,21 +808,23 @@ impl AncoreAccount {
         Ok(())
     }
 
-    /// Set the threshold (requires existing owner auth).
+    /// Set the threshold (requires quorum of existing owners).
+    /// Multi-owner mode must already be initialized via `initialize_multi_owner`.
     /// Threshold must be > 0 and <= number of owners.
-    pub fn set_threshold(env: Env, new_threshold: u32) -> Result<(), ContractError> {
-        let owner = Self::get_owner(env.clone())?;
-        owner.require_auth();
-
+    pub fn set_threshold(env: Env, signers: Vec<Address>, new_threshold: u32) -> Result<(), ContractError> {
         let owners: Vec<Address> = env
             .storage()
             .instance()
             .get(&DataKey::Owners)
-            .unwrap_or_else(|| {
-                let mut v = Vec::new(&env);
-                v.push_back(owner);
-                v
-            });
+            .ok_or(ContractError::NotInitialized)?;
+
+        let threshold: u32 = env
+            .storage()
+            .instance()
+            .get(&DataKey::Threshold)
+            .ok_or(ContractError::NotInitialized)?;
+
+        Self::require_multi_owner_quorum(&env, &owners, threshold, &signers)?;
 
         if new_threshold == 0 || new_threshold > owners.len() {
             return Err(ContractError::InvalidThreshold);
@@ -2412,10 +2463,14 @@ mod test {
         client.initialize_multi_owner(&owners, &1);
         assert_eq!(client.get_owners().len(), 2);
 
-        client.add_owner(&owner3);
+        // threshold=1 — one existing owner is sufficient to authorize
+        let mut signers = Vec::new(&env);
+        signers.push_back(owner.clone());
+
+        client.add_owner(&signers, &owner3);
         assert_eq!(client.get_owners().len(), 3);
 
-        client.remove_owner(&owner2);
+        client.remove_owner(&signers, &owner2);
         assert_eq!(client.get_owners().len(), 2);
     }
 
@@ -2439,10 +2494,16 @@ mod test {
         client.initialize_multi_owner(&owners, &1);
         assert_eq!(client.get_threshold(), Some(1));
 
-        client.set_threshold(&2);
+        let mut one_signer = Vec::new(&env);
+        one_signer.push_back(owner.clone());
+        client.set_threshold(&one_signer, &2);
         assert_eq!(client.get_threshold(), Some(2));
 
-        client.set_threshold(&3);
+        // threshold is now 2; need 2 distinct owners to authorize
+        let mut two_signers = Vec::new(&env);
+        two_signers.push_back(owner.clone());
+        two_signers.push_back(owner2.clone());
+        client.set_threshold(&two_signers, &3);
         assert_eq!(client.get_threshold(), Some(3));
     }
 
@@ -2466,8 +2527,65 @@ mod test {
         client.initialize_multi_owner(&owners, &3);
         assert_eq!(client.get_threshold(), Some(3));
 
-        client.remove_owner(&owner3);
+        // threshold=3 — all three owners must sign
+        let mut all_signers = Vec::new(&env);
+        all_signers.push_back(owner.clone());
+        all_signers.push_back(owner2.clone());
+        all_signers.push_back(owner3.clone());
+
+        client.remove_owner(&all_signers, &owner3);
         assert_eq!(client.get_threshold(), Some(2));
+    }
+
+    #[test]
+    fn test_owner_management_requires_multi_owner_initialized() {
+        let env = Env::default();
+        let contract_id = env.register_contract(None, AncoreAccount);
+        let client = AncoreAccountClient::new(&env, &contract_id);
+
+        let owner = Address::generate(&env);
+        init(&env, &client, &owner);
+        env.mock_all_auths();
+
+        let other = Address::generate(&env);
+        let signers = Vec::new(&env); // empty — doesn't matter, should fail before quorum check
+
+        // Without calling initialize_multi_owner first, all management calls must fail
+        let result = client.try_add_owner(&signers, &other);
+        assert!(matches!(result, Err(Ok(ContractError::NotInitialized))));
+
+        let result = client.try_remove_owner(&signers, &other);
+        assert!(matches!(result, Err(Ok(ContractError::NotInitialized))));
+
+        let result = client.try_set_threshold(&signers, &1);
+        assert!(matches!(result, Err(Ok(ContractError::NotInitialized))));
+    }
+
+    #[test]
+    fn test_quorum_insufficient_signers_rejected() {
+        let env = Env::default();
+        let contract_id = env.register_contract(None, AncoreAccount);
+        let client = AncoreAccountClient::new(&env, &contract_id);
+
+        let owner = Address::generate(&env);
+        init(&env, &client, &owner);
+        env.mock_all_auths();
+
+        let owner2 = Address::generate(&env);
+        let owner3 = Address::generate(&env);
+        let mut owners = Vec::new(&env);
+        owners.push_back(owner.clone());
+        owners.push_back(owner2.clone());
+        owners.push_back(owner3.clone());
+        client.initialize_multi_owner(&owners, &2);
+
+        let owner4 = Address::generate(&env);
+
+        // Only 1 signer but threshold is 2 — must be rejected
+        let mut one_signer = Vec::new(&env);
+        one_signer.push_back(owner.clone());
+        let result = client.try_add_owner(&one_signer, &owner4);
+        assert!(matches!(result, Err(Ok(ContractError::Unauthorized))));
     }
 
     #[test]
