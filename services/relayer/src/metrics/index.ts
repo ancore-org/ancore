@@ -105,17 +105,31 @@ export const relayErrors = new RelayErrorCounter();
 
 class SimpleCounter {
   private value = 0;
-  inc(by = 1): void { this.value += by; }
-  get(): number { return this.value; }
-  reset(): void { this.value = 0; }
+  inc(by = 1): void {
+    this.value += by;
+  }
+  get(): number {
+    return this.value;
+  }
+  reset(): void {
+    this.value = 0;
+  }
 }
 
 class SimpleGauge {
   private value = 0;
-  set(v: number): void { this.value = v; }
-  inc(by = 1): void { this.value += by; }
-  dec(by = 1): void { this.value -= by; }
-  get(): number { return this.value; }
+  set(v: number): void {
+    this.value = v;
+  }
+  inc(by = 1): void {
+    this.value += by;
+  }
+  dec(by = 1): void {
+    this.value -= by;
+  }
+  get(): number {
+    return this.value;
+  }
 }
 
 /**
@@ -199,11 +213,15 @@ export function renderPrometheusMetrics(): string {
   lines.push('# TYPE scheduler_jobs_failed_total counter');
   lines.push(`scheduler_jobs_failed_total ${schedulerJobsFailed.get()}`);
 
-  lines.push('# HELP scheduler_consecutive_failures_total Transfers that accumulated ≥2 consecutive failures');
+  lines.push(
+    '# HELP scheduler_consecutive_failures_total Transfers that accumulated ≥2 consecutive failures'
+  );
   lines.push('# TYPE scheduler_consecutive_failures_total counter');
   lines.push(`scheduler_consecutive_failures_total ${schedulerConsecutiveFailures.get()}`);
 
-  lines.push('# HELP scheduler_job_lag_seconds_total Cumulative seconds between next_run_at and actual execution');
+  lines.push(
+    '# HELP scheduler_job_lag_seconds_total Cumulative seconds between next_run_at and actual execution'
+  );
   lines.push('# TYPE scheduler_job_lag_seconds_total counter');
   lines.push(`scheduler_job_lag_seconds_total ${schedulerJobLagSecondsTotal.get().toFixed(3)}`);
 

@@ -1,0 +1,530 @@
+openapi: 3.1.0
+info:
+  title: Ancore Indexer API
+  description: |
+    REST API for querying account activity and contract events from the Ancore Indexer.
+    Supports cursor-based pagination, flexible filtering, and account-scoped security.
+  version: 1.1.0
+  contact:
+    name: Ancore
+    url: https://github.com/ancore-org/ancore
+
+servers:
+  - url: https://indexer.ancore.io
+    description: Production
+  - url: http://localhost:3000
+    description: Local development
+
+paths:
+  /api/v1/accounts/{account_id}/activity:
+    get:
+      operationId: listAccountActivity
+      summary: List account activity
+      description: |
+        Query the timeline of activity for an account with optional filters and cursor-based pagination.
+        All queries are scoped to the specified account for security isolation.
+      tags: [Account Activity]
+      parameters:
+        - $ref: '#/components/parameters/AccountId'
+        - $ref: '#/components/parameters/Limit100'
+        - $ref: '#/components/parameters/CursorAfter'
+        - $ref: '#/components/parameters/CursorBefore'
+        - name: activity_type
+          in: query
+          schema:
+            type: string
+          description: "Filter by activity type (e.g., payment, transfer, session_key_added)"
+        - name: asset
+          in: query
+          schema:
+            type: string
+          description: 'Filter by asset identifier ("native" for XLM or "CODE:ISSUER" format)'
+        - name: counterparty
+          in: query
+          schema:
+            type: string
+          description: Filter by counterparty address
+        - name: ledger_min
+          in: query
+          schema:
+            type: integer
+          description: Minimum ledger sequence (inclusive)
+        - name: ledger_max
+          in: query
+          schema:
+            type: integer
+          description: Maximum ledger sequence (inclusive)
+        - name: from_date
+          in: query
+          schema:
+            type: string
+            format: date-time
+          description: ISO 8601 datetime lower bound (inclusive)
+        - name: to_date
+          in: query
+          schema:
+            type: string
+            format: date-time
+          description: ISO 8601 datetime upper bound (inclusive)
+      responses:
+        '200':
+          description: Paginated activity list
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/ActivityRecord'
+                  pagination:
+                    $ref: '#/components/schemas/Pagination'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '504':
+          $ref: '#/components/responses/QueryTimeout'
+
+  /api/v1/accounts/{account_id}/activity/{activity_id}:
+    get:
+      operationId: getActivityById
+      summary: Get activity by ID
+      description: Fetch a specific activity record by its ID, scoped to the account.
+      tags: [Account Activity]
+      parameters:
+        - $ref: '#/components/parameters/AccountId'
+        - name: activity_id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+          description: UUID of the activity record
+      responses:
+        '200':
+          description: Activity record
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    $ref: '#/components/schemas/ActivityRecord'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /api/v1/accounts/{account_id}/activity/types:
+    get:
+      operationId: listActivityTypes
+      summary: List activity types
+      description: Get all distinct activity types that have occurred for an account.
+      tags: [Account Activity]
+      parameters:
+        - $ref: '#/components/parameters/AccountId'
+      responses:
+        '200':
+          description: Distinct activity types
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      type: string
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /api/v1/accounts/{account_id}/statements/rows:
+    get:
+      operationId: listStatementRows
+      summary: List statement rows
+      description: Get statement-style rows for a date-scoped activity query.
+      tags: [Statements]
+      parameters:
+        - $ref: '#/components/parameters/AccountId'
+        - name: from_date
+          in: query
+          required: true
+          schema:
+            type: string
+            format: date-time
+        - name: to_date
+          in: query
+          required: true
+          schema:
+            type: string
+            format: date-time
+        - $ref: '#/components/parameters/Limit100'
+        - $ref: '#/components/parameters/CursorAfter'
+      responses:
+        '200':
+          description: Statement rows
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/StatementRow'
+                  pagination:
+                    $ref: '#/components/schemas/Pagination'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+
+  /api/v1/contract-events:
+    get:
+      operationId: listContractEvents
+      summary: List contract events
+      description: |
+        Query contract events with optional filters and cursor-based pagination.
+        Supports filtering by contract address, account ID, event type, and ledger range.
+      tags: [Contract Events]
+      parameters:
+        - $ref: '#/components/parameters/Limit200'
+        - $ref: '#/components/parameters/CursorAfter'
+        - $ref: '#/components/parameters/CursorBefore'
+        - name: contract
+          in: query
+          schema:
+            type: string
+          description: Filter by contract address (C-address)
+        - name: account
+          in: query
+          schema:
+            type: string
+          description: Filter by account ID (wallet smart account)
+        - name: type
+          in: query
+          schema:
+            type: string
+            enum:
+              - initialized
+              - executed
+              - session_key_added
+              - session_key_revoked
+              - session_key_ttl_refreshed
+              - upgraded
+              - migrated
+          description: Filter by event type
+        - name: ledger_min
+          in: query
+          schema:
+            type: integer
+          description: Minimum ledger sequence (inclusive)
+        - name: ledger_max
+          in: query
+          schema:
+            type: integer
+          description: Maximum ledger sequence (inclusive)
+      responses:
+        '200':
+          description: Paginated contract events
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/ContractEvent'
+                  pagination:
+                    $ref: '#/components/schemas/Pagination'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+
+  /api/v1/contract-events/{event_id}:
+    get:
+      operationId: getContractEventById
+      summary: Get contract event by ID
+      description: Fetch a specific contract event by its UUID.
+      tags: [Contract Events]
+      parameters:
+        - name: event_id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+          description: UUID of the contract event
+      responses:
+        '200':
+          description: Contract event
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    $ref: '#/components/schemas/ContractEvent'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /api/v1/contract-events/types:
+    get:
+      operationId: listContractEventTypes
+      summary: List contract event types
+      description: |
+        Get all distinct event types for a contract address or account.
+        At least one of `contract` or `account` query parameter is required.
+      tags: [Contract Events]
+      parameters:
+        - name: contract
+          in: query
+          schema:
+            type: string
+          description: Contract address to filter by
+        - name: account
+          in: query
+          schema:
+            type: string
+          description: Account ID to filter by
+      responses:
+        '200':
+          description: Distinct event types
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      type: string
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /health:
+    get:
+      operationId: getHealth
+      summary: Health check
+      description: Returns indexer health status including lag and checkpoint info.
+      tags: [System]
+      responses:
+        '200':
+          description: Health status
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                  last_ledger_seq:
+                    type: integer
+                  lag:
+                    type: integer
+
+  /metrics:
+    get:
+      operationId: getMetrics
+      summary: Metrics (JSON)
+      description: Returns cursor staleness and ingest metrics in JSON format.
+      tags: [System]
+      responses:
+        '200':
+          description: Metrics data
+
+  /metrics/prometheus:
+    get:
+      operationId: getMetricsPrometheus
+      summary: Metrics (Prometheus)
+      description: Prometheus-compatible metrics endpoint.
+      tags: [System]
+      responses:
+        '200':
+          description: Prometheus metrics
+
+components:
+  parameters:
+    AccountId:
+      name: account_id
+      in: path
+      required: true
+      schema:
+        type: string
+        pattern: '^G[A-Z0-9]{55}$'
+      description: Stellar public key (56 characters, starting with G)
+
+    Limit100:
+      name: limit
+      in: query
+      schema:
+        type: integer
+        default: 20
+        minimum: 1
+        maximum: 100
+      description: Number of records per page (1-100, default 20)
+
+    Limit200:
+      name: limit
+      in: query
+      schema:
+        type: integer
+        default: 50
+        minimum: 1
+        maximum: 200
+      description: Number of records per page (1-200, default 50)
+
+    CursorAfter:
+      name: cursor_after
+      in: query
+      schema:
+        type: string
+      description: Opaque cursor for forward pagination
+
+    CursorBefore:
+      name: cursor_before
+      in: query
+      schema:
+        type: string
+      description: Opaque cursor for backward pagination
+
+  schemas:
+    ActivityRecord:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        account_id:
+          type: string
+        activity_type:
+          type: string
+        amount:
+          type: string
+          nullable: true
+        asset:
+          type: string
+          nullable: true
+        asset_code:
+          type: string
+          nullable: true
+        asset_issuer:
+          type: string
+          nullable: true
+        counterparty:
+          type: string
+          nullable: true
+        tx_hash:
+          type: string
+        ledger_seq:
+          type: integer
+        created_at:
+          type: string
+          format: date-time
+        metadata:
+          type: object
+          nullable: true
+
+    ContractEvent:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        contract_address:
+          type: string
+        account_id:
+          type: string
+        event_type:
+          type: string
+          enum:
+            - initialized
+            - executed
+            - session_key_added
+            - session_key_revoked
+            - session_key_ttl_refreshed
+            - upgraded
+            - migrated
+        ledger_seq:
+          type: integer
+        timestamp:
+          type: string
+          format: date-time
+        tx_hash:
+          type: string
+        data:
+          type: object
+
+    Pagination:
+      type: object
+      properties:
+        has_next_page:
+          type: boolean
+        has_previous_page:
+          type: boolean
+        next_cursor:
+          type: string
+          nullable: true
+        prev_cursor:
+          type: string
+          nullable: true
+        count:
+          type: integer
+
+    StatementRow:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        account_id:
+          type: string
+        activity_type:
+          type: string
+        amount:
+          type: string
+        asset:
+          type: string
+        counterparty:
+          type: string
+        tx_hash:
+          type: string
+        ledger_seq:
+          type: integer
+        created_at:
+          type: string
+          format: date-time
+        status:
+          type: string
+        memo_or_reference:
+          type: string
+          nullable: true
+
+    ErrorEnvelope:
+      type: object
+      properties:
+        code:
+          type: string
+        message:
+          type: string
+        details:
+          type: object
+          nullable: true
+
+  responses:
+    BadRequest:
+      description: Invalid filter or cursor
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorEnvelope'
+
+    NotFound:
+      description: Resource not found
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorEnvelope'
+
+    QueryTimeout:
+      description: Database query timed out
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorEnvelope'

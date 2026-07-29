@@ -41,7 +41,9 @@ function rowToTransfer(row: Record<string, unknown>): ScheduledTransfer {
     consecutiveFailures: row.consecutive_failures as number,
     createdAt: (row.created_at as Date).toISOString(),
     updatedAt: (row.updated_at as Date).toISOString(),
-    lastExecutionAt: row.last_execution_at ? (row.last_execution_at as Date).toISOString() : undefined,
+    lastExecutionAt: row.last_execution_at
+      ? (row.last_execution_at as Date).toISOString()
+      : undefined,
   };
 }
 
@@ -84,7 +86,7 @@ export class PgScheduledTransferStore {
         input.note ?? null,
         JSON.stringify(input.relayPayload),
         now,
-      ],
+      ]
     );
     return rowToTransfer(result.rows[0]);
   }
@@ -94,7 +96,7 @@ export class PgScheduledTransferStore {
       `SELECT * FROM scheduled_transfers
        WHERE account_id = $1 AND caller_id = $2
        ORDER BY created_at DESC`,
-      [accountAddress, callerId],
+      [accountAddress, callerId]
     );
     return result.rows.map(rowToTransfer);
   }
@@ -102,7 +104,7 @@ export class PgScheduledTransferStore {
   async getById(id: string): Promise<ScheduledTransfer | undefined> {
     const result = await this.pool.query<Record<string, unknown>>(
       `SELECT * FROM scheduled_transfers WHERE id = $1`,
-      [id],
+      [id]
     );
     return result.rows[0] ? rowToTransfer(result.rows[0]) : undefined;
   }
@@ -110,25 +112,31 @@ export class PgScheduledTransferStore {
   async getByIdForCaller(id: string, callerId: string): Promise<ScheduledTransfer | undefined> {
     const result = await this.pool.query<Record<string, unknown>>(
       `SELECT * FROM scheduled_transfers WHERE id = $1 AND caller_id = $2`,
-      [id, callerId],
+      [id, callerId]
     );
     return result.rows[0] ? rowToTransfer(result.rows[0]) : undefined;
   }
 
-  async updateStatus(id: string, status: ScheduledTransferStatus): Promise<ScheduledTransfer | undefined> {
+  async updateStatus(
+    id: string,
+    status: ScheduledTransferStatus
+  ): Promise<ScheduledTransfer | undefined> {
     const result = await this.pool.query<Record<string, unknown>>(
       `UPDATE scheduled_transfers
        SET status = $1, updated_at = NOW()
        WHERE id = $2
        RETURNING *`,
-      [status, id],
+      [status, id]
     );
     return result.rows[0] ? rowToTransfer(result.rows[0]) : undefined;
   }
 
   async updateAfterExecution(
     id: string,
-    patch: Pick<ScheduledTransfer, 'status' | 'nextRunAt' | 'lastExecutionAt' | 'consecutiveFailures'>,
+    patch: Pick<
+      ScheduledTransfer,
+      'status' | 'nextRunAt' | 'lastExecutionAt' | 'consecutiveFailures'
+    >
   ): Promise<ScheduledTransfer | undefined> {
     const result = await this.pool.query<Record<string, unknown>>(
       `UPDATE scheduled_transfers
@@ -145,7 +153,7 @@ export class PgScheduledTransferStore {
         patch.lastExecutionAt ? new Date(patch.lastExecutionAt) : null,
         patch.consecutiveFailures,
         id,
-      ],
+      ]
     );
     return result.rows[0] ? rowToTransfer(result.rows[0]) : undefined;
   }
@@ -159,7 +167,7 @@ export class PgScheduledTransferStore {
          AND st.next_run_at <= $1
          AND stl.transfer_id IS NULL
        ORDER BY st.next_run_at ASC`,
-      [now],
+      [now]
     );
     return result.rows.map(rowToTransfer);
   }
@@ -182,7 +190,7 @@ export class PgScheduledTransferStore {
              expires_at = EXCLUDED.expires_at
          WHERE scheduled_transfer_leases.expires_at < NOW()
        RETURNING worker_id`,
-      [id, this.workerId, expiresAt],
+      [id, this.workerId, expiresAt]
     );
     // If the INSERT/UPDATE succeeded and we own the row, we got the lease
     if (!result.rowCount || result.rowCount === 0) return false;
@@ -192,7 +200,7 @@ export class PgScheduledTransferStore {
   async releaseLease(id: string): Promise<void> {
     await this.pool.query(
       `DELETE FROM scheduled_transfer_leases WHERE transfer_id = $1 AND worker_id = $2`,
-      [id, this.workerId],
+      [id, this.workerId]
     );
   }
 
@@ -207,7 +215,9 @@ export class PgScheduledTransferStore {
 
   // ── Execution logs ───────────────────────────────────────────────────────────
 
-  async appendExecution(log: Omit<ScheduledTransferExecutionLog, 'id'>): Promise<ScheduledTransferExecutionLog> {
+  async appendExecution(
+    log: Omit<ScheduledTransferExecutionLog, 'id'>
+  ): Promise<ScheduledTransferExecutionLog> {
     const result = await this.pool.query<Record<string, unknown>>(
       `INSERT INTO scheduled_transfer_executions
          (scheduled_transfer_id, executed_at, outcome, transaction_id, error)
@@ -219,7 +229,7 @@ export class PgScheduledTransferStore {
         log.outcome,
         log.transactionId ?? null,
         log.error ?? null,
-      ],
+      ]
     );
     return rowToExecution(result.rows[0]);
   }
@@ -230,7 +240,7 @@ export class PgScheduledTransferStore {
        WHERE scheduled_transfer_id = $1
        ORDER BY executed_at DESC
        LIMIT 50`,
-      [scheduledTransferId],
+      [scheduledTransferId]
     );
     return result.rows.map(rowToExecution);
   }
@@ -240,13 +250,13 @@ export class PgScheduledTransferStore {
   async recordFailureNotification(
     transferId: string,
     notificationType: string,
-    payload: Record<string, unknown> = {},
+    payload: Record<string, unknown> = {}
   ): Promise<void> {
     await this.pool.query(
       `INSERT INTO scheduled_transfer_notifications
          (scheduled_transfer_id, notification_type, payload)
        VALUES ($1, $2, $3)`,
-      [transferId, notificationType, JSON.stringify(payload)],
+      [transferId, notificationType, JSON.stringify(payload)]
     );
   }
 }

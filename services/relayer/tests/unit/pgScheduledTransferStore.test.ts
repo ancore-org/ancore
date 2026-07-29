@@ -42,7 +42,13 @@ function makeTransferRow(overrides: Partial<Row> = {}): Row {
     end_at: null,
     note: null,
     user_approved_at: now,
-    relay_payload: { sessionKey: 'aa'.repeat(32), operation: 'relay_execute', parameters: {}, signature: 'bb'.repeat(64), nonce: 0 },
+    relay_payload: {
+      sessionKey: 'aa'.repeat(32),
+      operation: 'relay_execute',
+      parameters: {},
+      signature: 'bb'.repeat(64),
+      nonce: 0,
+    },
     consecutive_failures: 0,
     created_at: now,
     updated_at: now,
@@ -149,12 +155,13 @@ describe('PgScheduledTransferStore.listDue', () => {
 });
 
 describe('PgScheduledTransferStore.tryAcquireLease', () => {
-  it('returns true when the upsert returns this worker\'s worker_id', async () => {
+  it("returns true when the upsert returns this worker's worker_id", async () => {
     const store = new PgScheduledTransferStore(null as never);
     const workerId = (store as unknown as { workerId: string }).workerId;
 
     const pool = {
-      query: vi.fn()
+      query: vi
+        .fn()
         .mockResolvedValueOnce({ rows: [{ worker_id: workerId }], rowCount: 1 })
         .mockResolvedValueOnce({ rows: [{ worker_id: workerId }], rowCount: 1 }),
     };
@@ -207,7 +214,9 @@ describe('PgScheduledTransferStore.recordFailureNotification', () => {
     const pool = { query: vi.fn().mockResolvedValue({ rows: [], rowCount: 1 }) };
     const store = new PgScheduledTransferStore(pool as never);
 
-    await store.recordFailureNotification('xfer-uuid-1', 'consecutive_failure', { consecutiveFailures: 2 });
+    await store.recordFailureNotification('xfer-uuid-1', 'consecutive_failure', {
+      consecutiveFailures: 2,
+    });
 
     expect(pool.query).toHaveBeenCalledOnce();
     expect(pool.query.mock.calls[0][0]).toContain('INSERT INTO scheduled_transfer_notifications');

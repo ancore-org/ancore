@@ -1,9 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import type { ScheduledTransfer, ScheduledTransferExecutionLog } from '@ancore/types';
-import {
-  getExtensionSchedulerClient,
-  type SchedulerClient,
-} from '@/services/scheduler-client';
+import { getExtensionSchedulerClient, type SchedulerClient } from '@/services/scheduler-client';
 import { useAccountStore } from '@/stores/account';
 
 const REFRESH_INTERVAL_MS = 15_000;

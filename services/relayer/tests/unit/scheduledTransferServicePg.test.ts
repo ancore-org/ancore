@@ -45,12 +45,14 @@ function makeAsyncStore(transfers: ScheduledTransfer[]): AnyScheduledTransferSto
   return {
     create: vi.fn().mockResolvedValue(transfers[0]),
     listByAccount: vi.fn().mockResolvedValue(transfers),
-    getByIdForCaller: vi.fn().mockImplementation((id: string) =>
-      Promise.resolve(transfers.find((t) => t.id === id))
-    ),
-    updateStatus: vi.fn().mockImplementation((id: string, status: string) =>
-      Promise.resolve({ ...transfers.find((t) => t.id === id)!, status })
-    ),
+    getByIdForCaller: vi
+      .fn()
+      .mockImplementation((id: string) => Promise.resolve(transfers.find((t) => t.id === id))),
+    updateStatus: vi
+      .fn()
+      .mockImplementation((id: string, status: string) =>
+        Promise.resolve({ ...transfers.find((t) => t.id === id)!, status })
+      ),
     updateAfterExecution: vi.fn().mockResolvedValue(undefined),
     listDue: vi.fn().mockResolvedValue(transfers.filter((t) => t.status === 'active')),
     tryAcquireProcessing: vi.fn().mockResolvedValue(true),
@@ -118,7 +120,7 @@ describe('ScheduledTransferService — failure notifications', () => {
     expect(notifier.onConsecutiveFailure).toHaveBeenCalledOnce();
     expect(notifier.onConsecutiveFailure).toHaveBeenCalledWith(
       expect.objectContaining({ id: 'xfer-1' }),
-      2,
+      2
     );
   });
 
@@ -150,7 +152,7 @@ describe('ScheduledTransferService — failure notifications', () => {
     expect(store.recordFailureNotification).toHaveBeenCalledWith(
       transfer.id,
       'max_failures_reached',
-      expect.objectContaining({ consecutiveFailures: 5 }),
+      expect.objectContaining({ consecutiveFailures: 5 })
     );
   });
 
@@ -182,7 +184,7 @@ describe('ScheduledTransferService — once-frequency transfers', () => {
 
     expect(store.updateAfterExecution).toHaveBeenCalledWith(
       'xfer-1',
-      expect.objectContaining({ status: 'completed' }),
+      expect.objectContaining({ status: 'completed' })
     );
   });
 
@@ -196,7 +198,7 @@ describe('ScheduledTransferService — once-frequency transfers', () => {
 
     expect(store.updateAfterExecution).toHaveBeenCalledWith(
       'xfer-1',
-      expect.objectContaining({ status: 'completed' }),
+      expect.objectContaining({ status: 'completed' })
     );
   });
 });

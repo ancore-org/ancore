@@ -28,7 +28,7 @@ export class ScheduledTransferService {
   constructor(
     private readonly store: AnyScheduledTransferStore,
     private readonly relayService: RelayServiceContract,
-    private readonly notifier?: FailureNotifier,
+    private readonly notifier?: FailureNotifier
   ) {}
 
   async create(input: CreateScheduledTransferInput, callerId: string): Promise<ScheduledTransfer> {
@@ -145,11 +145,12 @@ export class ScheduledTransferService {
           await this.notifier.onMaxFailuresReached(transfer).catch(() => {});
         }
         if ('recordFailureNotification' in this.store) {
-          await (this.store as PgScheduledTransferStore).recordFailureNotification(
-            transfer.id,
-            'max_failures_reached',
-            { consecutiveFailures, error: response.error?.message },
-          ).catch(() => {});
+          await (this.store as PgScheduledTransferStore)
+            .recordFailureNotification(transfer.id, 'max_failures_reached', {
+              consecutiveFailures,
+              error: response.error?.message,
+            })
+            .catch(() => {});
         }
         return;
       }
@@ -166,11 +167,12 @@ export class ScheduledTransferService {
         await this.notifier.onConsecutiveFailure(transfer, consecutiveFailures).catch(() => {});
       }
       if (consecutiveFailures > 1 && 'recordFailureNotification' in this.store) {
-        await (this.store as PgScheduledTransferStore).recordFailureNotification(
-          transfer.id,
-          'consecutive_failure',
-          { consecutiveFailures, error: response.error?.message },
-        ).catch(() => {});
+        await (this.store as PgScheduledTransferStore)
+          .recordFailureNotification(transfer.id, 'consecutive_failure', {
+            consecutiveFailures,
+            error: response.error?.message,
+          })
+          .catch(() => {});
       }
       return;
     }
@@ -178,7 +180,7 @@ export class ScheduledTransferService {
     const nextRunAt = computeNextRunAt(
       now,
       transfer.frequency,
-      transfer.endAt ? new Date(transfer.endAt) : undefined,
+      transfer.endAt ? new Date(transfer.endAt) : undefined
     );
 
     if (nextRunAt) {

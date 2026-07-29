@@ -9,8 +9,9 @@ vi.mock('react-router-dom', () => ({
 }));
 
 vi.mock('@/stores/hardware-wallet', () => ({
-  useHardwareWalletStore: (sel: (s: { signerMode: string; ledgerPublicKey: string | null }) => unknown) =>
-    sel({ signerMode: 'software', ledgerPublicKey: null }),
+  useHardwareWalletStore: (
+    sel: (s: { signerMode: string; ledgerPublicKey: string | null }) => unknown
+  ) => sel({ signerMode: 'software', ledgerPublicKey: null }),
 }));
 
 const sendMessageMock = vi.fn((_msg, cb) => cb && cb());
@@ -36,7 +37,7 @@ describe('SignTransactionApprovalScreen keyboard behaviour', () => {
     await user.keyboard('{Escape}');
     expect(sendMessageMock).toHaveBeenCalledWith(
       { type: 'REJECT_SIGN_REQUEST', requestId: 'req-2' },
-      expect.any(Function),
+      expect.any(Function)
     );
   });
 
