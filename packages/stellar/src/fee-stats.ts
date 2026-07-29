@@ -93,13 +93,16 @@ async function fetchRaw(horizonUrl: string): Promise<HorizonFeeStats> {
   return response.json() as Promise<HorizonFeeStats>;
 }
 
-function normalize(raw: HorizonFeeStats): FeeStats {
-  return {
-    minFee: parseInt(raw.fee_charged.min, 10),
-    modeFee: parseInt(raw.fee_charged.mode, 10),
-    p90Fee: parseInt(raw.fee_charged.p90, 10),
-    isFallback: false,
-  };
+function normalize(raw: HorizonFeeStats): FeeStats | null {
+  const minFee = parseInt(raw.fee_charged.min, 10);
+  const modeFee = parseInt(raw.fee_charged.mode, 10);
+  const p90Fee = parseInt(raw.fee_charged.p90, 10);
+
+  if (!Number.isFinite(minFee) || minFee < 0) return null;
+  if (!Number.isFinite(modeFee) || modeFee < 0) return null;
+  if (!Number.isFinite(p90Fee) || p90Fee < 0) return null;
+
+  return { minFee, modeFee, p90Fee, isFallback: false };
 }
 
 /**
@@ -133,7 +136,9 @@ export async function fetchFeeStats(options: FeeStatsOptions): Promise<FeeStats>
       isRetryable: retryOptions.isRetryable ?? defaultIsRetryable,
     });
 
-    return normalize(raw);
+    const normalized = normalize(raw);
+    if (normalized) return normalized;
+    return { ...fallback, isFallback: true };
   } catch {
     return { ...fallback, isFallback: true };
   }

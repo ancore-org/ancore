@@ -36,6 +36,21 @@ describe('retry', () => {
       expect(calculateDelay(2, 500, true)).toBe(1000);
       expect(calculateDelay(3, 500, true)).toBe(2000);
     });
+
+    it('should clamp delay to maxDelayMs', () => {
+      expect(calculateDelay(10, 1000, true, 5000)).toBe(5000);
+      expect(calculateDelay(20, 1000, true, 5000)).toBe(5000);
+    });
+
+    it('should never exceed default 30s ceiling', () => {
+      for (let attempt = 1; attempt <= 20; attempt++) {
+        expect(calculateDelay(attempt, 1000, true)).toBeLessThanOrEqual(30_000);
+      }
+    });
+
+    it('should clamp linear delay to maxDelayMs', () => {
+      expect(calculateDelay(1, 50000, false, 30000)).toBe(30000);
+    });
   });
 
   describe('withRetry', () => {
