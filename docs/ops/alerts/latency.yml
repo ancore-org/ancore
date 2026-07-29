@@ -7,7 +7,7 @@ groups:
       - alert: HighP95Latency
         expr: >
           histogram_quantile(0.95,
-            rate(http_request_duration_seconds_bucket[5m])
+            rate(relay_request_duration_seconds_bucket[5m])
           ) > 0.5
         for: 5m
         labels:
@@ -24,7 +24,7 @@ groups:
       - alert: HighP99Latency
         expr: >
           histogram_quantile(0.99,
-            rate(http_request_duration_seconds_bucket[5m])
+            rate(relay_request_duration_seconds_bucket[5m])
           ) > 2.0
         for: 5m
         labels:
@@ -41,9 +41,9 @@ groups:
       - alert: LatencySpikeDetected
         # Detects sudden 2× increase relative to the 1h baseline
         expr: >
-          histogram_quantile(0.95, rate(http_request_duration_seconds_bucket[5m]))
+          histogram_quantile(0.95, rate(relay_request_duration_seconds_bucket[5m]))
           >
-          2 * histogram_quantile(0.95, rate(http_request_duration_seconds_bucket[1h] offset 5m))
+          2 * histogram_quantile(0.95, rate(relay_request_duration_seconds_bucket[1h] offset 5m))
         for: 3m
         labels:
           severity: warning

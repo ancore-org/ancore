@@ -134,7 +134,7 @@
       "pluginVersion": "10.0.0",
       "targets": [
         {
-          "expr": "(1 - (rate(http_requests_total{status=~\"5..\"}[28d]) / rate(http_requests_total[28d]))) * 100",
+          "expr": "(1 - (rate(relay_errors_total[28d]) / rate(relay_request_total[28d]))) * 100",
           "refId": "A"
         }
       ],
@@ -215,7 +215,7 @@
       "pluginVersion": "10.0.0",
       "targets": [
         {
-          "expr": "(rate(http_requests_total{status=~\"5..\"}[1h]) / rate(http_requests_total[1h])) / 0.001",
+          "expr": "(rate(relay_errors_total[1h]) / rate(relay_request_total[1h])) / 0.001",
           "refId": "A"
         }
       ],

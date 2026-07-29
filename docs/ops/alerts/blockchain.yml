@@ -21,9 +21,9 @@ groups:
 
       - alert: TransactionFailureRateHigh
         expr: >
-          rate(stellar_transactions_failed_total[5m])
+          rate(relay_errors_total[5m])
           /
-          rate(stellar_transactions_total[5m]) > 0.05
+          rate(relay_request_total[5m]) > 0.05
         for: 5m
         labels:
           severity: warning

@@ -24,7 +24,7 @@ export const DEFAULT_MOBILE_WALLET_NAVIGATION: NavigationItem[] = [
 const NetworkBadge = ({ network }: { network: string }) => {
   const isMainnet = network === 'mainnet';
   const badgeColor = isMainnet ? 'bg-emerald-500' : 'bg-amber-500';
-  
+
   return (
     <span
       className={`inline-flex items-center px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider text-white ${badgeColor}`}

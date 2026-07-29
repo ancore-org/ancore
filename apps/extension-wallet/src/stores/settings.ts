@@ -189,7 +189,7 @@ export const useSettingsStore = create<SettingsState>()(
 
         // Try to restore from last successful network if persisted network is invalid
         const lastSuccessfulNetwork = await loadLastSuccessfulNetwork();
-        
+
         // Validate network and derive horizon URL if missing or invalid
         const validNetwork =
           network === 'mainnet' || network === 'testnet' || network === 'futurenet'
