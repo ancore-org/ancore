@@ -356,6 +356,14 @@ export const SendFlow: React.FC = () => {
     [formState.policyAction, formState.recipient, formState.amount, send]
   );
 
+  const isAmountInvalid = formState.policyAction === 'block';
+  const amountDescriptionIds = [
+    'send-amount-help',
+    formState.policyMessage ? 'send-amount-policy-message' : null,
+  ]
+    .filter(Boolean)
+    .join(' ');
+
   const isSubmitDisabled =
     send.loading || formState.policyAction === 'block' || !formState.recipient || !formState.amount;
 
@@ -441,15 +449,22 @@ export const SendFlow: React.FC = () => {
 
           {/* Recipient Field */}
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
+            <label
+              htmlFor="send-recipient"
+              className="block text-sm font-medium text-gray-700 mb-2"
+            >
               Recipient Address
             </label>
             <input
+              id="send-recipient"
               type="text"
               name="recipient"
               value={formState.recipient}
               onChange={handleInputChange}
               placeholder="Stellar address or @username"
+              aria-label="Recipient address"
+              aria-required="true"
+              aria-invalid="false"
               className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent font-mono text-sm"
               required
             />
@@ -457,8 +472,11 @@ export const SendFlow: React.FC = () => {
 
           {/* Amount Field */}
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">Amount (XLM)</label>
+            <label htmlFor="send-amount" className="block text-sm font-medium text-gray-700 mb-2">
+              Amount (XLM)
+            </label>
             <input
+              id="send-amount"
               type="number"
               name="amount"
               value={formState.amount}
@@ -466,26 +484,50 @@ export const SendFlow: React.FC = () => {
               placeholder="0.00"
               step="0.01"
               min="0"
+              aria-label="Amount in XLM"
+              aria-describedby={amountDescriptionIds}
+              aria-invalid={isAmountInvalid}
+              aria-required="true"
               className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
               required
             />
-            <p className="text-xs text-gray-500 mt-2">
+            <p id="send-amount-help" className="text-xs text-gray-500 mt-2">
               Today's total: {todayTotal} XLM / Daily limit: {userPolicy.dailyLimit} XLM
             </p>
           </div>
 
-          {/* Step-up Warning */}
-          {formState.policyAction === 'step_up' && formState.policyMessage && (
-            <div className="p-4 rounded-lg bg-amber-50 border border-amber-200 flex items-start gap-3">
-              <AlertCircle className="w-5 h-5 text-amber-600 shrink-0 mt-0.5" />
-              <div>
-                <strong className="text-amber-900 text-sm uppercase tracking-wide">
-                  Verification Required
-                </strong>
-                <p className="text-sm text-amber-700 mt-1">{formState.policyMessage}</p>
+          {/* Policy Validation Message */}
+          {formState.policyAction &&
+            formState.policyAction !== 'allow' &&
+            formState.policyMessage && (
+              <div
+                id="send-amount-policy-message"
+                role={isAmountInvalid ? 'alert' : 'status'}
+                className={`p-4 rounded-lg border flex items-start gap-3 ${
+                  isAmountInvalid ? 'bg-red-50 border-red-200' : 'bg-amber-50 border-amber-200'
+                }`}
+              >
+                <AlertCircle
+                  className={`w-5 h-5 shrink-0 mt-0.5 ${
+                    isAmountInvalid ? 'text-red-600' : 'text-amber-600'
+                  }`}
+                />
+                <div>
+                  <strong
+                    className={`text-sm uppercase tracking-wide ${
+                      isAmountInvalid ? 'text-red-900' : 'text-amber-900'
+                    }`}
+                  >
+                    {isAmountInvalid ? 'Transfer Blocked' : 'Verification Required'}
+                  </strong>
+                  <p
+                    className={`text-sm mt-1 ${isAmountInvalid ? 'text-red-700' : 'text-amber-700'}`}
+                  >
+                    {formState.policyMessage}
+                  </p>
+                </div>
               </div>
-            </div>
-          )}
+            )}
 
           {/* Signing Method (real mode only) */}
           {!DEMO_MODE && (
@@ -509,13 +551,19 @@ export const SendFlow: React.FC = () => {
 
           {/* Memo Field */}
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">Memo (Optional)</label>
+            <label htmlFor="send-memo" className="block text-sm font-medium text-gray-700 mb-2">
+              Memo (Optional)
+            </label>
             <textarea
+              id="send-memo"
               name="memo"
               value={formState.memo}
               onChange={handleInputChange}
               placeholder="Add a note for this transfer..."
               rows={3}
+              aria-label="Transfer memo"
+              aria-required="false"
+              aria-invalid="false"
               className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent resize-none"
             />
           </div>
