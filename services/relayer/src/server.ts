@@ -7,6 +7,7 @@ import cors from 'cors';
 import rateLimit from 'express-rate-limit';
 import { z } from 'zod';
 import { TransferPolicySchema } from '@ancore/types';
+import { loadEnvOrExit } from './config/env';
 import { RelayService } from './services/relayService';
 import { createStellarSubmitterFromEnv } from './services/stellarSubmitter';
 import { createAuthMiddleware } from './middleware/auth';
@@ -75,14 +76,6 @@ const stubAuthService: AuthServiceContract = {
 
 const defaultSignatureService: SignatureServiceContract = new Ed25519SignatureService();
 
-function parseAllowedOrigins(): string[] | string {
-  const envOrigins = process.env.ALLOWED_ORIGINS;
-  if (!envOrigins) {
-    return '*';
-  }
-  return envOrigins.split(',').map((origin) => origin.trim());
-}
-
 export function createApp(
   authService?: AuthServiceContract,
   signatureService: SignatureServiceContract = defaultSignatureService,
@@ -91,10 +84,13 @@ export function createApp(
   relayOptions?: RelayServiceOptions,
   nonceStore: NonceStore = new MemoryNonceStore()
 ): Express {
-  const authSecret = process.env.RELAYER_AUTH_SECRET;
+  // Fail fast on misconfiguration before any middleware or listener is wired up.
+  const env = loadEnvOrExit();
+
+  const authSecret = env.RELAYER_AUTH_SECRET;
   const hasConfiguredAuth = Boolean(authService ?? authSecret);
 
-  if (process.env.NODE_ENV === 'production' && !hasConfiguredAuth) {
+  if (env.NODE_ENV === 'production' && !hasConfiguredAuth) {
     console.error('RELAYER_AUTH_SECRET must be set in production to avoid stub auth');
     process.exit(1);
   }
@@ -103,10 +99,9 @@ export function createApp(
     authService ?? (authSecret ? createBearerAuthService(authSecret) : stubAuthService);
   const app = express();
 
-  const corsOrigins = parseAllowedOrigins();
   app.use(
     cors({
-      origin: corsOrigins,
+      origin: env.ALLOWED_ORIGINS,
       methods: ['GET', 'POST', 'PATCH', 'OPTIONS'],
       allowedHeaders: ['Authorization', 'Content-Type', 'X-Request-Id', 'x-request-id'],
       exposedHeaders: ['X-Request-Id', 'x-request-id'],
@@ -121,7 +116,7 @@ export function createApp(
   app.use(createRequestLoggerMiddleware());
 
   const useMockSubmission =
-    relayOptions?.useMockSubmission === true || process.env.RELAYER_USE_MOCK_SUBMISSION === 'true';
+    relayOptions?.useMockSubmission === true || env.RELAYER_USE_MOCK_SUBMISSION;
   const submitter =
     transactionSubmitter ?? (useMockSubmission ? undefined : createStellarSubmitterFromEnv());
 
@@ -134,7 +129,7 @@ export function createApp(
 
   const relayLimiter = rateLimit({
     windowMs: 15 * 60 * 1000,
-    max: process.env.RELAY_RATE_LIMIT_MAX ? parseInt(process.env.RELAY_RATE_LIMIT_MAX) : 50,
+    max: env.RELAY_RATE_LIMIT_MAX,
     message: 'Too many relay requests from this IP, please try again later.',
     keyGenerator: (req: Request) => {
       const callerId = (req as any).callerId;
@@ -146,7 +141,7 @@ export function createApp(
 
   const statusLimiter = rateLimit({
     windowMs: 15 * 60 * 1000,
-    max: process.env.STATUS_RATE_LIMIT_MAX ? parseInt(process.env.STATUS_RATE_LIMIT_MAX) : 200,
+    max: env.STATUS_RATE_LIMIT_MAX,
     message: 'Too many status requests from this IP, please try again later.',
   });
 
@@ -176,9 +171,7 @@ export function createApp(
     relayService
   );
   const schedulerEngine = new SchedulerEngine(scheduledTransferService, {
-    pollIntervalMs: process.env.SCHEDULER_POLL_INTERVAL_MS
-      ? parseInt(process.env.SCHEDULER_POLL_INTERVAL_MS, 10)
-      : 1_000,
+    pollIntervalMs: env.SCHEDULER_POLL_INTERVAL_MS,
   });
 
   if (relayOptions?.startScheduler !== false) {
@@ -240,7 +233,9 @@ export function createApp(
 }
 
 if (require.main === module) {
-  const PORT = process.env['PORT'] ?? 3000;
+  // Validate the whole environment before doing anything else, so a bad config
+  // is a clear boot-time failure rather than a runtime surprise.
+  const { PORT } = loadEnvOrExit();
   const app = createApp();
 
   app.listen(PORT, () => {

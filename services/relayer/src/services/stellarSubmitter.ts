@@ -2,6 +2,7 @@ import { rpc, TransactionBuilder, Transaction } from '@stellar/stellar-sdk';
 import { SimulationFailedError, StellarClient } from '@ancore/stellar';
 import type { Network } from '@ancore/types';
 import type { TransactionSubmitterContract, TransactionSubmissionResult } from '../types';
+import { getEnv } from '../config/env';
 
 const NETWORK_PASSPHRASES: Record<Network, string> = {
   testnet: 'Test SDF Network ; September 2015',
@@ -87,8 +88,9 @@ export function resolveStellarNetwork(value: string | undefined): Network {
 }
 
 export function createStellarSubmitterFromEnv(): StellarTransactionSubmitter {
-  const network = resolveStellarNetwork(process.env.STELLAR_NETWORK);
-  const networkPassphrase = process.env.STELLAR_NETWORK_PASSPHRASE;
+  // STELLAR_NETWORK is validated as an enum by src/config/env.ts, so an
+  // unrecognised value fails at boot instead of silently becoming `testnet`.
+  const { STELLAR_NETWORK: network, STELLAR_NETWORK_PASSPHRASE: networkPassphrase } = getEnv();
   return new StellarTransactionSubmitter({
     network,
     ...(networkPassphrase ? { networkPassphrase } : {}),

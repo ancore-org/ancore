@@ -2,6 +2,7 @@ import request from 'supertest';
 import { NetworkError } from '@ancore/stellar';
 import { createApp } from '../../src/server';
 import { IdempotencyStore } from '../../src/store/idempotency';
+import { resetEnvCache } from '../../src/config/env';
 import type {
   AuthServiceContract,
   SignatureServiceContract,
@@ -355,6 +356,9 @@ describe('POST /relay/execute — idempotency-key header', () => {
     beforeAll(() => {
       originalSecret = process.env.RELAYER_AUTH_SECRET;
       process.env.RELAYER_AUTH_SECRET = 'integration-secret';
+      // createApp() reads the cached, Zod-validated env; invalidate it so the
+      // secret set above is picked up.
+      resetEnvCache();
     });
 
     afterAll(() => {
@@ -363,6 +367,7 @@ describe('POST /relay/execute — idempotency-key header', () => {
       } else {
         process.env.RELAYER_AUTH_SECRET = originalSecret;
       }
+      resetEnvCache();
     });
 
     it('denies access with 401 when invalid token is supplied', async () => {

@@ -1,17 +1,17 @@
 import { Request, Response } from 'express';
 import rateLimit from 'express-rate-limit';
+import { getEnv } from '../config/env';
 
 /**
  * Resolves the per-account rate-limit (requests per minute) from options or env.
  *
- * Priority: options.rpm → RELAY_RATE_LIMIT_RPM env var → 30 (default).
- * Guards against NaN and non-positive values by falling back to 30.
+ * Priority: options.rpm → validated `RELAY_RATE_LIMIT_RPM` (default 30).
+ * The env value is bounds-checked at boot by `src/config/env.ts`, so NaN and
+ * non-positive values fail startup instead of silently falling back.
  */
 function resolveRpm(rpm?: number): number {
   if (rpm !== undefined && rpm > 0) return rpm;
-  const fromEnv = Number(process.env.RELAY_RATE_LIMIT_RPM);
-  if (!isNaN(fromEnv) && fromEnv > 0) return fromEnv;
-  return 30;
+  return getEnv().RELAY_RATE_LIMIT_RPM;
 }
 
 /**

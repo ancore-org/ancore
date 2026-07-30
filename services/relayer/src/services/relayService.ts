@@ -2,7 +2,8 @@ import { randomBytes } from 'crypto';
 import { trace, SpanStatusCode } from '@opentelemetry/api';
 import { validateTransferPolicy } from '@ancore/types';
 import { getSessionKey } from '@ancore/account-abstraction';
-import { rpc, Networks } from '@stellar/stellar-sdk';
+import { rpc } from '@stellar/stellar-sdk';
+import { getEnv } from '../config/env';
 import type { JobQueue } from '../queue/JobQueue';
 import type { IdempotencyStore } from '../store/idempotency';
 import type { NonceStore } from '../store/nonceStore';
@@ -33,7 +34,7 @@ function mockTxId(): string {
 const tracer = trace.getTracer('ancore-relayer');
 
 function isMockSubmissionEnabled(options?: RelayServiceOptions): boolean {
-  return options?.useMockSubmission === true || process.env.RELAYER_USE_MOCK_SUBMISSION === 'true';
+  return options?.useMockSubmission === true || getEnv().RELAYER_USE_MOCK_SUBMISSION;
 }
 
 export class RelayService implements RelayServiceContract {
@@ -94,12 +95,11 @@ export class RelayService implements RelayServiceContract {
 
         try {
           const targetContract = request.parameters.accountAddress as string;
+          const { RPC_URL, NETWORK_PASSPHRASE } = getEnv();
           const onChainKey = await getSessionKey(targetContract, request.sessionKey, {
-            server: new rpc.Server(
-              process.env.RPC_URL || 'https://soroban-testnet.stellar.org'
-            ) as any,
+            server: new rpc.Server(RPC_URL) as any,
             sourceAccount: targetContract,
-            networkPassphrase: process.env.NETWORK_PASSPHRASE || Networks.TESTNET,
+            networkPassphrase: NETWORK_PASSPHRASE,
           });
           if (!onChainKey) {
             const error: RelayError = {
@@ -305,7 +305,7 @@ export class RelayService implements RelayServiceContract {
       return { status: 'ok', message: 'Health check not implemented' };
     }
 
-    const timeoutMs = parseInt(process.env.SIGNATURE_SERVICE_HEALTH_TIMEOUT_MS || '5000', 10);
+    const timeoutMs = getEnv().SIGNATURE_SERVICE_HEALTH_TIMEOUT_MS;
 
     try {
       const start = Date.now();

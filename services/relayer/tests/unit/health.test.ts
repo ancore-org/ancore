@@ -2,6 +2,7 @@ import { RelayService } from '../../src/services/relayService';
 import type { SignatureServiceContract, TransactionSubmitterContract } from '../../src/types';
 import { IdempotencyStore } from '../../src/store/idempotency';
 import { JobQueue } from '../../src/queue/JobQueue';
+import { resetEnvCache } from '../../src/config/env';
 
 describe('RelayService health check with signature service', () => {
   let mockSignatureService: SignatureServiceContract;
@@ -24,6 +25,12 @@ describe('RelayService health check with signature service', () => {
         .mockResolvedValue({ assembledXdr: 'xdr', gasUsed: 0 }),
       isHealthy: jest.fn().mockResolvedValue({ healthy: true, latencyMs: 50 }),
     };
+  });
+
+  // The relayer reads configuration through a cached, Zod-validated env module,
+  // so tests that mutate process.env must invalidate that cache.
+  afterEach(() => {
+    resetEnvCache();
   });
 
   describe('signature service status', () => {
@@ -60,6 +67,7 @@ describe('RelayService health check with signature service', () => {
         );
 
       process.env.SIGNATURE_SERVICE_HEALTH_TIMEOUT_MS = '100';
+      resetEnvCache();
 
       const service = new RelayService(mockSignatureService, queue, store, mockSubmitter);
       const status = await service.checkSignatureServiceHealth();
@@ -121,6 +129,7 @@ describe('RelayService health check with signature service', () => {
   describe('health endpoint configuration', () => {
     it('uses configurable timeout from environment', async () => {
       process.env.SIGNATURE_SERVICE_HEALTH_TIMEOUT_MS = '2000';
+      resetEnvCache();
 
       mockSignatureService.isHealthy = jest
         .fn()
@@ -136,6 +145,7 @@ describe('RelayService health check with signature service', () => {
 
     it('defaults to 5000ms timeout when not configured', async () => {
       delete process.env.SIGNATURE_SERVICE_HEALTH_TIMEOUT_MS;
+      resetEnvCache();
 
       mockSignatureService.isHealthy = jest.fn().mockResolvedValue({ healthy: true });
 
