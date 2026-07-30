@@ -20,9 +20,9 @@ function extractAsset(prompt: string): 'XLM' | 'USDC' {
   return /\busdc\b/i.test(prompt) ? 'USDC' : 'XLM';
 }
 
-function extractDestination(prompt: string, fallback: string): string {
+function extractDestination(prompt: string): string | undefined {
   const match = prompt.match(STELLAR_ADDRESS_RE);
-  return match ? match[0] : fallback;
+  return match ? match[0] : undefined;
 }
 
 /**
@@ -51,7 +51,11 @@ export function deterministicDraftIntent({
     return { intent, summary: 'Drafted invoice intent' };
   }
 
-  const destination = extractDestination(prompt, 'G123');
+  const destination = extractDestination(prompt);
+  if (!destination) {
+    throw new Error('Unable to draft payment intent: destination address missing from prompt');
+  }
+
   const intent: Intent = { type: 'payment', destination, amount, asset };
   return { intent, summary: 'Drafted payment intent' };
 }

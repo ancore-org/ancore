@@ -38,11 +38,10 @@ describe('deterministicDraftIntent', () => {
     }
   });
 
-  it('falls back to a default destination when no address is present', () => {
-    const result = deterministicDraftIntent({ prompt: 'Send 10 XLM to Bob', accountId: 'GACC' });
-    if (result.intent.type === 'payment') {
-      expect(result.intent.destination).toBe('G123');
-    }
+  it('rejects prompts without a parseable destination instead of fabricating one', () => {
+    expect(() =>
+      deterministicDraftIntent({ prompt: 'Send 10 XLM to Bob', accountId: 'GACC' })
+    ).toThrow(/destination/i);
   });
 
   it('defaults amount to "10" when no number is present in the prompt', () => {

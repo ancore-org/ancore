@@ -1,12 +1,13 @@
 import { z } from 'zod';
 import { InvoiceIntentSchema } from '../intents/invoice';
+import { amountStringSchema } from './amount';
 
 /**
  * Payment intent schema validates requests to transfer funds.
  */
 export const paymentIntentSchema = z.object({
   type: z.literal('payment'),
-  amount: z.string().regex(/^\d+(\.\d+)?$/, 'Invalid amount format'),
+  amount: amountStringSchema,
   asset: z.enum(['XLM', 'USDC']),
   destination: z.string().min(1, 'Destination is required'),
   requiresConfirmation: z.boolean().optional(),

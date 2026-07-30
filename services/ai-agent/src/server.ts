@@ -92,10 +92,16 @@ export function createApp(): Express {
 
       return res.status(200).json(response);
     } catch (err) {
-      log.error(
-        { accountId, error: err instanceof Error ? err.message : String(err) },
-        'draft_intent_failed'
-      );
+      const message = err instanceof Error ? err.message : String(err);
+      log.error({ accountId, error: message }, 'draft_intent_failed');
+
+      if (/destination/i.test(message)) {
+        return res.status(400).json({
+          error: 'Needs clarification',
+          message: 'Please specify a Stellar destination address for the payment intent.',
+        });
+      }
+
       return res.status(500).json({ error: 'Failed to draft intent' });
     }
   });

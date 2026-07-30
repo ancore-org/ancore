@@ -66,10 +66,12 @@ export async function handleRequestAccess(
 
   enqueueApproval(ctx.requestId, origin, MethodName.REQUEST_ACCESS, params);
 
-  // Open approval UX before the MVP auto-approval path.
-  void openApprovalWindow(ctx.requestId, 'grant-access');
+  await openApprovalWindow(ctx.requestId, 'grant-access');
 
-  // For MVP, auto-approve (in production, wait for user approval)
+  const approvalResult = await waitForApproval(ctx.requestId);
+  if (approvalResult === undefined) {
+    throw new Error('Access request was not approved.');
+  }
 
   await addToAllowlist(network, smartAccountId, origin);
 

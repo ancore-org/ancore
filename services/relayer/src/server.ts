@@ -101,6 +101,13 @@ export function createApp(
   nonceStore: NonceStore = new MemoryNonceStore()
 ): Express {
   const authSecret = process.env.RELAYER_AUTH_SECRET;
+  const hasConfiguredAuth = Boolean(authService ?? authSecret);
+
+  if (process.env.NODE_ENV === 'production' && !hasConfiguredAuth) {
+    console.error('RELAYER_AUTH_SECRET must be set in production to avoid stub auth');
+    process.exit(1);
+  }
+
   const resolvedAuthService =
     authService ?? (authSecret ? createBearerAuthService(authSecret) : stubAuthService);
   const app = express();
