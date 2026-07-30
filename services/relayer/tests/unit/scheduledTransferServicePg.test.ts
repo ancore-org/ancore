@@ -124,6 +124,23 @@ describe('ScheduledTransferService — failure notifications', () => {
     );
   });
 
+  it('transitions to failed status when consecutive failures reach the cap', async () => {
+    const transfer = makeTransfer({ consecutiveFailures: 4, frequency: 'monthly' }); // will become 5
+    const store = makeAsyncStore([transfer]);
+    const relayService = makeRelayService(false);
+
+    const svc = new ScheduledTransferService(store, relayService);
+    await svc.processDueTransfers(new Date());
+
+    expect(store.updateAfterExecution).toHaveBeenCalledWith(
+      transfer.id,
+      expect.objectContaining({
+        status: 'failed',
+        consecutiveFailures: 5,
+      })
+    );
+  });
+
   it('calls onMaxFailuresReached when consecutive failures reach the cap', async () => {
     const transfer = makeTransfer({ consecutiveFailures: 4, frequency: 'monthly' }); // will become 5
     const store = makeAsyncStore([transfer]);
@@ -139,6 +156,10 @@ describe('ScheduledTransferService — failure notifications', () => {
 
     expect(notifier.onMaxFailuresReached).toHaveBeenCalledOnce();
     expect(notifier.onConsecutiveFailure).not.toHaveBeenCalled();
+    expect(store.updateAfterExecution).toHaveBeenCalledWith(
+      transfer.id,
+      expect.objectContaining({ status: 'failed' })
+    );
   });
 
   it('records failure notification in pg store on max failures', async () => {
@@ -153,6 +174,10 @@ describe('ScheduledTransferService — failure notifications', () => {
       transfer.id,
       'max_failures_reached',
       expect.objectContaining({ consecutiveFailures: 5 })
+    );
+    expect(store.updateAfterExecution).toHaveBeenCalledWith(
+      transfer.id,
+      expect.objectContaining({ status: 'failed' })
     );
   });
 

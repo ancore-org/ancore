@@ -5,6 +5,7 @@ import { nextRetryAfter } from '../queue/backoff';
 import { ScheduledTransferStore } from './ScheduledTransferStore';
 import type { PgScheduledTransferStore } from './PgScheduledTransferStore';
 import { computeNextRunAt, isDue } from './schedule-utils';
+import { schedulerMaxFailuresReached } from '../metrics';
 import type {
   CreateScheduledTransferInput,
   ScheduledTransfer,
@@ -53,7 +54,12 @@ export class ScheduledTransferService {
 
   async cancel(id: string, callerId: string): Promise<ScheduledTransfer | undefined> {
     const transfer = await this.store.getByIdForCaller(id, callerId);
-    if (!transfer || transfer.status === 'cancelled' || transfer.status === 'completed') {
+    if (
+      !transfer ||
+      transfer.status === 'cancelled' ||
+      transfer.status === 'completed' ||
+      transfer.status === 'failed'
+    ) {
       return undefined;
     }
     return this.store.updateStatus(id, 'cancelled');
@@ -135,12 +141,15 @@ export class ScheduledTransferService {
 
       if (consecutiveFailures >= MAX_CONSECUTIVE_FAILURES) {
         await this.store.updateAfterExecution(transfer.id, {
-          status: 'completed',
+          status: 'failed',
           nextRunAt: transfer.nextRunAt,
           lastExecutionAt: executedAt,
           consecutiveFailures,
         });
-        // Notify: max failures reached, transfer cancelled
+
+        schedulerMaxFailuresReached.inc();
+
+        // Notify: max failures reached, transfer terminated
         if (this.notifier) {
           await this.notifier.onMaxFailuresReached(transfer).catch(() => {});
         }

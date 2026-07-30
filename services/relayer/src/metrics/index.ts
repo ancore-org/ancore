@@ -138,11 +138,13 @@ class SimpleGauge {
  * scheduler_jobs_failed_total — count of failed executions.
  * scheduler_job_lag_seconds — seconds between next_run_at and actual execution time.
  * scheduler_consecutive_failures_total — times a transfer accumulated ≥2 consecutive failures.
+ * scheduler_max_failures_reached_total — times a transfer reached the max consecutive failure cap.
  */
 export const schedulerJobsExecuted = new SimpleCounter();
 export const schedulerJobsSucceeded = new SimpleCounter();
 export const schedulerJobsFailed = new SimpleCounter();
 export const schedulerConsecutiveFailures = new SimpleCounter();
+export const schedulerMaxFailuresReached = new SimpleCounter();
 
 /** Gauge: sum of lag seconds across all executions in this process lifetime. */
 export const schedulerJobLagSecondsTotal = new SimpleGauge();
@@ -218,6 +220,12 @@ export function renderPrometheusMetrics(): string {
   );
   lines.push('# TYPE scheduler_consecutive_failures_total counter');
   lines.push(`scheduler_consecutive_failures_total ${schedulerConsecutiveFailures.get()}`);
+
+  lines.push(
+    '# HELP scheduler_max_failures_reached_total Transfers that reached the max consecutive failures cap'
+  );
+  lines.push('# TYPE scheduler_max_failures_reached_total counter');
+  lines.push(`scheduler_max_failures_reached_total ${schedulerMaxFailuresReached.get()}`);
 
   lines.push(
     '# HELP scheduler_job_lag_seconds_total Cumulative seconds between next_run_at and actual execution'
