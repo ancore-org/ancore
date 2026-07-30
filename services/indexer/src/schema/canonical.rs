@@ -131,15 +131,23 @@ pub fn normalise(raw: RawEvent) -> Result<CanonicalEvent, NormaliseError> {
         return Err(NormaliseError::MissingField("contract_id"));
     }
 
-    let kind = classify_event(&raw.topics);
+    // `raw.topics` are base64 XDR SCVals per their documented contract (a
+    // real Soroban RPC response always encodes them this way); decode to
+    // plain strings before classifying. `decode_topic` falls back to its
+    // input unchanged on anything that isn't valid base64 XDR, so this is
+    // also a no-op for callers (tests, older data) that already hand in
+    // plain strings like "transfer".
+    let decoded_topics = crate::schema::xdr_decode::decode_topics(&raw.topics);
+
+    let kind = classify_event(&decoded_topics);
 
     // The primary account is the contract that emitted the event.
     // Downstream enrichment can override this for transfer events.
     let account_id = raw.contract_id.clone();
 
-    // Extract optional transfer fields from topics / data heuristically.
-    // Real implementations would decode XDR; here we use positional conventions.
-    let (amount, asset, counterparty) = extract_transfer_fields(&kind, &raw.topics);
+    // Extract optional transfer fields from the decoded topics using
+    // positional convention (see extract_transfer_fields's doc comment).
+    let (amount, asset, counterparty) = extract_transfer_fields(&kind, &decoded_topics);
 
     Ok(CanonicalEvent {
         id: Uuid::new_v4(),

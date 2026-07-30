@@ -54,12 +54,23 @@ fn decode_cursor(cursor: &str) -> Result<DecodedCursor> {
 }
 
 /// Insert a single contract event record.
-pub async fn insert_contract_event(db: &PgPool, params: &InsertContractEvent) -> Result<Uuid> {
+///
+/// Idempotent on `(tx_hash, event_type, ledger_seq)` (see migration
+/// `007_add_ingest_idempotency_constraints.sql`) — re-inserting the same
+/// event (a worker restart replaying already-processed ledgers, or an
+/// overlapping backfill range) is a no-op rather than a duplicate row.
+/// Returns `None` when the row already existed.
+pub async fn insert_contract_event(
+    db: &PgPool,
+    params: &InsertContractEvent,
+) -> Result<Option<Uuid>> {
     let id = Uuid::new_v4();
-    sqlx::query(
+    let row = sqlx::query(
         "INSERT INTO contract_events \
          (id, contract_address, account_id, event_type, ledger_seq, timestamp, tx_hash, data) \
-         VALUES ($1, $2, $3, $4, $5, $6, $7, $8)",
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8) \
+         ON CONFLICT (tx_hash, event_type, ledger_seq) DO NOTHING \
+         RETURNING id",
     )
     .bind(id)
     .bind(&params.contract_address)
@@ -69,10 +80,10 @@ pub async fn insert_contract_event(db: &PgPool, params: &InsertContractEvent) ->
     .bind(params.timestamp)
     .bind(&params.tx_hash)
     .bind(&params.data)
-    .execute(db)
+    .fetch_optional(db)
     .await?;
 
-    Ok(id)
+    Ok(row.map(|r| r.get::<Uuid, _>("id")))
 }
 
 /// Query contract events with cursor pagination and optional filters.

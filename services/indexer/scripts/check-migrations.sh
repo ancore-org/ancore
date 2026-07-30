@@ -51,6 +51,7 @@ if [[ "${SKIP_DOWN:-0}" != "1" ]]; then
     DROP TABLE IF EXISTS account_activity CASCADE;
     DROP TABLE IF EXISTS ingest_checkpoints CASCADE;
     DROP TABLE IF EXISTS schema_migrations CASCADE;
+    DROP TABLE IF EXISTS contract_events CASCADE;
   "
   echo "==> Re-applying migrations after teardown"
   for file in "$MIGRATIONS_DIR"/*.sql; do
