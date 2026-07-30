@@ -193,3 +193,16 @@ export {
   StorageErrorCode,
 } from './storage/storage-adapter';
 export * from './signing/ledger-adapter';
+
+// Invoice lifecycle
+export {
+  InvoiceClient,
+  InvoiceClientError,
+  type InvoiceClientOptions,
+  type PayInvoiceParams,
+  type OpenInvoiceResult,
+  type PayInvoiceResult,
+  type CancelInvoiceResult,
+  type ExpireInvoiceResult,
+  type ListInvoicesResult,
+} from './invoice-client';

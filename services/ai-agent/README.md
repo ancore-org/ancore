@@ -22,11 +22,12 @@ AI-assisted financial workflow orchestration service for the Ancore account abst
 
 ## Environment Variables
 
-| Variable          | Required | Default      | Description                                        |
-| ----------------- | -------- | ------------ | -------------------------------------------------- |
-| `PORT`            | No       | `3001`       | HTTP listen port                                   |
-| `NODE_ENV`        | No       | `production` | Runtime environment (`production` / `development`) |
-| `SERVICE_VERSION` | No       | `0.1.0`      | Version string returned by the `/health` endpoint  |
+| Variable            | Required | Default      | Description                                                                                                                                                                                                                                                         |
+| ------------------- | -------- | ------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `PORT`              | No       | `3001`       | HTTP listen port                                                                                                                                                                                                                                                    |
+| `NODE_ENV`          | No       | `production` | Runtime environment (`production` / `development`)                                                                                                                                                                                                                  |
+| `SERVICE_VERSION`   | No       | `0.1.0`      | Version string returned by the `/health` endpoint                                                                                                                                                                                                                   |
+| `ANTHROPIC_API_KEY` | No       | unset        | Enables the Claude Haiku (`claude-haiku-4-5`) provider for `/agent/draft-intent`. When unset, unavailable, or when the LLM errors/times out/returns invalid output, the endpoint transparently falls back to a deterministic parser — the endpoint always succeeds. |
 
 ---
 
@@ -52,6 +53,10 @@ No authentication required.
 ### `POST /agent/draft-intent`
 
 Drafts financial action intents from natural language prompts. Rate-limited to 60 requests/minute and maximum prompt length of 2000 characters.
+
+Backed by Claude Haiku (`claude-haiku-4-5`, tool-forced structured output validated against the same Zod schemas as `/v1/intents/validate`) when `ANTHROPIC_API_KEY` is set, with an automatic, dependency-free deterministic fallback parser when the LLM is unavailable, errors, times out, or returns output that fails schema validation. The response's `source` field (`"llm"` or `"deterministic"`) tells you which path produced the draft.
+
+**Every response is a draft only** — `status` is always `"draft"` and `requiresConfirmation` is always `true`, enforced server-side by `enforceNoAutonomousExecution()` before the response is returned (a guardrail violation is a `500`, never a silent pass-through). Nothing in this service ever signs or submits a transaction.
 
 **Request Body:**
 
@@ -224,6 +229,8 @@ All requests are logged as structured JSON objects to `stdout` by a request logg
 ### Privacy and Redaction
 
 To prevent PII and prompt leaks, the logging system automatically redacts sensitive fields like `prompt` and `freeText` from all log output, even when `NODE_ENV` is not production. If you run the service with debug logging enabled, the full request bodies will still never expose user prompts.
+
+`/agent/draft-intent` additionally writes a `draft_intent_audit` log entry per request (`timestamp`, `accountId`, `source`, `intentType`, `riskLevel`, and a `promptRedacted` field). `promptRedacted` runs the prompt through `redactSecrets()` (`src/logging/redact-secrets.ts`), which replaces Stellar secret keys (`S` + 55 base32 chars), seed phrases (12+ consecutive lowercase words), and API-key-shaped tokens with `[REDACTED]` — see `src/logging/__tests__/redact-secrets.test.ts` for the exact patterns covered.
 
 **Example log entry:**
 
