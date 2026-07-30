@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { isMemoRequired } from '@/utils/memoCheck';
 import { AddressInput, cn } from '@ancore/ui-kit';
 import { BASE_SEND_RESERVE, DEFAULT_SEND_FEE } from '@/utils/amount';
@@ -8,11 +8,15 @@ import {
   type SendService,
 } from '@/hooks/useSendTransaction';
 import { useRecentRecipients } from '@/hooks/useRecentRecipients';
+import { useAccountStore } from '@/stores/account';
+import { DEMO_ACCOUNT_ADDRESS } from '@/services/scheduler-client';
 import { ConfirmDialog } from '@/screens/Send/ConfirmDialog';
 import { ReviewScreen } from '@/screens/Send/ReviewScreen';
 import { StatusScreen } from '@/screens/Send/StatusScreen';
+import { AiDraftPanel } from '@/screens/Send/AiDraftPanel';
+import type { AgentDraftIntent } from '@/services/ai-agent-client';
 import { TransferNoteInput } from '@/components/TransferNoteInput';
-import { AlertCircle, ArrowLeftRight, Delete } from 'lucide-react';
+import { AlertCircle, ArrowLeftRight, Delete, Sparkles } from 'lucide-react';
 import {
   ScheduleControls,
   createDefaultScheduleConfig,
@@ -52,6 +56,28 @@ export function SendScreen({
   const send = useSendTransaction({ balance, assetDecimals, service, pollIntervalMs });
   const { recipients, addRecipient } = useRecentRecipients();
   const [memoWarning, setMemoWarning] = useState<string | null>(null);
+  const [showAiDraft, setShowAiDraft] = useState(false);
+
+  const activeAccountId = useAccountStore((state) => state.activeAccountId);
+  const accounts = useAccountStore((state) => state.accounts);
+  const accountAddress = useMemo(
+    () => accounts.find((a) => a.id === activeAccountId)?.address ?? DEMO_ACCOUNT_ADDRESS,
+    [accounts, activeAccountId]
+  );
+
+  /**
+   * Accepts an AI-drafted intent and prefills the form for the user to
+   * review. GUARDRAIL: this only sets local form state — it does not touch
+   * `send.tx`, does not call `send.goToReview`, and does not submit
+   * anything. The user still has to go through Continue → Review → Confirm
+   * → Sign like any other send.
+   */
+  const handleAiDraftAccept = (intent: AgentDraftIntent) => {
+    if (intent.type === 'payment') {
+      setForm((current) => ({ ...current, to: intent.destination, amount: intent.amount }));
+    }
+    setShowAiDraft(false);
+  };
 
   const isMainnet = send.tx?.fee?.network === 'mainnet' || !send.tx;
 
@@ -143,11 +169,27 @@ export function SendScreen({
 
   return (
     <div className="wallet-sheet">
-      <header className="wallet-header">
+      <header className="wallet-header flex items-center justify-between">
         <h1 className="wallet-title">Send</h1>
+        <button
+          type="button"
+          onClick={() => setShowAiDraft((current) => !current)}
+          className="flex items-center gap-1.5 rounded-full bg-white/10 px-3 py-1.5 text-[12px] font-medium text-foreground transition-colors hover:bg-white/15"
+        >
+          <Sparkles className="h-3.5 w-3.5 text-teal-300" aria-hidden />
+          {showAiDraft ? 'Manual form' : 'Draft with AI'}
+        </button>
       </header>
 
       <div className="flex flex-1 flex-col gap-4 overflow-y-auto px-5 pb-6">
+        {showAiDraft && (
+          <AiDraftPanel
+            accountId={accountAddress}
+            onAccept={handleAiDraftAccept}
+            onClose={() => setShowAiDraft(false)}
+          />
+        )}
+
         {/* Source asset card */}
         <div className="wallet-card space-y-5">
           <div className="flex items-center justify-between gap-3">

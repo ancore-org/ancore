@@ -1,26 +1,18 @@
 import express, { Express, Request, Response } from 'express';
-import { intentSchema, HIGH_VALUE_PAYMENT_THRESHOLD, type Intent } from './schemas/intent';
+import { intentSchema, HIGH_VALUE_PAYMENT_THRESHOLD } from './schemas/intent';
 import { requestLogger } from './middleware/request-logger';
 import { draftIntentRateLimiter } from './middleware/rate-limiter';
 import { scoreRisk } from './risk';
+import { generateDraftIntent } from './draft-intent';
+import { enforceNoAutonomousExecution } from './guardrail';
+import { redactSecrets } from './logging/redact-secrets';
+import { log } from './logging/logger';
+import type { DraftIntentResponse } from './types';
 
 const MAX_PROMPT_LENGTH = 2000;
 const MAX_ACCOUNT_ID_LENGTH = 128;
 
 const startTime = Date.now();
-
-/**
- * Determines if a payment intent requires confirmation based on amount.
- * High-value payments (e.g., >100 USDC or >1000 XLM) require confirmation.
- */
-function requiresConfirmation(intent: any): boolean {
-  if (intent.type === 'payment') {
-    const amount = parseFloat(intent.amount);
-    const threshold = intent.asset === 'USDC' ? 100 : 1000;
-    return amount > threshold;
-  }
-  return false;
-}
 
 /**
  * App factory — exported for testing.
@@ -49,7 +41,10 @@ export function createApp(): Express {
   });
 
   // ── Draft Intent endpoint ──────────────────────────────────────────────────
-  app.post('/agent/draft-intent', draftIntentRateLimiter, (req: Request, res: Response) => {
+  // LLM-backed (Claude Haiku, env-gated) with a deterministic offline fallback.
+  // GUARDRAIL: every response is validated by enforceNoAutonomousExecution()
+  // before it is returned — a violation is a 500, never a silent pass-through.
+  app.post('/agent/draft-intent', draftIntentRateLimiter, async (req: Request, res: Response) => {
     const { prompt, accountId } = req.body;
     if (!prompt || !accountId || typeof prompt !== 'string' || typeof accountId !== 'string') {
       return res.status(400).json({ error: 'Invalid request: prompt and accountId required' });
@@ -67,23 +62,42 @@ export function createApp(): Express {
       });
     }
 
-    const isInvoice = prompt.toLowerCase().includes('invoice');
-    const draftIntent: Intent = isInvoice
-      ? {
-          type: 'invoice',
-          amount: '10',
-          asset: 'XLM',
-          recipient: accountId,
-          dueDate: new Date().toISOString(),
-        }
-      : { type: 'payment', destination: 'G123', amount: '10', asset: 'XLM' };
-    return res.status(200).json({
-      status: 'draft',
-      requiresConfirmation: true,
-      summary: isInvoice ? 'Drafted invoice intent' : 'Drafted payment intent',
-      intent: draftIntent,
-      risk: scoreRisk(draftIntent),
-    });
+    try {
+      const { intent, summary, source } = await generateDraftIntent({ prompt, accountId });
+      const risk = scoreRisk(intent);
+
+      const response = {
+        status: 'draft' as const,
+        requiresConfirmation: true as const,
+        summary,
+        intent,
+        risk,
+        source,
+      };
+
+      // Fail closed: never return a response that hasn't passed the guardrail.
+      enforceNoAutonomousExecution(response as unknown as DraftIntentResponse);
+
+      log.info(
+        {
+          timestamp: new Date().toISOString(),
+          accountId,
+          source,
+          intentType: intent.type,
+          riskLevel: risk.level,
+          promptRedacted: redactSecrets(prompt),
+        },
+        'draft_intent_audit'
+      );
+
+      return res.status(200).json(response);
+    } catch (err) {
+      log.error(
+        { accountId, error: err instanceof Error ? err.message : String(err) },
+        'draft_intent_failed'
+      );
+      return res.status(500).json({ error: 'Failed to draft intent' });
+    }
   });
 
   // ── Intent validation ──────────────────────────────────────────────────────

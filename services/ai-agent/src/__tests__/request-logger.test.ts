@@ -36,9 +36,15 @@ describe('Request Logger Middleware', () => {
       'request_complete'
     );
 
-    // Ensure prompt substring does not appear in the arguments
-    const logArgs = infoSpy.mock.calls[0];
-    const logArgsStr = JSON.stringify(logArgs);
-    expect(logArgsStr).not.toContain('Send $5 to Bob');
+    // Ensure the prompt substring does not appear in the generic
+    // request-complete log call (the request logger never reads req.body.prompt).
+    // A separate, intentionally-scoped draft_intent_audit log call also fires for
+    // this route — see src/__tests__/draft-intent-route.test.ts — and is allowed
+    // to carry secret-redacted (not fully blanked) prompt content by design.
+    const requestCompleteCall = infoSpy.mock.calls.find(
+      ([, message]) => message === 'request_complete'
+    );
+    expect(requestCompleteCall).toBeDefined();
+    expect(JSON.stringify(requestCompleteCall)).not.toContain('Send $5 to Bob');
   });
 });
