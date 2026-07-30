@@ -59,4 +59,26 @@ describe('loadMobileWalletEnvironment', () => {
       })
     ).toThrow('Unsupported ANCORE_MOBILE_NETWORK');
   });
+
+  it('loads mainnet defaults when requested', () => {
+    const environment = loadMobileWalletEnvironment({
+      ...baseEnv,
+      ANCORE_MOBILE_NETWORK: 'mainnet',
+    });
+
+    expect(environment).toMatchObject({
+      network: 'mainnet',
+      rpcUrl: 'https://soroban-rpc.mainnet.stellar.gateway.fm',
+      networkPassphrase: 'Public Global Stellar Network ; September 2015',
+    });
+  });
+
+  it('passes through walletConnectProjectId when set', () => {
+    const environment = loadMobileWalletEnvironment({
+      ...baseEnv,
+      WALLETCONNECT_PROJECT_ID: 'test-project-id',
+    });
+
+    expect(environment.walletConnectProjectId).toBe('test-project-id');
+  });
 });

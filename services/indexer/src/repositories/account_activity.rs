@@ -69,16 +69,23 @@ pub struct InsertActivity {
 
 /// Insert a single activity record, deriving `asset_code`/`asset_issuer`
 /// from the raw `asset` string via [`normalize_asset`].
-#[allow(dead_code)] // exercised by integration tests; ingest wiring lands separately
-pub async fn insert_activity(db: &PgPool, params: &InsertActivity) -> Result<Uuid> {
+///
+/// Idempotent on `(tx_hash, activity_type, ledger_seq)` (see migration
+/// `007_add_ingest_idempotency_constraints.sql`) — re-inserting the same
+/// activity (a worker restart replaying already-processed ledgers, or an
+/// overlapping backfill range) is a no-op rather than a duplicate row.
+/// Returns `None` when the row already existed.
+pub async fn insert_activity(db: &PgPool, params: &InsertActivity) -> Result<Option<Uuid>> {
     let (asset_code, asset_issuer) = normalize_asset(params.asset.as_deref());
 
     let id = Uuid::new_v4();
-    sqlx::query(
+    let row = sqlx::query(
         "INSERT INTO account_activity \
          (id, account_id, activity_type, amount, asset, asset_code, asset_issuer, \
           counterparty, tx_hash, ledger_seq, created_at, metadata) \
-         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)",
+         VALUES ($1, $2, $3, $4::numeric, $5, $6, $7, $8, $9, $10, $11, $12) \
+         ON CONFLICT (tx_hash, activity_type, ledger_seq) DO NOTHING \
+         RETURNING id",
     )
     .bind(id)
     .bind(&params.account_id)
@@ -92,10 +99,10 @@ pub async fn insert_activity(db: &PgPool, params: &InsertActivity) -> Result<Uui
     .bind(params.ledger_seq)
     .bind(params.created_at)
     .bind(&params.metadata)
-    .execute(db)
+    .fetch_optional(db)
     .await?;
 
-    Ok(id)
+    Ok(row.map(|r| r.get::<Uuid, _>("id")))
 }
 
 /// Filter options for activity queries
@@ -148,7 +155,9 @@ fn encode_cursor(created_at: DateTime<Utc>, id: Uuid) -> String {
 /// Decode cursor to extract created_at and id
 fn decode_cursor(cursor: &str) -> Result<DecodedCursor> {
     if cursor.trim().is_empty() {
-        return Err(ApiError::InvalidCursor("Cursor cannot be empty".to_string()));
+        return Err(ApiError::InvalidCursor(
+            "Cursor cannot be empty".to_string(),
+        ));
     }
 
     let decoded = base64::engine::general_purpose::URL_SAFE_NO_PAD
@@ -166,12 +175,16 @@ fn decode_cursor(cursor: &str) -> Result<DecodedCursor> {
 
     // Validate UUID format
     if Uuid::parse_str(&cursor_obj.i).is_err() {
-        return Err(ApiError::InvalidCursor("Invalid UUID in cursor".to_string()));
+        return Err(ApiError::InvalidCursor(
+            "Invalid UUID in cursor".to_string(),
+        ));
     }
 
     // Validate timestamp format
     if DateTime::parse_from_rfc3339(&cursor_obj.t).is_err() {
-        return Err(ApiError::InvalidCursor("Invalid timestamp format in cursor".to_string()));
+        return Err(ApiError::InvalidCursor(
+            "Invalid timestamp format in cursor".to_string(),
+        ));
     }
 
     Ok(cursor_obj)

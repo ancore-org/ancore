@@ -137,6 +137,7 @@ export {
   defaultScheduleStartAt,
   SCHEDULE_FREQUENCY_OPTIONS,
   DEMO_ACCOUNT_ADDRESS,
+  ConfigError,
   type SchedulerClient,
   type SchedulerClientOptions,
 } from './scheduler-client';
@@ -192,3 +193,16 @@ export {
   StorageErrorCode,
 } from './storage/storage-adapter';
 export * from './signing/ledger-adapter';
+
+// Invoice lifecycle
+export {
+  InvoiceClient,
+  InvoiceClientError,
+  type InvoiceClientOptions,
+  type PayInvoiceParams,
+  type OpenInvoiceResult,
+  type PayInvoiceResult,
+  type CancelInvoiceResult,
+  type ExpireInvoiceResult,
+  type ListInvoicesResult,
+} from './invoice-client';

@@ -1,6 +1,6 @@
 import React, { useMemo, useState } from 'react';
 import { Send, Loader2, CheckCircle2, ExternalLink, Wallet, Shield } from 'lucide-react';
-import { useSendTransaction } from '../hooks/useSendTransaction';
+import { useSendTransaction, validateRecipientInput } from '../hooks/useSendTransaction';
 import { useSendFeeEstimate } from '../hooks/useSendFeeEstimate';
 import { useWalletConnection } from '../hooks/useWalletConnection';
 import type { SendStrategy } from '../services/send-service';
@@ -69,6 +69,14 @@ export const SendPage: React.FC = () => {
     disabled: DEMO_MODE || !recipient || !amount,
   });
 
+  // Live format feedback while typing. An empty field is not an error yet —
+  // that only surfaces on submit, via the hook.
+  const liveRecipientError = useMemo(
+    () => (recipient.trim() ? (validateRecipientInput(recipient) ?? null) : null),
+    [recipient]
+  );
+  const recipientError = send.recipientError ?? liveRecipientError;
+
   const onSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     setFormError(null);
@@ -106,17 +114,17 @@ export const SendPage: React.FC = () => {
         <label className="block space-y-2">
           <span className="text-sm font-medium">Recipient</span>
           <input
-            aria-describedby={send.recipientError ? 'recipient-error' : undefined}
-            aria-invalid={!!send.recipientError}
+            aria-describedby={recipientError ? 'recipient-error' : undefined}
+            aria-invalid={!!recipientError}
             className="w-full rounded-lg border px-3 py-2 font-mono text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
             onChange={(event) => setRecipient(event.target.value)}
             placeholder="@alice or G..."
             value={recipient}
           />
         </label>
-        {send.recipientError && (
+        {recipientError && (
           <p className="text-sm font-medium text-destructive" id="recipient-error" role="alert">
-            {send.recipientError}
+            {recipientError}
           </p>
         )}
 
@@ -173,7 +181,7 @@ export const SendPage: React.FC = () => {
           </div>
         )}
 
-        {send.error && !send.recipientError && (
+        {send.error && !recipientError && (
           <p className="text-sm font-medium text-destructive" role="alert">
             {send.error.message}
           </p>
@@ -181,7 +189,7 @@ export const SendPage: React.FC = () => {
 
         <button
           className="inline-flex w-full items-center justify-center gap-2 rounded-lg bg-blue-600 px-4 py-2 font-medium text-white hover:bg-blue-700 disabled:opacity-50"
-          disabled={send.loading}
+          disabled={send.loading || !!liveRecipientError}
           type="submit"
         >
           {send.loading ? (

@@ -143,7 +143,7 @@
       "pluginVersion": "10.0.0",
       "targets": [
         {
-          "expr": "sum by(job) (rate(http_requests_total{job=~\"$service\"}[5m]))",
+          "expr": "sum by(job) (rate(relay_request_total{job=~\"$service\"}[5m]))",
           "refId": "A"
         }
       ],
@@ -225,7 +225,7 @@
       "pluginVersion": "10.0.0",
       "targets": [
         {
-          "expr": "(rate(http_requests_total{status=~\"5..\", job=~\"$service\"}[5m]) / rate(http_requests_total{job=~\"$service\"}[5m])) * 100",
+          "expr": "(rate(relay_errors_total{job=~\"$service\"}[5m]) / rate(relay_request_total{job=~\"$service\"}[5m])) * 100",
           "refId": "A"
         }
       ],
@@ -299,17 +299,17 @@
       "pluginVersion": "10.0.0",
       "targets": [
         {
-          "expr": "histogram_quantile(0.50, rate(http_request_duration_seconds_bucket{job=~\"$service\"}[5m])) * 1000",
+          "expr": "histogram_quantile(0.50, rate(relay_request_duration_seconds_bucket{job=~\"$service\"}[5m])) * 1000",
           "legendFormat": "P50 - {{job}}",
           "refId": "A"
         },
         {
-          "expr": "histogram_quantile(0.95, rate(http_request_duration_seconds_bucket{job=~\"$service\"}[5m])) * 1000",
+          "expr": "histogram_quantile(0.95, rate(relay_request_duration_seconds_bucket{job=~\"$service\"}[5m])) * 1000",
           "legendFormat": "P95 - {{job}}",
           "refId": "B"
         },
         {
-          "expr": "histogram_quantile(0.99, rate(http_request_duration_seconds_bucket{job=~\"$service\"}[5m])) * 1000",
+          "expr": "histogram_quantile(0.99, rate(relay_request_duration_seconds_bucket{job=~\"$service\"}[5m])) * 1000",
           "legendFormat": "P99 - {{job}}",
           "refId": "C"
         }
@@ -418,7 +418,7 @@
       "pluginVersion": "10.0.0",
       "targets": [
         {
-          "expr": "(1 - (rate(http_requests_total{status=~\"5..\", job=~\"$service\"}[28d]) / rate(http_requests_total{job=~\"$service\"}[28d]))) * 100",
+          "expr": "(1 - (rate(relay_errors_total{job=~\"$service\"}[28d]) / rate(relay_request_total{job=~\"$service\"}[28d]))) * 100",
           "refId": "A"
         }
       ],

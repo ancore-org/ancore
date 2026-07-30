@@ -1,5 +1,5 @@
 import { randomBytes } from 'crypto';
-import { trace } from '@opentelemetry/api';
+import { trace, SpanStatusCode } from '@opentelemetry/api';
 import { validateTransferPolicy } from '@ancore/types';
 import { getSessionKey } from '@ancore/account-abstraction';
 import { rpc, Networks } from '@stellar/stellar-sdk';
@@ -21,11 +21,11 @@ import type {
 import { RelayErrorCodes } from '../types';
 import { mapSimulationError } from './mapSimulationError';
 import { mapSubmissionError } from './mapSubmissionError';
+import { recordSubmitLatency } from '../metrics';
 
 const SIGNED_TX_PARAMETER = 'signedTransactionXdr';
 const startTime = Date.now();
 
-/** Generate a synthetic transaction id for dev-only mock submission */
 function mockTxId(): string {
   return randomBytes(32).toString('hex').toUpperCase();
 }
@@ -36,15 +36,6 @@ function isMockSubmissionEnabled(options?: RelayServiceOptions): boolean {
   return options?.useMockSubmission === true || process.env.RELAYER_USE_MOCK_SUBMISSION === 'true';
 }
 
-/**
- * RelayService validates signed relay requests and submits pre-signed Soroban
- * transactions to Stellar via Horizon.
- *
- * Security checks performed:
- *  - Signature verification (Ed25519 via SignatureServiceContract)
- *  - Nonce must be a non-negative integer (structural; replay tracking is out of scope for MVP)
- *  - Session key must be a 64-char hex string
- */
 export class RelayService implements RelayServiceContract {
   private readonly useMockSubmission: boolean;
 
@@ -63,6 +54,7 @@ export class RelayService implements RelayServiceContract {
     return tracer.startActiveSpan('relayer.validate', async (span): Promise<ValidationResult> => {
       span.setAttribute('session_key_id', request.sessionKey);
       span.setAttribute('nonce', request.nonce);
+      span.setAttribute('operation', request.operation);
 
       try {
         const keyError = this.validateSessionKey(request.sessionKey);
@@ -71,6 +63,8 @@ export class RelayService implements RelayServiceContract {
             code: RelayErrorCodes.INVALID_SIGNATURE,
             message: keyError,
           };
+          span.setStatus({ code: SpanStatusCode.ERROR, message: keyError });
+          span.setAttribute('error.code', error.code);
           return { valid: false, error };
         }
 
@@ -79,6 +73,8 @@ export class RelayService implements RelayServiceContract {
             code: RelayErrorCodes.NONCE_REPLAY,
             message: 'Nonce must be non-negative',
           };
+          span.setStatus({ code: SpanStatusCode.ERROR, message: error.message });
+          span.setAttribute('error.code', error.code);
           return { valid: false, error };
         }
 
@@ -88,6 +84,8 @@ export class RelayService implements RelayServiceContract {
           } catch (err) {
             const message = err instanceof Error ? err.message : 'Nonce already used';
             const error: RelayError = { code: RelayErrorCodes.NONCE_REPLAY, message };
+            span.setStatus({ code: SpanStatusCode.ERROR, message });
+            span.setAttribute('error.code', error.code);
             return { valid: false, error };
           }
         }
@@ -104,42 +102,44 @@ export class RelayService implements RelayServiceContract {
             networkPassphrase: process.env.NETWORK_PASSPHRASE || Networks.TESTNET,
           });
           if (!onChainKey) {
-            return {
-              valid: false,
-              error: {
-                code: RelayErrorCodes.INVALID_SIGNATURE,
-                message: 'Session key not found on chain',
-              },
+            const error: RelayError = {
+              code: RelayErrorCodes.INVALID_SIGNATURE,
+              message: 'Session key not found on chain',
             };
+            span.setStatus({ code: SpanStatusCode.ERROR, message: error.message });
+            span.setAttribute('error.code', error.code);
+            return { valid: false, error };
           }
         } catch (e: unknown) {
           // ignore or handle error if contract query fails
         }
 
-        // Prefer injected SignatureServiceContract so tests and production share one path.
-        // (Avoid direct @noble/ed25519 ESM import in this service — Jest + package dualism.)
         const ok = this.signatureService.verify(request.sessionKey, payload, request.signature);
         if (!ok) {
-          return {
-            valid: false,
-            error: {
-              code: RelayErrorCodes.INVALID_SIGNATURE,
-              message: 'Signature verification failed',
-            },
+          const error: RelayError = {
+            code: RelayErrorCodes.INVALID_SIGNATURE,
+            message: 'Signature verification failed',
           };
+          span.setStatus({ code: SpanStatusCode.ERROR, message: error.message });
+          span.setAttribute('error.code', error.code);
+          return { valid: false, error };
         }
 
         if (request.transferPolicy) {
           const { policy, amount, todayTotal } = request.transferPolicy;
           const policyResult = validateTransferPolicy(amount, todayTotal, policy);
           if (policyResult.action === 'block') {
-            return {
-              valid: false,
-              error: { code: RelayErrorCodes.POLICY_DENIED, message: policyResult.message },
+            const error: RelayError = {
+              code: RelayErrorCodes.POLICY_DENIED,
+              message: policyResult.message,
             };
+            span.setStatus({ code: SpanStatusCode.ERROR, message: error.message });
+            span.setAttribute('error.code', error.code);
+            return { valid: false, error };
           }
         }
 
+        span.setStatus({ code: SpanStatusCode.OK });
         return { valid: true };
       } finally {
         span.end();
@@ -188,21 +188,45 @@ export class RelayService implements RelayServiceContract {
       const { assembledXdr, gasUsed } = await tracer.startActiveSpan(
         'relayer.simulate',
         async (span) => {
+          span.setAttribute('signed_xdr_length', signedXdr.length);
           try {
-            return await this.transactionSubmitter!.simulateAndAssembleTransaction(signedXdr);
+            const result =
+              await this.transactionSubmitter!.simulateAndAssembleTransaction(signedXdr);
+            span.setAttribute('gas_used', result.gasUsed);
+            span.setAttribute('assembled_xdr_length', result.assembledXdr.length);
+            span.setStatus({ code: SpanStatusCode.OK });
+            return result;
+          } catch (err) {
+            const message = err instanceof Error ? err.message : 'Simulation failed';
+            span.setStatus({ code: SpanStatusCode.ERROR, message });
+            span.recordException(err instanceof Error ? err : new Error(String(err)));
+            throw err;
           } finally {
             span.end();
           }
         }
       );
 
+      const submitStart = Date.now();
       const result = await tracer.startActiveSpan('relayer.submit', async (span) => {
+        span.setAttribute('assembled_xdr_length', assembledXdr.length);
         try {
-          return await this.transactionSubmitter!.submitSignedTransaction(assembledXdr);
+          const submitResult =
+            await this.transactionSubmitter!.submitSignedTransaction(assembledXdr);
+          span.setAttribute('transaction_hash', submitResult.transactionHash);
+          span.setStatus({ code: SpanStatusCode.OK });
+          return submitResult;
+        } catch (err) {
+          const message = err instanceof Error ? err.message : 'Submission failed';
+          span.setStatus({ code: SpanStatusCode.ERROR, message });
+          span.recordException(err instanceof Error ? err : new Error(String(err)));
+          throw err;
         } finally {
           span.end();
         }
       });
+      const submitDurationSeconds = (Date.now() - submitStart) / 1000;
+      recordSubmitLatency(submitDurationSeconds);
 
       return {
         success: true,
@@ -252,7 +276,6 @@ export class RelayService implements RelayServiceContract {
     };
   }
 
-  /** Async RPC health probe — call from a background tick or status handler when needed */
   async checkRpcHealth(): Promise<DependencyStatus> {
     if (this.useMockSubmission) {
       return { status: 'ok', latencyMs: 12, message: 'Mock submission mode' };
@@ -277,7 +300,6 @@ export class RelayService implements RelayServiceContract {
     }
   }
 
-  /** Async signature service health probe with configurable timeout */
   async checkSignatureServiceHealth(): Promise<DependencyStatus> {
     if (!this.signatureService.isHealthy) {
       return { status: 'ok', message: 'Health check not implemented' };
@@ -312,8 +334,6 @@ export class RelayService implements RelayServiceContract {
       };
     }
   }
-
-  // ── Private helpers ──────────────────────────────────────────────────────
 
   private resolveRpcStatus(): DependencyStatus {
     if (this.useMockSubmission) {
@@ -354,7 +374,6 @@ export class RelayService implements RelayServiceContract {
     return null;
   }
 
-  /** Deterministic canonical payload for signature verification */
   private canonicalPayload(req: RelayExecuteRequest): string {
     return Buffer.from(
       JSON.stringify({ sessionKey: req.sessionKey, operation: req.operation, nonce: req.nonce })

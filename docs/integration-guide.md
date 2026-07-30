@@ -151,6 +151,24 @@ from `@ancore/account-abstraction` unless building advanced tooling.
 
 ---
 
+## Service API references
+
+HTTP service contracts are published as OpenAPI specs. Wallet teams calling a
+service directly must code against the spec, not against observed responses.
+
+| Service | Spec | Notes |
+|---------|------|-------|
+| Indexer | [`services/indexer/openapi.yaml`](../services/indexer/openapi.yaml) | Activity feed, statement rows, contract events (incl. session-key lifecycle events), cursor pagination examples |
+| Relayer | [`services/relayer/openapi.yaml`](../services/relayer/openapi.yaml) | Relay execute/validate/status |
+| AI agent | [`services/ai-agent/openapi.yaml`](../services/ai-agent/openapi.yaml) | Intent drafting |
+
+The indexer spec is linted in CI via `pnpm docs:lint-openapi` (Spectral,
+ruleset in [`.spectral.yaml`](../.spectral.yaml)). The contract event catalog
+behind the contract-events endpoints lives in
+[`docs/indexer/contract-events.md`](./indexer/contract-events.md).
+
+---
+
 ## Integration checklist
 
 Before shipping any feature that touches contract methods or SDK wrappers:

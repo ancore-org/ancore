@@ -10,16 +10,23 @@ const maxRequests = 60; // 60 requests per minute
 const hits = new Map<string, RateLimitStore>();
 
 // Clean up expired entries every 5 minutes to prevent memory leaks
-setInterval(() => {
-  const now = Date.now();
-  for (const [key, record] of hits.entries()) {
-    if (now > record.resetTime) {
-      hits.delete(key);
+setInterval(
+  () => {
+    const now = Date.now();
+    for (const [key, record] of hits.entries()) {
+      if (now > record.resetTime) {
+        hits.delete(key);
+      }
     }
-  }
-}, 5 * 60 * 1000).unref();
+  },
+  5 * 60 * 1000
+).unref();
 
-export function draftIntentRateLimiter(req: Request, res: Response, next: NextFunction): void | Response {
+export function draftIntentRateLimiter(
+  req: Request,
+  res: Response,
+  next: NextFunction
+): void | Response {
   const accountId = req.body?.accountId;
   const key = accountId ? `account:${accountId}` : `ip:${req.ip || 'unknown'}`;
   const now = Date.now();

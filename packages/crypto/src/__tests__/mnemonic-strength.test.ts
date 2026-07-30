@@ -113,15 +113,10 @@ describe('validateMnemonicStrength', () => {
   });
 
   it('throws INVALID_CHECKSUM for mnemonic with wrong checksum', () => {
-    const validMnemonic = bip39.generateMnemonic(128);
-    const words = validMnemonic.split(' ');
-    // Swap last two words to break checksum
-    const last = words[words.length - 1];
-    const secondLast = words[words.length - 2];
-    words[words.length - 1] = secondLast;
-    words[words.length - 2] = last;
-    const invalidMnemonic = words.join(' ');
-
+    // "use" was replaced with "abandon" — all 12 words are valid English BIP39
+    // words, but the checksum is wrong so bip39.validateMnemonic returns false.
+    const invalidMnemonic =
+      'abandon laundry bone grid divide level lawn raccoon vacuum click abstract buddy';
     expect(() => validateMnemonicStrength(invalidMnemonic)).toThrow(MnemonicValidationError);
     try {
       validateMnemonicStrength(invalidMnemonic);

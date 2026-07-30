@@ -84,11 +84,41 @@ export const DEFAULTS = {
   telemetryOptIn: false,
 };
 
-const STORE_VERSION = 4;
+const STORE_VERSION = 5;
+
+const LAST_SUCCESSFUL_NETWORK_KEY = 'ancore-last-successful-network';
 
 function applyTheme(theme: ThemePreference): void {
   if (typeof document === 'undefined') return;
   document.documentElement.dataset.theme = theme;
+}
+
+/**
+ * Save the last successfully used network to a separate storage key.
+ * This persists even if settings are reset or corrupted, preventing silent network switches.
+ */
+async function saveLastSuccessfulNetwork(network: NetworkMode): Promise<void> {
+  try {
+    await extensionStorage.setItem(LAST_SUCCESSFUL_NETWORK_KEY, network);
+  } catch (error) {
+    console.warn('[Settings] Failed to save last successful network:', error);
+  }
+}
+
+/**
+ * Load the last successfully used network from separate storage.
+ * Returns undefined if no saved network exists or on error.
+ */
+async function loadLastSuccessfulNetwork(): Promise<NetworkMode | undefined> {
+  try {
+    const saved = await extensionStorage.getItem(LAST_SUCCESSFUL_NETWORK_KEY);
+    if (saved === 'mainnet' || saved === 'testnet' || saved === 'futurenet') {
+      return saved;
+    }
+  } catch (error) {
+    console.warn('[Settings] Failed to load last successful network:', error);
+  }
+  return undefined;
 }
 
 export const useSettingsStore = create<SettingsState>()(
@@ -97,10 +127,13 @@ export const useSettingsStore = create<SettingsState>()(
       ...DEFAULTS,
 
       setNetwork: (network) =>
-        set(() => ({
-          network,
-          horizonUrl: NETWORK_HORIZON_URLS[network],
-        })),
+        set(async () => {
+          await saveLastSuccessfulNetwork(network);
+          return {
+            network,
+            horizonUrl: NETWORK_HORIZON_URLS[network],
+          };
+        }),
       setHorizonUrl: (url) =>
         set((state) => {
           // Validate against the current network profile before persisting.
@@ -145,7 +178,7 @@ export const useSettingsStore = create<SettingsState>()(
         telemetryOptIn: state.telemetryOptIn,
       }),
       migrate: (persistedState) => persistedState as SettingsState,
-      merge: (persistedState, currentState) => {
+      merge: async (persistedState, currentState) => {
         const persisted = (persistedState as Partial<SettingsState> | undefined) ?? {};
         const network = persisted.network;
         const theme = persisted.theme;
@@ -154,11 +187,14 @@ export const useSettingsStore = create<SettingsState>()(
         const transferStepUpThreshold = persisted.transferStepUpThreshold;
         const horizonUrl = persisted.horizonUrl;
 
+        // Try to restore from last successful network if persisted network is invalid
+        const lastSuccessfulNetwork = await loadLastSuccessfulNetwork();
+
         // Validate network and derive horizon URL if missing or invalid
         const validNetwork =
           network === 'mainnet' || network === 'testnet' || network === 'futurenet'
             ? network
-            : DEFAULTS.network;
+            : (lastSuccessfulNetwork ?? DEFAULTS.network);
 
         // If horizonUrl is missing, invalid, or fails URL validation for the network, derive from network
         const candidateUrl =

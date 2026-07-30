@@ -27,7 +27,10 @@ export interface Messages {
   };
   SIGN_TRANSACTION: {
     request: { xdr: string; networkPassphrase: string };
-    response: { signedXdr: string } | { error: string };
+    response:
+      | { signedXdr: string }
+      | { error: string }
+      | { requiresHardware: true; xdr: string; networkPassphrase: string };
   };
   GET_WALLET_STATE: {
     request: Record<string, never>;

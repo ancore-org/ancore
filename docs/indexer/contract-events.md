@@ -2,6 +2,8 @@
 
 > Canonical reference for all events emitted by `contracts/account/src/lib.rs`.  
 > Use this document to map on-chain events to indexer ingestion actions.  
+> Query these events through the indexer contract-events endpoints — see
+> [`services/indexer/openapi.yaml`](../../services/indexer/openapi.yaml).  
 > Last updated: 2026-06-01
 
 ---

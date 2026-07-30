@@ -80,16 +80,16 @@ export function createCancelScheduledTransferHandler(service: ScheduledTransferS
 }
 
 export function createListExecutionsHandler(service: ScheduledTransferService) {
-  return (req: Request, res: Response): void => {
+  return async (req: Request, res: Response): Promise<void> => {
     const callerId = getCallerId(res);
-    const transfer = service.get(req.params['id'] ?? '', callerId);
+    const transfer = await service.get(req.params['id'] ?? '', callerId);
 
     if (!transfer) {
       res.status(404).json({ error: 'NOT_FOUND', message: 'Scheduled transfer not found' });
       return;
     }
 
-    const executions = service.listExecutions(transfer.id, callerId);
+    const executions = await service.listExecutions(transfer.id, callerId);
     res.status(200).json({ data: executions });
   };
 }

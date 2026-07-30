@@ -12,6 +12,7 @@ import {
   parseDecimal,
   type SplitMode,
 } from '../lib/split-bill-validation';
+import { stellarAddressError } from '../lib/address-validation';
 
 // ── Create form ───────────────────────────────────────────────────────────────
 
@@ -66,6 +67,8 @@ function CreateBillForm({ onCreated }: { onCreated: (id: string) => void }) {
   const [participants, setParticipants] = useState<ParticipantDraft[]>([newParticipant()]);
   const [error, setError] = useState('');
   const [shareErrors, setShareErrors] = useState<Record<string, string>>({});
+  const [addressErrors, setAddressErrors] = useState<Record<string, string>>({});
+  const [creatorAddressError, setCreatorAddressError] = useState('');
 
   // Recomputed on every render so the running total updates as the user types.
   // Errors are only *surfaced* on submit; this just drives the live summary.
@@ -94,13 +97,36 @@ function CreateBillForm({ onCreated }: { onCreated: (id: string) => void }) {
     e.preventDefault();
     setError('');
     setShareErrors({});
+    setAddressErrors({});
+    setCreatorAddressError('');
 
     if (!title.trim()) return setError('Title is required.');
     if (!creatorAddress.trim()) return setError('Your address is required.');
+
+    const creatorError = stellarAddressError(creatorAddress);
+    if (creatorError) {
+      setCreatorAddressError(creatorError);
+      return setError(creatorError);
+    }
+
     if (participants.length === 0) return setError('Add at least one participant.');
 
     for (const p of participants) {
       if (!p.address.trim()) return setError('All participants need an address.');
+    }
+
+    // Every participant is paid on-chain, so a malformed address is caught here
+    // rather than at settlement time. All rows are checked so the user fixes
+    // them in one pass instead of one per submit.
+    const badAddresses: Record<string, string> = {};
+    for (const p of participants) {
+      const addressError = stellarAddressError(p.address);
+      if (addressError) badAddresses[p.key] = addressError;
+    }
+
+    if (Object.keys(badAddresses).length > 0) {
+      setAddressErrors(badAddresses);
+      return setError('Fix the highlighted participant addresses.');
     }
 
     // Shares must add up: to 100% in percentage mode, or to the bill total in
@@ -154,8 +180,19 @@ function CreateBillForm({ onCreated }: { onCreated: (id: string) => void }) {
             value={creatorAddress}
             onChange={(e) => setCreatorAddress(e.target.value)}
             placeholder="G..."
-            className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2 text-sm font-mono focus:outline-none focus:ring-2 focus:ring-slate-400"
+            aria-invalid={creatorAddressError ? true : undefined}
+            aria-describedby={creatorAddressError ? 'creator-address-error' : undefined}
+            className={`mt-1 w-full rounded-lg border px-3 py-2 text-sm font-mono focus:outline-none focus:ring-2 ${
+              creatorAddressError
+                ? 'border-red-400 focus:ring-red-400'
+                : 'border-slate-300 focus:ring-slate-400'
+            }`}
           />
+          {creatorAddressError && (
+            <span id="creator-address-error" className="mt-1 block text-xs text-red-600">
+              {creatorAddressError}
+            </span>
+          )}
         </label>
       </div>
 
@@ -228,6 +265,8 @@ function CreateBillForm({ onCreated }: { onCreated: (id: string) => void }) {
           {participants.map((p) => {
             const shareError = shareErrors[p.key];
             const shareErrorId = `share-error-${p.key}`;
+            const addressError = addressErrors[p.key];
+            const addressErrorId = `address-error-${p.key}`;
 
             return (
               <li key={p.key}>
@@ -238,7 +277,13 @@ function CreateBillForm({ onCreated }: { onCreated: (id: string) => void }) {
                       value={p.address}
                       onChange={(e) => updateParticipant(p.key, { address: e.target.value })}
                       placeholder="G..."
-                      className="mt-1 w-full rounded border border-slate-300 px-2 py-1.5 text-xs font-mono focus:outline-none focus:ring-1 focus:ring-slate-400"
+                      aria-invalid={addressError ? true : undefined}
+                      aria-describedby={addressError ? addressErrorId : undefined}
+                      className={`mt-1 w-full rounded border px-2 py-1.5 text-xs font-mono focus:outline-none focus:ring-1 ${
+                        addressError
+                          ? 'border-red-400 focus:ring-red-400'
+                          : 'border-slate-300 focus:ring-slate-400'
+                      }`}
                     />
                   </label>
                   <label className="block">
@@ -289,6 +334,12 @@ function CreateBillForm({ onCreated }: { onCreated: (id: string) => void }) {
                     <Trash2 className="w-4 h-4" />
                   </button>
                 </div>
+
+                {addressError && (
+                  <p id={addressErrorId} className="mt-1 text-xs text-red-600">
+                    {addressError}
+                  </p>
+                )}
 
                 {shareError && (
                   <p id={shareErrorId} className="mt-1 text-xs text-red-600">

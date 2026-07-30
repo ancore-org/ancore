@@ -1,4 +1,5 @@
 import React from 'react';
+import { Link } from 'react-router-dom';
 import { AccountSummary } from '../components/AccountSummary';
 import { TransactionList } from '../components/TransactionList';
 import { AccountOverviewGrid } from '../widgets/AccountOverviewGrid';
@@ -86,7 +87,17 @@ export const Dashboard: React.FC = () => {
       )}
       <AccountOverviewGrid publicKey={account.address} />
       <AccountSummary account={account} />
-      <TransactionList transactions={transactions} />
+      <TransactionList
+        transactions={transactions}
+        emptyAction={
+          <Link
+            to="/send"
+            className="inline-flex items-center rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700"
+          >
+            Send your first payment
+          </Link>
+        }
+      />
       {hasMore && (
         <div className="flex justify-center">
           <button

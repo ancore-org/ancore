@@ -2,7 +2,7 @@
 
 > **Purpose:** Learn from [Freighter extension](https://github.com/stellar/freighter) and [Freighter Mobile](https://github.com/stellar/freighter-mobile) — SDF’s production Stellar wallets — and document what Ancore should adopt, what it already does well, and what is incorrectly or incompletely implemented today.
 >
-> **Last reviewed:** 2026-07-16 (status pass; detail sections below may still lag)  
+> **Last reviewed:** 2026-07-16 (status pass; detail sections below may still lag — drift tracked in #976)  
 > **Freighter extension reference:** v5.42.x (`master`)  
 > **Freighter mobile reference:** v1.19.x (`main`)  
 > **Ancore reference:** `apps/extension-wallet`, `apps/mobile-wallet`, `apps/mobile-app`, `packages/core-sdk`
@@ -101,7 +101,7 @@ These are areas where Ancore is already aligned with Freighter-style wallet engi
 | Unlock rate limiting | Session handling | `unlock-rate-limit.ts` (exponential backoff) | ✅ Ancore adds explicit throttling |
 | Soroban awareness | First-class RPC + swap | Session keys, contract ops via `AncoreClient` | ⚠️ Different focus (AA vs classic) |
 | E2E tests | Playwright (12+ flows) | Playwright smoke (`tests/e2e/`) | ⚠️ Ancore much thinner |
-| i18n | en + pt, scanner in CI | English only | ❌ Gap |
+| i18n | en + pt, scanner in CI | `en` + `pt-BR` locale files, key-parity lint in CI (`check-i18n-keys.mjs`) | 🔄 Wiring + completeness gate tracked in #984 |
 
 ---
 
@@ -243,7 +243,7 @@ Priority-ordered issues found in the Ancore codebase vs Freighter production bar
 | Issue | Evidence | Freighter has |
 |-------|----------|---------------|
 | Inline placeholder Session Keys in router | `router/index.tsx` vs `screens/SessionKeys/` | Dedicated management screens |
-| Hardware wallet support | — | Ledger via WebHID |
+| Hardware wallet support | Settings → Hardware wallet + `LedgerSigningAdapter` (WebHID) | Ledger via WebHID |
 | Swap / token management | — | Soroswap integration, addToken API |
 | Collectibles / NFTs | — | Backend v2 + handlers |
 | Side panel signing | — | Chrome sidePanel for MV3 |

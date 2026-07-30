@@ -1,0 +1,895 @@
+openapi: 3.1.0
+info:
+  title: Ancore Indexer Service API
+  description: |
+    HTTP query API for the Ancore indexer service. The indexer ingests Stellar
+    ledger data and Soroban contract events emitted by the Ancore account
+    contract, and exposes them to wallets through account-scoped activity
+    feeds, statement rows, and contract-event filters.
+
+    ## Pagination
+    Activity and statement endpoints use opaque cursor-based pagination.
+    Cursors are returned in the response envelope (`next_cursor` /
+    `prev_cursor`) and must be passed back verbatim via `cursor_after` or
+    `cursor_before`. Never construct or modify cursors client-side — the
+    encoding is an implementation detail and may change.
+
+    Contract-event endpoints use `limit` / `offset` pagination.
+
+    ## Session key events
+    There is no dedicated `session_key_events` route. Session-key lifecycle
+    events (`session_key_added`, `session_key_revoked`,
+    `session_key_ttl_refreshed`) are contract events emitted by the account
+    contract and are served by `/api/v1/contract-events` using the `type`
+    filter. They also surface in the account activity feed as
+    `activity_type` values. See `docs/indexer/contract-events.md` for the
+    canonical event catalog.
+
+    ## Errors
+    All errors return a structured envelope:
+    `{ "code": "...", "message": "...", "details"?: ... }` with
+    machine-readable codes: `INVALID_CURSOR`, `INVALID_FILTER`, `NOT_FOUND`,
+    `QUERY_TIMEOUT`, `DATABASE_ERROR`, `INTERNAL_ERROR`.
+
+    ## Rate limiting
+    All routes sit behind a token-bucket rate limiter configured via
+    `RATE_LIMIT_PER_SECOND` and `RATE_LIMIT_BURST_SIZE`; throttled requests
+    receive `429 Too Many Requests`.
+
+    ## Example: first page, then follow the cursor
+    ```bash
+    curl "http://localhost:3000/api/v1/accounts/GBVLTMFBHLPBFCP37PF5TRDHNXBFRZUFYVKPGVK4SEMHOKZDHYMOZNJS/activity?limit=20"
+    # → { "data": [...], "pagination": { "next_cursor": "eyJ0IjoiMjAyNi0wNy0...", ... } }
+
+    curl "http://localhost:3000/api/v1/accounts/GBVLTMFBHLPBFCP37PF5TRDHNXBFRZUFYVKPGVK4SEMHOKZDHYMOZNJS/activity?limit=20&cursor_after=eyJ0IjoiMjAyNi0wNy0wMVQxMjowMDowMCswMDowMCIsImkiOiI3ZjljMjRlOC0zYjJhLTRkNGYtOWM2Yi0yYTFmMGU4ZDVjM2IifQ=="
+    ```
+
+    ## Example: session-key events for a contract
+    ```bash
+    curl "http://localhost:3000/api/v1/contract-events?contract=CAAQCAIBAEAQCAIBAEAQCAIBAEAQCAIBAEAQCAIBAEAQCAIBAEAQC526&type=session_key_added&limit=50"
+    ```
+  version: 1.0.0
+  contact:
+    name: Ancore Team
+    url: https://github.com/ancore-org/ancore
+
+servers:
+  - url: https://indexer.ancore.io
+    description: Production server
+  - url: https://indexer-staging.ancore.io
+    description: Staging server
+  - url: http://localhost:3000
+    description: Local development server
+
+tags:
+  - name: activity
+    description: Account-scoped activity feed with cursor pagination
+  - name: statements
+    description: Statement rows for export flows
+  - name: contract-events
+    description: Soroban contract events, including session-key lifecycle events
+  - name: health
+    description: Service health and operational metrics
+
+paths:
+  /api/v1/accounts/{account_id}/activity:
+    get:
+      tags:
+        - activity
+      summary: List account activity
+      description: |
+        Returns the activity timeline for an account with optional filters and
+        opaque cursor pagination. `cursor_after` and `cursor_before` are
+        mutually exclusive — passing both returns `400 INVALID_FILTER`.
+      operationId: listAccountActivity
+      parameters:
+        - $ref: '#/components/parameters/AccountId'
+        - name: cursor_after
+          in: query
+          description: |
+            Opaque cursor for forward pagination. Pass the `next_cursor` value
+            from a previous response verbatim.
+          schema:
+            type: string
+          example: 'eyJ0IjoiMjAyNi0wNy0wMVQxMjowMDowMCswMDowMCIsImkiOiI3ZjljMjRlOC0zYjJhLTRkNGYtOWM2Yi0yYTFmMGU4ZDVjM2IifQ=='
+        - name: cursor_before
+          in: query
+          description: |
+            Opaque cursor for backward pagination. Pass the `prev_cursor` value
+            from a previous response verbatim.
+          schema:
+            type: string
+        - name: limit
+          in: query
+          description: Records per page. Values outside [1, 100] are clamped.
+          schema:
+            type: integer
+            default: 20
+            minimum: 1
+            maximum: 100
+        - name: activity_type
+          in: query
+          description: >
+            Exact-match filter on activity type
+            (e.g. `payment`, `execute`, `session_key_added`).
+          schema:
+            type: string
+          example: payment
+        - name: asset
+          in: query
+          description: >
+            Exact-match asset filter — `native` for XLM or `CODE:ISSUER` for
+            credit assets.
+          schema:
+            type: string
+          example: 'USDC:GA5ZSEJYB37JRC5AVCIA5MOP4RHTM335X2KGX3IHOJAPP5RE34K4KZVN'
+        - name: counterparty
+          in: query
+          description: Exact-match filter on the counterparty address.
+          schema:
+            type: string
+        - name: ledger_min
+          in: query
+          description: Inclusive lower bound on ledger sequence. Must be <= `ledger_max`.
+          schema:
+            type: integer
+            format: int64
+        - name: ledger_max
+          in: query
+          description: Inclusive upper bound on ledger sequence.
+          schema:
+            type: integer
+            format: int64
+        - name: from_date
+          in: query
+          description: Inclusive lower bound on record timestamp (RFC 3339).
+          schema:
+            type: string
+            format: date-time
+          example: '2026-07-01T00:00:00Z'
+        - name: to_date
+          in: query
+          description: Inclusive upper bound on record timestamp (RFC 3339).
+          schema:
+            type: string
+            format: date-time
+      responses:
+        '200':
+          description: Page of activity records
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ActivityListResponse'
+              example:
+                data:
+                  - id: '7f9c24e8-3b2a-4d4f-9c6b-2a1f0e8d5c3b'
+                    account_id: 'GBVLTMFBHLPBFCP37PF5TRDHNXBFRZUFYVKPGVK4SEMHOKZDHYMOZNJS'
+                    activity_type: 'payment'
+                    amount: '125.5000000'
+                    asset: 'native'
+                    asset_code: 'XLM'
+                    counterparty: 'GA5ZSEJYB37JRC5AVCIA5MOP4RHTM335X2KGX3IHOJAPP5RE34K4KZVN'
+                    tx_hash: '3389e9f0f1a65f19736cacf544c2e825313e8447f569233bb8db39aa607c8889'
+                    ledger_seq: 123456
+                    created_at: '2026-07-01T12:00:00Z'
+                    metadata:
+                      memo: 'invoice-42'
+                pagination:
+                  has_next_page: true
+                  has_previous_page: false
+                  next_cursor: 'eyJ0IjoiMjAyNi0wNy0wMVQxMjowMDowMCswMDowMCIsImkiOiI3ZjljMjRlOC0zYjJhLTRkNGYtOWM2Yi0yYTFmMGU4ZDVjM2IifQ=='
+                  count: 1
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '429':
+          $ref: '#/components/responses/RateLimited'
+        '500':
+          $ref: '#/components/responses/InternalError'
+        '504':
+          $ref: '#/components/responses/QueryTimeout'
+
+  /api/v1/accounts/{account_id}/activity/types:
+    get:
+      tags:
+        - activity
+      summary: List distinct activity types for an account
+      description: >
+        Returns the distinct `activity_type` values recorded for the account,
+        suitable for populating filter dropdowns.
+      operationId: listAccountActivityTypes
+      parameters:
+        - $ref: '#/components/parameters/AccountId'
+      responses:
+        '200':
+          description: Distinct activity types
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ActivityTypesResponse'
+              example:
+                data:
+                  - execute
+                  - payment
+                  - session_key_added
+                  - session_key_revoked
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '429':
+          $ref: '#/components/responses/RateLimited'
+        '500':
+          $ref: '#/components/responses/InternalError'
+
+  /api/v1/accounts/{account_id}/activity/{activity_id}:
+    get:
+      tags:
+        - activity
+      summary: Get a single activity record
+      description: >
+        Returns one activity record by UUID, scoped to the account. Returns
+        `404 NOT_FOUND` when the record does not exist or belongs to a
+        different account.
+      operationId: getAccountActivityById
+      parameters:
+        - $ref: '#/components/parameters/AccountId'
+        - name: activity_id
+          in: path
+          required: true
+          description: Activity record UUID.
+          schema:
+            type: string
+            format: uuid
+          example: '7f9c24e8-3b2a-4d4f-9c6b-2a1f0e8d5c3b'
+      responses:
+        '200':
+          description: Activity record
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ActivityResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '429':
+          $ref: '#/components/responses/RateLimited'
+        '500':
+          $ref: '#/components/responses/InternalError'
+
+  /api/v1/accounts/{account_id}/statements/rows:
+    get:
+      tags:
+        - statements
+      summary: List statement rows for a date range
+      description: |
+        Returns flattened statement rows (timestamp, counterparty, amount,
+        asset, status, memo/reference) for export flows. `from_date` and
+        `to_date` are required; forward-only pagination via `cursor_after`.
+      operationId: listStatementRows
+      parameters:
+        - $ref: '#/components/parameters/AccountId'
+        - name: from_date
+          in: query
+          required: true
+          description: Inclusive start of the statement window (RFC 3339). Must be <= `to_date`.
+          schema:
+            type: string
+            format: date-time
+          example: '2026-07-01T00:00:00Z'
+        - name: to_date
+          in: query
+          required: true
+          description: Inclusive end of the statement window (RFC 3339).
+          schema:
+            type: string
+            format: date-time
+          example: '2026-07-31T23:59:59Z'
+        - name: cursor_after
+          in: query
+          description: Opaque cursor from a previous response's `next_cursor`.
+          schema:
+            type: string
+          example: 'eyJ0IjoiMjAyNi0wNy0wMVQxMjowMDowMCswMDowMCIsImkiOiI3ZjljMjRlOC0zYjJhLTRkNGYtOWM2Yi0yYTFmMGU4ZDVjM2IifQ=='
+        - name: limit
+          in: query
+          description: Rows per page. Values outside [1, 100] are clamped.
+          schema:
+            type: integer
+            default: 20
+            minimum: 1
+            maximum: 100
+      responses:
+        '200':
+          description: Page of statement rows
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/StatementRowsResponse'
+              example:
+                rows:
+                  - id: '7f9c24e8-3b2a-4d4f-9c6b-2a1f0e8d5c3b'
+                    timestamp: '2026-07-01T12:00:00Z'
+                    counterparty: 'GA5ZSEJYB37JRC5AVCIA5MOP4RHTM335X2KGX3IHOJAPP5RE34K4KZVN'
+                    amount: '125.5000000'
+                    asset: 'XLM'
+                    status: 'success'
+                    memo_or_reference: 'invoice-42'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '429':
+          $ref: '#/components/responses/RateLimited'
+        '500':
+          $ref: '#/components/responses/InternalError'
+
+  /api/v1/contract-events:
+    get:
+      tags:
+        - contract-events
+      summary: List contract events
+      description: |
+        Returns Soroban contract events with optional filters. Use
+        `contract` + `type` to query session-key lifecycle events
+        (`session_key_added`, `session_key_revoked`,
+        `session_key_ttl_refreshed`) for a smart account.
+      operationId: listContractEvents
+      parameters:
+        - name: contract
+          in: query
+          description: Filter by emitting contract address (C… address).
+          schema:
+            type: string
+          example: 'CAAQCAIBAEAQCAIBAEAQCAIBAEAQCAIBAEAQCAIBAEAQCAIBAEAQC526'
+        - name: type
+          in: query
+          description: >
+            Exact-match filter on event type (e.g. `initialized`, `executed`,
+            `session_key_added`, `session_key_revoked`,
+            `session_key_ttl_refreshed`, `upgraded`, `migrated`).
+          schema:
+            type: string
+          example: session_key_added
+        - name: ledger_min
+          in: query
+          description: Inclusive lower bound on ledger sequence. Must be <= `ledger_max`.
+          schema:
+            type: integer
+            format: int64
+        - name: ledger_max
+          in: query
+          description: Inclusive upper bound on ledger sequence.
+          schema:
+            type: integer
+            format: int64
+        - name: limit
+          in: query
+          description: Records per page. Values outside [1, 200] are clamped.
+          schema:
+            type: integer
+            default: 50
+            minimum: 1
+            maximum: 200
+        - name: offset
+          in: query
+          description: Number of records to skip (offset pagination).
+          schema:
+            type: integer
+            format: int64
+            minimum: 0
+      responses:
+        '200':
+          description: Contract events ordered by ledger sequence (descending)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ContractEventsListResponse'
+              example:
+                data:
+                  - id: '2a1f0e8d-5c3b-4d4f-9c6b-7f9c24e83b2a'
+                    contract_address: 'CAAQCAIBAEAQCAIBAEAQCAIBAEAQCAIBAEAQCAIBAEAQCAIBAEAQC526'
+                    event_type: 'session_key_added'
+                    ledger_seq: 123460
+                    timestamp: '2026-07-01T12:05:00Z'
+                    tx_hash: '5a8f2c7b9a103389e9f0f1a65f19736cacf544c2e825313e8447f569233bb8db'
+                    data:
+                      public_key: 'a3f1c2d4e5b6978877665544332211aabbccddeeff00112233445566778899aa'
+                      expires_at: 1783123200
+                count: 1
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '429':
+          $ref: '#/components/responses/RateLimited'
+        '500':
+          $ref: '#/components/responses/InternalError'
+
+  /api/v1/contract-events/types:
+    get:
+      tags:
+        - contract-events
+      summary: List distinct event types for a contract
+      description: >
+        Returns the distinct `event_type` values recorded for the given
+        contract. The `contract` query parameter is required.
+      operationId: listContractEventTypes
+      parameters:
+        - name: contract
+          in: query
+          required: true
+          description: Contract address to scope the type list to.
+          schema:
+            type: string
+          example: 'CAAQCAIBAEAQCAIBAEAQCAIBAEAQCAIBAEAQCAIBAEAQCAIBAEAQC526'
+      responses:
+        '200':
+          description: Distinct event types
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ContractEventTypesResponse'
+              example:
+                data:
+                  - executed
+                  - initialized
+                  - session_key_added
+                  - session_key_revoked
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '429':
+          $ref: '#/components/responses/RateLimited'
+        '500':
+          $ref: '#/components/responses/InternalError'
+
+  /api/v1/contract-events/{event_id}:
+    get:
+      tags:
+        - contract-events
+      summary: Get a single contract event
+      description: >
+        Returns one contract event by UUID. Returns `404 NOT_FOUND` when the
+        event does not exist.
+      operationId: getContractEventById
+      parameters:
+        - name: event_id
+          in: path
+          required: true
+          description: Contract event UUID.
+          schema:
+            type: string
+            format: uuid
+          example: '2a1f0e8d-5c3b-4d4f-9c6b-7f9c24e83b2a'
+      responses:
+        '200':
+          description: Contract event
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ContractEventResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '429':
+          $ref: '#/components/responses/RateLimited'
+        '500':
+          $ref: '#/components/responses/InternalError'
+
+  /health:
+    get:
+      tags:
+        - health
+      summary: Service health and ingest lag
+      description: >
+        Reports the latest indexed ledger, chain head, block/second lag, and
+        database schema migration state. Status is `degraded` when the lag
+        exceeds 100 ledgers or migrations are not up to date.
+      operationId: getHealth
+      responses:
+        '200':
+          description: Health report
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HealthResponse'
+        '500':
+          $ref: '#/components/responses/InternalError'
+
+  /metrics:
+    get:
+      tags:
+        - health
+      summary: Ingestion cursor metrics (JSON)
+      description: >
+        Returns cursor staleness metrics per ingestion stream. For Prometheus
+        text format, scrape the dedicated metrics port instead.
+      operationId: getMetrics
+      responses:
+        '200':
+          description: Cursor metrics
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MetricsResponse'
+        '500':
+          $ref: '#/components/responses/InternalError'
+
+components:
+  parameters:
+    AccountId:
+      name: account_id
+      in: path
+      required: true
+      description: Stellar public key — 56 characters starting with `G`.
+      schema:
+        type: string
+        pattern: '^G[A-Z2-7]{55}$'
+      example: 'GBVLTMFBHLPBFCP37PF5TRDHNXBFRZUFYVKPGVK4SEMHOKZDHYMOZNJS'
+
+  responses:
+    BadRequest:
+      description: Invalid filter, cursor, or parameter
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorEnvelope'
+          example:
+            code: 'INVALID_FILTER'
+            message: 'cannot specify both cursor_after and cursor_before'
+    NotFound:
+      description: Resource not found
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorEnvelope'
+          example:
+            code: 'NOT_FOUND'
+            message: 'Resource not found'
+    RateLimited:
+      description: Rate limit exceeded
+    QueryTimeout:
+      description: Query timed out
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorEnvelope'
+          example:
+            code: 'QUERY_TIMEOUT'
+            message: 'query exceeded the configured timeout'
+    InternalError:
+      description: Internal server or database error
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorEnvelope'
+          example:
+            code: 'INTERNAL_ERROR'
+            message: 'Internal server error'
+
+  schemas:
+    ErrorEnvelope:
+      type: object
+      description: Structured error envelope returned by all API routes.
+      required:
+        - code
+        - message
+      properties:
+        code:
+          type: string
+          description: Machine-readable error code.
+          enum:
+            - INVALID_CURSOR
+            - INVALID_FILTER
+            - NOT_FOUND
+            - QUERY_TIMEOUT
+            - DATABASE_ERROR
+            - INTERNAL_ERROR
+        message:
+          type: string
+          description: Human-readable description of the error.
+        details:
+          description: Optional structured details (validation context, field names).
+
+    ActivityRecord:
+      type: object
+      description: A single account activity record.
+      required:
+        - id
+        - account_id
+        - activity_type
+        - tx_hash
+        - ledger_seq
+        - created_at
+      properties:
+        id:
+          type: string
+          format: uuid
+        account_id:
+          type: string
+          description: Stellar public key the record is scoped to.
+        activity_type:
+          type: string
+          description: >
+            Activity classification, e.g. `payment`, `execute`,
+            `session_key_added`, `session_key_revoked`.
+        amount:
+          type: ['string', 'null']
+          description: Amount as a decimal string.
+        asset:
+          type: ['string', 'null']
+          description: Raw asset identifier — `native` or `CODE:ISSUER`.
+        asset_code:
+          type: ['string', 'null']
+          description: Alphabetic asset code — `XLM` for native, or the credit-asset code.
+        asset_issuer:
+          type: ['string', 'null']
+          description: Issuing account address; null for native XLM.
+        counterparty:
+          type: ['string', 'null']
+        tx_hash:
+          type: string
+          description: Transaction hash (hex).
+        ledger_seq:
+          type: integer
+          format: int64
+        created_at:
+          type: string
+          format: date-time
+        metadata:
+          type: ['object', 'null']
+          description: Free-form metadata (memo, status, function, nonce, …).
+
+    PaginationInfo:
+      type: object
+      description: Cursor pagination envelope for activity lists.
+      required:
+        - has_next_page
+        - has_previous_page
+        - count
+      properties:
+        has_next_page:
+          type: boolean
+        has_previous_page:
+          type: boolean
+        next_cursor:
+          type: ['string', 'null']
+          description: Opaque cursor for the next page; pass as `cursor_after`.
+        prev_cursor:
+          type: ['string', 'null']
+          description: Opaque cursor for the previous page; pass as `cursor_before`.
+        count:
+          type: integer
+          description: Number of records in this page.
+
+    ActivityListResponse:
+      type: object
+      required:
+        - data
+        - pagination
+      properties:
+        data:
+          type: array
+          items:
+            $ref: '#/components/schemas/ActivityRecord'
+        pagination:
+          $ref: '#/components/schemas/PaginationInfo'
+
+    ActivityResponse:
+      type: object
+      required:
+        - data
+      properties:
+        data:
+          $ref: '#/components/schemas/ActivityRecord'
+
+    ActivityTypesResponse:
+      type: object
+      required:
+        - data
+      properties:
+        data:
+          type: array
+          items:
+            type: string
+
+    StatementRow:
+      type: object
+      required:
+        - id
+        - timestamp
+        - counterparty
+        - amount
+        - asset
+        - status
+        - memo_or_reference
+      properties:
+        id:
+          type: string
+          format: uuid
+        timestamp:
+          type: string
+          format: date-time
+        counterparty:
+          type: string
+        amount:
+          type: string
+        asset:
+          type: string
+        status:
+          type: string
+          description: Derived from record metadata; `unknown` when absent.
+        memo_or_reference:
+          type: string
+          description: Memo or reference from metadata, falling back to the tx hash.
+
+    StatementRowsResponse:
+      type: object
+      required:
+        - rows
+      properties:
+        rows:
+          type: array
+          items:
+            $ref: '#/components/schemas/StatementRow'
+        next_cursor:
+          type: ['string', 'null']
+          description: Opaque cursor for the next page; pass as `cursor_after`.
+
+    ContractEvent:
+      type: object
+      description: A decoded Soroban contract event.
+      required:
+        - id
+        - contract_address
+        - event_type
+        - ledger_seq
+        - timestamp
+        - tx_hash
+        - data
+      properties:
+        id:
+          type: string
+          format: uuid
+        contract_address:
+          type: string
+          description: Emitting contract address (C… address).
+        event_type:
+          type: string
+          description: >
+            Event name from the account contract, e.g. `initialized`,
+            `executed`, `session_key_added`, `session_key_revoked`,
+            `session_key_ttl_refreshed`, `upgraded`, `migrated`.
+        ledger_seq:
+          type: integer
+          format: int64
+        timestamp:
+          type: string
+          format: date-time
+        tx_hash:
+          type: string
+        data:
+          type: object
+          description: Decoded event payload; shape depends on `event_type`.
+
+    ContractEventsListResponse:
+      type: object
+      required:
+        - data
+        - count
+      properties:
+        data:
+          type: array
+          items:
+            $ref: '#/components/schemas/ContractEvent'
+        count:
+          type: integer
+          description: Number of records in this page.
+
+    ContractEventResponse:
+      type: object
+      required:
+        - data
+      properties:
+        data:
+          $ref: '#/components/schemas/ContractEvent'
+
+    ContractEventTypesResponse:
+      type: object
+      required:
+        - data
+      properties:
+        data:
+          type: array
+          items:
+            type: string
+
+    HealthResponse:
+      type: object
+      required:
+        - timestamp
+        - status
+        - latest_indexed_ledger
+        - chain_head
+        - lag_blocks
+        - lag_seconds
+        - expected_schema_version
+        - migration_status
+        - applied_migrations
+      properties:
+        timestamp:
+          type: string
+          format: date-time
+        status:
+          type: string
+          enum:
+            - ok
+            - degraded
+        latest_indexed_ledger:
+          type: integer
+          format: int64
+        chain_head:
+          type: integer
+          format: int64
+        lag_blocks:
+          type: integer
+          format: int64
+        lag_seconds:
+          type: integer
+          format: int64
+        schema_version:
+          type: ['integer', 'null']
+          description: Highest migration version applied to the database.
+        expected_schema_version:
+          type: integer
+        migration_status:
+          type: string
+          enum:
+            - up_to_date
+            - pending
+            - ahead
+            - unknown
+        latest_migration:
+          type: ['string', 'null']
+        migration_applied_at:
+          type: ['string', 'null']
+          format: date-time
+        applied_migrations:
+          type: integer
+          format: int64
+
+    CursorMetrics:
+      type: object
+      required:
+        - stream
+        - last_ledger_seq
+        - last_updated_at
+        - staleness_seconds
+        - is_stale
+      properties:
+        stream:
+          type: string
+          description: Name of the ingestion stream.
+        last_ledger_seq:
+          type: integer
+          format: int64
+        last_updated_at:
+          type: string
+          format: date-time
+        staleness_seconds:
+          type: integer
+          format: int64
+        is_stale:
+          type: boolean
+          description: True when staleness exceeds the 300s threshold.
+
+    MetricsResponse:
+      type: object
+      required:
+        - cursors
+        - status
+      properties:
+        cursors:
+          type: array
+          items:
+            $ref: '#/components/schemas/CursorMetrics'
+        status:
+          type: string
+          enum:
+            - ok
+            - degraded

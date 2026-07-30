@@ -1,3 +1,7 @@
+// Tracing must be imported first to register the OpenTelemetry SDK before
+// any other module creates spans or instruments HTTP traffic.
+import './tracing';
+
 import express, { Express, Request, Response, NextFunction } from 'express';
 import cors from 'cors';
 import rateLimit from 'express-rate-limit';
@@ -11,7 +15,7 @@ import { createIdempotencyMiddleware } from './middleware/idempotency';
 import { createPayloadGuardMiddleware } from './middleware/payloadGuard';
 import { createRequestLoggerMiddleware } from './middleware/requestLogger';
 import { createRequestIdMiddleware } from './middleware/requestId';
-import { createMetricsCollectorMiddleware } from './middleware/metricsCollector';
+import { createMetricsCollectorMiddleware, relayMockMode } from './middleware/metricsCollector';
 import { renderPrometheusMetrics } from './metrics';
 import { validateBody } from './validation/middleware';
 import { createExecuteRelayHandler } from './handlers/executeRelay';
@@ -41,8 +45,6 @@ import {
   createListExecutionsHandler,
 } from './scheduler';
 
-// ── Request schema ────────────────────────────────────────────────────────────
-
 const relayRequestSchema = z.object({
   sessionKey: z
     .string()
@@ -55,8 +57,6 @@ const relayRequestSchema = z.object({
     .length(128)
     .regex(/^[0-9a-fA-F]+$/),
   nonce: z.number().int().nonnegative(),
-  // Optional; zod strips unknown keys, so this must be declared for the
-  // service-level policy check (POLICY_DENIED) to be reachable over HTTP.
   transferPolicy: z
     .object({
       policy: TransferPolicySchema,
@@ -65,8 +65,6 @@ const relayRequestSchema = z.object({
     })
     .optional(),
 });
-
-// ── Stub implementations (replace with real services) ─────────────────────────
 
 const stubAuthService: AuthServiceContract = {
   async verifyToken(token: string) {
@@ -77,17 +75,10 @@ const stubAuthService: AuthServiceContract = {
 
 const defaultSignatureService: SignatureServiceContract = new Ed25519SignatureService();
 
-// ── App factory (exported for testing) ───────────────────────────────────────
-
-/**
- * Parse ALLOWED_ORIGINS environment variable into an array of allowed origins.
- * Format: comma-separated list of origins (e.g., "http://localhost:3000,https://app.example.com")
- * If not set, defaults to allowing all origins for development ('*').
- */
 function parseAllowedOrigins(): string[] | string {
   const envOrigins = process.env.ALLOWED_ORIGINS;
   if (!envOrigins) {
-    return '*'; // Default to wildcard for development
+    return '*';
   }
   return envOrigins.split(',').map((origin) => origin.trim());
 }
@@ -101,6 +92,13 @@ export function createApp(
   nonceStore: NonceStore = new MemoryNonceStore()
 ): Express {
   const authSecret = process.env.RELAYER_AUTH_SECRET;
+  const hasConfiguredAuth = Boolean(authService ?? authSecret);
+
+  if (process.env.NODE_ENV === 'production' && !hasConfiguredAuth) {
+    console.error('RELAYER_AUTH_SECRET must be set in production to avoid stub auth');
+    process.exit(1);
+  }
+
   const resolvedAuthService =
     authService ?? (authSecret ? createBearerAuthService(authSecret) : stubAuthService);
   const app = express();
@@ -116,47 +114,39 @@ export function createApp(
     })
   );
 
-  // Payload guard: reject oversized requests before body parsing to prevent
-  // resource abuse. Runs early in the stack, before express.json().
   app.use(createPayloadGuardMiddleware());
 
-  // Request ID middleware: validate or generate X-Request-Id, attach to req
   app.use(createRequestIdMiddleware());
 
-  // Request logger: attaches req.log and emits start/complete structured logs.
-  // Registered after CORS and payload guard, before auth and body parsing.
   app.use(createRequestLoggerMiddleware());
-
-  // Metrics collector: records /relay/* latency histogram and error counter.
-  // Registered after request logger so req.startTime is already set.
-  app.use(createMetricsCollectorMiddleware());
-
-  app.use(express.json());
 
   const useMockSubmission =
     relayOptions?.useMockSubmission === true || process.env.RELAYER_USE_MOCK_SUBMISSION === 'true';
   const submitter =
     transactionSubmitter ?? (useMockSubmission ? undefined : createStellarSubmitterFromEnv());
 
-  // Rate limiting for relay operations
+  const mockMode = useMockSubmission || !submitter;
+  relayMockMode.set(mockMode ? 1 : 0);
+
+  app.use(createMetricsCollectorMiddleware(mockMode));
+
+  app.use(express.json());
+
   const relayLimiter = rateLimit({
-    windowMs: 15 * 60 * 1000, // 15 minutes
-    max: process.env.RELAY_RATE_LIMIT_MAX ? parseInt(process.env.RELAY_RATE_LIMIT_MAX) : 50, // limit each IP to 50 requests per windowMs
+    windowMs: 15 * 60 * 1000,
+    max: process.env.RELAY_RATE_LIMIT_MAX ? parseInt(process.env.RELAY_RATE_LIMIT_MAX) : 50,
     message: 'Too many relay requests from this IP, please try again later.',
     keyGenerator: (req: Request) => {
-      // If authenticated, use callerId, else use IP
       const callerId = (req as any).callerId;
       return callerId || req.ip;
     },
   });
 
-  // Per-account rate limiting for relay execute: 30 req/min per account (independent of IP limiter above)
   const accountLimiter = createAccountRateLimiterMiddleware();
 
-  // Rate limiting for status
   const statusLimiter = rateLimit({
-    windowMs: 15 * 60 * 1000, // 15 minutes
-    max: process.env.STATUS_RATE_LIMIT_MAX ? parseInt(process.env.STATUS_RATE_LIMIT_MAX) : 200, // higher limit for status
+    windowMs: 15 * 60 * 1000,
+    max: process.env.STATUS_RATE_LIMIT_MAX ? parseInt(process.env.STATUS_RATE_LIMIT_MAX) : 200,
     message: 'Too many status requests from this IP, please try again later.',
   });
 
@@ -249,11 +239,10 @@ export function createApp(
   return app;
 }
 
-// ── Entrypoint ────────────────────────────────────────────────────────────────
-
 if (require.main === module) {
   const PORT = process.env['PORT'] ?? 3000;
   const app = createApp();
+
   app.listen(PORT, () => {
     console.log(`Relayer service listening on port ${PORT}`);
   });

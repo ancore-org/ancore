@@ -68,4 +68,38 @@ describe('sign-transaction handler', () => {
     expect(result.signedXdr).toBeDefined();
     expect(result.signedXdr).not.toEqual(xdr);
   });
+
+  it('should defer to hardware when Ledger is the preferred signer', async () => {
+    (isBackgroundSessionUnlocked as any).mockReturnValue(true);
+
+    const chromeStorage = {
+      storage: {
+        local: {
+          get: vi.fn((_key: string, cb: (result: Record<string, unknown>) => void) => {
+            cb({
+              ancore_hardware_wallet: JSON.stringify({
+                state: {
+                  signerMode: 'ledger',
+                  ledgerPublicKey: 'GABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789ABCDEFGHIJKLMNOPQRSTUV',
+                },
+              }),
+            });
+          }),
+        },
+      },
+    };
+    (globalThis as { chrome?: unknown }).chrome = chromeStorage;
+
+    const result = await handlerCb({
+      xdr: 'AAAA...',
+      networkPassphrase: Networks.TESTNET,
+    });
+
+    expect(result).toEqual({
+      requiresHardware: true,
+      xdr: 'AAAA...',
+      networkPassphrase: Networks.TESTNET,
+    });
+    expect(getSigningKeypair).not.toHaveBeenCalled();
+  });
 });

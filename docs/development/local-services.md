@@ -112,13 +112,18 @@ DATABASE_URL=postgres://postgres:ancore@localhost:5432/ancore_indexer \
 
 **Endpoints**:
 - `GET /relay/status` - Service status
-- `POST /relay/submit` - Submit transaction
+- `POST /relay/execute` - Execute a signed relay transaction
+- `POST /relay/validate` - Pre-flight validation without executing
 
 **Environment Variables**:
 - `PORT` - Service port (default: 3000, mapped to 3001 on host)
 - `NODE_ENV` - Environment (development, production)
-- `STELLAR_NETWORK` - Stellar network (testnet, mainnet)
-- `STELLAR_HORIZON_URL` - Horizon API URL
+- `STELLAR_NETWORK` - Stellar network (testnet, mainnet, futurenet, local)
+- `RELAYER_AUTH_SECRET` - Bearer token secret; **unset falls back to a stub that accepts any token**
+- `RELAYER_USE_MOCK_SUBMISSION` - Dev-only: skip Stellar submission entirely
+
+Full table (limits, timers, RPC configuration) and the mock-mode warning:
+[services/relayer/README.md → Environment Variables](../../services/relayer/README.md#environment-variables).
 
 ## Configuration
 

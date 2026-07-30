@@ -76,7 +76,12 @@ function respond(requestId: string, ok: boolean, result?: unknown, error?: strin
 window.addEventListener('message', (event) => {
   // Only accept messages from the same window (not iframes or other origins).
   if (event.source !== window) return;
-  if (!isExternalRequest(event.data)) return;
+  if (!isExternalRequest(event.data)) {
+    if (import.meta.env.DEV && event.data) {
+      console.debug(`${logPrefix} Dropped malformed message`, event.data);
+    }
+    return;
+  }
 
   const { requestId, method, params } = event.data;
   const origin = window.location.origin;

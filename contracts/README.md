@@ -1,6 +1,19 @@
 # Ancore Smart Contracts
 
+> [!WARNING]
+> **UNAUDITED & TESTNET-ONLY**
+> These contracts are currently in active development and have **not** been audited. They are intended for **testnet use only**. Do not use in production or with real funds.
+
 Soroban smart contracts for the Ancore account abstraction system.
+
+## Status: Implemented vs Planned
+
+| Feature            | Status         | Notes                                                                                           |
+| :----------------- | :------------- | :---------------------------------------------------------------------------------------------- |
+| Single Signer Auth | ✅ Implemented | Ed25519 Native Stellar signature validation.                                                    |
+| Session Keys       | ✅ Implemented | Scoped permissions, expirations, and spend limits.                                              |
+| Multi-sig Auth     | 🚧 Planned     | See tracking issue [#990](https://github.com/ancore-org/ancore/issues/990).                     |
+| Passkey Auth       | 🚧 Planned     | WebAuthn secp256r1. See tracking issue [#971](https://github.com/ancore-org/ancore/issues/971). |
 
 ## Structure
 

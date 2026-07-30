@@ -1,0 +1,9 @@
+// Jest Snapshot v1, https://goo.gl/fbAQLP
+
+exports[`account abstraction XDR helpers round-trips add_session_key args 1`] = `
+[
+  "AAAADQAAACCZ2z48GOOuFkC/VoIzifgRtTrJwBsrkerFxSy6YMXJ/g==",
+  "AAAABQAAAABlU/EA",
+  "AAAAEAAAAAEAAAACAAAAAwAAAAAAAAADAAAAAg==",
+]
+`;

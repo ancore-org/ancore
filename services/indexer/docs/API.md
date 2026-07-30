@@ -1,5 +1,8 @@
 # Indexer Query API Documentation
 
+> Machine-readable contract: [`services/indexer/openapi.yaml`](../openapi.yaml)
+> (linted in CI via `pnpm docs:lint-openapi`).
+
 ## Overview
 
 The Ancore Indexer provides a comprehensive REST API for querying account activity data with cursor-based pagination, flexible filtering, and account-scoped security.

@@ -21,6 +21,9 @@ export interface MobileWalletEnvironment extends NetworkConfig {
   readOnlyAccountId?: string;
   readOnlyAccountAddress?: string;
   walletConnectProjectId?: string;
+  remoteConfigUrl?: string;
+  appVersion?: string;
+  remoteConfigBypass?: boolean;
 }
 
 export type MobileWalletEnvSource = Record<string, string | undefined>;
@@ -118,6 +121,9 @@ export const loadMobileWalletEnvironment = (
     readOnlyAccountId: source.ANCORE_MOBILE_READONLY_ACCOUNT_ID?.trim() || undefined,
     readOnlyAccountAddress: source.ANCORE_MOBILE_READONLY_ACCOUNT_ADDRESS?.trim() || undefined,
     walletConnectProjectId: source.WALLETCONNECT_PROJECT_ID?.trim() || undefined,
+    remoteConfigUrl: source.ANCORE_MOBILE_REMOTE_CONFIG_URL?.trim() || undefined,
+    appVersion: source.ANCORE_MOBILE_APP_VERSION?.trim() || undefined,
+    remoteConfigBypass: source.ANCORE_MOBILE_REMOTE_CONFIG_BYPASS?.trim() === 'true',
   };
 };
 
@@ -133,6 +139,9 @@ export const loadMobileWalletEnvironmentFromEnv = (): MobileWalletEnvironment =>
     EXPO_PUBLIC_RELAYER_URL: process.env.EXPO_PUBLIC_RELAYER_URL,
     EXPO_PUBLIC_AI_AGENT_URL: process.env.EXPO_PUBLIC_AI_AGENT_URL,
     WALLETCONNECT_PROJECT_ID: process.env.WALLETCONNECT_PROJECT_ID,
+    ANCORE_MOBILE_REMOTE_CONFIG_URL: process.env.ANCORE_MOBILE_REMOTE_CONFIG_URL,
+    ANCORE_MOBILE_APP_VERSION: process.env.ANCORE_MOBILE_APP_VERSION,
+    ANCORE_MOBILE_REMOTE_CONFIG_BYPASS: process.env.ANCORE_MOBILE_REMOTE_CONFIG_BYPASS,
   };
 
   return loadMobileWalletEnvironment(source);

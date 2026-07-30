@@ -6,6 +6,7 @@ import {
   type ResolvedHandle,
 } from '@ancore/types';
 import type { Transaction, TransactionStatus, SignMethod } from '../types/dashboard';
+import { stellarAddressError } from '../lib/address-validation';
 import { resolveHandle as defaultResolveHandle } from '../services/handle-resolver';
 import type { SendStrategy, SendResult } from '../services/send-service';
 import { pollTransactionConfirmation, type TransactionPollStatus } from '../services/tx-polling';
@@ -64,7 +65,14 @@ const HANDLE_NOT_FOUND_MESSAGE = 'Handle not found';
 // Validation
 // ---------------------------------------------------------------------------
 
-function validateRecipientInput(recipient: string): string | undefined {
+/**
+ * Validate what the user typed into the recipient field.
+ *
+ * Handles (`@alice`) are checked for shape only — resolution happens later.
+ * Everything else must be a Stellar address; the check is shared with the
+ * other dashboard forms so the wording and accepted formats stay identical.
+ */
+export function validateRecipientInput(recipient: string): string | undefined {
   const trimmed = recipient.trim();
 
   if (!trimmed) {
@@ -75,7 +83,7 @@ function validateRecipientInput(recipient: string): string | undefined {
     return isUsernameHandle(trimmed) ? undefined : 'Enter a valid @username handle';
   }
 
-  return /^G[A-Z0-9]{55}$/.test(trimmed) ? undefined : 'Invalid Stellar address';
+  return stellarAddressError(trimmed) ?? undefined;
 }
 
 export async function resolveSendRecipient(

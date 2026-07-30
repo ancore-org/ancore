@@ -50,6 +50,50 @@ describe('Intent Schema Validation', () => {
       expect(result.success).toBe(false);
     });
 
+    it('should reject zero amounts', () => {
+      const intent = {
+        type: 'payment' as const,
+        amount: '0',
+        asset: 'XLM' as const,
+        destination: 'GCZST3XVCDTUJ76ZAV2HA72KYPJW5YJSNXVZTSKNBPWTXGVLNPXQ4JH',
+      };
+      const result = paymentIntentSchema.safeParse(intent);
+      expect(result.success).toBe(false);
+    });
+
+    it('should reject negative-like amounts', () => {
+      const intent = {
+        type: 'payment' as const,
+        amount: '-1',
+        asset: 'XLM' as const,
+        destination: 'GCZST3XVCDTUJ76ZAV2HA72KYPJW5YJSNXVZTSKNBPWTXGVLNPXQ4JH',
+      };
+      const result = paymentIntentSchema.safeParse(intent);
+      expect(result.success).toBe(false);
+    });
+
+    it('should reject amounts with too many decimal places', () => {
+      const intent = {
+        type: 'payment' as const,
+        amount: '1.123456789',
+        asset: 'XLM' as const,
+        destination: 'GCZST3XVCDTUJ76ZAV2HA72KYPJW5YJSNXVZTSKNBPWTXGVLNPXQ4JH',
+      };
+      const result = paymentIntentSchema.safeParse(intent);
+      expect(result.success).toBe(false);
+    });
+
+    it('should reject very large amounts', () => {
+      const intent = {
+        type: 'payment' as const,
+        amount: '1000000000000000000000000',
+        asset: 'XLM' as const,
+        destination: 'GCZST3XVCDTUJ76ZAV2HA72KYPJW5YJSNXVZTSKNBPWTXGVLNPXQ4JH',
+      };
+      const result = paymentIntentSchema.safeParse(intent);
+      expect(result.success).toBe(false);
+    });
+
     it('should reject unsupported asset', () => {
       const intent = {
         type: 'payment' as const,
