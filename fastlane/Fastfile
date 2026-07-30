@@ -1,0 +1,132 @@
+default_platform(:ios)
+
+platform :ios do
+  desc "Run mobile e2e tests before release"
+  lane :e2e_tests do
+    UI.message("🧪 Running Maestro e2e tests on iOS simulator...")
+    
+    # Ensure maestro is available
+    ensure_maestro_installed
+    
+    # Run the 3 ready flows
+    run_maestro_flow(
+      flow: "lock-unlock.yaml",
+      description: "Testing lock/unlock cycle"
+    )
+    
+    run_maestro_flow(
+      flow: "walletconnect-pair.yaml",
+      description: "Testing WalletConnect pairing"
+    )
+    
+    run_maestro_flow(
+      flow: "sign-xdr.yaml",
+      description: "Testing XDR signing via WalletConnect"
+    )
+    
+    UI.success("✅ All iOS e2e tests passed!")
+  end
+
+  desc "Build and release iOS app (runs e2e gate)"
+  lane :release do
+    # Run e2e tests as quality gate
+    e2e_tests
+    
+    # TODO: Wire actual build/upload steps once native project exists
+    # - build_app
+    # - upload_to_testflight
+    # - deliver
+    
+    UI.success("🎉 iOS release ready (e2e tests passed)")
+  end
+  
+  private_lane :run_maestro_flow do |options|
+    flow = options[:flow]
+    desc = options[:description]
+    env_file = "apps/mobile-app/e2e/common/env.yaml"
+    flow_path = "apps/mobile-app/e2e/flows/#{flow}"
+    
+    UI.message("  → #{desc}")
+    sh(
+      "maestro test #{flow_path} --env-file #{env_file} --timeout 600",
+      error_callback: ->(result) {
+        UI.error("❌ Flow #{flow} failed")
+        raise "Maestro e2e test failed: #{flow}"
+      }
+    )
+  end
+
+  private_lane :ensure_maestro_installed do
+    unless `which maestro`.empty?
+      return
+    end
+    UI.error("❌ maestro CLI not found")
+    UI.message("Install from: https://maestro.mobile/")
+    raise "maestro CLI required"
+  end
+end
+
+platform :android do
+  desc "Run mobile e2e tests before release"
+  lane :e2e_tests do
+    UI.message("🧪 Running Maestro e2e tests on Android emulator...")
+    
+    # Ensure maestro is available
+    ensure_maestro_installed
+    
+    # Run the 3 ready flows
+    run_maestro_flow(
+      flow: "lock-unlock.yaml",
+      description: "Testing lock/unlock cycle"
+    )
+    
+    run_maestro_flow(
+      flow: "walletconnect-pair.yaml",
+      description: "Testing WalletConnect pairing"
+    )
+    
+    run_maestro_flow(
+      flow: "sign-xdr.yaml",
+      description: "Testing XDR signing via WalletConnect"
+    )
+    
+    UI.success("✅ All Android e2e tests passed!")
+  end
+
+  desc "Build and release Android app (runs e2e gate)"
+  lane :release do
+    # Run e2e tests as quality gate
+    e2e_tests
+    
+    # TODO: Wire actual build/upload steps once native project exists
+    # - build_android_app
+    # - upload_to_play_store
+    
+    UI.success("🎉 Android release ready (e2e tests passed)")
+  end
+  
+  private_lane :run_maestro_flow do |options|
+    flow = options[:flow]
+    desc = options[:description]
+    env_file = "apps/mobile-app/e2e/common/env.yaml"
+    flow_path = "apps/mobile-app/e2e/flows/#{flow}"
+    
+    UI.message("  → #{desc}")
+    sh(
+      "maestro test #{flow_path} --env-file #{env_file} --timeout 600",
+      error_callback: ->(result) {
+        UI.error("❌ Flow #{flow} failed")
+        raise "Maestro e2e test failed: #{flow}"
+      }
+    )
+  end
+
+  private_lane :ensure_maestro_installed do
+    unless `which maestro`.empty?
+      return
+    end
+    UI.error("❌ maestro CLI not found")
+    UI.message("Install from: https://maestro.mobile/")
+    raise "maestro CLI required"
+  end
+end

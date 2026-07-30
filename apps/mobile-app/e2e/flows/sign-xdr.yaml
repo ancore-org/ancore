@@ -1,0 +1,11 @@
+appId: com.ancore.mobile
+---
+# Centralized from apps/mobile-wallet/e2e/flows/sign-xdr.yaml
+- launchApp
+- runFlow:
+    file: walletconnect-pair.yaml
+- runScript:
+    file: common/send-mock-signxdr-request.js
+- assertVisible: "Approve Transaction"
+- tapOn: "Approve"
+- assertVisible: "Transaction Signed"

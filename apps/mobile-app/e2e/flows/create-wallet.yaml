@@ -1,0 +1,19 @@
+appId: com.ancore.mobile
+---
+# Centralized from apps/mobile-wallet/e2e/flows/create-wallet.yaml
+# TODO: requires #783 (mobile-wire-onboarding) — enable in CI after that ships
+- launchApp
+- tapOn: "Create a new wallet"
+- assertVisible: "Create a new wallet"
+- tapOn: "Wallet name"
+- inputText: ${E2E_TEST_WALLET_NAME}
+- tapOn: "Continue"
+- assertVisible: "Your recovery phrase"
+- tapOn: "I wrote it down"
+- assertVisible: "Verify your recovery phrase"
+- tapOn: "Password"
+- inputText: ${E2E_TEST_PASSWORD}
+- tapOn: "Confirm password"
+- inputText: ${E2E_TEST_PASSWORD}
+- tapOn: "Continue"
+- assertVisible: "Wallet setup complete"
