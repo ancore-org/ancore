@@ -10,7 +10,9 @@ pub enum ContractEventType {
     Executed,
     SessionKeyAdded,
     SessionKeyRevoked,
+    SessionKeyTtlRefreshed,
     Upgraded,
+    Migrated,
 }
 
 impl ContractEventType {
@@ -20,7 +22,9 @@ impl ContractEventType {
             ContractEventType::Executed => "executed",
             ContractEventType::SessionKeyAdded => "session_key_added",
             ContractEventType::SessionKeyRevoked => "session_key_revoked",
+            ContractEventType::SessionKeyTtlRefreshed => "session_key_ttl_refreshed",
             ContractEventType::Upgraded => "upgraded",
+            ContractEventType::Migrated => "migrated",
         }
     }
 }
@@ -40,7 +44,9 @@ impl std::str::FromStr for ContractEventType {
             "executed" => Ok(ContractEventType::Executed),
             "session_key_added" => Ok(ContractEventType::SessionKeyAdded),
             "session_key_revoked" => Ok(ContractEventType::SessionKeyRevoked),
+            "session_key_ttl_refreshed" => Ok(ContractEventType::SessionKeyTtlRefreshed),
             "upgraded" => Ok(ContractEventType::Upgraded),
+            "migrated" => Ok(ContractEventType::Migrated),
             _ => Err(()),
         }
     }
@@ -51,6 +57,7 @@ impl std::str::FromStr for ContractEventType {
 pub struct ContractEvent {
     pub id: Uuid,
     pub contract_address: String,
+    pub account_id: String,
     pub event_type: String,
     pub ledger_seq: i64,
     pub timestamp: DateTime<Utc>,
@@ -62,6 +69,7 @@ pub struct ContractEvent {
 #[derive(Debug, Clone)]
 pub struct InsertContractEvent {
     pub contract_address: String,
+    pub account_id: String,
     pub event_type: String,
     pub ledger_seq: i64,
     pub timestamp: DateTime<Utc>,
@@ -73,11 +81,14 @@ pub struct InsertContractEvent {
 #[derive(Debug, Clone, Default)]
 pub struct ContractEventFilter {
     pub contract_address: Option<String>,
+    pub account_id: Option<String>,
     pub event_type: Option<String>,
     pub ledger_min: Option<i64>,
     pub ledger_max: Option<i64>,
     pub limit: Option<u32>,
     pub offset: Option<u64>,
+    pub cursor_after: Option<String>,
+    pub cursor_before: Option<String>,
 }
 
 #[cfg(test)]
@@ -96,7 +107,12 @@ mod tests {
             ContractEventType::SessionKeyRevoked.to_string(),
             "session_key_revoked"
         );
+        assert_eq!(
+            ContractEventType::SessionKeyTtlRefreshed.to_string(),
+            "session_key_ttl_refreshed"
+        );
         assert_eq!(ContractEventType::Upgraded.to_string(), "upgraded");
+        assert_eq!(ContractEventType::Migrated.to_string(), "migrated");
     }
 
     #[test]
@@ -109,6 +125,16 @@ mod tests {
             "session_key_added".parse::<ContractEventType>().unwrap(),
             ContractEventType::SessionKeyAdded
         );
+        assert_eq!(
+            "session_key_ttl_refreshed"
+                .parse::<ContractEventType>()
+                .unwrap(),
+            ContractEventType::SessionKeyTtlRefreshed
+        );
+        assert_eq!(
+            "migrated".parse::<ContractEventType>().unwrap(),
+            ContractEventType::Migrated
+        );
         assert!("invalid".parse::<ContractEventType>().is_err());
     }
 
@@ -119,7 +145,9 @@ mod tests {
             ContractEventType::Executed,
             ContractEventType::SessionKeyAdded,
             ContractEventType::SessionKeyRevoked,
+            ContractEventType::SessionKeyTtlRefreshed,
             ContractEventType::Upgraded,
+            ContractEventType::Migrated,
         ];
         for kind in kinds {
             let json = serde_json::to_string(&kind).unwrap();

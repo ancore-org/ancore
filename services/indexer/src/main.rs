@@ -102,6 +102,87 @@ async fn main() -> anyhow::Result<()> {
         Err(err) => tracing::warn!(error = %err, "failed to load ingest checkpoint"),
     }
 
+    // Start the ingestion worker (issue #996): every other piece of this
+    // pipeline — checkpointing, the sink, cursor pagination on the read
+    // side — was already built and tested, but nothing ever actually
+    // pulled events from a real network. Gated on SOROBAN_RPC_URL so a
+    // deployment that hasn't configured an RPC endpoint yet still starts
+    // and serves the read API (just with nothing new to ingest), rather
+    // than failing to boot.
+    match std::env::var("SOROBAN_RPC_URL") {
+        Ok(rpc_url) => {
+            let contract_ids = std::env::var("SOROBAN_CONTRACT_IDS")
+                .unwrap_or_default()
+                .split(',')
+                .map(str::trim)
+                .filter(|s| !s.is_empty())
+                .map(str::to_string)
+                .collect::<Vec<_>>();
+            if contract_ids.is_empty() {
+                tracing::warn!(
+                    "SOROBAN_CONTRACT_IDS is not set — ingesting events from ALL contracts, \
+                     which is almost certainly not what you want in production"
+                );
+            }
+
+            let poll_interval_secs = std::env::var("INGEST_POLL_INTERVAL_SECS")
+                .ok()
+                .and_then(|v| v.parse::<u64>().ok())
+                .unwrap_or(5);
+
+            let source = ancore_indexer::ingest::RpcEventSource::new(
+                ancore_indexer::ingest::RpcSourceConfig {
+                    rpc_url,
+                    contract_ids,
+                },
+            );
+            let sink = ancore_indexer::ingest::PostgresEventSink::new(pool.clone());
+            let checkpoint_store =
+                ancore_indexer::ingest::PostgresCheckpointStore::new(pool.clone());
+
+            let mut worker = ancore_indexer::ingest::IngestWorker::with_checkpoint_store(
+                ancore_indexer::ingest::WorkerConfig::default(),
+                source,
+                sink,
+                checkpoint_store,
+            )
+            .bootstrap_from_store()
+            .await?;
+
+            tokio::spawn(async move {
+                let mut interval =
+                    tokio::time::interval(std::time::Duration::from_secs(poll_interval_secs));
+                loop {
+                    interval.tick().await;
+                    match worker.run_once().await {
+                        Ok(stats) => {
+                            if stats.fetched > 0 {
+                                tracing::info!(
+                                    fetched = stats.fetched,
+                                    skipped = stats.skipped,
+                                    normalised = stats.normalised,
+                                    persisted = stats.persisted,
+                                    errors = stats.errors,
+                                    "ingest batch complete"
+                                );
+                            }
+                        }
+                        Err(err) => {
+                            tracing::error!(error = %err, "ingest batch failed, will retry next tick");
+                        }
+                    }
+                }
+            });
+
+            tracing::info!(interval_secs = poll_interval_secs, "ingest worker started");
+        }
+        Err(_) => {
+            tracing::warn!(
+                "SOROBAN_RPC_URL not set — ingest worker disabled, serving read API only"
+            );
+        }
+    }
+
     // Build our application with routes
     let app = Router::new()
         // Account activity query API

@@ -1,0 +1,9 @@
+appId: com.ancore.mobile
+---
+# Centralized from apps/mobile-wallet/e2e/flows/walletconnect-pair.yaml
+- launchApp
+- tapOn: "Scan QR"
+- pasteText: "wc:mock-pairing-uri@2?relay-protocol=irn&symKey=test"
+- assertVisible: "Approve Session"
+- tapOn: "Approve"
+- assertVisible: "Session Active"

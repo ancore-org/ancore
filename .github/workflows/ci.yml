@@ -117,6 +117,10 @@ jobs:
       - name: Test
         run: pnpm turbo run test --filter=${{ matrix.filter }}
 
+      - name: Coverage gate (security-critical packages)
+        if: contains(fromJSON('["core-sdk", "account-abstraction", "crypto", "stellar"]'), matrix.name)
+        run: node scripts/coverage-gate.js
+
   app:
     name: App — ${{ matrix.name }}
     runs-on: ubuntu-latest
@@ -175,6 +179,9 @@ jobs:
 
       - name: Check documented repository structure
         run: pnpm docs:check-structure
+
+      - name: Validate documentation links
+        run: pnpm docs:validate-links
 
       - name: Lint OpenAPI specs
         run: pnpm docs:lint-openapi

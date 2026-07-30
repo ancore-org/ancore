@@ -33,6 +33,7 @@
     "indexer:check": "cd services/indexer && cargo check",
     "indexer:lint-migrations": "node services/indexer/scripts/lint-migrations.mjs",
     "audit:security": "node tools/security-audit.js",
+    "coverage:gate": "node scripts/coverage-gate.js",
     "docs:validate-links": "node scripts/validate-doc-links.js",
     "docs:lint-openapi": "npx --yes @stoplight/spectral-cli lint --fail-severity=warn services/indexer/openapi.yaml",
     "verify": "pnpm lint && pnpm typecheck && pnpm test",

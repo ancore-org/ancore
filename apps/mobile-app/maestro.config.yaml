@@ -1,0 +1,4 @@
+appId: com.ancore.mobile
+name: Ancore mobile app Maestro e2e suite
+flows:
+  - e2e/flows

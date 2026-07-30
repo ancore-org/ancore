@@ -86,6 +86,14 @@ const KEY_CREATOR_IDX: Symbol = symbol_short!("CRIDX");
 const KEY_RECIPIENT_IDX: Symbol = symbol_short!("RCIDX");
 
 // ---------------------------------------------------------------------------
+// TTL constants
+// ---------------------------------------------------------------------------
+
+const DAY_IN_LEDGERS: u32 = 17280; // 24 h × 60 min × 60 sec / 5 sec per ledger
+const INSTANCE_BUMP_AMOUNT: u32 = 30 * DAY_IN_LEDGERS; // 30 days
+const INSTANCE_BUMP_THRESHOLD: u32 = 15 * DAY_IN_LEDGERS; // 15 days
+
+// ---------------------------------------------------------------------------
 // Events (stable schema for #974 indexer)
 // ---------------------------------------------------------------------------
 
@@ -148,6 +156,35 @@ fn push_to_index(env: &Env, key: (Symbol, Address), id: BytesN<32>) {
         .unwrap_or_else(|| Vec::new(env));
     ids.push_back(id);
     env.storage().instance().set(&key, &ids);
+}
+
+// ---------------------------------------------------------------------------
+// TTL helper
+// ---------------------------------------------------------------------------
+
+/// Extends the contract instance TTL after every write.
+///
+/// When a `due_date` is provided and lies in the future, the bump is sized to
+/// keep the entry alive until after that date (plus the default 30-day buffer),
+/// so long-lived invoices don't silently expire from ledger state before they
+/// are due. Falls back to the standard 30-day bump otherwise.
+fn extend_ttl(env: &Env, due_date: Option<u64>) {
+    let (threshold, amount) = match due_date {
+        Some(due) => {
+            let current = env.ledger().timestamp();
+            if due > current {
+                let diff_secs = due.saturating_sub(current);
+                let diff_ledgers: u32 = (diff_secs / 5).try_into().unwrap_or(u32::MAX);
+                let ledgers_to_live = diff_ledgers.saturating_add(INSTANCE_BUMP_AMOUNT);
+                let threshold = ledgers_to_live.saturating_sub(INSTANCE_BUMP_AMOUNT / 2);
+                (threshold, ledgers_to_live)
+            } else {
+                (INSTANCE_BUMP_THRESHOLD, INSTANCE_BUMP_AMOUNT)
+            }
+        }
+        None => (INSTANCE_BUMP_THRESHOLD, INSTANCE_BUMP_AMOUNT),
+    };
+    env.storage().instance().extend_ttl(threshold, amount);
 }
 
 // ---------------------------------------------------------------------------
@@ -229,6 +266,8 @@ impl InvoiceContract {
         push_to_index(&env, creator_index_key(&creator), id.clone());
         push_to_index(&env, recipient_index_key(&recipient), id.clone());
 
+        extend_ttl(&env, due_date);
+
         events::invoice_created(
             &env,
             id.clone(),
@@ -268,6 +307,7 @@ impl InvoiceContract {
             .instance()
             .set(&(KEY_INV, id.clone()), &invoice);
 
+        extend_ttl(&env, invoice.due_date);
         events::invoice_opened(&env, id, invoice.creator);
         Ok(())
     }
@@ -305,6 +345,7 @@ impl InvoiceContract {
                 env.storage()
                     .instance()
                     .set(&(KEY_INV, id.clone()), &invoice);
+                extend_ttl(&env, None);
                 events::invoice_expired(&env, id, invoice.creator);
                 return Err(InvoiceError::Expired);
             }
@@ -323,6 +364,7 @@ impl InvoiceContract {
             .instance()
             .set(&(KEY_INV, id.clone()), &invoice);
 
+        extend_ttl(&env, None);
         events::invoice_paid(
             &env,
             id,
@@ -355,6 +397,7 @@ impl InvoiceContract {
             .instance()
             .set(&(KEY_INV, id.clone()), &invoice);
 
+        extend_ttl(&env, None);
         events::invoice_cancelled(&env, id, creator);
         Ok(())
     }
@@ -386,6 +429,7 @@ impl InvoiceContract {
             .instance()
             .set(&(KEY_INV, id.clone()), &invoice);
 
+        extend_ttl(&env, None);
         events::invoice_expired(&env, id, creator);
         Ok(())
     }
@@ -420,5 +464,54 @@ impl InvoiceContract {
             .instance()
             .get(&(KEY_INV, id.clone()))
             .ok_or(InvoiceError::NotFound)
+    }
+}
+
+#[cfg(test)]
+mod test {
+    use super::*;
+    use soroban_sdk::testutils::{Address as _, Ledger};
+    use soroban_sdk::Address;
+
+    /// Issue #1129: writes must extend the instance TTL so long-lived invoices
+    /// (with a future `due_date`) remain readable after the ledger advances well
+    /// past the default (non-extended) instance TTL.
+    #[test]
+    fn test_invoice_readable_after_ledger_advance_past_default_ttl() {
+        let env = Env::default();
+        env.mock_all_auths();
+        let contract_id = env.register_contract(None, InvoiceContract);
+        let client = InvoiceContractClient::new(&env, &contract_id);
+
+        let creator = Address::generate(&env);
+        let recipient = Address::generate(&env);
+        // Use a dummy token address — create() stores but doesn't transfer in Draft.
+        let asset = Address::generate(&env);
+
+        // Due 90 days out — the TTL bump should be sized to cover it.
+        let due_date = env.ledger().timestamp() + 90 * 24 * 60 * 60;
+
+        let id = client
+            .create(
+                &creator,
+                &recipient,
+                &1000i128,
+                &asset,
+                &None,
+                &Some(due_date),
+                &None,
+            )
+            .unwrap();
+
+        // Advance the ledger well past the default 30-day bump (INSTANCE_BUMP_AMOUNT)
+        // that would apply without a due-date-aware extension.
+        env.ledger().with_mut(|li| {
+            li.sequence_number = li.sequence_number.saturating_add(40 * DAY_IN_LEDGERS);
+        });
+
+        let invoice = client.get(&id).unwrap();
+        assert_eq!(invoice.id, id);
+        // Invoice starts in Draft; it was never opened, so status stays Draft.
+        assert_eq!(invoice.status, InvoiceStatus::Draft);
     }
 }
