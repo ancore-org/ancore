@@ -114,6 +114,45 @@ export class PasskeySigningError extends PasskeyError {
   }
 }
 
+function hasPasskeyErrorCode(value: unknown, code: string): boolean {
+  return (
+    typeof value === 'object' &&
+    value !== null &&
+    'code' in value &&
+    (value as { code?: unknown }).code === code
+  );
+}
+
+/**
+ * Runtime guard for passkey unsupported errors.
+ *
+ * Checks the stable `code` discriminant instead of relying on `instanceof`, so it
+ * continues to work when errors cross bundle or duplicate-class boundaries.
+ */
+export function isPasskeyNotSupportedError(value: unknown): value is PasskeyNotSupportedError {
+  return hasPasskeyErrorCode(value, 'PASSKEY_NOT_SUPPORTED');
+}
+
+/**
+ * Runtime guard for passkey registration errors.
+ *
+ * Checks the stable `code` discriminant instead of relying on `instanceof`, so it
+ * continues to work when errors cross bundle or duplicate-class boundaries.
+ */
+export function isPasskeyRegistrationError(value: unknown): value is PasskeyRegistrationError {
+  return hasPasskeyErrorCode(value, 'PASSKEY_REGISTRATION_ERROR');
+}
+
+/**
+ * Runtime guard for passkey signing errors.
+ *
+ * Checks the stable `code` discriminant instead of relying on `instanceof`, so it
+ * continues to work when errors cross bundle or duplicate-class boundaries.
+ */
+export function isPasskeySigningError(value: unknown): value is PasskeySigningError {
+  return hasPasskeyErrorCode(value, 'PASSKEY_SIGNING_ERROR');
+}
+
 // ---------------------------------------------------------------------------
 // Internal helpers
 // ---------------------------------------------------------------------------

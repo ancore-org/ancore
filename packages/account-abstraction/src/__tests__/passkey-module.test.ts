@@ -8,6 +8,9 @@ import {
   PasskeyNotSupportedError,
   PasskeyRegistrationError,
   PasskeySigningError,
+  isPasskeyNotSupportedError,
+  isPasskeyRegistrationError,
+  isPasskeySigningError,
   registerPasskey,
   signRelayPayload,
 } from '../passkey/passkeyModule';
@@ -408,5 +411,47 @@ describe('error classes', () => {
 
   it('PasskeyNotSupportedError has correct code', () => {
     expect(new PasskeyNotSupportedError().code).toBe('PASSKEY_NOT_SUPPORTED');
+  });
+
+  it('type guards match errors by stable code', () => {
+    expect(isPasskeyNotSupportedError(new PasskeyNotSupportedError())).toBe(true);
+    expect(isPasskeyRegistrationError(new PasskeyRegistrationError('oops'))).toBe(true);
+    expect(isPasskeySigningError(new PasskeySigningError('oops'))).toBe(true);
+  });
+
+  it('type guards work across bundle boundaries when instanceof would fail', () => {
+    const crossBundleNotSupported = {
+      name: 'PasskeyNotSupportedError',
+      message: 'WebAuthn is not supported in this environment',
+      code: 'PASSKEY_NOT_SUPPORTED',
+    };
+    const crossBundleRegistration = {
+      name: 'PasskeyRegistrationError',
+      message: 'Passkey creation was cancelled or failed',
+      code: 'PASSKEY_REGISTRATION_ERROR',
+    };
+    const crossBundleSigning = {
+      name: 'PasskeySigningError',
+      message: 'Passkey assertion was cancelled or failed',
+      code: 'PASSKEY_SIGNING_ERROR',
+    };
+
+    expect(crossBundleNotSupported).not.toBeInstanceOf(PasskeyNotSupportedError);
+    expect(crossBundleRegistration).not.toBeInstanceOf(PasskeyRegistrationError);
+    expect(crossBundleSigning).not.toBeInstanceOf(PasskeySigningError);
+
+    expect(isPasskeyNotSupportedError(crossBundleNotSupported)).toBe(true);
+    expect(isPasskeyRegistrationError(crossBundleRegistration)).toBe(true);
+    expect(isPasskeySigningError(crossBundleSigning)).toBe(true);
+  });
+
+  it('type guards reject other passkey error codes and non-errors', () => {
+    expect(isPasskeyNotSupportedError(new PasskeyRegistrationError('oops'))).toBe(false);
+    expect(isPasskeyRegistrationError(new PasskeySigningError('oops'))).toBe(false);
+    expect(isPasskeySigningError(new PasskeyNotSupportedError())).toBe(false);
+
+    expect(isPasskeyNotSupportedError(null)).toBe(false);
+    expect(isPasskeyRegistrationError({ code: 'OTHER_ERROR' })).toBe(false);
+    expect(isPasskeySigningError('PASSKEY_SIGNING_ERROR')).toBe(false);
   });
 });
