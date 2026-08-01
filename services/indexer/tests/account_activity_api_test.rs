@@ -84,7 +84,7 @@ async fn insert_test_activity(
 async fn integration_test_list_activity_happy_path() {
     let (app, pool) = setup_test_app().await;
 
-    let account_id = "GABC1234567890ABCDEFGHIJKLMNOPQRSTUVWXYZ1234567890";
+    let account_id = "GBBM6BKZPEHWYO3E3YKREDPQXMS4VK35YLNU7NFBRI26RAN7GI5POFBB";
     let base_time = chrono::Utc
         .with_ymd_and_hms(2024, 1, 15, 10, 30, 0)
         .unwrap();
@@ -128,7 +128,7 @@ async fn integration_test_list_activity_happy_path() {
 async fn integration_test_list_with_all_filters() {
     let (app, pool) = setup_test_app().await;
 
-    let account_id = "GABC1234567890ABCDEFGHIJKLMNOPQRSTUVWXYZ1234567890";
+    let account_id = "GBBM6BKZPEHWYO3E3YKREDPQXMS4VK35YLNU7NFBRI26RAN7GI5POFBB";
     let base_time = chrono::Utc
         .with_ymd_and_hms(2024, 1, 15, 10, 30, 0)
         .unwrap();
@@ -175,7 +175,7 @@ async fn integration_test_list_with_all_filters() {
 async fn integration_test_pagination_forward() {
     let (app, pool) = setup_test_app().await;
 
-    let account_id = "GABC1234567890ABCDEFGHIJKLMNOPQRSTUVWXYZ1234567890";
+    let account_id = "GBBM6BKZPEHWYO3E3YKREDPQXMS4VK35YLNU7NFBRI26RAN7GI5POFBB";
     let base_time = chrono::Utc
         .with_ymd_and_hms(2024, 1, 15, 10, 30, 0)
         .unwrap();
@@ -237,7 +237,7 @@ async fn integration_test_pagination_forward() {
 async fn integration_test_invalid_cursor_returns_400() {
     let (app, _pool) = setup_test_app().await;
 
-    let account_id = "GABC1234567890ABCDEFGHIJKLMNOPQRSTUVWXYZ1234567890";
+    let account_id = "GBBM6BKZPEHWYO3E3YKREDPQXMS4VK35YLNU7NFBRI26RAN7GI5POFBB";
 
     let response = app
         .oneshot(
@@ -265,7 +265,7 @@ async fn integration_test_invalid_cursor_returns_400() {
 async fn integration_test_both_cursors_returns_400() {
     let (app, _pool) = setup_test_app().await;
 
-    let account_id = "GABC1234567890ABCDEFGHIJKLMNOPQRSTUVWXYZ1234567890";
+    let account_id = "GBBM6BKZPEHWYO3E3YKREDPQXMS4VK35YLNU7NFBRI26RAN7GI5POFBB";
 
     let response = app
         .oneshot(
@@ -293,7 +293,7 @@ async fn integration_test_both_cursors_returns_400() {
 async fn integration_test_invalid_limit_clamped() {
     let (app, pool) = setup_test_app().await;
 
-    let account_id = "GABC1234567890ABCDEFGHIJKLMNOPQRSTUVWXYZ1234567890";
+    let account_id = "GBBM6BKZPEHWYO3E3YKREDPQXMS4VK35YLNU7NFBRI26RAN7GI5POFBB";
     let base_time = chrono::Utc
         .with_ymd_and_hms(2024, 1, 15, 10, 30, 0)
         .unwrap();
@@ -337,7 +337,7 @@ async fn integration_test_invalid_limit_clamped() {
 async fn integration_test_get_by_id_found() {
     let (app, pool) = setup_test_app().await;
 
-    let account_id = "GABC1234567890ABCDEFGHIJKLMNOPQRSTUVWXYZ1234567890";
+    let account_id = "GBBM6BKZPEHWYO3E3YKREDPQXMS4VK35YLNU7NFBRI26RAN7GI5POFBB";
     let base_time = chrono::Utc
         .with_ymd_and_hms(2024, 1, 15, 10, 30, 0)
         .unwrap();
@@ -368,7 +368,7 @@ async fn integration_test_get_by_id_found() {
 async fn integration_test_get_by_id_not_found() {
     let (app, _pool) = setup_test_app().await;
 
-    let account_id = "GABC1234567890ABCDEFGHIJKLMNOPQRSTUVWXYZ1234567890";
+    let account_id = "GBBM6BKZPEHWYO3E3YKREDPQXMS4VK35YLNU7NFBRI26RAN7GI5POFBB";
     let random_id = Uuid::new_v4();
 
     let response = app
@@ -392,7 +392,7 @@ async fn integration_test_get_by_id_not_found() {
 async fn integration_test_account_not_found_returns_empty() {
     let (app, _pool) = setup_test_app().await;
 
-    let account_id = "GABC1234567890ABCDEFGHIJKLMNOPQRSTUVWXYZ1234567890";
+    let account_id = "GBBM6BKZPEHWYO3E3YKREDPQXMS4VK35YLNU7NFBRI26RAN7GI5POFBB";
 
     let response = app
         .oneshot(
@@ -417,7 +417,7 @@ async fn integration_test_account_not_found_returns_empty() {
 async fn integration_test_get_types() {
     let (app, pool) = setup_test_app().await;
 
-    let account_id = "GABC1234567890ABCDEFGHIJKLMNOPQRSTUVWXYZ1234567890";
+    let account_id = "GBBM6BKZPEHWYO3E3YKREDPQXMS4VK35YLNU7NFBRI26RAN7GI5POFBB";
     let base_time = chrono::Utc
         .with_ymd_and_hms(2024, 1, 15, 10, 30, 0)
         .unwrap();
@@ -484,7 +484,7 @@ async fn integration_test_invalid_account_id_returns_400() {
 async fn integration_test_invalid_ledger_range_returns_400() {
     let (app, _pool) = setup_test_app().await;
 
-    let account_id = "GABC1234567890ABCDEFGHIJKLMNOPQRSTUVWXYZ1234567890";
+    let account_id = "GBBM6BKZPEHWYO3E3YKREDPQXMS4VK35YLNU7NFBRI26RAN7GI5POFBB";
 
     let response = app
         .oneshot(
