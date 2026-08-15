@@ -59,17 +59,53 @@ export const SignAuthEntryApprovalSheet: React.FC<SignAuthEntryApprovalSheetProp
   );
 };
 
+function isWalletConnectSession(value: unknown): value is SessionTypes.Struct {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) {
+    return false;
+  }
+  const session = value as Record<string, unknown>;
+  if (typeof session.topic !== 'string') {
+    return false;
+  }
+  if (!session.peer || typeof session.peer !== 'object' || Array.isArray(session.peer)) {
+    return false;
+  }
+  return true;
+}
+
 export function parseSignAuthEntryRequest(event: Record<string, unknown>): {
   request: SignAuthEntryRequest;
   parsed: ParsedAuthEntry;
 } {
-  const id = Number(event.id);
-  const topic = String(event.topic ?? '');
+  const rawId = event.id;
+  let id: number;
+  if (typeof rawId === 'number' && Number.isSafeInteger(rawId)) {
+    id = rawId;
+  } else if (typeof rawId === 'string' && rawId.trim().length > 0) {
+    const parsedId = Number(rawId);
+    if (!Number.isSafeInteger(parsedId)) {
+      throw new Error('Invalid or missing WalletConnect request id');
+    }
+    id = parsedId;
+  } else {
+    throw new Error('Invalid or missing WalletConnect request id');
+  }
+
+  const rawTopic = event.topic;
+  if (typeof rawTopic !== 'string' || rawTopic.trim().length === 0) {
+    throw new Error('Invalid or missing WalletConnect request topic');
+  }
+  const topic = rawTopic.trim();
+
   const params = (event.params ?? {}) as { authEntry?: string; entryXdr?: string };
   const entryXdr = params.authEntry ?? params.entryXdr;
 
   if (!entryXdr) {
     throw new Error('Missing authEntry parameter');
+  }
+
+  if (!isWalletConnectSession(event.session)) {
+    throw new Error('Invalid or missing WalletConnect session');
   }
 
   const parsed = parseAuthEntryXdr(entryXdr);
@@ -80,7 +116,7 @@ export function parseSignAuthEntryRequest(event: Record<string, unknown>): {
       topic,
       method: 'stellar_signAuthEntry',
       params: { authEntry: entryXdr },
-      session: event.session as SessionTypes.Struct,
+      session: event.session,
     },
     parsed,
   };
