@@ -13,6 +13,9 @@ name = "ancore-indexer"
 path = "src/main.rs"
 
 [dependencies]
+# CLI
+clap = { version = "4", features = ["derive"] }
+
 # Web framework
 axum = "0.7"
 tokio = { version = "1", features = ["full"] }

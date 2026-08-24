@@ -7,9 +7,11 @@ pub mod sink;
 pub mod source;
 pub mod worker;
 
+pub use backfill::{BackfillCommand, BackfillConfig, BackfillStats};
 pub use checkpoint::{Checkpoint, CheckpointStore, MemoryCheckpointStore, PostgresCheckpointStore};
 pub use dead_letter::{
-    DeadLetterRecord, DeadLetterStore, MemoryDeadLetterStore, PostgresDeadLetterStore,
+    reprocess_dead_letters, DeadLetterRecord, DeadLetterStore, MemoryDeadLetterStore,
+    PendingDeadLetter, PostgresDeadLetterStore, ReprocessStats,
 };
 pub use postgres_sink::PostgresEventSink;
 pub use rpc_source::{RpcEventSource, RpcSourceConfig};

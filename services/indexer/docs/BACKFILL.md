@@ -123,12 +123,19 @@ GET https://horizon.stellar.org/ledgers?order=desc&limit=1
 ### 2. Run the backfill
 
 ```bash
-# Set environment
+# Set environment — same RPC config the live ingest worker uses
 export DATABASE_URL="postgresql://user:pass@localhost:5432/ancore_indexer"
+export SOROBAN_RPC_URL="https://soroban-rpc.example.com"
+export SOROBAN_CONTRACT_IDS="CCONTRACT1...,CCONTRACT2..."
 
-# Run backfill binary (or use the HTTP endpoint)
-cargo run --bin backfill -- --from 53000000 --to 53100000 --batch-size 500
+# Run the backfill subcommand of the indexer binary
+cargo run --bin ancore-indexer -- backfill --from 53000000 --to 53100000 --batch-size 500
 ```
+
+This runs as a one-shot command against the real `RpcEventSource`/`PostgresEventSink` and exits
+— it does not start the HTTP API or the live ingest worker. It also never reads or writes the
+`ingest_checkpoints` table, so it's safe to run alongside a live worker without risk of
+corrupting or regressing its resume cursor.
 
 ### 3. Verify completeness
 
@@ -156,6 +163,42 @@ WHERE next_ledger_seq - ledger_seq > 1;
 
 After backfill completes, the real-time `IngestWorker` will automatically resume from the
 checkpoint. No manual intervention is needed.
+
+## Dead-Letter Reprocessing
+
+Events that fail `normalise()` (e.g. missing `tx_hash`/`contract_id`) are written to
+`ingest_dead_letters` instead of being silently dropped, so they can be recovered once the
+underlying bug is fixed.
+
+### 1. Inspect pending dead letters
+
+```sql
+SELECT id, stream, ledger_seq, error_message, created_at
+FROM ingest_dead_letters
+WHERE reprocessed_at IS NULL
+ORDER BY created_at ASC;
+```
+
+### 2. Ship the fix, then reprocess
+
+```bash
+export DATABASE_URL="postgresql://user:pass@localhost:5432/ancore_indexer"
+cargo run --bin ancore-indexer -- reprocess-dead-letters --limit 100
+```
+
+Each pending row's stored raw payload is re-run through the same `normalise()` used by live
+ingest and backfill. Rows that persist successfully are marked `reprocessed_at = NOW()`; rows
+that still fail are left pending (not dropped) for another retry after a further fix. Like
+backfill, this never touches `ingest_checkpoints` — it replays rows by id, not by ledger cursor.
+
+### 3. Verify
+
+```sql
+SELECT COUNT(*) FROM ingest_dead_letters WHERE reprocessed_at IS NULL;
+```
+
+Re-run with a higher `--limit` (or repeatedly) until this reaches zero for the rows you expect
+to have fixed.
 
 ## Event Classification Reference
 
