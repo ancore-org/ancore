@@ -32,6 +32,14 @@ export interface Messages {
       | { error: string }
       | { requiresHardware: true; xdr: string; networkPassphrase: string };
   };
+  SIGN_MESSAGE: {
+    request: { message: string; networkPassphrase?: string };
+    response: { signature: string } | { error: string };
+  };
+  SIGN_RELAY_PAYLOAD: {
+    request: { operation: string; nonce: number };
+    response: { sessionKey: string; signature: string } | { error: string };
+  };
   GET_WALLET_STATE: {
     request: Record<string, never>;
     response: { state: WalletState };

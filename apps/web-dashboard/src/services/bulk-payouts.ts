@@ -50,7 +50,9 @@ export interface RelayExecuteRequest {
 export interface RelayerPayoutSubmitterOptions {
   baseUrl: string;
   getAuthToken: () => string | Promise<string>;
-  buildRelayRequest: (submission: PayoutSubmission) => RelayExecuteRequest;
+  buildRelayRequest: (
+    submission: PayoutSubmission
+  ) => RelayExecuteRequest | Promise<RelayExecuteRequest>;
   fetchImpl?: typeof fetch;
 }
 
@@ -149,6 +151,7 @@ export function createRelayerPayoutSubmitter(
 
   return async (submission: PayoutSubmission) => {
     const token = await options.getAuthToken();
+    const relayRequest = await options.buildRelayRequest(submission);
     const response = await fetchImpl(`${baseUrl}/relay/execute`, {
       method: 'POST',
       headers: {
@@ -156,7 +159,7 @@ export function createRelayerPayoutSubmitter(
         Authorization: `Bearer ${token}`,
         'Idempotency-Key': submission.idempotencyKey,
       },
-      body: JSON.stringify(options.buildRelayRequest(submission)),
+      body: JSON.stringify(relayRequest),
     });
 
     const body = (await readJsonResponse(response)) as {

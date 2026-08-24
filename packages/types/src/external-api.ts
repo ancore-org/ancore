@@ -20,6 +20,7 @@ export enum ExternalApiMethodName {
   SIGN_TRANSACTION = 'signTransaction',
   SIGN_AUTH_ENTRY = 'signAuthEntry',
   SIGN_MESSAGE = 'signMessage',
+  SIGN_RELAY_PAYLOAD = 'signRelayPayload',
   REQUEST_SESSION_KEY = 'requestSessionKey',
 }
 
@@ -157,4 +158,23 @@ export interface SignMessageResult {
  */
 export interface GetPublicKeyResult {
   readonly publicKey: string;
+}
+
+/**
+ * Params for signRelayPayload handler (issue #1213).
+ */
+export interface SignRelayPayloadParams {
+  readonly operation: string;
+  readonly nonce: number;
+}
+
+/**
+ * Result from signRelayPayload handler.
+ * The wallet computes its own sessionKey (real public key) and signs the
+ * canonical payload internally, returning both atomically — the caller never
+ * needs a separate "get my public key" round trip.
+ */
+export interface SignRelayPayloadResult {
+  readonly sessionKey: string;
+  readonly signature: string;
 }

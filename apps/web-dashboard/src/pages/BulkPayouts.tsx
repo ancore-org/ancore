@@ -1,7 +1,8 @@
 import { useMemo, useState, type ChangeEvent } from 'react';
 import { AlertCircle, CheckCircle2, Play, Upload } from 'lucide-react';
 import { Badge, Button, Card, CardContent, CardHeader, CardTitle } from '@ancore/ui-kit';
-import { buildDefaultRelayPayload, resolveRelayerBaseUrl } from '../services/scheduler-client';
+import { buildSignedRelayPayload, resolveRelayerBaseUrl } from '../services/scheduler-client';
+import { createWalletApiRelaySigner } from '../services/relay-signer';
 import {
   createRelayerPayoutSubmitter,
   executeBulkPayoutBatch,
@@ -37,11 +38,18 @@ export function BulkPayoutsPage() {
       createRelayerPayoutSubmitter({
         baseUrl: resolveRelayerBaseUrl(import.meta.env.VITE_RELAYER_URL),
         getAuthToken: () => session?.accessToken ?? 'ancore-client-token',
-        buildRelayRequest: (submission: PayoutSubmission) =>
-          withSignedTransactionXdr(
-            buildDefaultRelayPayload(submission.recipient, submission.amount),
-            submission.signedTransactionXdr
-          ),
+        buildRelayRequest: async (submission: PayoutSubmission) => {
+          // The outer envelope always needs a real relay signature — even
+          // when the CSV supplies a pre-signed transaction XDR, that's a
+          // separate field the relayer validates independently (issue #1213).
+          const signer = await createWalletApiRelaySigner();
+          const payload = await buildSignedRelayPayload(
+            submission.recipient,
+            submission.amount,
+            signer
+          );
+          return withSignedTransactionXdr(payload, submission.signedTransactionXdr);
+        },
       }),
     [session?.accessToken]
   );

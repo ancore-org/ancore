@@ -103,7 +103,14 @@ describe('RelayerSendStrategy', () => {
     expect(fee.minBalance).toBe('0.0050100');
   });
 
-  it('send posts to /relay/execute and returns job ID', async () => {
+  it('send posts to /relay/execute with a real signed payload (not the old hardcoded fake) and returns job ID', async () => {
+    vi.mock('@ancore/wallet-api', () => ({
+      signRelayPayload: vi.fn(async () => ({
+        sessionKey: 'cd'.repeat(32),
+        signature: 'ef'.repeat(64),
+      })),
+    }));
+
     const mockFetch = vi.fn(() =>
       Promise.resolve(
         new Response(JSON.stringify({ success: true, jobId: 'job-123' }), {
@@ -123,9 +130,21 @@ describe('RelayerSendStrategy', () => {
       expect.stringContaining('/relay/execute'),
       expect.objectContaining({ method: 'POST' })
     );
+
+    const sentBody = JSON.parse((mockFetch.mock.calls[0][1] as RequestInit).body as string);
+    expect(sentBody.sessionKey).toBe('cd'.repeat(32));
+    expect(sentBody.signature).toBe('ef'.repeat(64));
+    expect(sentBody.sessionKey).not.toBe('a'.repeat(64));
+    expect(sentBody.signature).not.toBe('b'.repeat(128));
   });
 
   it('send throws on relayer error', async () => {
+    vi.mock('@ancore/wallet-api', () => ({
+      signRelayPayload: vi.fn(async () => ({
+        sessionKey: 'cd'.repeat(32),
+        signature: 'ef'.repeat(64),
+      })),
+    }));
     vi.stubGlobal(
       'fetch',
       vi.fn(() =>
@@ -145,6 +164,12 @@ describe('RelayerSendStrategy', () => {
   });
 
   it('send throws on non-ok response', async () => {
+    vi.mock('@ancore/wallet-api', () => ({
+      signRelayPayload: vi.fn(async () => ({
+        sessionKey: 'cd'.repeat(32),
+        signature: 'ef'.repeat(64),
+      })),
+    }));
     vi.stubGlobal(
       'fetch',
       vi.fn(() => Promise.resolve(new Response('Internal error', { status: 500 })))

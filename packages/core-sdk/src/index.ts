@@ -132,7 +132,6 @@ export {
   getSchedulerClient,
   resetSchedulerClientForTests,
   resolveRelayerBaseUrl,
-  buildDefaultRelayPayload,
   toIsoStartAt,
   defaultScheduleStartAt,
   SCHEDULE_FREQUENCY_OPTIONS,
@@ -141,6 +140,17 @@ export {
   type SchedulerClient,
   type SchedulerClientOptions,
 } from './scheduler-client';
+
+// Real relay-payload signing (issue #1213 — replaces the removed
+// buildDefaultRelayPayload, which hardcoded a fake sessionKey/signature).
+export {
+  buildRelayCanonicalPayload,
+  buildSignedRelayPayload,
+  type CanonicalPayloadInput,
+  type RelaySigner,
+  type RelayExecuteParameters,
+  type SignedRelayPayload,
+} from './relay-payload';
 
 export {
   mapExecuteWithSessionKeyError,

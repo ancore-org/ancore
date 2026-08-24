@@ -7,7 +7,15 @@ jest.mock('../bridge', () => ({
   sendExternalRequest: (...args: unknown[]) => sendExternalRequest(...args),
 }));
 
-import { connect, getAddress, getNetwork, isConnected, requestSessionKey } from '../index';
+import {
+  connect,
+  getAddress,
+  getNetwork,
+  isConnected,
+  requestSessionKey,
+  signMessage,
+  signRelayPayload,
+} from '../index';
 import { WalletApiError, WalletNotInstalledError } from '../bridge';
 
 describe('wallet-api public methods', () => {
@@ -81,5 +89,36 @@ describe('wallet-api public methods', () => {
     });
 
     expect(sendExternalRequest).toHaveBeenCalledWith(ExternalApiMethod.REQUEST_SESSION_KEY, policy);
+  });
+
+  it("signMessage maps the background's real { signature } response to { signedMessage } (issue #1213)", async () => {
+    // The background resolves with { signature }, not { signedMessage } — this
+    // was previously a dead/mismatched field name that made the public API
+    // return `undefined` at runtime despite the extension signing correctly.
+    sendExternalRequest.mockResolvedValue({ signature: 'ab'.repeat(64) });
+
+    await expect(signMessage({ message: 'hello' })).resolves.toEqual({
+      signedMessage: 'ab'.repeat(64),
+    });
+    expect(sendExternalRequest).toHaveBeenCalledWith(ExternalApiMethod.SIGN_MESSAGE, {
+      message: 'hello',
+    });
+  });
+
+  it('signRelayPayload forwards operation/nonce and returns the real sessionKey + signature (issue #1213)', async () => {
+    sendExternalRequest.mockResolvedValue({
+      sessionKey: 'cd'.repeat(32),
+      signature: 'ef'.repeat(64),
+    });
+
+    await expect(signRelayPayload({ operation: 'relay_execute', nonce: 42 })).resolves.toEqual({
+      sessionKey: 'cd'.repeat(32),
+      signature: 'ef'.repeat(64),
+    });
+
+    expect(sendExternalRequest).toHaveBeenCalledWith(ExternalApiMethod.SIGN_RELAY_PAYLOAD, {
+      operation: 'relay_execute',
+      nonce: 42,
+    });
   });
 });

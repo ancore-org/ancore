@@ -1,5 +1,6 @@
 import { StellarClient, createStellarClient } from '@ancore/stellar';
-import { buildDefaultRelayPayload, resolveRelayerBaseUrl } from '@ancore/core-sdk';
+import { buildSignedRelayPayload, resolveRelayerBaseUrl } from '@ancore/core-sdk';
+import { createWalletApiRelaySigner } from './relay-signer';
 import { NETWORK_PASSPHRASES } from '@ancore/wallet-shared';
 import {
   Operation,
@@ -224,7 +225,8 @@ export class RelayerSendStrategy implements SendStrategy {
     const baseUrl = resolveRelayerBaseUrl();
     const token = this.getAuthToken ? await this.getAuthToken() : 'ancore-dashboard-token';
 
-    const payload = buildDefaultRelayPayload(params.recipient, params.amount);
+    const signer = await createWalletApiRelaySigner();
+    const payload = await buildSignedRelayPayload(params.recipient, params.amount, signer);
     const idempotencyKey = `dashboard-send-${Date.now()}-${Math.random().toString(36).slice(2)}`;
 
     const response = await this.fetchImpl(`${baseUrl}/relay/execute`, {

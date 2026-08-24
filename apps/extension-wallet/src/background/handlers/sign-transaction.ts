@@ -32,38 +32,60 @@ async function isHardwareSignerPreferred(): Promise<boolean> {
   return false;
 }
 
+export interface SignTransactionInput {
+  xdr: string;
+  networkPassphrase?: string;
+}
+
+export type SignTransactionOutput =
+  | { signedXdr: string }
+  | { requiresHardware: true; xdr: string; networkPassphrase: string };
+
+/**
+ * Validate and sign a transaction XDR with the account owner's real keypair.
+ *
+ * Used by both the internal popup ↔ background message path
+ * (`registerSignTransactionHandlers`) and the external dApp approval-resolution
+ * path (`service-worker.ts`'s `APPROVE_SIGN_REQUEST` listener) — mirrors the
+ * shared-function shape already used by `signAuthEntry`.
+ */
+export async function signTransaction({
+  xdr,
+  networkPassphrase,
+}: SignTransactionInput): Promise<SignTransactionOutput> {
+  if (!isBackgroundSessionUnlocked()) {
+    throw new Error('Wallet is locked');
+  }
+
+  const { network } = getSettingsState();
+  const activePassphrase = NETWORK_PASSPHRASES[network as StellarNetwork];
+  const defaultPassphrase = NETWORK_PASSPHRASES.testnet;
+
+  const expectedPassphrase = networkPassphrase ?? defaultPassphrase;
+  if (activePassphrase && expectedPassphrase !== activePassphrase) {
+    throw new Error('Network passphrase mismatch');
+  }
+
+  // Never export the software seed when Ledger is the preferred signer.
+  // WebHID signing must happen in the popup / approval document.
+  if (await isHardwareSignerPreferred()) {
+    return {
+      requiresHardware: true as const,
+      xdr,
+      networkPassphrase: expectedPassphrase,
+    };
+  }
+
+  const kp = await getSigningKeypair();
+  const tx = TransactionBuilder.fromXDR(xdr, expectedPassphrase);
+
+  // AA path: When tx targets smart account execute contract invocation envelope,
+  // coordinate with @ancore/account-abstraction signing contract — document owner-key vs session-key decision
+
+  tx.sign(kp);
+  return { signedXdr: tx.toXDR() };
+}
+
 export function registerSignTransactionHandlers(): void {
-  registerHandler('SIGN_TRANSACTION', async ({ xdr, networkPassphrase }) => {
-    if (!isBackgroundSessionUnlocked()) {
-      throw new Error('Wallet is locked');
-    }
-
-    const { network } = getSettingsState();
-    const activePassphrase = NETWORK_PASSPHRASES[network as StellarNetwork];
-    const defaultPassphrase = NETWORK_PASSPHRASES.testnet;
-
-    const expectedPassphrase = networkPassphrase ?? defaultPassphrase;
-    if (activePassphrase && expectedPassphrase !== activePassphrase) {
-      throw new Error('Network passphrase mismatch');
-    }
-
-    // Never export the software seed when Ledger is the preferred signer.
-    // WebHID signing must happen in the popup / approval document.
-    if (await isHardwareSignerPreferred()) {
-      return {
-        requiresHardware: true as const,
-        xdr,
-        networkPassphrase: expectedPassphrase,
-      };
-    }
-
-    const kp = await getSigningKeypair();
-    const tx = TransactionBuilder.fromXDR(xdr, expectedPassphrase);
-
-    // AA path: When tx targets smart account execute contract invocation envelope,
-    // coordinate with @ancore/account-abstraction signing contract — document owner-key vs session-key decision
-
-    tx.sign(kp);
-    return { signedXdr: tx.toXDR() };
-  });
+  registerHandler('SIGN_TRANSACTION', async (params) => signTransaction(params));
 }

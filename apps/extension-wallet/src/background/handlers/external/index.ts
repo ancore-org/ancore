@@ -16,6 +16,7 @@ import {
   handleSignTransaction,
   handleSignAuthEntry,
   handleSignMessage,
+  handleSignRelayPayload,
   handleRequestSessionKey,
 } from './handlers';
 import { ExternalApiMethodName } from '@ancore/types';
@@ -34,6 +35,7 @@ export function registerAllExternalHandlers(): void {
   registerExternalHandler(ExternalApiMethodName.SIGN_TRANSACTION, handleSignTransaction);
   registerExternalHandler(ExternalApiMethodName.SIGN_AUTH_ENTRY, handleSignAuthEntry);
   registerExternalHandler(ExternalApiMethodName.SIGN_MESSAGE, handleSignMessage);
+  registerExternalHandler(ExternalApiMethodName.SIGN_RELAY_PAYLOAD, handleSignRelayPayload);
   registerExternalHandler(ExternalApiMethodName.REQUEST_SESSION_KEY, handleRequestSessionKey);
 }
 

@@ -144,12 +144,22 @@ export async function signAuthEntry(params: {
   return sendExternalRequest(ExternalApiMethod.SIGN_AUTH_ENTRY, params);
 }
 
-/** Sign an arbitrary message (SEP-53 style). */
+/**
+ * Sign an arbitrary message (SEP-53 style).
+ *
+ * The background resolves this with `{ signature }` (hex-encoded), not
+ * `{ signedMessage }` — read the real field and re-shape it for the public
+ * API so existing/future callers of `signedMessage` keep working.
+ */
 export async function signMessage(params: {
   message: string;
   networkPassphrase?: string;
 }): Promise<{ signedMessage: string }> {
-  return sendExternalRequest(ExternalApiMethod.SIGN_MESSAGE, params);
+  const result = await sendExternalRequest<{ signature: string }>(
+    ExternalApiMethod.SIGN_MESSAGE,
+    params
+  );
+  return { signedMessage: result.signature };
 }
 
 /**
@@ -163,6 +173,19 @@ export async function requestSessionKey(
     ExternalApiMethod.REQUEST_SESSION_KEY,
     policy as unknown as Record<string, unknown>
   );
+}
+
+/**
+ * Sign a relay envelope for the platform relayer's `/relay/execute` endpoint
+ * (issue #1213). The wallet computes its own sessionKey (its real public
+ * key) and canonical payload internally, signs it, and returns both fields
+ * atomically — the caller never needs a separate "get my public key" step.
+ */
+export async function signRelayPayload(params: {
+  operation: string;
+  nonce: number;
+}): Promise<{ sessionKey: string; signature: string }> {
+  return sendExternalRequest(ExternalApiMethod.SIGN_RELAY_PAYLOAD, params);
 }
 
 export type { SessionKeyPolicy, RequestSessionKeyResult } from '@ancore/types';

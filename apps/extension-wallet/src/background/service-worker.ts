@@ -13,7 +13,11 @@ import {
   removeApproval,
 } from './handlers/external/response-queue';
 import { signAuthEntry } from './handlers/sign-auth-entry';
-import type { ExternalApiRequest, ExternalApiMethodName } from '@ancore/types';
+import { signTransaction } from './handlers/sign-transaction';
+import { signMessage } from './handlers/sign-message';
+import { signRelayPayload } from './handlers/sign-relay-payload';
+import { ExternalApiMethodName } from '@ancore/types';
+import type { ExternalApiRequest } from '@ancore/types';
 import { createLogger } from './logger';
 
 type ChromeRuntimeManifest = {
@@ -281,8 +285,29 @@ chrome.runtime.onMessage.addListener((message: unknown, _sender, sendResponse) =
 chrome.runtime.onMessage.addListener((message: unknown, _sender, sendResponse) => {
   const msg = message as { type?: string; requestId?: string };
   if (msg.type === 'APPROVE_SIGN_REQUEST' && msg.requestId) {
-    resolveRequest(msg.requestId, { signedXdr: 'AAAAAgAAAAA=' });
-    sendResponse({ ok: true });
+    const pending = getApproval(msg.requestId);
+    if (!pending) {
+      rejectRequest(msg.requestId, new Error('Approval request not found'));
+      sendResponse({ ok: false, error: 'Approval request not found' });
+      return true;
+    }
+    const signer =
+      pending.method === ExternalApiMethodName.SIGN_MESSAGE
+        ? signMessage
+        : pending.method === ExternalApiMethodName.SIGN_RELAY_PAYLOAD
+          ? signRelayPayload
+          : signTransaction;
+    void signer(pending.params as never)
+      .then((result) => {
+        resolveRequest(msg.requestId!, result);
+        removeApproval(msg.requestId!);
+        sendResponse({ ok: true });
+      })
+      .catch((err: Error) => {
+        rejectRequest(msg.requestId!, err);
+        removeApproval(msg.requestId!);
+        sendResponse({ ok: false, error: err.message });
+      });
     return true;
   }
   if (msg.type === 'REJECT_SIGN_REQUEST' && msg.requestId) {

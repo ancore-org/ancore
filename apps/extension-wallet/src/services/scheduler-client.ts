@@ -1,5 +1,6 @@
 import {
-  buildDefaultRelayPayload,
+  buildRelayCanonicalPayload,
+  buildSignedRelayPayload,
   createSchedulerClient,
   getSchedulerClient,
   defaultScheduleStartAt,
@@ -10,16 +11,18 @@ import {
   toIsoStartAt,
   type SchedulerClient,
   type SchedulerClientOptions,
+  type RelaySigner,
 } from '@ancore/core-sdk';
 
 export {
-  buildDefaultRelayPayload,
+  buildRelayCanonicalPayload,
+  buildSignedRelayPayload,
   defaultScheduleStartAt,
   DEMO_ACCOUNT_ADDRESS,
   SCHEDULE_FREQUENCY_OPTIONS,
   toIsoStartAt,
 };
-export type { SchedulerClient, SchedulerClientOptions };
+export type { SchedulerClient, SchedulerClientOptions, RelaySigner };
 
 const EXTENSION_AUTH_TOKEN_KEY = 'ancore_extension_access_token';
 const DEFAULT_RELAYER_URL =

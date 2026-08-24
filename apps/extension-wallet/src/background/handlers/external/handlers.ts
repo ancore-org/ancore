@@ -372,6 +372,37 @@ export async function handleSignMessage(
   return result as { signature: string };
 }
 
+/**
+ * signRelayPayload handler (issue #1213)
+ * Enqueues an approval request, opens the approval UI, and awaits the user's
+ * decision. On approval the popup resolves with { sessionKey, signature } —
+ * the wallet's real relay-envelope signature — on rejection it throws so the
+ * dApp receives a proper error.
+ */
+export async function handleSignRelayPayload(
+  ctx: ExternalHandlerContext
+): Promise<{ sessionKey: string; signature: string }> {
+  const { origin, params, requestId } = ctx;
+  const typedParams = params as { operation?: string; network?: string; smartAccountId?: string };
+
+  const network = typedParams.network || 'testnet';
+  const smartAccountId =
+    typedParams.smartAccountId || 'CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA';
+
+  // Check allowlist
+  const allowed = await isAllowed(network, smartAccountId, origin);
+  if (!allowed) {
+    throw new Error('Origin not allowed. Call requestAccess first.');
+  }
+
+  // Enqueue and open the approval UI, then await the user's decision.
+  enqueueApproval(requestId, origin, MethodName.SIGN_RELAY_PAYLOAD, params);
+  await openApprovalWindow(requestId, 'sign-transaction');
+
+  const result = await waitForApproval(requestId);
+  return result as { sessionKey: string; signature: string };
+}
+
 function generateSessionKeyPair(): { publicKey: string; secretKey: string } {
   const alphabet = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ234567';
   let publicKey = 'G';

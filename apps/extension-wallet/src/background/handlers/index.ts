@@ -13,6 +13,8 @@ import { registerLockUnlockHandlers } from './lock-unlock';
 import { registerWalletStateHandlers } from './wallet-state';
 import { registerSignTransactionHandlers } from './sign-transaction';
 import { registerSignAuthEntryHandlers } from './sign-auth-entry';
+import { registerSignMessageHandlers } from './sign-message';
+import { registerSignRelayPayloadHandlers } from './sign-relay-payload';
 
 export function registerInternalHandlers(): void {
   registerWalletStateHandlers();
@@ -20,6 +22,8 @@ export function registerInternalHandlers(): void {
   registerHealthHandlers();
   registerSignTransactionHandlers();
   registerSignAuthEntryHandlers();
+  registerSignMessageHandlers();
+  registerSignRelayPayloadHandlers();
 }
 
 export { probeServicesOnStartup } from './health';

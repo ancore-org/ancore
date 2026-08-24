@@ -39,6 +39,7 @@ export const ExternalApiMethod = {
   SIGN_TRANSACTION: 'signTransaction',
   SIGN_AUTH_ENTRY: 'signAuthEntry',
   SIGN_MESSAGE: 'signMessage',
+  SIGN_RELAY_PAYLOAD: 'signRelayPayload',
   REQUEST_SESSION_KEY: 'requestSessionKey',
 } as const;
 

@@ -10,6 +10,7 @@
  */
 
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
+import { Keypair } from '@stellar/stellar-sdk';
 import type { MessageEnvelope, ResponseEnvelope } from '../../../messaging/types';
 import type { AuthState } from '../../../router/AuthGuard';
 
@@ -144,7 +145,10 @@ function makeAuthState(overrides: Partial<AuthState> = {}): AuthState {
   };
 }
 
-async function loadServiceWorker(authState: AuthState, options: { unlockReturns?: boolean } = {}) {
+async function loadServiceWorker(
+  authState: AuthState,
+  options: { unlockReturns?: boolean; signingSecret?: string } = {}
+) {
   vi.doMock('@/router/AuthGuard', () => ({
     readAuthState: vi.fn(() => authState),
     DEFAULT_AUTH_STATE: makeAuthState(),
@@ -155,6 +159,7 @@ async function loadServiceWorker(authState: AuthState, options: { unlockReturns?
     getSharedStorageManager: vi.fn(() => ({
       unlock: vi.fn(async () => options.unlockReturns ?? true),
       lock: vi.fn(),
+      getAccount: vi.fn(async () => ({ privateKey: options.signingSecret })),
     })),
     resetSharedStorageManagerForTests: vi.fn(),
   }));
@@ -494,5 +499,139 @@ describe('UNLOCK_WALLET', () => {
       expect((resp.payload as any).success).toBe(true);
       _resetHandlers();
     });
+  });
+});
+
+// ---------------------------------------------------------------------------
+// APPROVE_SIGN_REQUEST (dApp-facing sign/message bridge — issue #1213)
+// ---------------------------------------------------------------------------
+
+function approveSignRequest(
+  chrome: ChromeMock,
+  requestId: string
+): Promise<{ ok: boolean; error?: string }> {
+  return new Promise((resolve) => {
+    chrome.runtime.onMessage._trigger(
+      { type: 'APPROVE_SIGN_REQUEST', requestId },
+      {},
+      resolve as any
+    );
+  });
+}
+
+describe('APPROVE_SIGN_REQUEST', () => {
+  it('resolves a SIGN_TRANSACTION approval with a real, cryptographically signed XDR — not the old hardcoded fake', async () => {
+    const kp = Keypair.random();
+    const { _resetHandlers } = await loadServiceWorker(makeAuthState({ hasOnboarded: true }), {
+      signingSecret: kp.secret(),
+    });
+    await dispatch(chromeMock, 'UNLOCK_WALLET', { password: 'any' });
+
+    const { enqueueApproval, registerResponseCallbacks } =
+      await import('../handlers/external/response-queue');
+    const { Account, TransactionBuilder, Networks } = await import('@stellar/stellar-sdk');
+    const tx = new TransactionBuilder(new Account(kp.publicKey(), '1'), {
+      fee: '100',
+      networkPassphrase: Networks.TESTNET,
+    })
+      .setTimeout(0)
+      .build();
+    const xdr = tx.toXDR();
+
+    const requestId = 'req-sign-tx-1';
+    enqueueApproval(requestId, 'https://dapp.example', 'signTransaction', {
+      xdr,
+      networkPassphrase: Networks.TESTNET,
+    });
+    const waited = new Promise((resolve, reject) => {
+      registerResponseCallbacks(requestId, resolve, reject);
+    });
+
+    const ack = await approveSignRequest(chromeMock, requestId);
+    expect(ack.ok).toBe(true);
+
+    const result = (await waited) as { signedXdr?: string };
+    expect(result.signedXdr).toBeDefined();
+    expect(result.signedXdr).not.toEqual('AAAAAgAAAAA=');
+    expect(result.signedXdr).not.toEqual(xdr);
+    _resetHandlers();
+  });
+
+  it('resolves a SIGN_MESSAGE approval with a real, verifiable Ed25519 signature', async () => {
+    const kp = Keypair.random();
+    const { _resetHandlers } = await loadServiceWorker(makeAuthState({ hasOnboarded: true }), {
+      signingSecret: kp.secret(),
+    });
+    await dispatch(chromeMock, 'UNLOCK_WALLET', { password: 'any' });
+
+    const { enqueueApproval, registerResponseCallbacks } =
+      await import('../handlers/external/response-queue');
+
+    const message = '7b2273657373696f6e4b6579223a223078227d';
+    const requestId = 'req-sign-msg-1';
+    enqueueApproval(requestId, 'https://dapp.example', 'signMessage', { message });
+    const waited = new Promise((resolve, reject) => {
+      registerResponseCallbacks(requestId, resolve, reject);
+    });
+
+    const ack = await approveSignRequest(chromeMock, requestId);
+    expect(ack.ok).toBe(true);
+
+    const result = (await waited) as { signature?: string };
+    expect(result.signature).toMatch(/^[0-9a-f]{128}$/);
+    expect(kp.verify(Buffer.from(message, 'utf8'), Buffer.from(result.signature!, 'hex'))).toBe(
+      true
+    );
+    _resetHandlers();
+  });
+
+  it('resolves a SIGN_RELAY_PAYLOAD approval with a real sessionKey + signature (issue #1213)', async () => {
+    const kp = Keypair.random();
+    const { _resetHandlers } = await loadServiceWorker(makeAuthState({ hasOnboarded: true }), {
+      signingSecret: kp.secret(),
+    });
+    await dispatch(chromeMock, 'UNLOCK_WALLET', { password: 'any' });
+
+    const { enqueueApproval, registerResponseCallbacks } =
+      await import('../handlers/external/response-queue');
+    const { buildRelayCanonicalPayload } = await import('@ancore/core-sdk');
+
+    const requestId = 'req-sign-relay-1';
+    enqueueApproval(requestId, 'https://dapp.example', 'signRelayPayload', {
+      operation: 'relay_execute',
+      nonce: 99,
+    });
+    const waited = new Promise((resolve, reject) => {
+      registerResponseCallbacks(requestId, resolve, reject);
+    });
+
+    const ack = await approveSignRequest(chromeMock, requestId);
+    expect(ack.ok).toBe(true);
+
+    const result = (await waited) as { sessionKey?: string; signature?: string };
+    expect(result.sessionKey).not.toEqual('a'.repeat(64));
+    expect(result.signature).not.toEqual('b'.repeat(128));
+    expect(result.sessionKey).toMatch(/^[0-9a-f]{64}$/);
+    expect(result.signature).toMatch(/^[0-9a-f]{128}$/);
+
+    const canonicalPayload = buildRelayCanonicalPayload({
+      sessionKey: result.sessionKey!,
+      operation: 'relay_execute',
+      nonce: 99,
+    });
+    expect(
+      kp.verify(Buffer.from(canonicalPayload, 'utf8'), Buffer.from(result.signature!, 'hex'))
+    ).toBe(true);
+    _resetHandlers();
+  });
+
+  it('rejects when no matching approval is pending', async () => {
+    const { _resetHandlers } = await loadServiceWorker(makeAuthState({ hasOnboarded: true }));
+
+    const ack = await approveSignRequest(chromeMock, 'unknown-request-id');
+
+    expect(ack.ok).toBe(false);
+    expect(ack.error).toMatch(/not found/i);
+    _resetHandlers();
   });
 });
