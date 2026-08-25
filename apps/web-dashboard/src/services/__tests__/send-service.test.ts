@@ -111,7 +111,7 @@ describe('RelayerSendStrategy', () => {
       })),
     }));
 
-    const mockFetch = vi.fn(() =>
+    const mockFetch = vi.fn((_url: string, _init?: RequestInit) =>
       Promise.resolve(
         new Response(JSON.stringify({ success: true, jobId: 'job-123' }), {
           status: 200,
@@ -131,7 +131,7 @@ describe('RelayerSendStrategy', () => {
       expect.objectContaining({ method: 'POST' })
     );
 
-    const sentBody = JSON.parse((mockFetch.mock.calls[0][1] as RequestInit).body as string);
+    const sentBody = JSON.parse(mockFetch.mock.calls[0][1]?.body as string);
     expect(sentBody.sessionKey).toBe('cd'.repeat(32));
     expect(sentBody.signature).toBe('ef'.repeat(64));
     expect(sentBody.sessionKey).not.toBe('a'.repeat(64));
