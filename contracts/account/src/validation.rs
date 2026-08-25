@@ -92,7 +92,11 @@ pub fn check_spend_limits(input: &SpendCheckInput) -> Result<(), ContractError> 
 
     if let Some(cumulative_limit) = input.cumulative_limit {
         let mut spent = input.spent_in_window;
-        if input.now > input.spend_window_start.saturating_add(input.spend_window_seconds) {
+        if input.now
+            > input
+                .spend_window_start
+                .saturating_add(input.spend_window_seconds)
+        {
             spent = 0;
         }
 
