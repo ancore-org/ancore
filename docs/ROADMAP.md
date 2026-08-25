@@ -61,7 +61,7 @@
 | # | Item | Issue | Status |
 |---|------|-------|--------|
 | 3.1 | Internal contract security audit | #863 | 🔲 |
-| 3.2 | Contract fuzz tests | #833 → #994 | 🔲 |
+| 3.2 | Contract fuzz tests | #833 → #994 | 🔄 |
 | 3.3 | Blockaid scan for dApp sign | #876 → #975 | 🔲 |
 | 3.4 | Blockaid scan for in-app send | #771 → #975 | 🔲 |
 | 3.5 | Memo-required check for mainnet sends | #823 | ✅ |

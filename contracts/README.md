@@ -309,7 +309,20 @@ Cross-contract integration tests in workspace root.
 
 ### Fuzzing
 
-Use `cargo-fuzz` for fuzzing critical validation logic.
+Durable cargo-fuzz + proptest harness for `contracts/account` trust-boundary checks
+(execute args, session-key registration, spend limits, allowlist):
+
+```bash
+cd contracts
+cargo test -p ancore-account --test properties
+
+cd account
+cargo +nightly fuzz run fuzz_spend_limits -- -max_total_time=60
+```
+
+See [`account/FUZZING.md`](./account/FUZZING.md) for reproduce/minimize steps and how
+findings feed [`docs/security/INTERNAL_AUDIT_v0.md`](../docs/security/INTERNAL_AUDIT_v0.md).
+Nightly CI: `.github/workflows/contract-fuzz.yml`.
 
 ## Deployment
 
