@@ -225,14 +225,26 @@ export const WalletKitProvider: React.FC<WalletKitProviderProps> = ({
       const params = event.params?.request?.params;
 
       if (method === 'stellar_signAuthEntry') {
-        const { request, parsed } = parseSignAuthEntryRequest({
-          id: event.id,
-          topic: event.topic,
-          params,
-          session: event.session,
-        });
-        setParsedAuthEntry(parsed);
-        setPendingSignAuthEntry(request);
+        try {
+          const { request, parsed } = parseSignAuthEntryRequest({
+            id: event.id,
+            topic: event.topic,
+            params,
+            session: event.session,
+          });
+          setParsedAuthEntry(parsed);
+          setPendingSignAuthEntry(request);
+        } catch (error) {
+          const message = error instanceof Error ? error.message : 'Unparseable auth entry XDR';
+          await walletKit.respondSessionRequest({
+            topic: event.topic,
+            response: {
+              id: event.id,
+              jsonrpc: '2.0',
+              error: { code: 4001, message },
+            },
+          });
+        }
         return;
       }
 

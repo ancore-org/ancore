@@ -27,6 +27,7 @@
     "@ancore/stellar": "workspace:*",
     "@ancore/types": "workspace:*",
     "@reown/walletkit": "^1.5.5",
+    "@stellar/stellar-sdk": "^13.3.0",
     "@walletconnect/types": "^2.23.9",
     "@walletconnect/utils": "^2.23.9",
     "jail-monkey": "^3.0.0",

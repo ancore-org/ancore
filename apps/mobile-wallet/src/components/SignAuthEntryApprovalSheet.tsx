@@ -1,7 +1,11 @@
 import React from 'react';
 import type { SessionTypes } from '@walletconnect/types';
 
-import { parseAuthEntryXdr, type ParsedAuthEntry } from '../walletconnect/auth-entry-parser';
+import {
+  parseAuthEntryXdr,
+  type ParsedAuthEntry,
+  type ParsedInvocation,
+} from '../walletconnect/auth-entry-parser';
 
 export interface SignAuthEntryRequest {
   id: number;
@@ -17,6 +21,28 @@ interface SignAuthEntryApprovalSheetProps {
   onApprove: () => void;
   onReject: () => void;
 }
+
+const InvocationNode: React.FC<{ invocation: ParsedInvocation; depth: number }> = ({
+  invocation,
+  depth,
+}) => (
+  <div className="invocation-node" style={{ marginLeft: depth * 16 }}>
+    <p>
+      <strong>Contract:</strong> {invocation.contractId}
+    </p>
+    <p>
+      <strong>Function:</strong> {invocation.functionName}
+    </p>
+    {invocation.args.length > 0 && (
+      <p>
+        <strong>Args:</strong> {invocation.args.join(', ')}
+      </p>
+    )}
+    {invocation.subInvocations.map((sub, index) => (
+      <InvocationNode key={index} invocation={sub} depth={depth + 1} />
+    ))}
+  </div>
+);
 
 export const SignAuthEntryApprovalSheet: React.FC<SignAuthEntryApprovalSheetProps> = ({
   request,
@@ -36,14 +62,9 @@ export const SignAuthEntryApprovalSheet: React.FC<SignAuthEntryApprovalSheetProp
 
         <div className="auth-entry-details">
           <p>
-            <strong>Contract:</strong> {parsed.contractId}
+            <strong>Sub-invocations:</strong> {parsed.subInvocationCount}
           </p>
-          <p>
-            <strong>Function:</strong> {parsed.functionName}
-          </p>
-          <p>
-            <strong>Sub-invocations:</strong> {parsed.subInvocations}
-          </p>
+          <InvocationNode invocation={parsed.invocation} depth={0} />
         </div>
 
         <div className="action-buttons">
