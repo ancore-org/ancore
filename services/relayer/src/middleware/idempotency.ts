@@ -1,9 +1,10 @@
 import { Request, Response, NextFunction } from 'express';
-import type { IdempotencyStore } from '../store/idempotency';
+import type { IdempotencyStoreContract, AnyIdempotencyStore } from '../store/idempotency';
+import { rootLogger } from '../logging';
 
 /**
  * Express middleware that provides idempotency-key semantics for mutating
- * endpoints.
+ * endpoints. Supports both in-memory and distributed Postgres-backed stores.
  *
  * Behaviour:
  *  - If the `idempotency-key` header is absent the request is passed through
@@ -20,31 +21,40 @@ import type { IdempotencyStore } from '../store/idempotency';
  * app.post('/relay/execute', auth, validate, createIdempotencyMiddleware(store), executeHandler);
  * ```
  */
-export function createIdempotencyMiddleware(store: IdempotencyStore) {
-  return (req: Request, res: Response, next: NextFunction): void => {
-    const rawKey = req.headers['idempotency-key'];
-    // Only accept a single string value; reject arrays.
-    if (typeof rawKey !== 'string' || rawKey.trim() === '') {
+export function createIdempotencyMiddleware(store: IdempotencyStoreContract | AnyIdempotencyStore) {
+  return async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+    try {
+      const rawKey = req.headers['idempotency-key'];
+      // Only accept a single string value; reject arrays.
+      if (typeof rawKey !== 'string' || rawKey.trim() === '') {
+        next();
+        return;
+      }
+
+      const key = rawKey.trim();
+
+      const cached = await store.get(key);
+      if (cached) {
+        // Replay the original response deterministically.
+        res.status(cached.statusCode).json(cached.body);
+        return;
+      }
+
+      // Intercept res.json to capture the outgoing response before it is sent.
+      const originalJson = res.json.bind(res) as (body: unknown) => Response;
+      res.json = function (body: unknown): Response {
+        void Promise.resolve(store.set(key, { statusCode: res.statusCode, body })).catch((err) => {
+          rootLogger.error(
+            { error: err instanceof Error ? err.message : String(err) },
+            'Failed to persist idempotency entry'
+          );
+        });
+        return originalJson(body);
+      };
+
       next();
-      return;
+    } catch (err) {
+      next(err);
     }
-
-    const key = rawKey.trim();
-
-    const cached = store.get(key);
-    if (cached) {
-      // Replay the original response deterministically.
-      res.status(cached.statusCode).json(cached.body);
-      return;
-    }
-
-    // Intercept res.json to capture the outgoing response before it is sent.
-    const originalJson = res.json.bind(res) as (body: unknown) => Response;
-    res.json = function (body: unknown): Response {
-      store.set(key, { statusCode: res.statusCode, body });
-      return originalJson(body);
-    };
-
-    next();
   };
 }
