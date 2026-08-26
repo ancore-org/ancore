@@ -9,7 +9,7 @@ overrides:
   tmp: '>=0.2.4'
   esbuild: 0.21.5
   '@stellar/stellar-sdk': ^13.3.0
-  tar: '>=7.5.16'
+  tar: '>=7.5.21'
   vitest: '>=3.2.6 <4.0.0'
   form-data: '>=4.0.6'
   axios: '>=1.18.0'
@@ -9034,8 +9034,8 @@ packages:
     resolution: {integrity: sha512-ujeqbceABgwMZxEJnk2HDY2DlnUZ+9oEcb1KzTVfYHio0UE6dG71n60d8D2I4qNvleWrrXpmjpt7vZeF1LnMZQ==}
     engines: {node: '>=6'}
 
-  tar@7.5.20:
-    resolution: {integrity: sha512-9FcyK4PA6+WbzlTM9WhQm6vB5W7cP7dUiPsv1g7YDwEQnQ1CGpK3MGlKk/ITVWMk05kHZuBhmVhiv8LZoy/PFQ==}
+  tar@7.5.22:
+    resolution: {integrity: sha512-MFO/QzvtAOmJbkhOaCTvbGcFN9L9b+JunIsDwaKljSOdcLMea3NJ1k9Usz/rjdfSXTq4dfzfeS7W4p4YOAAHeA==}
     engines: {node: '>=18'}
 
   telejson@7.2.0:
@@ -16662,7 +16662,7 @@ snapshots:
       node-fetch-native: 1.6.7
       nypm: 0.5.4
       pathe: 2.0.3
-      tar: 7.5.20
+      tar: 7.5.22
 
   github-slugger@1.5.0: {}
 
@@ -20337,7 +20337,7 @@ snapshots:
       inherits: 2.0.4
       readable-stream: 3.6.2
 
-  tar@7.5.20:
+  tar@7.5.22:
     dependencies:
       '@isaacs/fs-minipass': 4.0.1
       chownr: 3.0.0
