@@ -79,6 +79,13 @@ export const ROUTE_RATE_LIMIT_CONFIG: Record<string, RouteRateLimitConfig> = {
  */
 export const DEFAULT_ROUTE_CONFIG: RouteRateLimitConfig = { rpm: 20 };
 
+/**
+ * Routes that do not carry account or session credentials in their request body.
+ * These endpoints are keyed by client IP rather than account key to prevent all
+ * callers from collapsing into and exhausting a single shared 'unknown' bucket.
+ */
+export const IP_KEYED_ROUTES = new Set(['/health', '/relay/status']);
+
 // ─── Account key resolver (mirrors accountRateLimiter.ts) ────────────────────
 
 /**
@@ -92,9 +99,11 @@ export const DEFAULT_ROUTE_CONFIG: RouteRateLimitConfig = { rpm: 20 };
  *   5. req.body.sessionKey  (primary identity in current relay schema)
  *   6. 'unknown'
  *
- * We deliberately do NOT fall back to IP — the existing global IP-based
- * limiter already covers that layer; mixing the two in the same keyGenerator
- * causes express-rate-limit v7 IPv6 validation errors.
+ * We deliberately do NOT fall back to IP for account-scoped routes — the existing
+ * global IP-based limiter already covers that layer; mixing the two in the same
+ * keyGenerator causes express-rate-limit v7 IPv6 validation errors.
+ * Routes without account context (/health, /relay/status) use dedicated IP keying
+ * via IP_KEYED_ROUTES to avoid sharing a single 'unknown' bucket across distinct clients.
  */
 function resolveAccountKey(req: Request): string {
   const body = req.body as Record<string, unknown> | undefined;
@@ -141,13 +150,14 @@ export function createRouteRateLimiter(
   };
 
   const windowMs = resolved.windowMs!;
+  const isIpKeyed = IP_KEYED_ROUTES.has(route);
 
   return rateLimit({
     windowMs,
     limit: resolved.rpm,
     standardHeaders: true, // emits RateLimit-* draft headers
     legacyHeaders: false, // suppresses deprecated X-RateLimit-* headers
-    keyGenerator: resolveAccountKey,
+    keyGenerator: isIpKeyed ? (req: Request) => req.ip || 'unknown' : resolveAccountKey,
     handler(_req: Request, res: Response) {
       res.status(429).json({
         error: 'RATE_LIMITED',

@@ -196,4 +196,25 @@ describe('normalizeError — additional branches', () => {
     expect(n.code).toBe('UNKNOWN');
     expect(typeof n.message).toBe('string');
   });
+
+  it('classifies exact 4xx/5xx status codes as NETWORK', () => {
+    expect(normalizeError({ code: '404', message: 'Not found' }).category).toBe('NETWORK');
+    expect(normalizeError({ code: '500', message: 'Server error' }).category).toBe('NETWORK');
+    expect(normalizeError({ code: '503', message: 'Service unavailable' }).category).toBe(
+      'NETWORK'
+    );
+  });
+
+  it('does not misclassify codes merely prefixed with 3 digits as NETWORK', () => {
+    // Should not match as NETWORK when code has suffix like _LEGACY_FIELD
+    const legacy = normalizeError({ code: '404_LEGACY_FIELD', message: 'legacy' });
+    expect(legacy.category).not.toBe('NETWORK');
+    expect(legacy.category).toBe('UNKNOWN');
+
+    const badReq = normalizeError({ code: '400_BAD_REQUEST', message: 'bad request' });
+    expect(badReq.category).toBe('VALIDATION');
+
+    const extendedNum = normalizeError({ code: '40400', message: 'extended code' });
+    expect(extendedNum.category).not.toBe('NETWORK');
+  });
 });

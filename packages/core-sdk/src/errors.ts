@@ -277,7 +277,7 @@ const CONTRACT_PATTERNS = [
 
 function detectCategoryFromCode(code: string): ErrorCategory {
   if (!code) return 'UNKNOWN';
-  if (/^(ECONN|EAI_|ETIMEDOUT|ENOT|5\d{2}|4\d{2})/.test(code)) return 'NETWORK';
+  if (/^(ECONN|EAI_|ETIMEDOUT|ENOT|[45]\d{2}\b)/.test(code)) return 'NETWORK';
   if (
     /SIMULATION|SUBMISSION|SESSION_KEY|CONTRACT|INVALID|UNAUTHORIZED|INSUFFICIENT|NONCE|REVOKE|SESSION|INITIALIZED/.test(
       code
