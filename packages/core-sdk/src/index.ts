@@ -81,6 +81,7 @@ export {
 export {
   AncoreSdkError,
   BuilderValidationError,
+  InvalidRetryPresetError,
   SessionKeyExecutionError,
   SessionKeyExecutionValidationError,
   SessionKeyManagementError,

@@ -4,6 +4,7 @@ import {
   SimulationFailedError,
   SimulationExpiredError,
   BuilderValidationError,
+  InvalidRetryPresetError,
   SessionKeyManagementError,
   SessionKeyExecutionError,
   SessionKeyExecutionValidationError,
@@ -44,6 +45,15 @@ describe('error classes', () => {
     const err = new BuilderValidationError('no operations added');
     expect(err.code).toBe('BUILDER_VALIDATION');
     expect(err.name).toBe('BuilderValidationError');
+  });
+
+  it('InvalidRetryPresetError has correct code, name, and properties', () => {
+    const err = new InvalidRetryPresetError('CUSTOM');
+    expect(err.code).toBe('INVALID_RETRY_PRESET');
+    expect(err.message).toBe('Unknown retry preset: CUSTOM');
+    expect(err.presetName).toBe('CUSTOM');
+    expect(err.name).toBe('InvalidRetryPresetError');
+    expect(err).toBeInstanceOf(AncoreSdkError);
   });
 
   it('SessionKeyManagementError accepts custom code and cause', () => {

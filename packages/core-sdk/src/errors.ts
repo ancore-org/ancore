@@ -88,6 +88,20 @@ export class BuilderValidationError extends AncoreSdkError {
 }
 
 /**
+ * Thrown when an invalid or unknown retry preset name is requested.
+ */
+export class InvalidRetryPresetError extends AncoreSdkError {
+  public readonly presetName?: string;
+
+  constructor(presetName: string) {
+    super('INVALID_RETRY_PRESET', `Unknown retry preset: ${presetName}`);
+    this.name = 'InvalidRetryPresetError';
+    this.presetName = presetName;
+    Object.setPrototypeOf(this, new.target.prototype);
+  }
+}
+
+/**
  * Thrown when session-key management operations fail after delegating to the
  * account abstraction layer.
  */

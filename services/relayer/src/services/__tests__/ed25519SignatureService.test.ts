@@ -51,4 +51,22 @@ describe('Ed25519SignatureService', () => {
     const { pubHex } = makeHexKeypair();
     expect(svc.verify(pubHex, 'payload', 'deadbeef')).toBe(false);
   });
+
+  describe('isHealthy', () => {
+    it('returns healthy: true and reports latency when crypto operations succeed', async () => {
+      const result = await svc.isHealthy();
+      expect(result.healthy).toBe(true);
+      expect(typeof result.latencyMs).toBe('number');
+      expect(result.latencyMs).toBeGreaterThanOrEqual(0);
+    });
+
+    it('returns healthy: false if verify throws or fails', async () => {
+      const brokenSvc = new Ed25519SignatureService();
+      jest.spyOn(brokenSvc, 'verify').mockReturnValue(false);
+
+      const result = await brokenSvc.isHealthy();
+      expect(result.healthy).toBe(false);
+      expect(typeof result.latencyMs).toBe('number');
+    });
+  });
 });
