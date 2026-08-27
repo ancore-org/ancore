@@ -68,13 +68,61 @@ fn overall_status(lag_blocks: i64, migration_status: MigrationStatus) -> &'stati
     }
 }
 
+#[derive(serde::Deserialize)]
+struct GetLatestLedgerResult {
+    sequence: i64,
+}
+
+#[derive(serde::Deserialize)]
+struct JsonRpcResponse {
+    result: Option<GetLatestLedgerResult>,
+    error: Option<JsonRpcError>,
+}
+
+#[derive(serde::Deserialize)]
+struct JsonRpcError {
+    code: i64,
+    message: String,
+}
+
+async fn fetch_chain_head_from_rpc(rpc_url: &str) -> anyhow::Result<i64> {
+    let client = reqwest::Client::builder()
+        .timeout(std::time::Duration::from_secs(5))
+        .build()?;
+
+    let request_body = serde_json::json!({
+        "jsonrpc": "2.0",
+        "id": 1,
+        "method": "getLatestLedger"
+    });
+
+    let response = client
+        .post(rpc_url)
+        .json(&request_body)
+        .send()
+        .await?;
+
+    if !response.status().is_success() {
+        anyhow::bail!("Stellar RPC returned HTTP status {}", response.status());
+    }
+
+    let parsed: JsonRpcResponse = response.json().await?;
+    if let Some(error) = parsed.error {
+        anyhow::bail!("Stellar RPC error {}: {}", error.code, error.message);
+    }
+
+    if let Some(result) = parsed.result {
+        Ok(result.sequence)
+    } else {
+        anyhow::bail!("Stellar RPC response had neither result nor error");
+    }
+}
+
 /// GET /health
 ///
 /// Returns indexer lag metrics derived from the account_activity table plus
 /// the live database schema version read from the `schema_migrations` ledger.
-/// In production, `chain_head` should be fetched from a live Horizon or
-/// Stellar RPC endpoint; here we use the MAX(ledger_seq) in the DB as a
-/// stand-in so the endpoint is fully self-contained.
+/// The chain_head sequence is fetched from the live network via getLatestLedger RPC.
 pub async fn health_handler(State(db): State<PgPool>) -> Result<Json<HealthResponse>> {
     // Latest ledger the indexer has indexed (most-recent record persisted).
     let indexed_row =
@@ -84,16 +132,19 @@ pub async fn health_handler(State(db): State<PgPool>) -> Result<Json<HealthRespo
 
     let latest_indexed_ledger: i64 = indexed_row.try_get("latest")?;
 
-    // Chain head proxy: in production replace with a Horizon /ledgers call.
-    // For now we treat the highest ledger we have ever seen as the chain head
-    // (same value, so lag is always 0 unless the indexer has genuinely fallen
-    // behind a separately-maintained chain-head counter).
-    let chain_head_row =
-        sqlx::query("SELECT COALESCE(MAX(ledger_seq), 0) AS head FROM account_activity")
-            .fetch_one(&db)
-            .await?;
-
-    let chain_head: i64 = chain_head_row.try_get("head")?;
+    // Chain head: query live network chain head via getLatestLedger Soroban RPC call.
+    let chain_head = match std::env::var("SOROBAN_RPC_URL") {
+        Ok(rpc_url) if !rpc_url.is_empty() => {
+            match fetch_chain_head_from_rpc(&rpc_url).await {
+                Ok(seq) => seq,
+                Err(err) => {
+                    tracing::warn!(error = %err, "failed to fetch chain head from RPC, falling back to database max");
+                    latest_indexed_ledger
+                }
+            }
+        }
+        _ => latest_indexed_ledger,
+    };
 
     let lag_blocks = (chain_head - latest_indexed_ledger).max(0);
     let lag_seconds = lag_blocks * STELLAR_LEDGER_CLOSE_SECONDS;

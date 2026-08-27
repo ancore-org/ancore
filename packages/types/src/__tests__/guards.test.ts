@@ -31,8 +31,14 @@ describe('guards', () => {
   });
 
   test('isValidPermission recognizes permissions', () => {
-    expect(isValidPermission(0)).toBe(true);
+    expect(isValidPermission(0)).toBe(false);
+    expect(isValidPermission(1)).toBe(true);
     expect(isValidPermission(2)).toBe(true);
+    expect(isValidPermission(4)).toBe(true);
+    expect(isValidPermission(8)).toBe(true);
+    expect(isValidPermission(3)).toBe(true);
+    expect(isValidPermission(15)).toBe(true);
+    expect(isValidPermission(16)).toBe(false);
     expect(isValidPermission(99)).toBe(false);
     expect(isValidPermission('x')).toBe(false);
   });

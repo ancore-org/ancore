@@ -34,7 +34,7 @@ export function isSessionKey(value: unknown): value is SessionKey {
 
 export function isValidPermission(value: unknown): boolean {
   if (typeof value !== 'number') return false;
-  return [0, 1, 2].includes(value);
+  return Number.isInteger(value) && value >= 1 && value <= 15;
 }
 
 /**
