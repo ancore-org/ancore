@@ -16,25 +16,41 @@
 
 type LogMeta = Record<string, unknown> | Error | unknown;
 
-/** Keys whose values are replaced with '<redacted>' before logging. */
-const REDACTED_KEYS = new Set([
+/** Substrings matched case-insensitively against object keys before logging. */
+const REDACTED_KEY_PATTERNS = [
   'password',
   'secret',
   'mnemonic',
-  'privateKey',
+  'privatekey',
   'seed',
   'token',
-  'key',
-]);
+  'apikey',
+];
 
-function redact(meta: LogMeta): LogMeta {
-  if (!meta || typeof meta !== 'object' || meta instanceof Error) return meta;
-  const obj = meta as Record<string, unknown>;
+function shouldRedactKey(key: string): boolean {
+  const normalized = key.toLowerCase();
+  if (normalized === 'key') return true;
+  return REDACTED_KEY_PATTERNS.some((pattern) => normalized.includes(pattern));
+}
+
+function redactValue(value: unknown): unknown {
+  if (!value || typeof value !== 'object' || value instanceof Error) {
+    return value;
+  }
+
+  if (Array.isArray(value)) {
+    return value.map((entry) => redactValue(entry));
+  }
+
   const safe: Record<string, unknown> = {};
-  for (const [k, v] of Object.entries(obj)) {
-    safe[k] = REDACTED_KEYS.has(k) ? '<redacted>' : v;
+  for (const [key, entry] of Object.entries(value as Record<string, unknown>)) {
+    safe[key] = shouldRedactKey(key) ? '<redacted>' : redactValue(entry);
   }
   return safe;
+}
+
+function redact(meta: LogMeta): LogMeta {
+  return redactValue(meta) as LogMeta;
 }
 
 export interface BackgroundLogger {
