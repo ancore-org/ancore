@@ -27,6 +27,31 @@ export function useTransferPolicy() {
 
   const updateSettings = useCallback(
     (settings: Partial<TransferPolicySettings>) => {
+      const nextDailyLimit =
+        settings.dailyLimit !== undefined ? settings.dailyLimit : dailyTransferLimit;
+      const nextStepUpThreshold =
+        settings.stepUpThreshold !== undefined
+          ? settings.stepUpThreshold
+          : transferStepUpThreshold;
+
+      if (
+        settings.dailyLimit !== undefined &&
+        (!Number.isFinite(settings.dailyLimit) || settings.dailyLimit < 0)
+      ) {
+        return;
+      }
+
+      if (
+        settings.stepUpThreshold !== undefined &&
+        (!Number.isFinite(settings.stepUpThreshold) || settings.stepUpThreshold < 0)
+      ) {
+        return;
+      }
+
+      if (nextStepUpThreshold > nextDailyLimit) {
+        return;
+      }
+
       if (settings.dailyLimit !== undefined) {
         setDailyTransferLimit(settings.dailyLimit);
       }
@@ -34,7 +59,12 @@ export function useTransferPolicy() {
         setTransferStepUpThreshold(settings.stepUpThreshold);
       }
     },
-    [setDailyTransferLimit, setTransferStepUpThreshold]
+    [
+      dailyTransferLimit,
+      transferStepUpThreshold,
+      setDailyTransferLimit,
+      setTransferStepUpThreshold,
+    ]
   );
 
   return {

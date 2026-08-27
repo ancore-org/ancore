@@ -50,4 +50,43 @@ describe('useTransferPolicy', () => {
     expect(result.current.policy.dailyLimit).toBe(2000);
     expect(result.current.policy.stepUpThreshold).toBe(250); // unchanged
   });
+
+  it('rejects invalid dailyLimit values', () => {
+    const { result } = renderHook(() => useTransferPolicy());
+
+    act(() => {
+      result.current.updateSettings({ dailyLimit: -1 });
+    });
+    expect(result.current.policy.dailyLimit).toBe(1000);
+
+    act(() => {
+      result.current.updateSettings({ dailyLimit: Number.NaN });
+    });
+    expect(result.current.policy.dailyLimit).toBe(1000);
+  });
+
+  it('rejects invalid stepUpThreshold values', () => {
+    const { result } = renderHook(() => useTransferPolicy());
+
+    act(() => {
+      result.current.updateSettings({ stepUpThreshold: -10 });
+    });
+    expect(result.current.policy.stepUpThreshold).toBe(250);
+
+    act(() => {
+      result.current.updateSettings({ stepUpThreshold: Number.NaN });
+    });
+    expect(result.current.policy.stepUpThreshold).toBe(250);
+  });
+
+  it('rejects stepUpThreshold greater than dailyLimit', () => {
+    const { result } = renderHook(() => useTransferPolicy());
+
+    act(() => {
+      result.current.updateSettings({ dailyLimit: 100, stepUpThreshold: 200 });
+    });
+
+    expect(result.current.policy.dailyLimit).toBe(1000);
+    expect(result.current.policy.stepUpThreshold).toBe(250);
+  });
 });
