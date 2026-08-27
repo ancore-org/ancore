@@ -41,9 +41,9 @@ export const DEFAULT_SIGNATURE_SERVICE_HEALTH_TIMEOUT_MS = 5_000;
  */
 export const BOUNDS = {
   PORT: { min: 1, max: 65_535 },
-  RELAY_RATE_LIMIT_MAX: { min: 1, max: 1_000_000 },
-  STATUS_RATE_LIMIT_MAX: { min: 1, max: 1_000_000 },
-  RELAY_RATE_LIMIT_RPM: { min: 1, max: 100_000 },
+  RELAY_RATE_LIMIT_MAX: { min: 1, max: 10_000 },
+  STATUS_RATE_LIMIT_MAX: { min: 1, max: 10_000 },
+  RELAY_RATE_LIMIT_RPM: { min: 1, max: 600 },
   /** 1 byte … 16 MiB. */
   RELAY_MAX_PAYLOAD_BYTES: { min: 1, max: 16 * 1024 * 1024 },
   /** 50 ms … 1 hour. Below 50 ms the scheduler would busy-spin. */
