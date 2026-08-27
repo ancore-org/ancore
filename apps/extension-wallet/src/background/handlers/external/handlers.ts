@@ -18,6 +18,7 @@ import type {
 } from '@ancore/types';
 import { ExternalApiMethodName as MethodName } from '@ancore/types';
 import { NETWORK_PASSPHRASES } from '@ancore/wallet-shared';
+import { z } from 'zod';
 import { AccountContract } from '@ancore/account-abstraction';
 import { rpc as StellarRpc } from '@stellar/stellar-sdk';
 import { isAllowed, addToAllowlist } from './allowlist';
@@ -33,6 +34,44 @@ import { readChromeLocal } from '../../chrome-api';
 
 /** chrome.storage.local key for the deployed smart-account C-address. */
 const CONTRACT_ADDRESS_KEY = 'ancore_contract_address';
+
+// ── Validation schemas (issue #1121) ────────────────────────────────────────
+
+const signTransactionSchema = z
+  .object({
+    xdr: z.string().min(1, 'xdr is required').refine((v) => v.trim().length > 0, 'xdr must not be empty'),
+    network: z.string().optional(),
+    smartAccountId: z.string().optional(),
+  })
+  .passthrough();
+
+const signAuthEntrySchema = z
+  .object({
+    authEntry: z.string().min(1, 'authEntry is required').refine((v) => v.trim().length > 0, 'authEntry must not be empty'),
+    network: z.string().optional(),
+    smartAccountId: z.string().optional(),
+  })
+  .passthrough();
+
+const signMessageSchema = z
+  .object({
+    message: z.string().min(1, 'message is required').refine((v) => v.trim().length > 0, 'message must not be empty'),
+    network: z.string().optional(),
+    smartAccountId: z.string().optional(),
+  })
+  .passthrough();
+
+const requestSessionKeySchema = z
+  .object({
+    expiresAt: z.number().int().positive('expiresAt must be a positive integer'),
+    permissions: z.number().int().nonnegative('permissions must be a non-negative integer'),
+    network: z.string().optional(),
+    smartAccountId: z.string().optional(),
+    allowedContracts: z.array(z.string()).optional(),
+    maxAmountPerCall: z.string().optional(),
+  })
+  .passthrough();
+
 
 const readFromChromeLocal = readChromeLocal;
 
@@ -271,7 +310,11 @@ export async function handleSignTransaction(
   ctx: ExternalHandlerContext
 ): Promise<SignTransactionResult> {
   const { origin, params, requestId } = ctx;
-  const typedParams = params as { xdr?: string; network?: string; smartAccountId?: string };
+  const parsed = signTransactionSchema.safeParse(params);
+  if (!parsed.success) {
+    throw new Error(`Invalid signTransaction params: ${parsed.error.issues.map((i) => `${i.path.join('.')}: ${i.message}`).join('; ')}`);
+  }
+  const typedParams = parsed.data as { xdr: string; network?: string; smartAccountId?: string };
 
   const network = typedParams.network || 'testnet';
   const smartAccountId =
@@ -302,7 +345,11 @@ export async function handleSignAuthEntry(
   ctx: ExternalHandlerContext
 ): Promise<{ signedAuthEntry: string }> {
   const { origin, params, requestId } = ctx;
-  const typedParams = params as { authEntry?: string; network?: string; smartAccountId?: string };
+  const parsed = signAuthEntrySchema.safeParse(params);
+  if (!parsed.success) {
+    throw new Error(`Invalid signAuthEntry params: ${parsed.error.issues.map((i) => `${i.path.join('.')}: ${i.message}`).join('; ')}`);
+  }
+  const typedParams = parsed.data as { authEntry: string; network?: string; smartAccountId?: string };
 
   // Validate the auth entry XDR before opening any UI.
   // Invalid XDR → error returned without opening the popup (AC).
@@ -352,7 +399,11 @@ export async function handleSignMessage(
   ctx: ExternalHandlerContext
 ): Promise<{ signature: string }> {
   const { origin, params, requestId } = ctx;
-  const typedParams = params as { message?: string; network?: string; smartAccountId?: string };
+  const parsed = signMessageSchema.safeParse(params);
+  if (!parsed.success) {
+    throw new Error(`Invalid signMessage params: ${parsed.error.issues.map((i) => `${i.path.join('.')}: ${i.message}`).join('; ')}`);
+  }
+  const typedParams = parsed.data as { message: string; network?: string; smartAccountId?: string };
 
   const network = typedParams.network || 'testnet';
   const smartAccountId =
@@ -426,14 +477,13 @@ export async function handleRequestSessionKey(
   ctx: ExternalHandlerContext
 ): Promise<RequestSessionKeyResult> {
   const { origin, params, requestId } = ctx;
-  const policy = params as SessionKeyPolicy;
-
-  if (!policy?.expiresAt || policy.expiresAt <= Date.now()) {
-    throw new Error('Session key policy must include a future expiresAt timestamp.');
+  const parsed = requestSessionKeySchema.safeParse(params);
+  if (!parsed.success) {
+    throw new Error(`Invalid session key params: ${parsed.error.issues.map((i) => `${i.path.join('.')}: ${i.message}`).join('; ')}`);
   }
-
-  if (typeof policy.permissions !== 'number') {
-    throw new Error('Session key policy must include permissions.');
+  const policy = parsed.data as SessionKeyPolicy;
+  if (policy.expiresAt <= Date.now()) {
+    throw new Error('Session key policy must include a future expiresAt timestamp.');
   }
 
   const { network, smartAccountId } = resolveWalletContext(params);
