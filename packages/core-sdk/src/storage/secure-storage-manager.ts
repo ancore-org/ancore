@@ -552,6 +552,98 @@ export class SecureStorageManager {
     this.lock();
   }
 
+  /**
+   * Changes the vault password by re-encrypting all vault data under a key
+   * derived from the new password.
+   *
+   * Every payload is encrypted with a key derived from (password, masterSalt),
+   * so a password change requires decrypting each item with the old key and
+   * re-encrypting it with a freshly derived one. A new master salt is generated
+   * so the old derived key cannot open the new vault.
+   *
+   * The manager does not need to be unlocked beforehand; `currentPassword` is
+   * verified against the stored verification payload regardless of the current
+   * lock state. On success the manager is left unlocked under the new password.
+   *
+   * Data is decrypted in full before anything is written, so a wrong password
+   * or an unreadable payload aborts the change with storage untouched. The new
+   * master salt is persisted last, after the re-encrypted items and the new
+   * verification payload, matching the write ordering used by `unlock`: if the
+   * process dies mid-write the old salt still refers to a readable vault.
+   *
+   * @param currentPassword - The existing vault password
+   * @param newPassword - The replacement password
+   * @param additionalKeys - Extra storage keys to re-encrypt alongside the
+   *   defaults, for adapter-specific data saved via `saveItem`
+   * @returns true if the password was changed, false if `currentPassword` is
+   *   incorrect or no vault exists
+   * @throws Error if a stored payload cannot be decrypted with the verified
+   *   password, which would otherwise silently drop data
+   *
+   * @example
+   * ```typescript
+   * const changed = await manager.changePassword('old-pw', 'new-pw');
+   * if (!changed) {
+   *   // wrong current password
+   * }
+   * ```
+   */
+  public async changePassword(
+    currentPassword: string,
+    newPassword: string,
+    additionalKeys: string[] = []
+  ): Promise<boolean> {
+    const masterSalt = await this.loadMasterSalt();
+    if (!masterSalt) {
+      // No vault to re-key.
+      return false;
+    }
+
+    // Verify the current password from a clean state — an already-unlocked
+    // manager must not let a wrong password through.
+    this.lock();
+    this.encryptionKey = await this.deriveEncryptionKey(currentPassword, masterSalt);
+    if (!(await this.verifyPassword())) {
+      this.lock();
+      return false;
+    }
+
+    const dataKeys = [...new Set<string>([...DEFAULT_DATA_KEYS, ...additionalKeys])];
+
+    // Decrypt everything up front. A failure here aborts before any write.
+    const decrypted = new Map<string, string>();
+    for (const key of dataKeys) {
+      const payload = await this.readEncryptedPayload(key);
+      if (!payload) {
+        continue;
+      }
+
+      try {
+        decrypted.set(key, await this.decryptData(payload));
+      } catch {
+        this.lock();
+        throw new Error(`Cannot change password: stored data under '${key}' is unreadable`);
+      }
+    }
+
+    // Switch to a key derived from the new password and a fresh master salt.
+    const newMasterSalt = this.initializeMasterSalt();
+    this.encryptionKey = await this.deriveEncryptionKey(newPassword, newMasterSalt);
+
+    // Re-encrypt data and verification payload before persisting the new salt,
+    // so an interrupted change leaves the old salt pointing at a readable vault.
+    for (const [key, plaintext] of decrypted) {
+      const payload = await this.encryptData(plaintext);
+      await this.storage.set(key, JSON.stringify(payload));
+    }
+
+    await this.createVerificationPayload();
+    await this.storage.set(MASTER_SALT_STORAGE_KEY, bufferToBase64(newMasterSalt));
+
+    this.touch();
+    return true;
+  }
+
   private async readEncryptedPayload(key: string): Promise<EncryptedPayload | null> {
     const serialized = await this.storage.get(key);
     return parseEncryptedPayload(serialized);

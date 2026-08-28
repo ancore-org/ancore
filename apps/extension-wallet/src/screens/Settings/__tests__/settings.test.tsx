@@ -19,7 +19,11 @@ import { NetworkSettings } from '../NetworkSettings';
 import { SecuritySettings } from '../SecuritySettings';
 import { AboutScreen } from '../AboutScreen';
 import { ConnectedSitesScreen } from '../ConnectedSitesScreen';
-import { revealVaultSecret, VaultExportError } from '../../../security/vault-export';
+import {
+  changeVaultPassword,
+  revealVaultSecret,
+  VaultExportError,
+} from '../../../security/vault-export';
 import { SettingsGroup, SettingItem } from '../../../components/SettingsGroup';
 
 vi.mock('../../../security/vault-export', () => ({
@@ -32,6 +36,8 @@ vi.mock('../../../security/vault-export', () => ({
   revealVaultSecret: vi.fn(async ({ kind }: { kind: 'privateKey' | 'mnemonic' }) =>
     kind === 'privateKey' ? 'STESTPRIVATEKEY' : 'word '.repeat(12).trim()
   ),
+  verifyVaultPassword: vi.fn(async () => true),
+  changeVaultPassword: vi.fn(async () => true),
 }));
 
 function renderSettingsScreen() {
@@ -221,6 +227,10 @@ describe('SecuritySettings', () => {
     vi.mocked(revealVaultSecret).mockImplementation(async ({ kind }) =>
       kind === 'privateKey' ? 'STESTPRIVATEKEY' : 'word '.repeat(12).trim()
     );
+    // Clear any queued mockResolvedValueOnce/mockRejectedValueOnce so an
+    // unconsumed one cannot leak into the next test.
+    vi.mocked(changeVaultPassword).mockReset();
+    vi.mocked(changeVaultPassword).mockResolvedValue(true);
   });
 
   it('renders security menu items', () => {
@@ -240,21 +250,94 @@ describe('SecuritySettings', () => {
   it('shows password mismatch error', async () => {
     render(<SecuritySettings {...defaultProps} />);
     await userEvent.click(screen.getByText('Change Password'));
-    await userEvent.type(screen.getByPlaceholderText('Enter current password'), 'oldpass');
-    await userEvent.type(screen.getByPlaceholderText('Min. 8 characters'), 'newpass1');
-    await userEvent.type(screen.getByPlaceholderText('Repeat new password'), 'newpass2');
+    await userEvent.type(screen.getByPlaceholderText('Enter current password'), 'Tr0ub4dor&Xk9');
+    await userEvent.type(
+      screen.getByPlaceholderText('Min. 12 chars, mixed case, digit, symbol'),
+      'Gv7#tLqz9Rme'
+    );
+    await userEvent.type(screen.getByPlaceholderText('Repeat new password'), 'Hn4$wKcx8Bqa');
     await userEvent.click(screen.getByRole('button', { name: /update password/i }));
-    expect(screen.getByText(/passwords do not match/i)).toBeInTheDocument();
+    expect(await screen.findByText(/passwords do not match/i)).toBeInTheDocument();
+    expect(changeVaultPassword).not.toHaveBeenCalled();
   });
 
   it('shows short password error', async () => {
     render(<SecuritySettings {...defaultProps} />);
     await userEvent.click(screen.getByText('Change Password'));
-    await userEvent.type(screen.getByPlaceholderText('Enter current password'), 'old');
-    await userEvent.type(screen.getByPlaceholderText('Min. 8 characters'), 'short');
+    await userEvent.type(screen.getByPlaceholderText('Enter current password'), 'Tr0ub4dor&Xk9');
+    await userEvent.type(
+      screen.getByPlaceholderText('Min. 12 chars, mixed case, digit, symbol'),
+      'short'
+    );
     await userEvent.type(screen.getByPlaceholderText('Repeat new password'), 'short');
     await userEvent.click(screen.getByRole('button', { name: /update password/i }));
-    expect(screen.getByText(/at least 8 characters/i)).toBeInTheDocument();
+    expect(await screen.findByText(/at least 12 characters/i)).toBeInTheDocument();
+    expect(changeVaultPassword).not.toHaveBeenCalled();
+  });
+
+  // --- the flow must actually reach the vault (issue #1278) ---
+
+  it('calls the vault and reports success only after it changes the password', async () => {
+    vi.mocked(changeVaultPassword).mockResolvedValueOnce(true);
+    render(<SecuritySettings {...defaultProps} />);
+    await userEvent.click(screen.getByText('Change Password'));
+    await userEvent.type(screen.getByPlaceholderText('Enter current password'), 'Tr0ub4dor&Xk9');
+    await userEvent.type(
+      screen.getByPlaceholderText('Min. 12 chars, mixed case, digit, symbol'),
+      'Gv7#tLqz9Rme'
+    );
+    await userEvent.type(screen.getByPlaceholderText('Repeat new password'), 'Gv7#tLqz9Rme');
+    await userEvent.click(screen.getByRole('button', { name: /update password/i }));
+
+    expect(changeVaultPassword).toHaveBeenCalledWith('Tr0ub4dor&Xk9', 'Gv7#tLqz9Rme');
+    expect(await screen.findByText(/password updated/i)).toBeInTheDocument();
+  });
+
+  it('does not show success when the current password is wrong', async () => {
+    vi.mocked(changeVaultPassword).mockResolvedValueOnce(false);
+    render(<SecuritySettings {...defaultProps} />);
+    await userEvent.click(screen.getByText('Change Password'));
+    await userEvent.type(screen.getByPlaceholderText('Enter current password'), 'Zc9!vQmr2Twe');
+    await userEvent.type(
+      screen.getByPlaceholderText('Min. 12 chars, mixed case, digit, symbol'),
+      'Gv7#tLqz9Rme'
+    );
+    await userEvent.type(screen.getByPlaceholderText('Repeat new password'), 'Gv7#tLqz9Rme');
+    await userEvent.click(screen.getByRole('button', { name: /update password/i }));
+
+    expect(await screen.findByText(/current password is incorrect/i)).toBeInTheDocument();
+    expect(screen.queryByText(/password updated/i)).not.toBeInTheDocument();
+  });
+
+  it('surfaces a vault failure instead of claiming success', async () => {
+    vi.mocked(changeVaultPassword).mockRejectedValueOnce(new Error('vault is unreadable'));
+    render(<SecuritySettings {...defaultProps} />);
+    await userEvent.click(screen.getByText('Change Password'));
+    await userEvent.type(screen.getByPlaceholderText('Enter current password'), 'Tr0ub4dor&Xk9');
+    await userEvent.type(
+      screen.getByPlaceholderText('Min. 12 chars, mixed case, digit, symbol'),
+      'Gv7#tLqz9Rme'
+    );
+    await userEvent.type(screen.getByPlaceholderText('Repeat new password'), 'Gv7#tLqz9Rme');
+    await userEvent.click(screen.getByRole('button', { name: /update password/i }));
+
+    expect(await screen.findByText(/vault is unreadable/i)).toBeInTheDocument();
+    expect(screen.queryByText(/password updated/i)).not.toBeInTheDocument();
+  });
+
+  it('rejects reusing the current password', async () => {
+    render(<SecuritySettings {...defaultProps} />);
+    await userEvent.click(screen.getByText('Change Password'));
+    await userEvent.type(screen.getByPlaceholderText('Enter current password'), 'Tr0ub4dor&Xk9');
+    await userEvent.type(
+      screen.getByPlaceholderText('Min. 12 chars, mixed case, digit, symbol'),
+      'Tr0ub4dor&Xk9'
+    );
+    await userEvent.type(screen.getByPlaceholderText('Repeat new password'), 'Tr0ub4dor&Xk9');
+    await userEvent.click(screen.getByRole('button', { name: /update password/i }));
+
+    expect(await screen.findByText(/must be different/i)).toBeInTheDocument();
+    expect(changeVaultPassword).not.toHaveBeenCalled();
   });
 
   it('navigates to auto-lock view and selects option', async () => {
