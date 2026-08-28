@@ -19,6 +19,10 @@ export interface AddressDisplayProps extends React.HTMLAttributes<HTMLDivElement
    * Optional label for the address
    */
   label?: string;
+  /**
+   * Optional callback for copy errors
+   */
+  onCopyError?: (error: Error) => void;
 }
 
 /**
@@ -26,7 +30,7 @@ export interface AddressDisplayProps extends React.HTMLAttributes<HTMLDivElement
  * Features truncation, copy-to-clipboard functionality, and responsive design
  */
 const AddressDisplay = React.forwardRef<HTMLDivElement, AddressDisplayProps>(
-  ({ address, copyable = true, truncate = 6, label, className, ...props }, ref) => {
+  ({ address, copyable = true, truncate = 6, label, onCopyError, className, ...props }, ref) => {
     const [copied, setCopied] = React.useState(false);
 
     const displayAddress = React.useMemo(() => {
@@ -43,8 +47,9 @@ const AddressDisplay = React.forwardRef<HTMLDivElement, AddressDisplayProps>(
         setTimeout(() => setCopied(false), 2000);
       } catch (err) {
         console.error('Failed to copy address:', err);
+        onCopyError?.(err instanceof Error ? err : new Error(String(err)));
       }
-    }, [address]);
+    }, [address, onCopyError]);
 
     return (
       <div ref={ref} className={cn('space-y-1', className)} {...props}>

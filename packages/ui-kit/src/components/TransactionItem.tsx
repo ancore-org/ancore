@@ -6,6 +6,7 @@ import {
   FiRepeat,
   FiTrendingDown,
   FiTrendingUp,
+  FiDollarSign,
 } from 'react-icons/fi';
 import { cn } from '@/lib/utils';
 import {
@@ -27,7 +28,7 @@ const TYPE_ICONS: Record<string, React.ReactNode> = {
   sent: <FiArrowUpRight className="h-4 w-4" aria-hidden="true" />,
   received: <FiArrowDownLeft className="h-4 w-4" aria-hidden="true" />,
   swap: <FiRepeat className="h-4 w-4" aria-hidden="true" />,
-  payment: <FiRefreshCw className="h-4 w-4" aria-hidden="true" />,
+  payment: <FiDollarSign className="h-4 w-4" aria-hidden="true" />,
   deposit: <FiTrendingUp className="h-4 w-4" aria-hidden="true" />,
   withdrawal: <FiTrendingDown className="h-4 w-4" aria-hidden="true" />,
 };
