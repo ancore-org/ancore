@@ -1,4 +1,4 @@
-import { bootstrapMobileWallet, type MobileWalletBootstrap } from '../bootstrap';
+import { bootstrapMobileWallet } from '../bootstrap';
 
 jest.mock(
   'react-native',

@@ -1,6 +1,13 @@
 import { useEffect, useRef, useState } from 'react';
 import { createStellarClient } from '@ancore/stellar';
-import { Operation, Asset, TransactionBuilder, Account } from '@stellar/stellar-sdk';
+import { NETWORK_PASSPHRASES } from '@ancore/wallet-shared';
+import {
+  Operation,
+  Asset,
+  TransactionBuilder,
+  Account,
+  TimeoutInfinite,
+} from '@stellar/stellar-sdk';
 
 // ---------------------------------------------------------------------------
 // Types
@@ -25,13 +32,6 @@ interface UseSendFeeEstimateOptions {
   /** Disable estimation. Default: false. */
   disabled?: boolean;
 }
-
-const NETWORK_PASSPHRASE: Record<string, string> = {
-  testnet: 'Test SDF Network ; September 2015',
-  mainnet: 'Public Global Stellar Network ; September 2015',
-  futurenet: 'Test SDF Future Network ; October 2022',
-  local: 'Standalone Network ; February 2017',
-};
 
 const INITIAL_STATE: FeeEstimateState = {
   fee: '0.0000100',
@@ -80,7 +80,7 @@ export function useSendFeeEstimate(
 
         try {
           const client = createStellarClient(network);
-          const passphrase = NETWORK_PASSPHRASE[network] ?? NETWORK_PASSPHRASE.testnet;
+          const passphrase = NETWORK_PASSPHRASES[network] ?? NETWORK_PASSPHRASES.testnet;
 
           const dummyAccount = new Account(
             'GAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAWHF',
@@ -97,6 +97,8 @@ export function useSendFeeEstimate(
               amount,
             })
           );
+          // Required by stellar-sdk: build() throws without explicit timebounds.
+          txBuilder.setTimeout(TimeoutInfinite);
           const tx = txBuilder.build();
 
           const result = await client.simulateTransaction(tx.toXDR());
@@ -104,13 +106,22 @@ export function useSendFeeEstimate(
           if (cancelledRef.current) return;
 
           if ('fee' in result && typeof result.fee === 'string') {
-            const feeNum = parseFloat(result.fee) || 0;
-            setState({
-              fee: result.fee,
-              minBalance: (0.5 + feeNum).toFixed(7),
-              loading: false,
-              error: null,
-            });
+            const feeNum = parseFloat(result.fee);
+            if (Number.isFinite(feeNum)) {
+              setState({
+                fee: result.fee,
+                minBalance: (0.5 + feeNum).toFixed(7),
+                loading: false,
+                error: null,
+              });
+            } else {
+              setState({
+                fee: '0.0000100',
+                minBalance: '0.0050100',
+                loading: false,
+                error: 'fee unavailable',
+              });
+            }
           } else {
             const errorMsg =
               'error' in result && typeof result.error === 'string'

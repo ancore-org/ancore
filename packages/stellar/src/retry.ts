@@ -9,6 +9,8 @@ export interface RetryOptions {
   maxRetries?: number;
   /** Base delay in milliseconds (default: 1000) */
   baseDelayMs?: number;
+  /** Maximum delay in milliseconds (default: 30000) */
+  maxDelayMs?: number;
   /** Whether to use exponential backoff (default: true) */
   exponential?: boolean;
   /** Optional function to determine if error is retryable */
@@ -38,6 +40,7 @@ export type RetryPresetName = keyof typeof RETRY_PRESETS;
 const DEFAULT_OPTIONS: Required<Omit<RetryOptions, 'isRetryable'>> = {
   maxRetries: 3,
   baseDelayMs: 1000,
+  maxDelayMs: 30_000,
   exponential: true,
 };
 
@@ -68,16 +71,18 @@ const sleep = (ms: number): Promise<void> => new Promise((resolve) => setTimeout
 /**
  * Calculate delay for a given attempt using exponential backoff
  * Attempt 1: 1s, Attempt 2: 2s, Attempt 3: 4s
+ * Delay is clamped to maxDelayMs (default: 30s)
  */
 export const calculateDelay = (
   attempt: number,
   baseDelayMs: number,
-  exponential: boolean
+  exponential: boolean,
+  maxDelayMs: number = 30_000
 ): number => {
   if (!exponential) {
-    return baseDelayMs;
+    return Math.min(baseDelayMs, maxDelayMs);
   }
-  return baseDelayMs * Math.pow(2, attempt - 1);
+  return Math.min(baseDelayMs * Math.pow(2, attempt - 1), maxDelayMs);
 };
 
 /**
@@ -97,7 +102,7 @@ export const calculateDelay = (
  * ```
  */
 export async function withRetry<T>(fn: () => Promise<T>, options: RetryOptions = {}): Promise<T> {
-  const { maxRetries, baseDelayMs, exponential } = {
+  const { maxRetries, baseDelayMs, maxDelayMs, exponential } = {
     ...DEFAULT_OPTIONS,
     ...options,
   };
@@ -122,7 +127,7 @@ export async function withRetry<T>(fn: () => Promise<T>, options: RetryOptions =
       }
 
       // Calculate and wait for delay before next attempt
-      const delay = calculateDelay(attempt, baseDelayMs, exponential);
+      const delay = calculateDelay(attempt, baseDelayMs, exponential, maxDelayMs);
       await sleep(delay);
     }
   }

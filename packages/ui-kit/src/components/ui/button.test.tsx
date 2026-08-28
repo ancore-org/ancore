@@ -38,7 +38,7 @@ describe('Button', () => {
     expect(screen.getByText('Small')).toHaveClass('h-9');
 
     rerender(<Button size="lg">Large</Button>);
-    expect(screen.getByText('Large')).toHaveClass('h-11');
+    expect(screen.getByText('Large')).toHaveClass('h-12');
   });
 
   it('has no axe violations in the default state', async () => {

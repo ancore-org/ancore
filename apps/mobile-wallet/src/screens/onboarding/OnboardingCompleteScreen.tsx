@@ -13,7 +13,7 @@ export function OnboardingCompleteScreen({ onRestart = noop }: Props) {
         <p className="text-sm text-slate-600">Restart returns the flow to the first screen.</p>
       </header>
 
-      <button onClick={onRestart} type="button">
+      <button aria-label="Restart onboarding" onClick={onRestart} type="button">
         Restart onboarding
       </button>
     </section>

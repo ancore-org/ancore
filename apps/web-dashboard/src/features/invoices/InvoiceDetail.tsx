@@ -2,10 +2,12 @@ import * as React from 'react';
 import { Invoice, InvoiceStatus } from '@ancore/types';
 import { Card, CardContent, CardHeader, CardTitle, Button } from '@ancore/ui-kit';
 import { formatAddress, formatTime } from '@ancore/ui-kit';
+import { buildPaymentLink } from '../../services/invoice-service';
 
 interface InvoiceDetailProps {
   invoice: Invoice;
   onPay?: (invoice: Invoice) => void;
+  onOpen?: (invoice: Invoice) => void;
   onCancel?: (invoice: Invoice) => void;
 }
 
@@ -25,9 +27,19 @@ const statusLabels: Record<InvoiceStatus, string> = {
   cancelled: 'Cancelled',
 };
 
-export function InvoiceDetail({ invoice, onPay, onCancel }: InvoiceDetailProps) {
+export function InvoiceDetail({ invoice, onPay, onOpen, onCancel }: InvoiceDetailProps) {
+  const [copied, setCopied] = React.useState(false);
+  const canOpen = invoice.status === 'draft';
   const canPay = invoice.status === 'open';
   const canCancel = invoice.status === 'open' || invoice.status === 'draft';
+  const canShare = invoice.status === 'open';
+
+  const handleCopyLink = async () => {
+    const link = buildPaymentLink(invoice.id);
+    await navigator.clipboard.writeText(link);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
+  };
 
   return (
     <Card>
@@ -60,18 +72,18 @@ export function InvoiceDetail({ invoice, onPay, onCancel }: InvoiceDetailProps) 
         <div className="space-y-3 text-sm">
           <div className="flex justify-between py-2 border-b">
             <span className="text-muted-foreground">Created</span>
-            <span>{formatTime(new Date(invoice.createdAt).getTime())}</span>
+            <span>{formatTime(new Date(invoice.createdAt))}</span>
           </div>
           {invoice.dueDate && (
             <div className="flex justify-between py-2 border-b">
               <span className="text-muted-foreground">Due Date</span>
-              <span>{formatTime(new Date(invoice.dueDate).getTime())}</span>
+              <span>{formatTime(new Date(invoice.dueDate))}</span>
             </div>
           )}
           {invoice.paidAt && (
             <div className="flex justify-between py-2 border-b">
               <span className="text-muted-foreground">Paid At</span>
-              <span>{formatTime(new Date(invoice.paidAt).getTime())}</span>
+              <span>{formatTime(new Date(invoice.paidAt))}</span>
             </div>
           )}
           {invoice.paymentTransactionId && (
@@ -89,10 +101,20 @@ export function InvoiceDetail({ invoice, onPay, onCancel }: InvoiceDetailProps) 
           </div>
         )}
 
-        <div className="flex gap-3 pt-4">
+        <div className="flex flex-wrap gap-3 pt-4">
+          {canOpen && onOpen && (
+            <Button onClick={() => onOpen(invoice)} variant="outline" className="flex-1">
+              Open Invoice
+            </Button>
+          )}
           {canPay && onPay && (
             <Button onClick={() => onPay(invoice)} className="flex-1">
               Pay Invoice
+            </Button>
+          )}
+          {canShare && (
+            <Button onClick={handleCopyLink} variant="outline">
+              {copied ? 'Copied!' : 'Copy Payment Link'}
             </Button>
           )}
           {canCancel && onCancel && (

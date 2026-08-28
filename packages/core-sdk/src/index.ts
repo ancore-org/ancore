@@ -81,6 +81,7 @@ export {
 export {
   AncoreSdkError,
   BuilderValidationError,
+  InvalidRetryPresetError,
   SessionKeyExecutionError,
   SessionKeyExecutionValidationError,
   SessionKeyManagementError,
@@ -132,7 +133,6 @@ export {
   getSchedulerClient,
   resetSchedulerClientForTests,
   resolveRelayerBaseUrl,
-  buildDefaultRelayPayload,
   toIsoStartAt,
   defaultScheduleStartAt,
   SCHEDULE_FREQUENCY_OPTIONS,
@@ -141,6 +141,17 @@ export {
   type SchedulerClient,
   type SchedulerClientOptions,
 } from './scheduler-client';
+
+// Real relay-payload signing (issue #1213 — replaces the removed
+// buildDefaultRelayPayload, which hardcoded a fake sessionKey/signature).
+export {
+  buildRelayCanonicalPayload,
+  buildSignedRelayPayload,
+  type CanonicalPayloadInput,
+  type RelaySigner,
+  type RelayExecuteParameters,
+  type SignedRelayPayload,
+} from './relay-payload';
 
 export {
   mapExecuteWithSessionKeyError,
@@ -193,3 +204,16 @@ export {
   StorageErrorCode,
 } from './storage/storage-adapter';
 export * from './signing/ledger-adapter';
+
+// Invoice lifecycle
+export {
+  InvoiceClient,
+  InvoiceClientError,
+  type InvoiceClientOptions,
+  type PayInvoiceParams,
+  type OpenInvoiceResult,
+  type PayInvoiceResult,
+  type CancelInvoiceResult,
+  type ExpireInvoiceResult,
+  type ListInvoicesResult,
+} from './invoice-client';

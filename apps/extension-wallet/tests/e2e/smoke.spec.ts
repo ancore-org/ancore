@@ -24,7 +24,7 @@ test.describe('Extension release-candidate smoke @smoke', () => {
     await seedWallet('onboarded-unlocked');
 
     await page.waitForURL(/\/home/, { timeout: 15_000 });
-    await expect(page.getByRole('heading', { name: 'Home' })).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'Your wallet' })).toBeVisible();
   });
 
   test('locked wallet unlocks and returns to home', async ({ page, seedWallet, freezeTime }) => {

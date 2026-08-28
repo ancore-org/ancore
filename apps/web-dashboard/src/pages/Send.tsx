@@ -6,14 +6,16 @@ import { useWalletConnection } from '../hooks/useWalletConnection';
 import type { SendStrategy } from '../services/send-service';
 import type { Transaction } from '../types/dashboard';
 
-const DEMO_MODE = import.meta.env.VITE_DEMO_MODE === 'true';
+import { env } from '../lib/env';
+
+const DEMO_MODE = env.VITE_DEMO_MODE === 'true';
 
 function StatusBadge({ status }: { status: Transaction['status'] }) {
   const styles: Record<string, string> = {
-    confirmed: 'bg-green-100 text-green-700',
-    pending: 'bg-blue-100 text-blue-700',
-    submitting: 'bg-amber-100 text-amber-700',
-    failed: 'bg-red-100 text-red-700',
+    confirmed: 'bg-success/10 text-success',
+    pending: 'bg-info/10 text-info',
+    submitting: 'bg-warning/10 text-warning',
+    failed: 'bg-destructive/10 text-destructive',
   };
 
   return (
@@ -30,8 +32,8 @@ function WalletStatus({ connected, onConnect }: { connected: boolean; onConnect:
     <div
       className={`flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs ${
         connected
-          ? 'bg-green-50 text-green-700 border border-green-200'
-          : 'bg-amber-50 text-amber-700 border border-amber-200'
+          ? 'border border-success/20 bg-success/10 text-success'
+          : 'border border-warning/20 bg-warning/10 text-warning'
       }`}
     >
       <Wallet className="w-3.5 h-3.5" />
@@ -100,7 +102,9 @@ export const SendPage: React.FC = () => {
     <section className="mx-auto max-w-xl space-y-6">
       <div className="flex items-start justify-between">
         <div>
-          <p className="text-sm font-medium uppercase tracking-[0.2em] text-blue-500">Send</p>
+          <p className="text-xs font-semibold uppercase tracking-[0.18em] text-muted-foreground">
+            Payment
+          </p>
           <h1 className="mt-2 text-3xl font-semibold">Send XLM</h1>
           <p className="mt-2 text-sm text-muted-foreground">
             Enter a Stellar address or an @username handle. Handles are resolved before
@@ -110,13 +114,13 @@ export const SendPage: React.FC = () => {
         <WalletStatus connected={wallet.connected} onConnect={wallet.connect} />
       </div>
 
-      <form className="space-y-5 rounded-xl border bg-card p-6 shadow-sm" onSubmit={onSubmit}>
+      <form className="dashboard-panel space-y-5 p-6" onSubmit={onSubmit}>
         <label className="block space-y-2">
           <span className="text-sm font-medium">Recipient</span>
           <input
             aria-describedby={recipientError ? 'recipient-error' : undefined}
             aria-invalid={!!recipientError}
-            className="w-full rounded-lg border px-3 py-2 font-mono text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+            className="dashboard-field font-mono"
             onChange={(event) => setRecipient(event.target.value)}
             placeholder="@alice or G..."
             value={recipient}
@@ -131,7 +135,7 @@ export const SendPage: React.FC = () => {
         <label className="block space-y-2">
           <span className="text-sm font-medium">Amount (XLM)</span>
           <input
-            className="w-full rounded-lg border px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+            className="dashboard-field"
             inputMode="decimal"
             onChange={(event) => setAmount(event.target.value)}
             placeholder="0.00"
@@ -141,7 +145,7 @@ export const SendPage: React.FC = () => {
         {formError && <p className="text-sm font-medium text-destructive">{formError}</p>}
 
         {send.resolvedRecipient && (
-          <div className="rounded-lg border border-blue-200 bg-blue-50 p-4 text-sm text-blue-950">
+          <div className="rounded-2xl border border-border bg-accent p-4 text-sm">
             <p className="font-semibold">Resolved recipient</p>
             {send.resolvedRecipient.handle && (
               <p>
@@ -157,8 +161,8 @@ export const SendPage: React.FC = () => {
 
         {/* Fee estimate (real mode only) */}
         {!DEMO_MODE && recipient && amount && (
-          <div className="flex items-center justify-between rounded-lg border border-gray-200 bg-gray-50 px-4 py-3 text-sm">
-            <span className="text-gray-600">Estimated fee</span>
+          <div className="flex items-center justify-between rounded-2xl border border-border bg-accent px-4 py-3 text-sm">
+            <span className="text-muted-foreground">Estimated fee</span>
             <span className="font-medium">
               {feeEstimate.loading ? (
                 <Loader2 className="w-3 h-3 animate-spin inline" />
@@ -171,7 +175,7 @@ export const SendPage: React.FC = () => {
 
         {/* Signing method badge (real mode only) */}
         {!DEMO_MODE && (
-          <div className="flex items-center gap-2 text-xs text-gray-500">
+          <div className="flex items-center gap-2 text-xs text-muted-foreground">
             <Shield className="w-3.5 h-3.5" />
             <span>
               {wallet.connected
@@ -188,8 +192,14 @@ export const SendPage: React.FC = () => {
         )}
 
         <button
-          className="inline-flex w-full items-center justify-center gap-2 rounded-lg bg-blue-600 px-4 py-2 font-medium text-white hover:bg-blue-700 disabled:opacity-50"
-          disabled={send.loading || !!liveRecipientError}
+          className="inline-flex h-12 w-full items-center justify-center gap-2 rounded-full bg-primary px-5 font-semibold text-primary-foreground transition-transform active:scale-[0.98] disabled:opacity-40"
+          disabled={
+            send.loading ||
+            !!liveRecipientError ||
+            !recipient.trim() ||
+            !amount.trim() ||
+            Number(amount) <= 0
+          }
           type="submit"
         >
           {send.loading ? (
@@ -203,7 +213,7 @@ export const SendPage: React.FC = () => {
 
       {/* Transaction status card */}
       {optimistic && (
-        <div className="rounded-xl border bg-card p-4 text-sm space-y-3">
+        <div className="dashboard-panel space-y-3 p-4 text-sm">
           <div className="flex items-center justify-between">
             <p className="font-semibold">Transaction</p>
             <StatusBadge status={optimistic.status} />
@@ -216,34 +226,34 @@ export const SendPage: React.FC = () => {
               href={`https://stellar.expert/explorer/testnet/tx/${optimistic.hash}`}
               target="_blank"
               rel="noopener noreferrer"
-              className="text-xs text-blue-600 underline inline-flex items-center gap-1"
+              className="inline-flex items-center gap-1 text-xs text-info underline"
             >
               {optimistic.hash.slice(0, 16)}… <ExternalLink className="w-3 h-3" />
             </a>
           )}
 
           {optimistic.status === 'pending' && (
-            <div className="flex items-center gap-2 text-xs text-blue-600">
+            <div className="flex items-center gap-2 text-xs text-info">
               <Loader2 className="w-3 h-3 animate-spin" />
               Waiting for on-chain confirmation…
             </div>
           )}
 
           {optimistic.status === 'confirmed' && (
-            <div className="flex items-center gap-2 text-xs text-green-600">
+            <div className="flex items-center gap-2 text-xs text-success">
               <CheckCircle2 className="w-3 h-3" />
               Confirmed on-chain
             </div>
           )}
 
           {optimistic.signMethod && (
-            <div className="flex items-center gap-1 text-xs text-gray-500">
+            <div className="flex items-center gap-1 text-xs text-muted-foreground">
               <Shield className="w-3 h-3" />
               Signed via {optimistic.signMethod === 'wallet-api' ? 'Extension' : 'Relay'}
             </div>
           )}
 
-          {optimistic.error && <p className="text-xs text-red-600">{optimistic.error}</p>}
+          {optimistic.error && <p className="text-xs text-destructive">{optimistic.error}</p>}
         </div>
       )}
     </section>

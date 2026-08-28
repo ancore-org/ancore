@@ -5,6 +5,14 @@
  * Normalizes async behavior and serialization, handles quota limits and typed errors.
  */
 
+/// <reference types="chrome" />
+// eslint-disable-next-line @typescript-eslint/triple-slash-reference -- ambient global declarations have no importable binding
+/// <reference path="../types/webextension-global.d.ts" />
+// This module is compiled as part of every consumer's program (@ancore/* maps to
+// source, not dist). Consumers that are not browser targets -- e.g. the React
+// Native app -- do not list "chrome" in their tsconfig `types`, so declare the
+// dependency here rather than requiring each consumer to opt in.
+
 import { StorageAdapter } from './types';
 
 // ─── Typed Errors ────────────────────────────────────────────────────────────

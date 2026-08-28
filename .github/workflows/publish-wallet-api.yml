@@ -125,10 +125,12 @@ jobs:
 
       - name: Publish summary
         run: |
-          echo "## Published @ancore/wallet-api@${{ steps.pkg.outputs.version }}" >> "$GITHUB_STEP_SUMMARY"
-          echo "" >> "$GITHUB_STEP_SUMMARY"
-          echo "| Field | Value |" >> "$GITHUB_STEP_SUMMARY"
-          echo "|-------|-------|" >> "$GITHUB_STEP_SUMMARY"
-          echo "| Version | \`${{ steps.pkg.outputs.version }}\` |" >> "$GITHUB_STEP_SUMMARY"
-          echo "| Registry | https://www.npmjs.com/package/@ancore/wallet-api |" >> "$GITHUB_STEP_SUMMARY"
-          echo "| Trigger | \`${{ github.event_name }}\` |" >> "$GITHUB_STEP_SUMMARY"
+          {
+            echo "## Published @ancore/wallet-api@${{ steps.pkg.outputs.version }}"
+            echo ""
+            echo "| Field | Value |"
+            echo "|-------|-------|"
+            echo "| Version | \`${{ steps.pkg.outputs.version }}\` |"
+            echo "| Registry | https://www.npmjs.com/package/@ancore/wallet-api |"
+            echo "| Trigger | \`${{ github.event_name }}\` |"
+          } >> "$GITHUB_STEP_SUMMARY"

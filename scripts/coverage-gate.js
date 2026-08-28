@@ -117,9 +117,24 @@ class CoverageGateChecker {
       }
 
       if (fileCoverage.l) {
+        // Legacy istanbul (<= 0.x) emitted an explicit per-line hit map.
         const lines = Object.values(fileCoverage.l);
         totalLines += lines.length;
         coveredLines += lines.filter((l) => l > 0).length;
+      } else if (fileCoverage.statementMap && fileCoverage.s) {
+        // Modern coverage-final.json has no `l` map; line coverage is derived
+        // from statementMap the same way istanbul-lib-coverage does it — a line
+        // is covered when any statement starting on it was executed.
+        const lineHits = new Map();
+        Object.entries(fileCoverage.statementMap).forEach(([index, loc]) => {
+          const line = loc && loc.start ? loc.start.line : undefined;
+          if (typeof line !== 'number') return;
+          const hits = fileCoverage.s[index] || 0;
+          const previous = lineHits.get(line) || 0;
+          lineHits.set(line, Math.max(previous, hits));
+        });
+        totalLines += lineHits.size;
+        coveredLines += [...lineHits.values()].filter((hits) => hits > 0).length;
       }
     });
 

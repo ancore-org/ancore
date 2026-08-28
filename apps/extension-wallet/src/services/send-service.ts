@@ -86,7 +86,7 @@ export function createProductionSendService(options: ProductionSendServiceOption
       if ('error' in response) {
         throw new Error(response.error);
       }
-      if ('requiresHardware' in response && response.requiresHardware) {
+      if ('requiresHardware' in response) {
         try {
           return await signWithLedger(unsignedXdr, networkPassphrase);
         } catch (err) {

@@ -6,7 +6,7 @@ export class KeychainSecureStoreAdapter implements SecureStoreAdapter {
   clear(): Promise<void> {
     return Promise.resolve();
   }
-  delete(key: string): Promise<void> {
+  delete(_key: string): Promise<void> {
     return Promise.resolve();
   }
   async set(key: string, value: string): Promise<void> {

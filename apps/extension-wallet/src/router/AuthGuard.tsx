@@ -1,11 +1,11 @@
 import * as React from 'react';
 import { Navigate, Outlet, useLocation } from 'react-router-dom';
+import { sendMessage } from '../messaging/sender';
 
 export const AUTH_STORAGE_KEY = 'ancore_extension_auth';
 
 export interface AuthState {
   hasOnboarded: boolean;
-  isUnlocked: boolean;
   walletName: string;
   accountAddress: string;
   smartAccountId?: string;
@@ -13,7 +13,6 @@ export interface AuthState {
 
 export const DEFAULT_AUTH_STATE: AuthState = {
   hasOnboarded: false,
-  isUnlocked: false,
   walletName: 'Ancore Wallet',
   accountAddress: 'GCFX...WALLET',
 };
@@ -21,10 +20,12 @@ export const DEFAULT_AUTH_STATE: AuthState = {
 interface AuthContextValue {
   authState: AuthState;
   unlockError: string | null;
+  isUnlocked: boolean;
   completeOnboarding: (walletName: string, publicKey?: string, smartAccountId?: string) => void;
   unlockWallet: (password: string) => Promise<boolean>;
   lockWallet: () => void;
   resetWallet: () => void;
+  refreshUnlockStatus: () => Promise<void>;
 }
 
 const AuthContext = React.createContext<AuthContextValue | null>(null);
@@ -70,12 +71,20 @@ function hasExtensionStorage(): boolean {
 export function ExtensionAuthProvider({
   children,
   unlockVerifier,
+  initiallyUnlocked = false,
 }: {
   children: React.ReactNode;
   unlockVerifier?: UnlockVerifier;
+  /**
+   * Test-only seam. `isUnlocked` is deliberately in-memory (never persisted),
+   * so tests that need to start past the lock screen cannot arrange it via
+   * storage the way they arrange `authState`.
+   */
+  initiallyUnlocked?: boolean;
 }) {
   const [authState, setAuthState] = React.useState<AuthState>(readAuthState);
   const [unlockError, setUnlockError] = React.useState<string | null>(null);
+  const [isUnlocked, setIsUnlocked] = React.useState(initiallyUnlocked);
   const [isInitializing, setIsInitializing] = React.useState(true);
 
   React.useEffect(() => {
@@ -103,6 +112,9 @@ export function ExtensionAuthProvider({
           writeAuthState(next);
           return next;
         });
+
+        // Check initial unlock status from background
+        await refreshUnlockStatusInternal();
       } catch (err) {
         console.error('Failed to check vault', err);
       } finally {
@@ -124,62 +136,88 @@ export function ExtensionAuthProvider({
     return () => window.removeEventListener('storage', handleStorage);
   }, []);
 
+  /**
+   * Refresh unlock status from background service worker.
+   * This is the single source of truth for lock state.
+   */
+  async function refreshUnlockStatusInternal() {
+    try {
+      if (!hasExtensionStorage()) {
+        return;
+      }
+
+      const response = await chrome.runtime.sendMessage({ type: 'GET_WALLET_STATE' });
+      if (response?.state === 'unlocked') {
+        setIsUnlocked(true);
+      } else {
+        setIsUnlocked(false);
+      }
+    } catch (err) {
+      console.error('Failed to refresh unlock status', err);
+      setIsUnlocked(false);
+    }
+  }
+
   const value = React.useMemo<AuthContextValue>(
     () => ({
       authState,
       unlockError,
+      isUnlocked,
       completeOnboarding: (walletName: string, publicKey?: string, smartAccountId?: string) => {
         setUnlockError(null);
         setAuthState({
           hasOnboarded: true,
-          isUnlocked: true,
           walletName: walletName.trim() || DEFAULT_AUTH_STATE.walletName,
           accountAddress: publicKey ?? DEFAULT_AUTH_STATE.accountAddress,
           ...(smartAccountId ? { smartAccountId } : {}),
         });
+        setIsUnlocked(true);
       },
       unlockWallet: async (password: string) => {
         try {
-          const isValid = await (unlockVerifier?.(password) ?? Boolean(password.trim()));
+          let isValid: boolean;
+
+          if (unlockVerifier) {
+            isValid = await unlockVerifier(password);
+          } else if (hasExtensionStorage()) {
+            const response = await sendMessage('UNLOCK_WALLET', { password });
+            isValid = response.success;
+          } else {
+            isValid = Boolean(password.trim());
+          }
 
           if (!isValid) {
             setUnlockError(DEFAULT_UNLOCK_ERROR);
-            setAuthState((current) => ({
-              ...current,
-              isUnlocked: false,
-            }));
+            setIsUnlocked(false);
             return false;
           }
 
           setUnlockError(null);
-          setAuthState((current) => ({
-            ...current,
-            hasOnboarded: true,
-            isUnlocked: true,
-          }));
+          setIsUnlocked(true);
           return true;
         } catch {
           setUnlockError(DEFAULT_UNLOCK_ERROR);
-          setAuthState((current) => ({
-            ...current,
-            isUnlocked: false,
-          }));
+          setIsUnlocked(false);
           return false;
         }
       },
       lockWallet: () => {
         setUnlockError(null);
-        setAuthState((current) => ({
-          ...current,
-          isUnlocked: false,
-        }));
+        setIsUnlocked(false);
+        if (hasExtensionStorage()) {
+          void sendMessage('LOCK_WALLET', {}).catch((error: unknown) => {
+            console.error('Failed to lock wallet in background', error);
+          });
+        }
       },
       resetWallet: () => {
         setUnlockError(null);
         setAuthState(DEFAULT_AUTH_STATE);
+        setIsUnlocked(false);
       },
+      refreshUnlockStatus: refreshUnlockStatusInternal,
     }),
-    [authState, unlockError, unlockVerifier]
+    [authState, unlockError, unlockVerifier, isUnlocked]
   );
 
   return (
@@ -209,14 +247,14 @@ export function useExtensionAuth(): AuthContextValue {
 }
 
 export function AuthGuard() {
-  const { authState } = useExtensionAuth();
+  const { authState, isUnlocked } = useExtensionAuth();
   const location = useLocation();
 
   if (!authState.hasOnboarded) {
     return <Navigate replace state={{ from: location.pathname }} to="/onboarding" />;
   }
 
-  if (!authState.isUnlocked) {
+  if (!isUnlocked) {
     return <Navigate replace state={{ from: location.pathname }} to="/unlock" />;
   }
 
@@ -230,10 +268,10 @@ export function PublicOnlyGuard({
   children: React.ReactElement;
   mode: 'welcome' | 'onboarding' | 'unlock';
 }) {
-  const { authState } = useExtensionAuth();
+  const { authState, isUnlocked } = useExtensionAuth();
 
   if (mode === 'unlock') {
-    if (authState.isUnlocked) {
+    if (isUnlocked) {
       return <Navigate replace to="/home" />;
     }
 
@@ -241,7 +279,7 @@ export function PublicOnlyGuard({
   }
 
   if (authState.hasOnboarded) {
-    return <Navigate replace to={authState.isUnlocked ? '/home' : '/unlock'} />;
+    return <Navigate replace to={isUnlocked ? '/home' : '/unlock'} />;
   }
 
   return children;

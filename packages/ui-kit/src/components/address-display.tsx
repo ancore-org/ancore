@@ -38,6 +38,10 @@ export interface AddressDisplayProps extends React.HTMLAttributes<HTMLDivElement
    * and an alert icon. When undefined (default), no validation indicator is shown.
    */
   isValid?: boolean;
+  /**
+   * Optional callback for copy errors
+   */
+  onCopyError?: (error: Error) => void;
 }
 
 /**
@@ -62,6 +66,7 @@ const AddressDisplay = React.forwardRef<HTMLDivElement, AddressDisplayProps>(
       copied: copiedProp,
       showIdenticon = false,
       isValid,
+      onCopyError,
       className,
       ...props
     },
@@ -88,8 +93,9 @@ const AddressDisplay = React.forwardRef<HTMLDivElement, AddressDisplayProps>(
         setTimeout(() => setInternalCopied(false), 2000);
       } catch (err) {
         console.error('Failed to copy address:', err);
+        onCopyError?.(err instanceof Error ? err : new Error(String(err)));
       }
-    }, [address, onCopy]);
+    }, [address, onCopy, onCopyError]);
 
     // Derive border / ring class from validation state
     const borderClass =

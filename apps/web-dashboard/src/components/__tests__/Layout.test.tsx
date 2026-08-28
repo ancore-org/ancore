@@ -34,8 +34,6 @@ describe('Layout', () => {
     renderWithProviders(<Layout />);
 
     expect(screen.getByLabelText('Send')).toBeInTheDocument();
-    expect(screen.getByLabelText('Request')).toBeInTheDocument();
-    expect(screen.getByLabelText('Scan')).toBeInTheDocument();
   });
 
   it('should render density toggle button', () => {

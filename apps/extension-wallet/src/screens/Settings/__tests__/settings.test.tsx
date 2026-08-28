@@ -434,6 +434,6 @@ describe('SettingsScreen', () => {
     renderSettingsScreen();
     expect(screen.getByText(i18n.t('settings.title'))).toBeInTheDocument();
     expect(screen.getByText(i18n.t('settings.subtitle'))).toBeInTheDocument();
-    expect(screen.getByText(i18n.t('settings.account.name'))).toBeInTheDocument();
+    expect(screen.getByText(i18n.t('settings.groups.account'))).toBeInTheDocument();
   });
 });

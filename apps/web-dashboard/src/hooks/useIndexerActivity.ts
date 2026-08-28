@@ -67,11 +67,13 @@ export function useIndexerActivity(accountId: string): UseIndexerActivityReturn 
 
         const data: IndexerPage = await response.json();
 
-        const transformedItems: Transaction[] = data.items.map((tx) => ({
-          ...tx,
-          amount: parseFloat(tx.amount),
-          timestamp: new Date(tx.timestamp),
-        }));
+        const transformedItems: Transaction[] = data.items
+          .map((tx) => ({
+            ...tx,
+            amount: parseFloat(tx.amount),
+            timestamp: new Date(tx.timestamp),
+          }))
+          .filter((tx) => !Number.isNaN(tx.amount) && !Number.isNaN(tx.timestamp.getTime()));
 
         if (cursor) {
           setItems((prev) => [...prev, ...transformedItems]);

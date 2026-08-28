@@ -1,7 +1,6 @@
 import { render, screen } from '@testing-library/react';
 import { describe, it, expect, vi } from 'vitest';
 import { BalanceWidget, NonceWidget, AccountStatusWidget } from '../AccountWidgets';
-import React from 'react';
 
 // Mock lucide-react to avoid issues with SVG rendering in tests
 vi.mock('lucide-react', () => ({

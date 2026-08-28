@@ -3,7 +3,6 @@ import {
   createSchedulerClient,
   getSchedulerClient,
   resetSchedulerClientForTests,
-  buildDefaultRelayPayload,
   toIsoStartAt,
   defaultScheduleStartAt,
   resolveRelayerBaseUrl,
@@ -11,6 +10,7 @@ import {
   SCHEDULE_FREQUENCY_OPTIONS,
   ConfigError,
 } from '../scheduler-client';
+import { buildSignedRelayPayload, type RelaySigner } from '../relay-payload';
 
 describe('resolveRelayerBaseUrl', () => {
   it('returns explicit URL stripped of trailing slash', () => {
@@ -67,16 +67,59 @@ describe('getSchedulerClient / resetSchedulerClientForTests', () => {
   });
 });
 
-describe('buildDefaultRelayPayload', () => {
-  it('returns a payload with expected shape', () => {
-    const payload = buildDefaultRelayPayload('GDEST...', '100');
+describe('buildSignedRelayPayload (issue #1213)', () => {
+  function fakeSigner(sessionKey: string, signature: string): RelaySigner {
+    return {
+      signRelayEnvelope: jest.fn(async () => ({ sessionKey, signature })),
+    };
+  }
+
+  it('returns a payload with expected shape, using the signer-provided sessionKey/signature', async () => {
+    const signer = fakeSigner('ab'.repeat(32), 'cd'.repeat(64));
+    const payload = await buildSignedRelayPayload('GDEST...', '100', signer);
+
     expect(payload.operation).toBe('relay_execute');
     expect(payload.parameters.to).toBe('GDEST...');
     expect(payload.parameters.amount).toBe('100');
     expect(payload.parameters.asset).toBe('XLM');
-    expect(payload.sessionKey).toHaveLength(64);
-    expect(payload.signature).toHaveLength(128);
+    expect(payload.sessionKey).toBe('ab'.repeat(32));
+    expect(payload.signature).toBe('cd'.repeat(64));
     expect(typeof payload.nonce).toBe('number');
+  });
+
+  it('never falls back to the old hardcoded fake sessionKey/signature', async () => {
+    const signer = fakeSigner('ab'.repeat(32), 'cd'.repeat(64));
+    const payload = await buildSignedRelayPayload('GDEST...', '100', signer);
+
+    expect(payload.sessionKey).not.toBe('a'.repeat(64));
+    expect(payload.signature).not.toBe('b'.repeat(128));
+  });
+
+  it('calls the signer with operation "relay_execute" and a numeric nonce', async () => {
+    const signer = fakeSigner('ab'.repeat(32), 'cd'.repeat(64));
+    await buildSignedRelayPayload('GDEST...', '100', signer);
+
+    expect(signer.signRelayEnvelope).toHaveBeenCalledWith(
+      expect.objectContaining({ operation: 'relay_execute', nonce: expect.any(Number) })
+    );
+  });
+
+  it('includes accountAddress in parameters only when supplied', async () => {
+    const signer = fakeSigner('ab'.repeat(32), 'cd'.repeat(64));
+
+    const withoutAddress = await buildSignedRelayPayload('GDEST...', '100', signer);
+    expect(withoutAddress.parameters.accountAddress).toBeUndefined();
+
+    const withAddress = await buildSignedRelayPayload('GDEST...', '100', signer, {
+      accountAddress: 'CACCOUNT...',
+    });
+    expect(withAddress.parameters.accountAddress).toBe('CACCOUNT...');
+  });
+
+  it('supports a custom asset', async () => {
+    const signer = fakeSigner('ab'.repeat(32), 'cd'.repeat(64));
+    const payload = await buildSignedRelayPayload('GDEST...', '100', signer, { asset: 'USDC' });
+    expect(payload.parameters.asset).toBe('USDC');
   });
 });
 

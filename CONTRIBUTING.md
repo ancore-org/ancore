@@ -118,6 +118,29 @@ Wallet contributors: see [docs/wallets/FREIGHTER_COMPARISON.md](docs/wallets/FRE
    pnpm test
    ```
 
+   To run tests for a single package only, use `pnpm --filter`:
+
+   ```bash
+   # Run tests for a specific package (use the package name from its package.json)
+   pnpm --filter @ancore/core-sdk test
+   pnpm --filter @ancore/wallet-shared test
+   pnpm --filter @ancore/ui-kit test
+   ```
+
+   To filter down to a single test file or pattern within a package:
+
+   ```bash
+   # Jest-based packages — pass --testPathPattern after a double dash
+   pnpm --filter @ancore/core-sdk test -- --testPathPattern=secure-storage
+
+   # Vitest-based packages (e.g. ui-kit) — pass the file glob directly
+   pnpm --filter @ancore/ui-kit test -- src/components/Button
+   ```
+
+   Running full `turbo test` on every save is slow in a large monorepo. Use the
+   package-scoped commands above during development and save the full suite for
+   pre-push verification.
+
 4. Run linting:
 
    ```bash
@@ -215,6 +238,14 @@ separate CI jobs that each fail independently. AGENTS.md also documents the spec
 (dependency declarations for stub files, Vite/Vitest config conflicts, duplicate Rust module trees)
 that have caused repeat CI breaks in this repo — read it before your first PR, whether you're a human
 or an AI agent.
+
+If your PR touches `.github/workflows/*.yml`, the CI job **Actionlint — Workflow YAML** runs
+[`actionlint`](https://github.com/rhysd/actionlint) against every workflow file and fails the build on
+invalid `if:` context references, non-existent step outputs, and bad action versions — the same class of
+schema problem that once broke `release.yml` silently for months (GitHub's UI just shows "This run likely
+failed because of a workflow file issue" with no job logs). Install it locally and run
+`actionlint .github/workflows/*.yml` (`brew install actionlint`) before pushing so you catch these before
+CI does.
 
 ## Security Boundaries
 

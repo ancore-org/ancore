@@ -148,13 +148,13 @@ describe('Scheduled transfers API', () => {
     });
     const service = new ScheduledTransferService(store, relayService);
 
-    const transfer = service.create(
+    const transfer = await service.create(
       validScheduledTransferBody(new Date().toISOString()),
       'test-caller'
     );
     await service.processDueTransfers(new Date());
 
-    const executions = service.listExecutions(transfer.id, 'test-caller');
+    const executions = await service.listExecutions(transfer.id, 'test-caller');
     expect(executions).toHaveLength(1);
     expect(executions[0]?.outcome).toBe('success');
     expect(executions[0]?.transactionId).toMatch(/^[0-9A-F]{64}$/);

@@ -53,6 +53,24 @@
       "issue": "https://github.com/ancore-org/ancore/issues/1085",
       "justification": "brace-expansion GHSA-mh99-v99m-4gvg uses vulnerable_versions <=5.0.7, which falsely matches 1.x/2.x. v5 is overridden to 5.0.8; 1.x/2.x are on patched 1.1.16/2.1.2 for the related DoS advisories.",
       "expires": "2026-10-27T00:00:00.000Z"
+    },
+    {
+      "id": "1138808",
+      "issue": "https://github.com/ancore-org/ancore/issues/1206",
+      "justification": "image-size ICNS parser DoS (GHSA-w3rx-r6r6-pgpr); no patched version exists upstream. Transitive dev/build dependency of metro (React Native bundler), not present in shipped runtime bundles and never fed attacker-controlled input.",
+      "expires": "2026-10-31T00:00:00.000Z"
+    },
+    {
+      "id": "1138809",
+      "issue": "https://github.com/ancore-org/ancore/issues/1206",
+      "justification": "image-size JXL/HEIF parser DoS (GHSA-5p2g-fcmc-qvqq); no patched version exists upstream. Transitive dev/build dependency of metro (React Native bundler), not present in shipped runtime bundles and never fed attacker-controlled input.",
+      "expires": "2026-10-31T00:00:00.000Z"
+    },
+    {
+      "id": "1139346",
+      "issue": "https://github.com/ancore-org/ancore/issues/1206",
+      "justification": "extract-zip unvalidated symlink path traversal (GHSA-jmr9-qjv8-65gv); no patched version exists upstream. Transitive dev-only dependency of puppeteer-core; only extracts trusted Puppeteer/Chromium download artifacts, never user-supplied zips.",
+      "expires": "2026-10-31T00:00:00.000Z"
     }
   ]
 }

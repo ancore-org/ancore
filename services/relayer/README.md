@@ -63,39 +63,60 @@ Wiring the wallets and dashboard to a local relayer:
 Every variable is optional — the service boots with the defaults below. Defaults are tuned for local
 development, so read the **Prod** column before deploying.
 
+All variables are declared in a single Zod schema at [`src/config/env.ts`](./src/config/env.ts) and
+validated **at boot**. A value that is missing its scheme, is not a number, or falls outside the
+bounds below is a startup failure: the process prints every offending variable at once and exits
+with code `1`.
+
+```
+[relayer/env] Invalid environment configuration:
+  RELAY_RATE_LIMIT_MAX: must be at least 1
+  RPC_URL: must be a valid URL (include http:// or https://)
+
+Fix the variables listed above and restart. See services/relayer/README.md
+for the full list of supported variables, their defaults, and bounds.
+```
+
+An empty value (`FOO=`) is treated as unset and falls back to the default. Application code reads
+configuration through `getEnv()` rather than `process.env` — the one exception is `src/tracing.ts`,
+which owns the standard `OTEL_*` variables and must run before any other module is imported.
+
 **Server and auth**
 
 | Variable              | Default | Prod         | Description                                                                                                                                       |
 | --------------------- | ------- | ------------ | ------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `PORT`                | `3000`  | as needed    | HTTP listen port                                                                                                                                  |
+| `PORT`                | `3000`  | as needed    | HTTP listen port. Must be an integer in `1…65535`                                                                                                 |
 | `RELAYER_AUTH_SECRET` | _unset_ | **required** | Bearer token secret for protected `/relay` routes. **When unset the service falls back to a stub auth service that accepts any non-empty token.** |
 | `ALLOWED_ORIGINS`     | `*`     | **set it**   | Comma-separated CORS allowlist, e.g. `http://localhost:5173,https://app.example.com`                                                              |
 
 **Stellar network**
 
-| Variable                     | Default                               | Description                                                                                   |
-| ---------------------------- | ------------------------------------- | --------------------------------------------------------------------------------------------- |
-| `STELLAR_NETWORK`            | `testnet`                             | One of `testnet`, `mainnet`, `futurenet`, `local`. Unrecognised values fall back to `testnet` |
-| `STELLAR_NETWORK_PASSPHRASE` | derived from `STELLAR_NETWORK`        | Overrides the passphrase used by the transaction submitter                                    |
-| `RPC_URL`                    | `https://soroban-testnet.stellar.org` | Soroban RPC endpoint used for on-chain session-key lookups                                    |
-| `NETWORK_PASSPHRASE`         | `Test SDF Network ; September 2015`   | Passphrase used for those session-key lookups                                                 |
+| Variable                     | Default                               | Description                                                                                 |
+| ---------------------------- | ------------------------------------- | ------------------------------------------------------------------------------------------- |
+| `STELLAR_NETWORK`            | `testnet`                             | One of `testnet`, `mainnet`, `futurenet`, `local`. **Unrecognised values now fail at boot** |
+| `STELLAR_NETWORK_PASSPHRASE` | derived from `STELLAR_NETWORK`        | Overrides the passphrase used by the transaction submitter                                  |
+| `RPC_URL`                    | `https://soroban-testnet.stellar.org` | Soroban RPC endpoint used for on-chain session-key lookups. Must be an absolute URL         |
+| `NETWORK_PASSPHRASE`         | `Test SDF Network ; September 2015`   | Passphrase used for those session-key lookups. Must be non-empty                            |
 
 **Limits and timers**
 
-| Variable                              | Default            | Description                                                               |
-| ------------------------------------- | ------------------ | ------------------------------------------------------------------------- |
-| `RELAY_RATE_LIMIT_RPM`                | `30`               | Per-**account** requests/minute on `/relay/execute` (429 + `Retry-After`) |
-| `RELAY_RATE_LIMIT_MAX`                | `50`               | Per-**caller/IP** requests per 15-minute window on `/relay/*`             |
-| `STATUS_RATE_LIMIT_MAX`               | `200`              | Per-IP requests per 15-minute window on `/relay/status`                   |
-| `RELAY_MAX_PAYLOAD_BYTES`             | `524288` (512 KiB) | Request bodies above this are rejected before JSON parsing                |
-| `SCHEDULER_POLL_INTERVAL_MS`          | `1000`             | Scheduled-transfer engine poll interval                                   |
-| `SIGNATURE_SERVICE_HEALTH_TIMEOUT_MS` | `5000`             | Timeout for the signature-service health probe                            |
+All values below must be whole numbers within the stated range. Zero, negative, fractional, and
+non-numeric values fail at boot rather than falling back to the default.
+
+| Variable                              | Default            | Range        | Description                                                               |
+| ------------------------------------- | ------------------ | ------------ | ------------------------------------------------------------------------- |
+| `RELAY_RATE_LIMIT_RPM`                | `30`               | `1…100000`   | Per-**account** requests/minute on `/relay/execute` (429 + `Retry-After`) |
+| `RELAY_RATE_LIMIT_MAX`                | `50`               | `1…1000000`  | Per-**caller/IP** requests per 15-minute window on `/relay/*`             |
+| `STATUS_RATE_LIMIT_MAX`               | `200`              | `1…1000000`  | Per-IP requests per 15-minute window on `/relay/status`                   |
+| `RELAY_MAX_PAYLOAD_BYTES`             | `524288` (512 KiB) | `1…16777216` | Request bodies above this are rejected before JSON parsing                |
+| `SCHEDULER_POLL_INTERVAL_MS`          | `1000`             | `50…3600000` | Scheduled-transfer engine poll interval                                   |
+| `SIGNATURE_SERVICE_HEALTH_TIMEOUT_MS` | `5000`             | `1…120000`   | Timeout for the signature-service health probe                            |
 
 **Dev-only flags**
 
-| Variable                      | Default | Description                                                    |
-| ----------------------------- | ------- | -------------------------------------------------------------- |
-| `RELAYER_USE_MOCK_SUBMISSION` | _unset_ | Set to the exact string `true` to enable mock mode — see below |
+| Variable                      | Default | Description                                                             |
+| ----------------------------- | ------- | ----------------------------------------------------------------------- |
+| `RELAYER_USE_MOCK_SUBMISSION` | `false` | Must be exactly `true` or `false`. `true` enables mock mode — see below |
 
 #### Mock mode — never enable outside local development
 

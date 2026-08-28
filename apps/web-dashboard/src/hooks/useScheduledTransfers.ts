@@ -6,11 +6,12 @@ import type {
   ScheduleFrequency,
 } from '@ancore/types';
 import {
-  buildDefaultRelayPayload,
+  buildSignedRelayPayload,
   createSchedulerClient,
   DEMO_ACCOUNT_ADDRESS,
   type SchedulerClient,
 } from '../services/scheduler-client';
+import { createWalletApiRelaySigner } from '../services/relay-signer';
 import { useDashboardAuth } from '../auth';
 
 const REFRESH_INTERVAL_MS = 15_000;
@@ -88,6 +89,10 @@ export function useScheduledTransfers(options: UseScheduledTransfersOptions = {}
       setError(null);
 
       try {
+        const signer = await createWalletApiRelaySigner();
+        const relayPayload = await buildSignedRelayPayload(form.to, form.amount, signer, {
+          accountAddress,
+        });
         const input: CreateScheduledTransferInput = {
           accountAddress,
           to: form.to,
@@ -98,7 +103,7 @@ export function useScheduledTransfers(options: UseScheduledTransfersOptions = {}
           endAt: form.endAt ? new Date(form.endAt).toISOString() : undefined,
           note: form.note,
           userApproved: true,
-          relayPayload: buildDefaultRelayPayload(form.to, form.amount),
+          relayPayload,
         };
 
         await client.createScheduledTransfer(input);

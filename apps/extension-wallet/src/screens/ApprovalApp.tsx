@@ -44,7 +44,8 @@ function getApprovalRoute(params: URLSearchParams): ApprovalRoute {
 export function ApprovalApp() {
   const params = new URLSearchParams(window.location.search);
   const requestId = params.get('requestId');
-  const copy = routeCopy[getApprovalRoute(params)];
+  const route = getApprovalRoute(params);
+  const copy = routeCopy[route];
 
   if (!requestId) {
     return (
@@ -54,5 +55,11 @@ export function ApprovalApp() {
     );
   }
 
-  return <SignTransactionApprovalScreen requestId={requestId} {...copy} />;
+  return (
+    <SignTransactionApprovalScreen
+      requestId={requestId}
+      requestType={route === 'sign-auth-entry' ? 'sign-auth-entry' : 'sign-transaction'}
+      {...copy}
+    />
+  );
 }

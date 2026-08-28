@@ -133,3 +133,32 @@ Inner contract calls are dispatched using `env.invoke_contract(&to, &function, a
 ## Conclusion
 
 The vulnerabilities identified during the internal review have been successfully patched, and full test coverage for the new validation checks has been added to the test suite. The `AncoreAccount` contract is now in a robust state ready for external audit engagement.
+
+---
+
+## Fuzzing program (ROADMAP 3.2 / #994)
+
+Continuous fuzzing and property testing cover the same trust boundaries reviewed above
+(`execute` args, `add_session_key`, spend limits, allowlist). Harness docs:
+[`contracts/account/FUZZING.md`](../../contracts/account/FUZZING.md).
+
+### How to file a fuzz finding
+
+1. Reproduce and minimize per FUZZING.md (`cargo fuzz run` / `cargo fuzz tmin`).
+2. Add a subsection under **Detailed Findings** using the existing severity template.
+3. Include: fuzz target name, CI run URL (or local command), minimized input hash, root cause, patch PR.
+4. Add a regression test under `contracts/account` (unit, property, or both).
+5. Mark status **Patched** only after CI green on the fix.
+
+### Current harness status
+
+| Target | Status |
+|--------|--------|
+| `fuzz_spend_policy` | Active (nightly CI) |
+| `fuzz_permissions` | Active |
+| `fuzz_spend_limits` | Active |
+| `fuzz_execute_args` | Active |
+| `fuzz_allowlist` | Active |
+| `fuzz_add_session_key` | Active |
+| proptest properties (`tests/properties.rs`) | Active |
+| Invoice fuzz | Deferred until Env-free validators exist |

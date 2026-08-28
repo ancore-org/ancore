@@ -1,5 +1,6 @@
 import { validateMnemonicStrength, MnemonicValidationError } from '../mnemonic';
 import * as bip39 from 'bip39';
+import vectors from './vectors/mnemonic-strength-vectors.json';
 
 describe('validateMnemonicStrength', () => {
   it('accepts a valid 12-word mnemonic', () => {
@@ -113,12 +114,10 @@ describe('validateMnemonicStrength', () => {
   });
 
   it('throws INVALID_CHECKSUM for mnemonic with wrong checksum', () => {
-    // 12× "abandon" is a known invalid BIP39 phrase (valid words, bad checksum).
-    // Swapping the last two words of a random mnemonic is not reliable — it can
-    // still pass checksum by chance and flake CI.
-    const invalidMnemonic = Array(12).fill('abandon').join(' ');
-    expect(bip39.validateMnemonic(invalidMnemonic)).toBe(false);
-
+    // "use" was replaced with "abandon" — all 12 words are valid English BIP39
+    // words, but the checksum is wrong so bip39.validateMnemonic returns false.
+    const invalidMnemonic =
+      'abandon laundry bone grid divide level lawn raccoon vacuum click abstract buddy';
     expect(() => validateMnemonicStrength(invalidMnemonic)).toThrow(MnemonicValidationError);
     try {
       validateMnemonicStrength(invalidMnemonic);
@@ -170,5 +169,37 @@ describe('validateMnemonicStrength', () => {
         expect(typeof err.details).toBe('string');
       }
     }
+  });
+});
+
+// ── JSON vector suite ─────────────────────────────────────────────────────────
+
+describe('validateMnemonicStrength — JSON vectors', () => {
+  interface Vector {
+    id: string;
+    description: string;
+    input: string;
+    expectThrow: boolean;
+    expectedCode?: string;
+  }
+
+  (vectors.vectors as Vector[]).forEach(({ id, description, input, expectThrow, expectedCode }) => {
+    it(`[${id}] ${description}`, () => {
+      if (!expectThrow) {
+        expect(() => validateMnemonicStrength(input)).not.toThrow();
+      } else {
+        expect(() => validateMnemonicStrength(input)).toThrow(MnemonicValidationError);
+        if (expectedCode) {
+          try {
+            validateMnemonicStrength(input);
+          } catch (err) {
+            expect(err).toBeInstanceOf(MnemonicValidationError);
+            if (err instanceof MnemonicValidationError) {
+              expect(err.code).toBe(expectedCode);
+            }
+          }
+        }
+      }
+    });
   });
 });

@@ -22,7 +22,8 @@
     "build-storybook": "storybook build",
     "test": "vitest run",
     "test:watch": "vitest",
-    "verify:theme-tokens": "pnpm --dir ../.. verify:theme-tokens"
+    "verify:theme-tokens": "pnpm --dir ../.. verify:theme-tokens",
+    "typecheck": "tsc --noEmit"
   },
   "keywords": [
     "ancore",

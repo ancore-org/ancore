@@ -14,8 +14,9 @@ import {
   persistUnlockSession,
   setBackgroundSessionUnlocked,
 } from '../session-state';
+import { createLogger } from '../logger';
 
-const logPrefix = '[ancore-extension/handlers/lock-unlock]';
+const log = createLogger('[ancore-extension/handlers/lock-unlock]');
 
 export function registerLockUnlockHandlers(): void {
   registerHandler('LOCK_WALLET', async () => {
@@ -33,10 +34,10 @@ export function registerLockUnlockHandlers(): void {
         })
       );
 
-      console.info(`${logPrefix} wallet locked`);
+      log.info('wallet locked');
       return { success: true };
     } catch (err) {
-      console.error(`${logPrefix} lock failed`, err);
+      log.error('lock failed', err);
       return { success: false };
     }
   });
@@ -44,14 +45,14 @@ export function registerLockUnlockHandlers(): void {
   registerHandler('UNLOCK_WALLET', async ({ password }) => {
     try {
       if (!password || typeof password !== 'string') {
-        console.warn(`${logPrefix} unlock attempted with invalid password`);
+        log.warn('unlock attempted with invalid password');
         return { success: false };
       }
 
       const attemptState = await loadUnlockAttemptState();
       const rateLimit = checkUnlockRateLimit(attemptState);
       if (rateLimit.locked) {
-        console.warn(`${logPrefix} unlock throttled`, { retryAfterMs: rateLimit.retryAfterMs });
+        log.warn('unlock throttled', { retryAfterMs: rateLimit.retryAfterMs });
         return {
           success: false,
           retryAfterMs: rateLimit.retryAfterMs,
@@ -61,7 +62,7 @@ export function registerLockUnlockHandlers(): void {
 
       const authState = readAuthState();
       if (!authState.hasOnboarded) {
-        console.warn(`${logPrefix} unlock attempted before onboarding`);
+        log.warn('unlock attempted before onboarding');
         return { success: false };
       }
 
@@ -69,7 +70,7 @@ export function registerLockUnlockHandlers(): void {
       const isUnlocked = await storageManager.unlock(password);
 
       if (!isUnlocked) {
-        console.warn(`${logPrefix} unlock rejected by SecureStorageManager`);
+        log.warn('unlock rejected by SecureStorageManager');
         const nextState = recordUnlockFailure(attemptState);
         await saveUnlockAttemptState(nextState);
         const lockout = checkUnlockRateLimit(nextState);
@@ -94,16 +95,14 @@ export function registerLockUnlockHandlers(): void {
         })
       );
 
-      console.info(`${logPrefix} wallet unlocked`);
+      log.info('wallet unlocked');
       return { success: true };
     } catch (err) {
-      console.error(`${logPrefix} unlock failed`, err);
+      log.error('unlock failed', err);
       setBackgroundSessionUnlocked(false);
       return { success: false };
     }
   });
 
-  if (import.meta.env.DEV) {
-    console.debug(`${logPrefix} registered`);
-  }
+  log.debug('registered');
 }

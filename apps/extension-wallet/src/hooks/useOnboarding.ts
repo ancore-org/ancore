@@ -10,18 +10,13 @@ import { useAccountStore } from '@/stores/account';
 import { createDeployClient, type DeployClient } from '@/services/deploy-account';
 import { getSharedStorageManager } from '@/security/storage-manager';
 
+import { writeChromeLocal } from '@/background/chrome-api';
+
 /** chrome.storage.local key for the deployed smart-account C-address. */
 export const CONTRACT_ADDRESS_KEY = 'ancore_contract_address';
 
 async function persistContractAddress(contractId: string): Promise<void> {
-  const chromeRef = (globalThis as { chrome?: any }).chrome;
-  if (chromeRef?.storage?.local) {
-    await new Promise<void>((resolve) => {
-      chromeRef.storage.local.set({ [CONTRACT_ADDRESS_KEY]: contractId }, resolve);
-    });
-  } else {
-    localStorage.setItem(CONTRACT_ADDRESS_KEY, contractId);
-  }
+  await writeChromeLocal(CONTRACT_ADDRESS_KEY, contractId);
 }
 
 /**

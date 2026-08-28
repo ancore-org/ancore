@@ -37,6 +37,26 @@ describe('WalletApiSendStrategy', () => {
     const available = await strategy.isAvailable();
     expect(available).toBe(false);
   });
+
+  it('throws fee unavailable when simulated fee is unparseable', async () => {
+    vi.mock('@ancore/stellar', async (importOriginal) => {
+      const actual = await importOriginal<typeof import('@ancore/stellar')>();
+      return {
+        ...actual,
+        createStellarClient: () => ({
+          simulateTransaction: vi.fn().mockResolvedValue({ fee: 'not-a-number' }),
+        }),
+      };
+    });
+
+    const { WalletApiSendStrategy } = await import('../send-service');
+    const strategy = new WalletApiSendStrategy(TESTNET_DEPS);
+    await expect(strategy.estimateFee({ recipient: VALID_ADDRESS, amount: '10' })).rejects.toThrow(
+      'fee unavailable'
+    );
+
+    vi.doUnmock('@ancore/stellar');
+  });
 });
 
 // ---------------------------------------------------------------------------
@@ -83,8 +103,15 @@ describe('RelayerSendStrategy', () => {
     expect(fee.minBalance).toBe('0.0050100');
   });
 
-  it('send posts to /relay/execute and returns job ID', async () => {
-    const mockFetch = vi.fn(() =>
+  it('send posts to /relay/execute with a real signed payload (not the old hardcoded fake) and returns job ID', async () => {
+    vi.mock('@ancore/wallet-api', () => ({
+      signRelayPayload: vi.fn(async () => ({
+        sessionKey: 'cd'.repeat(32),
+        signature: 'ef'.repeat(64),
+      })),
+    }));
+
+    const mockFetch = vi.fn((_url: string, _init?: RequestInit) =>
       Promise.resolve(
         new Response(JSON.stringify({ success: true, jobId: 'job-123' }), {
           status: 200,
@@ -103,9 +130,21 @@ describe('RelayerSendStrategy', () => {
       expect.stringContaining('/relay/execute'),
       expect.objectContaining({ method: 'POST' })
     );
+
+    const sentBody = JSON.parse(mockFetch.mock.calls[0][1]?.body as string);
+    expect(sentBody.sessionKey).toBe('cd'.repeat(32));
+    expect(sentBody.signature).toBe('ef'.repeat(64));
+    expect(sentBody.sessionKey).not.toBe('a'.repeat(64));
+    expect(sentBody.signature).not.toBe('b'.repeat(128));
   });
 
   it('send throws on relayer error', async () => {
+    vi.mock('@ancore/wallet-api', () => ({
+      signRelayPayload: vi.fn(async () => ({
+        sessionKey: 'cd'.repeat(32),
+        signature: 'ef'.repeat(64),
+      })),
+    }));
     vi.stubGlobal(
       'fetch',
       vi.fn(() =>
@@ -125,6 +164,12 @@ describe('RelayerSendStrategy', () => {
   });
 
   it('send throws on non-ok response', async () => {
+    vi.mock('@ancore/wallet-api', () => ({
+      signRelayPayload: vi.fn(async () => ({
+        sessionKey: 'cd'.repeat(32),
+        signature: 'ef'.repeat(64),
+      })),
+    }));
     vi.stubGlobal(
       'fetch',
       vi.fn(() => Promise.resolve(new Response('Internal error', { status: 500 })))

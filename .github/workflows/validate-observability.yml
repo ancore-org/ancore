@@ -44,6 +44,8 @@ jobs:
 
       - name: Validate alertmanager config
         run: |
+          # shellcheck disable=SC2016  # single quotes are intentional: sed must
+          # see the literal ${VAR} placeholder, not a shell-expanded value.
           sed \
             -e 's|\${PAGERDUTY_ROUTING_KEY}|dummy-key|g' \
             -e 's|\${SLACK_WEBHOOK_URL}|http://dummy|g' \

@@ -1,5 +1,5 @@
 import * as React from 'react';
-import { SecureStorageManager } from '@ancore/core-sdk';
+import { verifyVaultPassword } from '@/security/vault-export';
 import { AlertTriangle, Eye, EyeOff, Check, Copy, Monitor, X } from 'lucide-react';
 import { Button, Input } from '@ancore/ui-kit';
 import {
@@ -213,7 +213,7 @@ function TransferLimitsView({ onDone }: { onDone: () => void }) {
       return;
     }
 
-    updateSettings({ dailyLimit: daily, transferStepUpThreshold: stepUp });
+    updateSettings({ dailyLimit: daily, stepUpThreshold: stepUp });
     setSuccess(true);
 
     setTimeout(() => {
@@ -649,11 +649,11 @@ function SecurityMenu({
               );
               if (!password) return;
 
-              const storage = SecureStorageManager.shared?.() ?? SecureStorageManager;
-
-              const vault: any = await storage.unlock(password);
-              if (typeof vault.verifyPassword === 'function') {
-                await vault.verifyPassword(password);
+              // SecureStorageManager has no static `shared`/`unlock`; the old
+              // call threw on every attempt. verifyVaultPassword re-auths
+              // against the real vault and re-locks it.
+              if (!(await verifyVaultPassword(password))) {
+                throw new Error('invalid password');
               }
 
               onRequirePasswordForSensitiveActionsChange(true);

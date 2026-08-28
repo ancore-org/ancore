@@ -1,6 +1,15 @@
 import { StellarClient, createStellarClient } from '@ancore/stellar';
-import { buildDefaultRelayPayload, resolveRelayerBaseUrl } from '@ancore/core-sdk';
-import { Operation, Asset, TransactionBuilder, Account } from '@stellar/stellar-sdk';
+import { buildSignedRelayPayload, resolveRelayerBaseUrl } from '@ancore/core-sdk';
+import { createWalletApiRelaySigner } from './relay-signer';
+import { NETWORK_PASSPHRASES } from '@ancore/wallet-shared';
+import {
+  Operation,
+  Asset,
+  TransactionBuilder,
+  Account,
+  Memo,
+  TimeoutInfinite,
+} from '@stellar/stellar-sdk';
 import type { Transaction } from '@stellar/stellar-sdk';
 
 // ---------------------------------------------------------------------------
@@ -92,7 +101,7 @@ export class WalletApiSendStrategy implements SendStrategy {
     });
     txBuilder.addOperation(this.buildPaymentOp(params));
     if (params.memo) {
-      txBuilder.addMemo(TransactionBuilder.Memo.text(params.memo));
+      txBuilder.addMemo(Memo.text(params.memo));
     }
     const unsignedTx = txBuilder.build();
     const unsignedXdr = unsignedTx.toXDR();
@@ -131,13 +140,7 @@ export class WalletApiSendStrategy implements SendStrategy {
   }
 
   private getNetworkPassphrase(): string {
-    const passphrases: Record<string, string> = {
-      testnet: 'Test SDF Network ; September 2015',
-      mainnet: 'Public Global Stellar Network ; September 2015',
-      futurenet: 'Test SDF Future Network ; October 2022',
-      local: 'Standalone Network ; February 2017',
-    };
-    return passphrases[this.network] ?? passphrases.testnet;
+    return NETWORK_PASSPHRASES[this.network] ?? NETWORK_PASSPHRASES.testnet;
   }
 
   private async estimateFeeFromNetwork(
@@ -157,16 +160,25 @@ export class WalletApiSendStrategy implements SendStrategy {
       for (const op of ops) {
         txBuilder.addOperation(op);
       }
+      // Required by stellar-sdk: build() throws without explicit timebounds.
+      // Omitting this made every estimate fall through to the static default.
+      txBuilder.setTimeout(TimeoutInfinite);
       const tx = txBuilder.build();
       const result = await client.simulateTransaction(tx.toXDR());
 
       if ('fee' in result) {
+        if (!Number.isFinite(Number(result.fee))) {
+          throw new Error('fee unavailable');
+        }
         return {
           baseFee: result.fee,
           minBalance: calculateMinBalance(result.fee),
         };
       }
-    } catch {
+    } catch (err) {
+      if (err instanceof Error && err.message === 'fee unavailable') {
+        throw err;
+      }
       // Fall through to default
     }
 
@@ -213,7 +225,8 @@ export class RelayerSendStrategy implements SendStrategy {
     const baseUrl = resolveRelayerBaseUrl();
     const token = this.getAuthToken ? await this.getAuthToken() : 'ancore-dashboard-token';
 
-    const payload = buildDefaultRelayPayload(params.recipient, params.amount);
+    const signer = await createWalletApiRelaySigner();
+    const payload = await buildSignedRelayPayload(params.recipient, params.amount, signer);
     const idempotencyKey = `dashboard-send-${Date.now()}-${Math.random().toString(36).slice(2)}`;
 
     const response = await this.fetchImpl(`${baseUrl}/relay/execute`, {
@@ -277,7 +290,10 @@ function resolveAsset(asset: SendParams['asset']): Asset {
 }
 
 function calculateMinBalance(feeXlm: string): string {
-  const feeNum = parseFloat(feeXlm) || 0;
+  const feeNum = parseFloat(feeXlm);
+  if (!Number.isFinite(feeNum)) {
+    throw new Error('fee unavailable');
+  }
   // Base reserve is 0.5 XLM + fee
   return (0.5 + feeNum).toFixed(7);
 }

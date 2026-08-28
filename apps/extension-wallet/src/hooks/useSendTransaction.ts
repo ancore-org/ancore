@@ -13,11 +13,12 @@ import { validateTransferPolicy } from '@ancore/types';
 import type { ScheduleConfig, TransferTiming } from '@/screens/Send/ScheduleControls';
 import { validateSchedule } from '@/utils/schedule-validation';
 import {
-  buildDefaultRelayPayload,
+  buildSignedRelayPayload,
   DEMO_ACCOUNT_ADDRESS,
   getExtensionSchedulerClient,
   toIsoStartAt,
   type SchedulerClient,
+  type RelaySigner,
 } from '@/services/scheduler-client';
 import { resolveHandle as defaultResolveHandle } from '@/services/handle-resolver';
 import type { SimulationState } from '@/screens/Send/SimulationPreview';
@@ -27,6 +28,24 @@ import { useDashboardSettingsStore } from '@/state/dashboard-settings';
 import { createProductionSendService } from '@/services/send-service';
 import { createStellarClient } from '@ancore/stellar';
 import { useAccountStore } from '@/stores/account';
+import { sendMessage } from '@/messaging';
+
+/**
+ * RelaySigner backed by the extension's own internal SIGN_RELAY_PAYLOAD
+ * handler (no bridge round-trip needed — this hook already runs inside the
+ * wallet; the handler computes its own sessionKey/signature, issue #1213).
+ */
+function createExtensionRelaySigner(): RelaySigner {
+  return {
+    async signRelayEnvelope({ operation, nonce }) {
+      const response = await sendMessage('SIGN_RELAY_PAYLOAD', { operation, nonce });
+      if ('error' in response) {
+        throw new Error(response.error);
+      }
+      return response;
+    },
+  };
+}
 export type SendStep = 'form' | 'review' | 'confirm' | 'status' | 'scheduled';
 export type TxStatus = 'idle' | 'pending' | 'confirmed' | 'failed';
 export type TransferPolicyAction = 'allow' | 'step_up' | 'block';
@@ -82,6 +101,8 @@ export interface UseSendTransactionOptions {
   balance?: number;
   /** Maximum decimal places allowed for the asset being sent. Defaults to 7 (XLM). */
   assetDecimals?: number;
+  /** Asset code shown in transfer-policy messages. Defaults to XLM. */
+  assetCode?: string;
   service?: SendService;
   pollIntervalMs?: number;
   dailyTransferLimit?: number;
@@ -167,6 +188,7 @@ export { validateSchedule } from '@/utils/schedule-validation';
 export function useSendTransaction(options: UseSendTransactionOptions = {}) {
   const balance = options.balance ?? DEFAULT_BALANCE;
   const assetDecimals = options.assetDecimals ?? 7;
+  const assetCode = options.assetCode ?? 'XLM';
   const pollIntervalMs = options.pollIntervalMs ?? DEFAULT_POLL_MS;
   const dailyTransferLimit = options.dailyTransferLimit ?? DEFAULT_DAILY_LIMIT;
   const transferStepUpThreshold = options.transferStepUpThreshold ?? DEFAULT_STEP_UP_THRESHOLD;
@@ -234,10 +256,15 @@ export function useSendTransaction(options: UseSendTransactionOptions = {}) {
 
       const numeric = Number(values.amount);
       if (!nextErrors.amount && Number.isFinite(numeric) && numeric > 0) {
-        const policyResult = validateTransferPolicy(numeric, todayTransferTotal, {
-          dailyLimit: dailyTransferLimit,
-          stepUpThreshold: transferStepUpThreshold,
-        });
+        const policyResult = validateTransferPolicy(
+          numeric,
+          todayTransferTotal,
+          {
+            dailyLimit: dailyTransferLimit,
+            stepUpThreshold: transferStepUpThreshold,
+          },
+          assetCode
+        );
         if (policyResult.action === 'block') {
           nextErrors.policy = policyResult.message;
         }
@@ -261,7 +288,14 @@ export function useSendTransaction(options: UseSendTransactionOptions = {}) {
         !nextErrors.simulation
       );
     },
-    [balance, assetDecimals, dailyTransferLimit, transferStepUpThreshold, todayTransferTotal]
+    [
+      balance,
+      assetDecimals,
+      assetCode,
+      dailyTransferLimit,
+      transferStepUpThreshold,
+      todayTransferTotal,
+    ]
   );
 
   const goToReview = useCallback(
@@ -305,10 +339,15 @@ export function useSendTransaction(options: UseSendTransactionOptions = {}) {
 
         // Determine policy action
         const numeric = Number(values.amount);
-        const policyResult = validateTransferPolicy(numeric, todayTransferTotal, {
-          dailyLimit: dailyTransferLimit,
-          stepUpThreshold: transferStepUpThreshold,
-        });
+        const policyResult = validateTransferPolicy(
+          numeric,
+          todayTransferTotal,
+          {
+            dailyLimit: dailyTransferLimit,
+            stepUpThreshold: transferStepUpThreshold,
+          },
+          assetCode
+        );
 
         setFee(estimatedFee);
         setTx({
@@ -420,8 +459,17 @@ export function useSendTransaction(options: UseSendTransactionOptions = {}) {
 
           const createScheduled =
             service.createScheduledTransfer ??
-            ((draft, scheduleConfig) =>
-              schedulerClient.createScheduledTransfer({
+            (async (draft, scheduleConfig) => {
+              const relaySigner = createExtensionRelaySigner();
+              const relayPayload = await buildSignedRelayPayload(
+                draft.to,
+                draft.amount,
+                relaySigner,
+                {
+                  accountAddress,
+                }
+              );
+              return schedulerClient.createScheduledTransfer({
                 accountAddress,
                 to: draft.to,
                 amount: draft.amount,
@@ -431,8 +479,9 @@ export function useSendTransaction(options: UseSendTransactionOptions = {}) {
                 endAt: scheduleConfig.endAt ? toIsoStartAt(scheduleConfig.endAt) : undefined,
                 note: draft.truncatedNote,
                 userApproved: true,
-                relayPayload: buildDefaultRelayPayload(draft.to, draft.amount),
-              }));
+                relayPayload,
+              });
+            });
 
           const created = await createScheduled(tx, schedule);
           setScheduledTransfer(created);

@@ -43,7 +43,10 @@ function resolveLinkPath(fromFile, linkTarget) {
  */
 function fileExists(filePath) {
   try {
-    return fs.statSync(filePath).isFile();
+    // Links to directories (e.g. "rfcs/", "./alerts/") are valid on GitHub —
+    // it renders the directory listing or its README. Accept either kind.
+    const stat = fs.statSync(filePath);
+    return stat.isFile() || stat.isDirectory();
   } catch {
     return false;
   }

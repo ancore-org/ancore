@@ -1,11 +1,12 @@
 import { z } from 'zod';
+import { amountStringSchema } from '../schemas/amount';
 
 /**
  * Invoice intent schema validates requests to create invoices.
  */
 export const InvoiceIntentSchema = z.object({
   type: z.literal('invoice'),
-  amount: z.string().regex(/^\d+(\.\d+)?$/, 'Invalid amount format'),
+  amount: amountStringSchema,
   asset: z.enum(['XLM', 'USDC']),
   recipient: z.string().min(1, 'Recipient is required'),
   dueDate: z.string().refine((date) => !isNaN(Date.parse(date)), {

@@ -21,7 +21,7 @@ if (typeof g.process === 'undefined') {
     env: { NODE_ENV: 'development' },
     browser: true,
     version: 'v20.0.0',
-  };
+  } as unknown as typeof g.process;
 } else if (!g.process.env) {
   g.process.env = { NODE_ENV: 'development' };
 }

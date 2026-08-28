@@ -141,19 +141,73 @@ export function validateMnemonic(mnemonic: string): boolean {
  * - Checksum (must pass BIP39 validation)
  *
  * @param mnemonic - The mnemonic phrase to validate
- * @throws {MnemonicValidationError} With specific error code and message
+ * @throws {MnemonicValidationError} With specific error code and message:
+ *   - `INVALID_TYPE`     — input is not a non-empty string
+ *   - `INVALID_LENGTH`   — word count is not 12 or 24
+ *   - `UNKNOWN_WORDS`    — one or more words are absent from the English BIP39 wordlist
+ *   - `INVALID_CHECKSUM` — words are valid but the BIP39 checksum fails
  *
- * @example
+ * @example Valid 12-word mnemonic (passes silently)
+ * ```typescript
+ * validateMnemonicStrength(
+ *   'abandon abandon abandon abandon abandon abandon ' +
+ *   'abandon abandon abandon abandon abandon about'
+ * );
+ * ```
+ *
+ * @example Valid 24-word mnemonic (passes silently)
+ * ```typescript
+ * validateMnemonicStrength(
+ *   'abandon abandon abandon abandon abandon abandon abandon abandon ' +
+ *   'abandon abandon abandon abandon abandon abandon abandon abandon ' +
+ *   'abandon abandon abandon abandon abandon abandon abandon art'
+ * );
+ * ```
+ *
+ * @example INVALID_TYPE — empty string
  * ```typescript
  * try {
- *   validateMnemonicStrength(userInput);
- *   // Proceed with import
+ *   validateMnemonicStrength('');
  * } catch (err) {
- *   if (err instanceof MnemonicValidationError) {
- *     // Display err.message to user based on err.code
- *   }
+ *   // err.code === 'INVALID_TYPE'
  * }
  * ```
+ *
+ * @example INVALID_LENGTH — wrong word count
+ * ```typescript
+ * try {
+ *   validateMnemonicStrength('abandon abandon abandon');
+ * } catch (err) {
+ *   // err.code === 'INVALID_LENGTH', err.message contains '3'
+ * }
+ * ```
+ *
+ * @example UNKNOWN_WORDS — non-BIP39 word
+ * ```typescript
+ * try {
+ *   validateMnemonicStrength(
+ *     'notaword abandon abandon abandon abandon abandon ' +
+ *     'abandon abandon abandon abandon abandon about'
+ *   );
+ * } catch (err) {
+ *   // err.code === 'UNKNOWN_WORDS', err.details lists the offending words
+ * }
+ * ```
+ *
+ * @example INVALID_CHECKSUM — all valid words but wrong checksum
+ * ```typescript
+ * try {
+ *   validateMnemonicStrength(
+ *     'abandon abandon abandon abandon abandon abandon ' +
+ *     'abandon abandon abandon abandon about abandon'
+ *   );
+ * } catch (err) {
+ *   // err.code === 'INVALID_CHECKSUM'
+ * }
+ * ```
+ *
+ * Unit vectors are maintained in
+ * `src/__tests__/vectors/mnemonic-strength-vectors.json`.
  */
 export function validateMnemonicStrength(mnemonic: string): void {
   if (!mnemonic || typeof mnemonic !== 'string') {

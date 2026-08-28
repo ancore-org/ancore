@@ -1,6 +1,7 @@
 import React from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { useHardwareWalletStore } from '@/stores/hardware-wallet';
+import { ShieldCheck, X } from 'lucide-react';
 
 function useRequestId(propsRequestId?: string): string | null {
   const [searchParams] = useSearchParams();
@@ -17,11 +18,14 @@ export function SignTransactionApprovalScreen({
   title = 'Sign Transaction',
   subtitle = 'Review and approve the transaction',
   description = 'A dApp is requesting to sign a transaction. Approve only if you trust the source.',
+  requestType = 'sign-transaction',
 }: {
   requestId?: string;
   title?: string;
   subtitle?: string;
   description?: string;
+  /** Determines which message types to send to the background on approve/reject. */
+  requestType?: 'sign-transaction' | 'sign-auth-entry';
 }) {
   const requestId = useRequestId(propRequestId);
   const [done, setDone] = React.useState(false);
@@ -88,44 +92,73 @@ export function SignTransactionApprovalScreen({
   }
 
   return (
-    <div className="flex min-h-screen flex-col bg-background">
-      <header className="bg-gradient-to-br from-primary to-purple-800 px-5 pb-6 pt-8 text-white">
-        <h1 className="text-2xl font-bold tracking-tight">{title}</h1>
-        <p className="mt-1 text-sm text-white/70">{subtitle}</p>
+    <div className="wallet-sheet">
+      <header className="wallet-header">
+        <div>
+          <p className="wallet-kicker">Approval request</p>
+          <h1 className="wallet-title mt-1">{title}</h1>
+        </div>
+        <button
+          aria-label="Reject request"
+          className="wallet-icon-btn"
+          disabled={submitting}
+          onClick={() => sendToBackground('reject')}
+          type="button"
+        >
+          <X className="h-5 w-5" />
+        </button>
       </header>
-      <main className="flex-1 space-y-4 p-4">
-        <section className="rounded-2xl border border-border bg-card p-4 shadow-sm">
-          <h2 className="text-sm font-semibold text-foreground">Request</h2>
-          <p className="mt-2 text-sm text-muted-foreground">ID: {requestId}</p>
-          <p className="text-sm text-muted-foreground">{description}</p>
+      <main className="flex flex-1 flex-col px-5 pb-6 pt-8">
+        <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-primary/10 text-primary">
+          <ShieldCheck className="h-7 w-7" strokeWidth={1.8} />
+        </div>
+        <div className="mt-6 text-center">
+          <h2 className="text-[22px] font-semibold tracking-[-0.03em] text-foreground">
+            {subtitle}
+          </h2>
+          <p className="mx-auto mt-2 max-w-[290px] text-[13px] leading-5 text-muted-foreground">
+            {description}
+          </p>
+        </div>
+
+        <section className="wallet-card mt-8">
+          <div className="flex items-center justify-between gap-4">
+            <span className="text-[11px] uppercase tracking-[0.14em] text-muted-foreground">
+              Request
+            </span>
+            <span className="max-w-[190px] overflow-hidden text-ellipsis whitespace-nowrap font-mono text-[11px] text-foreground">
+              {requestId}
+            </span>
+          </div>
           {hardwarePreferred && (
-            <p className="mt-3 rounded-lg bg-muted px-3 py-2 text-sm text-foreground">
+            <p className="mt-4 rounded-[14px] bg-accent px-3 py-3 text-[12px] leading-5 text-foreground">
               Ledger signing is enabled. Confirm the transaction on your device after approving.
             </p>
           )}
           {devicePrompt && (
-            <p className="mt-2 text-sm font-medium text-primary" role="status">
+            <p className="mt-3 text-[12px] font-medium text-primary" role="status">
               Waiting for Ledger confirmation…
             </p>
           )}
         </section>
-        <div className="flex gap-3">
-          <button
-            className="flex-1 rounded-xl border border-border px-4 py-3 text-sm font-semibold text-foreground transition hover:bg-accent disabled:opacity-50"
-            disabled={submitting}
-            onClick={() => sendToBackground('reject')}
-            type="button"
-          >
-            Reject
-          </button>
+
+        <div className="mt-auto space-y-3 pt-10">
           <button
             ref={approveRef}
-            className="flex-1 rounded-xl bg-primary px-4 py-3 text-sm font-semibold text-primary-foreground transition hover:opacity-90 disabled:opacity-50"
+            className="wallet-pill-btn"
             disabled={submitting}
             onClick={() => sendToBackground('approve')}
             type="button"
           >
             {hardwarePreferred ? 'Approve on Ledger' : 'Approve'}
+          </button>
+          <button
+            className="w-full py-2 text-[13px] font-medium text-muted-foreground transition-colors hover:text-foreground disabled:opacity-50"
+            disabled={submitting}
+            onClick={() => sendToBackground('reject')}
+            type="button"
+          >
+            Reject
           </button>
         </div>
       </main>

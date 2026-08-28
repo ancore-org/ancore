@@ -23,6 +23,10 @@ export const WALLET_API_SOURCE = 'ancore-wallet-api@1' as const;
  * External API methods exposed to dApps.
  * Freighter equivalent: requestAccess, getAddress, signTransaction, signAuthEntry, …
  * Ancore adds smart-account fields where AA differs from classic G-address wallets.
+ *
+ * SECURITY: This set is the authoritative whitelist of methods the content script
+ * will accept from dApp pages. Any method not listed here is rejected before
+ * reaching the background service worker.
  */
 export const ExternalApiMethod = {
   REQUEST_ACCESS: 'requestAccess',
@@ -31,9 +35,11 @@ export const ExternalApiMethod = {
   GET_NETWORK: 'getNetwork',
   IS_CONNECTED: 'isConnected',
   GET_SMART_ACCOUNT: 'getSmartAccount',
+  GET_PUBLIC_KEY: 'getPublicKey',
   SIGN_TRANSACTION: 'signTransaction',
   SIGN_AUTH_ENTRY: 'signAuthEntry',
   SIGN_MESSAGE: 'signMessage',
+  SIGN_RELAY_PAYLOAD: 'signRelayPayload',
   REQUEST_SESSION_KEY: 'requestSessionKey',
 } as const;
 

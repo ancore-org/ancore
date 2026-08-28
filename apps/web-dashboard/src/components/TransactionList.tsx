@@ -9,7 +9,7 @@ import {
   EmptyState,
 } from '@ancore/ui-kit';
 import { Download, Clock, ChevronUp, ChevronDown, Inbox, SearchX } from 'lucide-react';
-import type { Transaction } from '../types/dashboard';
+import type { Transaction, TransactionStatus } from '../types/dashboard';
 import { useTableDensity } from '../contexts/TableDensityContext';
 import { formatTxDate } from '../lib/formatDate';
 
@@ -117,14 +117,17 @@ export const TransactionList: React.FC<TransactionListProps> = ({
     window.URL.revokeObjectURL(url);
   };
 
-  const getStatusBadgeVariant = (status: 'confirmed' | 'pending', isOptimistic: boolean) => {
+  const getStatusBadgeVariant = (status: TransactionStatus, isOptimistic: boolean) => {
     if (isOptimistic && status === 'pending') {
       return 'secondary';
+    }
+    if (status === 'failed') {
+      return 'destructive';
     }
     return status === 'confirmed' ? 'default' : 'secondary';
   };
 
-  const getStatusDisplay = (status: 'confirmed' | 'pending', isOptimistic: boolean) => {
+  const getStatusDisplay = (status: TransactionStatus, isOptimistic: boolean) => {
     if (isOptimistic && status === 'pending') {
       return 'pending (optimistic)';
     }

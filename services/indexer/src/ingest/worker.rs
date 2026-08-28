@@ -4,13 +4,20 @@
 //! them into [`CanonicalEvent`]s, persists them, and advances the checkpoint
 //! cursor.  Out-of-order events (ledger_seq ≤ last checkpoint) are silently
 //! skipped to guarantee idempotent restarts.
+//!
+//! Events that fail normalisation are written to a [`DeadLetterStore`] and
+//! counted via [`crate::metrics::record_normalise_failure`] so failures are
+//! observable and recoverable rather than silently dropped.
 
 use anyhow::Context;
-use tracing::{debug, info, warn};
+use chrono::Utc;
+use tracing::{debug, error, info, warn};
 
 use super::checkpoint::{Checkpoint, CheckpointStore, MemoryCheckpointStore};
+use super::dead_letter::{DeadLetterRecord, DeadLetterStore, MemoryDeadLetterStore};
 use super::sink::EventSink;
 use super::source::EventSource;
+use crate::metrics;
 use crate::schema::canonical::{normalise, CanonicalEvent};
 
 // ── Worker ────────────────────────────────────────────────────────────────────
@@ -41,20 +48,23 @@ pub struct BatchStats {
     pub normalised: usize,
     pub persisted: usize,
     pub errors: usize,
+    /// Events written to the dead-letter store after a normalisation failure.
+    pub dead_lettered: usize,
 }
 
 /// The ingestion worker.
 ///
 /// Designed to be testable without a real database: the checkpoint store,
-/// event source, and event sink are all injected as trait objects.
-pub struct IngestWorker<Src, Snk, Cp = MemoryCheckpointStore> {
+/// event source, event sink, and dead-letter store are all injected.
+pub struct IngestWorker<Src, Snk, Cp = MemoryCheckpointStore, Dl = MemoryDeadLetterStore> {
     config: WorkerConfig,
     checkpoint: Cp,
     source: Src,
     sink: Snk,
+    dead_letters: Dl,
 }
 
-impl<Src, Snk> IngestWorker<Src, Snk, MemoryCheckpointStore>
+impl<Src, Snk> IngestWorker<Src, Snk, MemoryCheckpointStore, MemoryDeadLetterStore>
 where
     Src: EventSource,
     Snk: EventSink,
@@ -65,6 +75,7 @@ where
             checkpoint: MemoryCheckpointStore::default(),
             source,
             sink,
+            dead_letters: MemoryDeadLetterStore::default(),
         }
     }
 
@@ -75,7 +86,7 @@ where
     }
 }
 
-impl<Src, Snk, Cp> IngestWorker<Src, Snk, Cp>
+impl<Src, Snk, Cp> IngestWorker<Src, Snk, Cp, MemoryDeadLetterStore>
 where
     Src: EventSource,
     Snk: EventSink,
@@ -92,6 +103,29 @@ where
             checkpoint,
             source,
             sink,
+            dead_letters: MemoryDeadLetterStore::default(),
+        }
+    }
+}
+
+impl<Src, Snk, Cp, Dl> IngestWorker<Src, Snk, Cp, Dl>
+where
+    Src: EventSource,
+    Snk: EventSink,
+    Cp: CheckpointStore,
+    Dl: DeadLetterStore,
+{
+    /// Replace the dead-letter store (defaults to [`MemoryDeadLetterStore`]).
+    pub fn with_dead_letter_store<D: DeadLetterStore>(
+        self,
+        dead_letters: D,
+    ) -> IngestWorker<Src, Snk, Cp, D> {
+        IngestWorker {
+            config: self.config,
+            checkpoint: self.checkpoint,
+            source: self.source,
+            sink: self.sink,
+            dead_letters,
         }
     }
 
@@ -143,6 +177,7 @@ where
         }
 
         let mut canonical: Vec<CanonicalEvent> = Vec::with_capacity(raw_events.len());
+        let mut failures: Vec<DeadLetterRecord> = Vec::new();
         let mut max_ledger = last_seq;
 
         for raw in raw_events {
@@ -156,17 +191,45 @@ where
                 continue;
             }
 
-            match normalise(raw) {
+            let ledger_seq = raw.ledger_seq;
+            match normalise(raw.clone()) {
                 Ok(ev) => {
                     max_ledger = max_ledger.max(ev.ledger_seq);
                     canonical.push(ev);
                     stats.normalised += 1;
                 }
                 Err(e) => {
-                    warn!(error = %e, "failed to normalise event, skipping");
+                    metrics::record_normalise_failure();
+                    error!(
+                        error = %e,
+                        ledger_seq,
+                        tx_hash = %raw.tx_hash,
+                        contract_id = %raw.contract_id,
+                        raw_payload = ?raw,
+                        "failed to normalise event; writing to dead-letter store"
+                    );
+                    failures.push(DeadLetterRecord {
+                        stream: self.config.stream.clone(),
+                        ledger_seq,
+                        error: e.to_string(),
+                        raw,
+                        failed_at: Utc::now(),
+                    });
+                    // Advance past the failed ledger once it is queued for DLQ —
+                    // recovery is via reprocessing dead letters, not by stalling.
+                    max_ledger = max_ledger.max(ledger_seq);
                     stats.errors += 1;
                 }
             }
+        }
+
+        if !failures.is_empty() {
+            let count = failures.len();
+            self.dead_letters
+                .persist_failures(&failures)
+                .await
+                .context("persist dead-letter records")?;
+            stats.dead_lettered = count;
         }
 
         if !canonical.is_empty() {
@@ -175,8 +238,11 @@ where
                 .await
                 .context("persist canonical events")?;
             stats.persisted = canonical.len();
+        }
 
-            // Advance checkpoint only after successful persist
+        // Advance checkpoint after successful sink + DLQ writes so we do not
+        // re-fetch events that were either persisted or dead-lettered.
+        if max_ledger > last_seq {
             self.checkpoint
                 .save(&Checkpoint {
                     stream: self.config.stream.clone(),
@@ -188,6 +254,7 @@ where
             info!(
                 stream = %self.config.stream,
                 persisted = stats.persisted,
+                dead_lettered = stats.dead_lettered,
                 max_ledger,
                 "batch committed"
             );
@@ -204,6 +271,11 @@ where
             .ok()
             .flatten()
     }
+
+    /// Borrow the dead-letter store (for inspection / testing).
+    pub fn dead_letter_store(&self) -> &Dl {
+        &self.dead_letters
+    }
 }
 
 // ── Tests ─────────────────────────────────────────────────────────────────────
@@ -211,6 +283,7 @@ where
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::ingest::dead_letter::FailingDeadLetterStore;
     use crate::ingest::sink::MemorySink;
     use crate::ingest::source::VecSource;
     use crate::schema::canonical::RawEvent;
@@ -239,6 +312,7 @@ mod tests {
         assert_eq!(stats.normalised, 2);
         assert_eq!(stats.persisted, 2);
         assert_eq!(stats.skipped, 0);
+        assert_eq!(stats.dead_lettered, 0);
         assert_eq!(
             worker.current_checkpoint().await.unwrap().last_ledger_seq,
             2
@@ -249,7 +323,6 @@ mod tests {
     async fn skips_out_of_order_events() {
         let source = VecSource::new(vec![raw(5, "transfer"), raw(3, "transfer")]);
         let sink = MemorySink::default();
-        // Seed checkpoint at ledger 4 — ledger 3 is behind, ledger 5 is ahead
         let mut worker = IngestWorker::new(WorkerConfig::default(), source, sink)
             .with_initial_checkpoint(Checkpoint {
                 stream: "main".into(),
@@ -259,8 +332,8 @@ mod tests {
         let stats = worker.run_once().await.unwrap();
 
         assert_eq!(stats.fetched, 2);
-        assert_eq!(stats.skipped, 1); // ledger 3 skipped
-        assert_eq!(stats.normalised, 1); // ledger 5 processed
+        assert_eq!(stats.skipped, 1);
+        assert_eq!(stats.normalised, 1);
         assert_eq!(
             worker.current_checkpoint().await.unwrap().last_ledger_seq,
             5
@@ -269,7 +342,6 @@ mod tests {
 
     #[tokio::test]
     async fn restart_recovery_resumes_from_checkpoint() {
-        // First run: process ledgers 1-3
         let source1 = VecSource::new(vec![
             raw(1, "transfer"),
             raw(2, "transfer"),
@@ -282,7 +354,6 @@ mod tests {
         let cp = worker.current_checkpoint().await.unwrap();
         assert_eq!(cp.last_ledger_seq, 3);
 
-        // Simulate restart: new worker seeded with saved checkpoint
         let source2 = VecSource::new(vec![
             raw(2, "transfer"),
             raw(3, "transfer"),
@@ -294,7 +365,6 @@ mod tests {
 
         let stats = worker2.run_once().await.unwrap();
 
-        // Ledgers 2 and 3 are behind the checkpoint — only 4 should be processed
         assert_eq!(stats.skipped, 2);
         assert_eq!(stats.normalised, 1);
         assert_eq!(
@@ -317,8 +387,7 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn normalisation_error_increments_error_count() {
-        // A raw event with an empty tx_hash will fail normalisation
+    async fn normalisation_failure_writes_dead_letter_and_increments_errors() {
         let mut bad = raw(10, "transfer");
         bad.tx_hash = String::new();
 
@@ -329,8 +398,16 @@ mod tests {
         let stats = worker.run_once().await.unwrap();
 
         assert_eq!(stats.errors, 1);
+        assert_eq!(stats.dead_lettered, 1);
         assert_eq!(stats.normalised, 1);
-        // Checkpoint advances to the highest successfully processed ledger
+        assert_eq!(stats.persisted, 1);
+
+        let dlq = worker.dead_letter_store();
+        assert_eq!(dlq.records.len(), 1);
+        assert_eq!(dlq.records[0].ledger_seq, 10);
+        assert_eq!(dlq.records[0].raw.tx_hash, "");
+        assert!(dlq.records[0].error.contains("tx_hash"));
+
         assert_eq!(
             worker.current_checkpoint().await.unwrap().last_ledger_seq,
             11
@@ -338,10 +415,45 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn normalisation_failure_only_still_advances_checkpoint_after_dlq() {
+        let mut bad = raw(7, "transfer");
+        bad.tx_hash = String::new();
+
+        let source = VecSource::new(vec![bad]);
+        let sink = MemorySink::default();
+        let mut worker = IngestWorker::new(WorkerConfig::default(), source, sink);
+
+        let stats = worker.run_once().await.unwrap();
+
+        assert_eq!(stats.errors, 1);
+        assert_eq!(stats.dead_lettered, 1);
+        assert_eq!(stats.persisted, 0);
+        assert_eq!(worker.dead_letter_store().records.len(), 1);
+        assert_eq!(
+            worker.current_checkpoint().await.unwrap().last_ledger_seq,
+            7
+        );
+    }
+
+    #[tokio::test]
+    async fn dead_letter_store_failure_aborts_batch_without_advancing_checkpoint() {
+        let mut bad = raw(10, "transfer");
+        bad.tx_hash = String::new();
+
+        let source = VecSource::new(vec![bad, raw(11, "transfer")]);
+        let sink = MemorySink::default();
+        let mut worker = IngestWorker::new(WorkerConfig::default(), source, sink)
+            .with_dead_letter_store(FailingDeadLetterStore);
+
+        let err = worker.run_once().await.unwrap_err();
+        assert!(err.to_string().contains("dead-letter"));
+        assert!(worker.current_checkpoint().await.is_none());
+    }
+
+    #[tokio::test]
     async fn checkpoint_not_advanced_when_nothing_persisted() {
         let source = VecSource::new(vec![raw(1, "transfer")]);
         let sink = MemorySink::default();
-        // Checkpoint already at 5 — ledger 1 will be skipped
         let mut worker = IngestWorker::new(WorkerConfig::default(), source, sink)
             .with_initial_checkpoint(Checkpoint {
                 stream: "main".into(),
@@ -350,7 +462,6 @@ mod tests {
 
         worker.run_once().await.unwrap();
 
-        // Checkpoint must not regress
         assert_eq!(
             worker.current_checkpoint().await.unwrap().last_ledger_seq,
             5

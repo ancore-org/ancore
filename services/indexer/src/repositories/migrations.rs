@@ -13,7 +13,7 @@ use sqlx::{PgPool, Row};
 ///
 /// Bump this in the same commit that adds a migration file — it is the
 /// reference point `/health` compares the live ledger against.
-pub const EXPECTED_SCHEMA_VERSION: i32 = 5;
+pub const EXPECTED_SCHEMA_VERSION: i32 = 8;
 
 /// Where the database stands relative to [`EXPECTED_SCHEMA_VERSION`].
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]

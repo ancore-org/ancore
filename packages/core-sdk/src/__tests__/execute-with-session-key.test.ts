@@ -76,6 +76,25 @@ describe('execute-with-session-key', () => {
     ).rejects.toBeInstanceOf(SessionKeyExecutionValidationError);
   });
 
+  it('rejects a missing signer', async () => {
+    const client = new AncoreClient({
+      accountContract: { execute: jest.fn() } as any,
+      executionLayer: { executeWithSessionKey: jest.fn() },
+    });
+
+    for (const signer of [undefined, null]) {
+      await expect(
+        client.executeWithSessionKey({
+          target: VALID_CONTRACT,
+          function: 'transfer',
+          args: [],
+          expectedNonce: 0,
+          signer: signer as any,
+        })
+      ).rejects.toThrow(/signer\.publicKey must be a valid Stellar Ed25519 public key/);
+    }
+  });
+
   it('validates function name, args, nonce, and signer fields', async () => {
     const client = new AncoreClient({
       accountContract: { execute: jest.fn() } as any,

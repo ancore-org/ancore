@@ -48,7 +48,7 @@ export function ScheduledTransfersPage() {
     <div className="space-y-6">
       <section>
         <h2 className="text-2xl font-semibold">Scheduled Transfers</h2>
-        <p className="mt-2 text-sm text-slate-600">
+        <p className="mt-2 text-sm text-muted-foreground">
           Create one-time or recurring transfers with explicit approval. Execution outcomes appear
           below after each run.
         </p>
@@ -63,7 +63,7 @@ export function ScheduledTransfersPage() {
             <label className="block text-sm">
               Recipient
               <input
-                className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2"
+                className="dashboard-field mt-2"
                 value={form.to}
                 onChange={(event) => setForm((current) => ({ ...current, to: event.target.value }))}
                 placeholder="G..."
@@ -73,7 +73,7 @@ export function ScheduledTransfersPage() {
             <label className="block text-sm">
               Amount (XLM)
               <input
-                className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2"
+                className="dashboard-field mt-2"
                 value={form.amount}
                 onChange={(event) =>
                   setForm((current) => ({ ...current, amount: event.target.value }))
@@ -84,7 +84,7 @@ export function ScheduledTransfersPage() {
             <label className="block text-sm">
               Frequency
               <select
-                className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2"
+                className="dashboard-field mt-2"
                 value={form.frequency}
                 onChange={(event) =>
                   setForm((current) => ({
@@ -104,7 +104,7 @@ export function ScheduledTransfersPage() {
               Start date & time
               <input
                 type="datetime-local"
-                className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2"
+                className="dashboard-field mt-2"
                 value={form.startAt}
                 onChange={(event) =>
                   setForm((current) => ({ ...current, startAt: event.target.value }))
@@ -117,7 +117,7 @@ export function ScheduledTransfersPage() {
                 End date (optional)
                 <input
                   type="datetime-local"
-                  className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2"
+                  className="dashboard-field mt-2"
                   value={form.endAt ?? ''}
                   onChange={(event) =>
                     setForm((current) => ({
@@ -142,7 +142,7 @@ export function ScheduledTransfersPage() {
               </Button>
             </div>
           </form>
-          {error && <p className="mt-3 text-sm text-red-600">{error}</p>}
+          {error && <p className="mt-3 text-sm text-destructive">{error}</p>}
         </CardContent>
       </Card>
 
@@ -151,23 +151,25 @@ export function ScheduledTransfersPage() {
           <CardTitle>Scheduled jobs</CardTitle>
         </CardHeader>
         <CardContent className="space-y-4">
-          {loading && <p className="text-sm text-slate-500">Loading scheduled transfers...</p>}
+          {loading && (
+            <p className="text-sm text-muted-foreground">Loading scheduled transfers...</p>
+          )}
           {!loading && transfers.length === 0 && (
-            <p className="text-sm text-slate-500">No scheduled transfers yet.</p>
+            <p className="text-sm text-muted-foreground">No scheduled transfers yet.</p>
           )}
           {transfers.map((transfer) => {
             const transferExecutions = executions[transfer.id] ?? [];
             return (
               <div
                 key={transfer.id}
-                className="space-y-3 border-b border-slate-200 pb-4 last:border-0 last:pb-0"
+                className="space-y-3 border-b border-border pb-4 last:border-0 last:pb-0"
               >
                 <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
                   <div>
                     <p className="font-medium">
                       {transfer.amount} {transfer.asset} → {transfer.to.slice(0, 12)}...
                     </p>
-                    <p className="text-sm text-slate-500">
+                    <p className="text-sm text-muted-foreground">
                       {transfer.frequency} · next run{' '}
                       {new Date(transfer.nextRunAt).toLocaleString()}
                     </p>

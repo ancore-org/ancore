@@ -46,7 +46,36 @@ function isLegacyStorageAdapter(
   return typeof (storage as StorageAdapter).remove === 'function';
 }
 
-function normalizeStorageAdapter(
+/**
+ * Parse only JSON object/array containers. Never coerce JSON scalars
+ * (`true`, `null`, `1e3`, …) — those must remain plain strings so
+ * round-trips stay byte-identical. Inferring JSON-ness from bare
+ * `JSON.parse` success is unsafe.
+ */
+export function tryParseStructuredJson(value: string): object | undefined {
+  const first = value.trimStart()[0];
+  if (first !== '{' && first !== '[') {
+    return undefined;
+  }
+
+  try {
+    const parsed: unknown = JSON.parse(value);
+    if (parsed !== null && typeof parsed === 'object') {
+      return parsed;
+    }
+  } catch {
+    // Invalid JSON — keep the original string.
+  }
+
+  return undefined;
+}
+
+/**
+ * Bridge a legacy `StorageAdapter` (typed `unknown` values) to the
+ * string-only `PlatformStorageAdapter` surface used by SecureStorageManager.
+ * Structured JSON is stored as native objects; everything else as strings.
+ */
+export function normalizeStorageAdapter(
   storage: PlatformStorageAdapter | StorageAdapter
 ): PlatformStorageAdapter {
   if (!isLegacyStorageAdapter(storage)) {
@@ -62,11 +91,8 @@ function normalizeStorageAdapter(
       return typeof value === 'string' ? value : JSON.stringify(value);
     },
     set: async (key, value) => {
-      try {
-        await storage.set(key, JSON.parse(value));
-      } catch {
-        await storage.set(key, value);
-      }
+      const structured = tryParseStructuredJson(value);
+      await storage.set(key, structured !== undefined ? structured : value);
     },
     delete: (key) => storage.remove(key),
   };
@@ -160,7 +186,18 @@ export class SecureStorageManager {
   }
 
   /**
-   * Clears the in-memory keys.
+   * Locks the storage manager by clearing the in-memory encryption key and
+   * cancelling any pending auto-lock timer. Call this when the user logs out
+   * or the session should end immediately.
+   *
+   * @example
+   * ```typescript
+   * const manager = new SecureStorageManager(storage);
+   * await manager.unlock('my-password');
+   * // ... do work ...
+   * manager.lock(); // key wiped from memory
+   * console.log(manager.isUnlocked); // false
+   * ```
    */
   public lock(): void {
     this.encryptionKey = null;
@@ -170,6 +207,17 @@ export class SecureStorageManager {
     }
   }
 
+  /**
+   * Whether the storage manager is currently unlocked and ready for
+   * encrypted reads/writes.
+   *
+   * @example
+   * ```typescript
+   * if (!manager.isUnlocked) {
+   *   await manager.unlock(password);
+   * }
+   * ```
+   */
   public get isUnlocked(): boolean {
     return this.encryptionKey !== null;
   }
@@ -355,10 +403,38 @@ export class SecureStorageManager {
     }
   }
 
+  /**
+   * Saves the primary account data to encrypted storage.
+   * The manager must be unlocked before calling this method.
+   *
+   * @param account - Account data to persist (addresses, keys metadata, etc.)
+   * @throws Error if the storage manager is locked
+   *
+   * @example
+   * ```typescript
+   * await manager.unlock('my-password');
+   * await manager.saveAccount({ address: 'G...', contractId: 'C...' });
+   * ```
+   */
   public async saveAccount(account: AccountData): Promise<void> {
     await this.saveItem('account', account);
   }
 
+  /**
+   * Retrieves the primary account data from encrypted storage.
+   * Returns `null` if no account has been saved yet.
+   *
+   * @returns The stored account data, or `null` if absent
+   * @throws Error if the storage manager is locked
+   *
+   * @example
+   * ```typescript
+   * const account = await manager.getAccount();
+   * if (account) {
+   *   console.log(account.address);
+   * }
+   * ```
+   */
   public async getAccount(): Promise<AccountData | null> {
     return this.getItem<AccountData>('account');
   }
@@ -379,6 +455,21 @@ export class SecureStorageManager {
     return (await this.getItem<RecentRecipientsData>('recentRecipients')) ?? { recipients: [] };
   }
 
+  /**
+   * Encrypts and persists an arbitrary JSON-serialisable value under `key`.
+   * Use typed helpers (`saveAccount`, `saveSessionKeys`, etc.) for well-known
+   * keys; use this for extension-specific or adapter-specific data.
+   *
+   * @param key - Storage key
+   * @param value - Any JSON-serialisable value
+   * @throws Error if the storage manager is locked
+   *
+   * @example
+   * ```typescript
+   * await manager.saveItem('customSettings', { theme: 'dark' });
+   * const settings = await manager.getItem<{ theme: string }>('customSettings');
+   * ```
+   */
   public async saveItem(key: string, value: unknown): Promise<void> {
     this.assertUnlocked();
 
@@ -387,6 +478,20 @@ export class SecureStorageManager {
     this.touch();
   }
 
+  /**
+   * Decrypts and returns the value stored under `key`, cast to `T`.
+   * Returns `null` if the key does not exist or the payload is unreadable.
+   *
+   * @param key - Storage key used in a prior `saveItem` call
+   * @returns The decrypted value cast to `T`, or `null`
+   * @throws Error if the storage manager is locked
+   *
+   * @example
+   * ```typescript
+   * const settings = await manager.getItem<{ theme: string }>('customSettings');
+   * console.log(settings?.theme); // 'dark'
+   * ```
+   */
   public async getItem<T>(key: string): Promise<T | null> {
     this.assertUnlocked();
 
@@ -404,10 +509,37 @@ export class SecureStorageManager {
     }
   }
 
+  /**
+   * Deletes a single key from storage without requiring the manager to be
+   * unlocked. Useful for clearing stale or corrupted entries.
+   *
+   * @param key - Storage key to remove
+   *
+   * @example
+   * ```typescript
+   * await manager.deleteItem('staleSessionKey');
+   * ```
+   */
   public async deleteItem(key: string): Promise<void> {
     await this.storage.delete(key);
   }
 
+  /**
+   * Wipes all vault data (master salt, verification payload, account, session
+   * keys, recent recipients) and any additional keys provided, then locks the
+   * manager. Use this for wallet reset / account removal flows.
+   *
+   * @param additionalKeys - Extra storage keys to delete alongside the defaults
+   *
+   * @example
+   * ```typescript
+   * // Full wallet wipe
+   * await manager.reset();
+   *
+   * // Wipe vault + custom adapter keys
+   * await manager.reset(['myAdapterKey', 'anotherKey']);
+   * ```
+   */
   public async reset(additionalKeys: string[] = []): Promise<void> {
     const keys = new Set<string>([
       MASTER_SALT_STORAGE_KEY,

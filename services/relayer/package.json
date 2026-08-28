@@ -7,7 +7,8 @@
     "build": "tsc --project tsconfig.json",
     "test": "jest --coverage",
     "lint": "eslint src/",
-    "check:log-redaction": "node scripts/check-log-redaction.js"
+    "check:log-redaction": "node scripts/check-log-redaction.js",
+    "typecheck": "tsc --noEmit"
   },
   "keywords": [
     "ancore",
@@ -18,10 +19,16 @@
   "license": "Apache-2.0",
   "dependencies": {
     "@ancore/stellar": "workspace:*",
+    "@ancore/wallet-shared": "workspace:*",
     "@ancore/test-fixtures": "workspace:*",
     "@ancore/types": "workspace:*",
     "@opentelemetry/api": "^1.9.1",
+    "@opentelemetry/auto-instrumentations-node": "^0.75.0",
+    "@opentelemetry/exporter-trace-otlp-proto": "^0.219.0",
+    "@opentelemetry/resources": "^2.0.0",
     "@opentelemetry/sdk-node": "^0.219.0",
+    "@opentelemetry/sdk-trace-base": "^2.0.0",
+    "@opentelemetry/semantic-conventions": "^1.30.0",
     "@stellar/stellar-sdk": "^13.3.0",
     "cors": "^2.8.5",
     "express": "^4.18.2",

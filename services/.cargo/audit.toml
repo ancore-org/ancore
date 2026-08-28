@@ -1,0 +1,15 @@
+# Cargo Audit configuration for the services workspace (ancore-indexer).
+# Cargo.lock lives at this workspace root, so `cargo audit` must run from here.
+# Add triaged advisory IDs to `ignore` to allowlist known false positives.
+
+[advisories]
+ignore = [
+  # RUSTSEC-2023-0071 (rsa 0.9.x, Marvin timing sidechannel).
+  # False positive for this workspace: `rsa` is only reachable via `sqlx-mysql`,
+  # and we build sqlx with the `postgres` driver only. `cargo tree -e normal`
+  # confirms `sqlx-mysql` is absent from the build graph, so the vulnerable code
+  # is never compiled or shipped. It appears here solely because cargo-audit
+  # scans Cargo.lock, which retains sqlx's optional driver crates.
+  # No fixed upstream release exists; re-evaluate if a MySQL driver is adopted.
+  "RUSTSEC-2023-0071",
+]

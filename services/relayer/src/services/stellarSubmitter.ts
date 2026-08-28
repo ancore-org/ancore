@@ -1,14 +1,9 @@
-import { rpc, TransactionBuilder, Transaction } from '@stellar/stellar-sdk';
+import { rpc, TransactionBuilder, Transaction, xdr } from '@stellar/stellar-sdk';
 import { SimulationFailedError, StellarClient } from '@ancore/stellar';
 import type { Network } from '@ancore/types';
+import { NETWORK_PASSPHRASES } from '@ancore/wallet-shared';
 import type { TransactionSubmitterContract, TransactionSubmissionResult } from '../types';
-
-const NETWORK_PASSPHRASES: Record<Network, string> = {
-  testnet: 'Test SDF Network ; September 2015',
-  mainnet: 'Public Global Stellar Network ; September 2015',
-  futurenet: 'Test SDF Future Network ; October 2022',
-  local: 'Standalone Network ; February 2017',
-};
+import { getEnv } from '../config/env';
 
 export interface StellarSubmitterConfig {
   network: Network;
@@ -62,9 +57,33 @@ export class StellarTransactionSubmitter implements TransactionSubmitterContract
     const transaction = this.parseTransaction(signedXdr);
     const response = await this.client.submitTransaction(transaction);
 
+    let gasUsed = 0;
+    if (response && typeof response === 'object') {
+      if ('fee_charged' in response && (response as any).fee_charged !== undefined) {
+        const parsed = Number.parseInt(String((response as any).fee_charged), 10);
+        if (!Number.isNaN(parsed)) {
+          gasUsed = parsed;
+        }
+      } else if ('result_xdr' in response && typeof (response as any).result_xdr === 'string') {
+        try {
+          const txResult = xdr.TransactionResult.fromXDR((response as any).result_xdr, 'base64');
+          const parsed = Number.parseInt(txResult.feeCharged().toString(), 10);
+          if (!Number.isNaN(parsed)) {
+            gasUsed = parsed;
+          }
+        } catch {
+          gasUsed = Number.parseInt(String(transaction.fee), 10) || 0;
+        }
+      } else {
+        gasUsed = Number.parseInt(String(transaction.fee), 10) || 0;
+      }
+    } else {
+      gasUsed = Number.parseInt(String(transaction.fee), 10) || 0;
+    }
+
     return {
       transactionHash: response.hash,
-      gasUsed: Number.parseInt(String(transaction.fee), 10) || 0,
+      gasUsed,
     };
   }
 
@@ -87,8 +106,9 @@ export function resolveStellarNetwork(value: string | undefined): Network {
 }
 
 export function createStellarSubmitterFromEnv(): StellarTransactionSubmitter {
-  const network = resolveStellarNetwork(process.env.STELLAR_NETWORK);
-  const networkPassphrase = process.env.STELLAR_NETWORK_PASSPHRASE;
+  // STELLAR_NETWORK is validated as an enum by src/config/env.ts, so an
+  // unrecognised value fails at boot instead of silently becoming `testnet`.
+  const { STELLAR_NETWORK: network, STELLAR_NETWORK_PASSPHRASE: networkPassphrase } = getEnv();
   return new StellarTransactionSubmitter({
     network,
     ...(networkPassphrase ? { networkPassphrase } : {}),

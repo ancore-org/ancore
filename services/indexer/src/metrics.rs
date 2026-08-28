@@ -4,7 +4,7 @@
 //! to enable proactive monitoring and alerting.
 
 use chrono::{DateTime, Utc};
-use metrics::{describe_gauge, describe_histogram, gauge, histogram};
+use metrics::{counter, describe_counter, describe_gauge, describe_histogram, gauge, histogram};
 use serde::Serialize;
 use sqlx::{PgPool, Row};
 
@@ -47,6 +47,10 @@ pub fn init_prometheus_metrics() {
         "indexer_ingest_batch_duration_seconds",
         "Duration of ingest batch processing"
     );
+    describe_counter!(
+        "indexer_ingest_normalise_failures_total",
+        "Number of raw events that failed normalisation during ingest"
+    );
 }
 
 /// Record lag metrics for Prometheus export.
@@ -70,6 +74,11 @@ pub fn record_ingest_metrics(
     histogram!("indexer_ingest_records_per_second").record(records_per_second);
     gauge!("indexer_ingest_lag_ledgers").set(lag_ledgers as f64);
     histogram!("indexer_ingest_batch_duration_seconds").record(batch_duration_seconds);
+}
+
+/// Increment the normalisation-failure counter (for alerting on silent drops).
+pub fn record_normalise_failure() {
+    counter!("indexer_ingest_normalise_failures_total").increment(1);
 }
 
 /// Fetch cursor staleness metrics for all ingestion streams.
@@ -192,6 +201,12 @@ mod tests {
         record_ingest_metrics(150.0, 5, 2.5);
         record_ingest_metrics(0.0, 0, 0.0);
         record_ingest_metrics(1000.0, 100, 10.0);
+    }
+
+    #[test]
+    fn record_normalise_failure_increments_without_panic() {
+        record_normalise_failure();
+        record_normalise_failure();
     }
 
     #[test]

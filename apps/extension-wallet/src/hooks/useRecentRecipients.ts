@@ -1,5 +1,10 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { ChromeStorageAdapter, SecureStorageManager, type RecentRecipient } from '@ancore/core-sdk';
+import {
+  assertValidEd25519PublicKey,
+  ChromeStorageAdapter,
+  SecureStorageManager,
+  type RecentRecipient,
+} from '@ancore/core-sdk';
 
 let _storageManager: InstanceType<typeof SecureStorageManager> | null = null;
 
@@ -35,6 +40,8 @@ export function useRecentRecipients() {
   }, []);
 
   const addRecipient = useCallback(async (recipient: Omit<RecentRecipient, 'timestamp'>) => {
+    assertValidEd25519PublicKey(recipient.address);
+
     const manager = getStorageManager();
     if (!manager.isUnlocked) return;
 

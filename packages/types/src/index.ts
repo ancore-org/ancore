@@ -29,6 +29,7 @@ export interface NetworkConfig {
 export * from './stellar';
 export * from './smart-account';
 export * from './session-key';
+export * from './session-permission';
 export * from './session-key-policy';
 export * from './user-operation';
 export * from './wallet';
@@ -42,3 +43,4 @@ export * from './statement';
 export * from './handle-resolution';
 export * from './invoice';
 export * from './external-api';
+export * from './fee-estimate';

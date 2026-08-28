@@ -3,12 +3,7 @@
  * Follows the same pattern as contactsStorage.ts.
  */
 
-import type {
-  SplitBill,
-  SplitBillParticipant,
-  CreateSplitBillInput,
-  ParticipantStatus,
-} from '../types/split-bill';
+import type { SplitBill, CreateSplitBillInput, ParticipantStatus } from '../types/split-bill';
 
 export const SPLIT_BILL_STORAGE_KEY = 'ancore-dashboard-split-bills';
 
@@ -23,7 +18,22 @@ export function loadSplitBills(): SplitBill[] {
   try {
     const raw = localStorage.getItem(SPLIT_BILL_STORAGE_KEY);
     if (!raw) return [];
-    return JSON.parse(raw) as SplitBill[];
+    const parsed = JSON.parse(raw);
+    if (!Array.isArray(parsed)) return [];
+    return parsed.filter((item): item is SplitBill => {
+      return (
+        typeof item === 'object' &&
+        item !== null &&
+        typeof item.id === 'string' &&
+        typeof item.title === 'string' &&
+        typeof item.creatorAddress === 'string' &&
+        Array.isArray(item.participants) &&
+        typeof item.status === 'string' &&
+        typeof item.expiresAt === 'number' &&
+        typeof item.createdAt === 'number' &&
+        typeof item.updatedAt === 'number'
+      );
+    });
   } catch {
     return [];
   }

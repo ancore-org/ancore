@@ -15,12 +15,20 @@ use uuid::Uuid;
 pub enum EventKind {
     /// Native XLM or asset transfer between accounts.
     Transfer,
+    /// Account contract initialized.
+    Initialized,
     /// Session key registered on an account contract.
     SessionKeyAdded,
     /// Session key revoked from an account contract.
     SessionKeyRevoked,
+    /// Session key TTL refreshed on an account contract.
+    SessionKeyTtlRefreshed,
     /// Relayed transaction executed via the account contract.
     RelayExecuted,
+    /// Contract WASM upgraded.
+    Upgraded,
+    /// Contract data-schema migration.
+    Migrated,
     /// Any event that does not map to a known kind.
     Unknown,
 }
@@ -29,9 +37,13 @@ impl std::fmt::Display for EventKind {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         let s = match self {
             EventKind::Transfer => "transfer",
+            EventKind::Initialized => "initialized",
             EventKind::SessionKeyAdded => "session_key_added",
             EventKind::SessionKeyRevoked => "session_key_revoked",
+            EventKind::SessionKeyTtlRefreshed => "session_key_ttl_refreshed",
             EventKind::RelayExecuted => "relay_executed",
+            EventKind::Upgraded => "upgraded",
+            EventKind::Migrated => "migrated",
             EventKind::Unknown => "unknown",
         };
         write!(f, "{s}")
@@ -119,15 +131,23 @@ pub fn normalise(raw: RawEvent) -> Result<CanonicalEvent, NormaliseError> {
         return Err(NormaliseError::MissingField("contract_id"));
     }
 
-    let kind = classify_event(&raw.topics);
+    // `raw.topics` are base64 XDR SCVals per their documented contract (a
+    // real Soroban RPC response always encodes them this way); decode to
+    // plain strings before classifying. `decode_topic` falls back to its
+    // input unchanged on anything that isn't valid base64 XDR, so this is
+    // also a no-op for callers (tests, older data) that already hand in
+    // plain strings like "transfer".
+    let decoded_topics = crate::schema::xdr_decode::decode_topics(&raw.topics);
+
+    let kind = classify_event(&decoded_topics);
 
     // The primary account is the contract that emitted the event.
     // Downstream enrichment can override this for transfer events.
     let account_id = raw.contract_id.clone();
 
-    // Extract optional transfer fields from topics / data heuristically.
-    // Real implementations would decode XDR; here we use positional conventions.
-    let (amount, asset, counterparty) = extract_transfer_fields(&kind, &raw.topics);
+    // Extract optional transfer fields from the decoded topics using
+    // positional convention (see extract_transfer_fields's doc comment).
+    let (amount, asset, counterparty) = extract_transfer_fields(&kind, &decoded_topics);
 
     Ok(CanonicalEvent {
         id: Uuid::new_v4(),
@@ -151,9 +171,13 @@ pub fn normalise(raw: RawEvent) -> Result<CanonicalEvent, NormaliseError> {
 fn classify_event(topics: &[String]) -> EventKind {
     match topics.first().map(String::as_str) {
         Some("transfer") => EventKind::Transfer,
+        Some("initialized") => EventKind::Initialized,
         Some("session_key_added") | Some("add_session_key") => EventKind::SessionKeyAdded,
         Some("session_key_revoked") | Some("revoke_session_key") => EventKind::SessionKeyRevoked,
+        Some("session_key_ttl_refreshed") => EventKind::SessionKeyTtlRefreshed,
         Some("relay_executed") | Some("execute") => EventKind::RelayExecuted,
+        Some("upgraded") => EventKind::Upgraded,
+        Some("migrated") => EventKind::Migrated,
         _ => EventKind::Unknown,
     }
 }
@@ -217,6 +241,47 @@ mod tests {
     }
 
     #[test]
+    fn normalise_session_key_revoked() {
+        let ev = normalise(make_raw(vec!["session_key_revoked", "GBSESSIONKEY"])).unwrap();
+        assert_eq!(ev.kind, EventKind::SessionKeyRevoked);
+        assert_eq!(ev.activity_type(), "session_key_revoked");
+    }
+
+    #[test]
+    fn normalise_session_key_ttl_refreshed() {
+        let ev = normalise(make_raw(vec!["session_key_ttl_refreshed", "GBSESSIONKEY"])).unwrap();
+        assert_eq!(ev.kind, EventKind::SessionKeyTtlRefreshed);
+        assert_eq!(ev.activity_type(), "session_key_ttl_refreshed");
+    }
+
+    #[test]
+    fn normalise_initialized() {
+        let ev = normalise(make_raw(vec!["initialized", "GBOWNER"])).unwrap();
+        assert_eq!(ev.kind, EventKind::Initialized);
+        assert_eq!(ev.activity_type(), "initialized");
+    }
+
+    #[test]
+    fn normalise_upgraded() {
+        let ev = normalise(make_raw(vec!["upgraded"])).unwrap();
+        assert_eq!(ev.kind, EventKind::Upgraded);
+        assert_eq!(ev.activity_type(), "upgraded");
+    }
+
+    #[test]
+    fn normalise_migrated() {
+        let ev = normalise(make_raw(vec!["migrated"])).unwrap();
+        assert_eq!(ev.kind, EventKind::Migrated);
+        assert_eq!(ev.activity_type(), "migrated");
+    }
+
+    #[test]
+    fn normalise_relay_executed_legacy_alias() {
+        let ev = normalise(make_raw(vec!["execute"])).unwrap();
+        assert_eq!(ev.kind, EventKind::RelayExecuted);
+    }
+
+    #[test]
     fn normalise_unknown_event() {
         let ev = normalise(make_raw(vec!["some_future_event"])).unwrap();
         assert_eq!(ev.kind, EventKind::Unknown);
@@ -245,6 +310,19 @@ mod tests {
     #[test]
     fn activity_type_string_matches_kind() {
         assert_eq!(EventKind::Transfer.to_string(), "transfer");
+        assert_eq!(EventKind::Initialized.to_string(), "initialized");
+        assert_eq!(EventKind::SessionKeyAdded.to_string(), "session_key_added");
+        assert_eq!(
+            EventKind::SessionKeyRevoked.to_string(),
+            "session_key_revoked"
+        );
+        assert_eq!(
+            EventKind::SessionKeyTtlRefreshed.to_string(),
+            "session_key_ttl_refreshed"
+        );
         assert_eq!(EventKind::RelayExecuted.to_string(), "relay_executed");
+        assert_eq!(EventKind::Upgraded.to_string(), "upgraded");
+        assert_eq!(EventKind::Migrated.to_string(), "migrated");
+        assert_eq!(EventKind::Unknown.to_string(), "unknown");
     }
 }

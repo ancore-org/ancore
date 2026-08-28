@@ -83,24 +83,26 @@ export function resetUnlockAttempts(): UnlockAttemptState {
   return { ...DEFAULT_UNLOCK_ATTEMPT_STATE };
 }
 
+import { getChromeSessionStorageArea } from './chrome-api';
+
 interface SessionStorageLike {
   get(key: string): Promise<unknown>;
   set(items: Record<string, unknown>): Promise<void>;
 }
 
 function getSessionStorage(): SessionStorageLike | null {
-  const chromeRef = (globalThis as { chrome?: any }).chrome;
-  if (chromeRef?.storage?.session) {
+  const session = getChromeSessionStorageArea();
+  if (session) {
     return {
       get: (key: string) =>
         new Promise((resolve) => {
-          chromeRef.storage.session.get(key, (result: Record<string, unknown>) => {
+          session.get(key, (result: Record<string, unknown>) => {
             resolve(result[key] ?? null);
           });
         }),
       set: (items: Record<string, unknown>) =>
         new Promise((resolve) => {
-          chromeRef.storage.session.set(items, resolve);
+          session.set(items, resolve);
         }),
     };
   }

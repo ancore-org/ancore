@@ -25,7 +25,7 @@ test.describe('Lock / unlock flow', () => {
     await page.waitForLoadState('networkidle');
 
     await expect(page).toHaveURL(/\/home/);
-    await expect(page.getByRole('heading', { name: 'Home' })).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'Your wallet' })).toBeVisible();
   });
 
   test('unlock button is disabled when password is empty', async ({ page, seedWallet }) => {

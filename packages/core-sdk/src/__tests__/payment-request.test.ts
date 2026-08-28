@@ -126,6 +126,49 @@ describe('PaymentRequest Parser', () => {
       ).toThrow('memoType must be one of: text, id, hash, return.');
     });
 
+    it('throws when text memo exceeds 28 bytes', () => {
+      expect(() =>
+        parsePaymentRequest({
+          destination: VALID_ADDRESS,
+          amount: '10',
+          memo: 'a'.repeat(29),
+        })
+      ).toThrow('Text memo must be 28 bytes or less.');
+
+      expect(() =>
+        parsePaymentRequest({
+          destination: VALID_ADDRESS,
+          amount: '10',
+          memo: 'a'.repeat(29),
+          memoType: 'text',
+        })
+      ).toThrow('Text memo must be 28 bytes or less.');
+
+      expect(() =>
+        parsePaymentRequest({
+          destination: VALID_ADDRESS,
+          amount: '10',
+          memo: '👍👍👍👍👍👍👍👍',
+        })
+      ).toThrow('Text memo must be 28 bytes or less.');
+    });
+
+    it('allows text memo of 28 bytes or less', () => {
+      const result1 = parsePaymentRequest({
+        destination: VALID_ADDRESS,
+        amount: '10',
+        memo: 'a'.repeat(28),
+      });
+      expect(result1.memo).toBe('a'.repeat(28));
+
+      const result2 = parsePaymentRequest({
+        destination: VALID_ADDRESS,
+        amount: '10',
+        memo: '👍👍👍👍👍👍👍',
+      });
+      expect(result2.memo).toBe('👍👍👍👍👍👍👍');
+    });
+
     it('ignores non-string label/message/callbackUrl', () => {
       const payload = {
         destination: VALID_ADDRESS,

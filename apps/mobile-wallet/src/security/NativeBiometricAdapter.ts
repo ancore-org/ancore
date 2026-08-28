@@ -1,5 +1,5 @@
 // @ts-nocheck
-import ReactNativeBiometrics, { BiometryTypes } from 'react-native-biometrics';
+import ReactNativeBiometrics from 'react-native-biometrics';
 import type { IBiometricAuthService } from './hooks/useBiometricUnlock';
 import type { BiometricFailureReason } from './biometric-lockout.types';
 
@@ -25,7 +25,8 @@ export class NativeBiometricAdapter implements IBiometricAuthService {
     errorCode?: BiometricFailureReason;
   }> {
     try {
-      const { available, biometryType } = await this.rnBiometrics.isSensorAvailable();
+      const { available, biometryType: _biometryType } =
+        await this.rnBiometrics.isSensorAvailable();
       if (!available) {
         return { success: false, errorCode: 'BIOMETRIC_NOT_AVAILABLE' };
       }

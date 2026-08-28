@@ -54,7 +54,7 @@ export interface ScheduledTransfer {
   amount: string;
   asset: string;
   frequency: z.infer<typeof scheduleFrequencySchema>;
-  status: 'active' | 'paused' | 'cancelled' | 'completed';
+  status: 'active' | 'paused' | 'cancelled' | 'completed' | 'failed';
   startAt: string;
   nextRunAt: string;
   endAt?: string;

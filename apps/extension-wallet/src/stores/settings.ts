@@ -6,6 +6,7 @@
 
 import { create } from 'zustand';
 import { persist, createJSONStorage } from 'zustand/middleware';
+import type { StateStorage } from 'zustand/middleware';
 import { extensionStorage } from './_storage';
 import { validateHorizonUrl, isValidHorizonUrl } from '@ancore/stellar';
 
@@ -33,7 +34,7 @@ export interface SettingsState {
   enableLockShortcut: boolean;
   telemetryOptIn: boolean;
 
-  setNetwork: (network: NetworkMode) => void;
+  setNetwork: (network: NetworkMode) => Promise<void>;
   setTheme: (theme: ThemePreference) => void;
   setAutoLockMinutes: (minutes: number) => void;
   setRequirePasswordForSensitiveActions: (value: boolean) => void;
@@ -41,6 +42,7 @@ export interface SettingsState {
   setDailyTransferLimit: (amount: number) => void;
   setTransferStepUpThreshold: (amount: number) => void;
   setEnableLockShortcut: (value: boolean) => void;
+  setTelemetryOptIn: (value: boolean) => void;
   /**
    * Override the Horizon URL for the currently selected network.
    * Validates the URL against the active network profile before applying.
@@ -109,7 +111,7 @@ async function saveLastSuccessfulNetwork(network: NetworkMode): Promise<void> {
  * Load the last successfully used network from separate storage.
  * Returns undefined if no saved network exists or on error.
  */
-export async function loadLastSuccessfulNetwork(): Promise<NetworkMode | undefined> {
+async function loadLastSuccessfulNetwork(): Promise<NetworkMode | undefined> {
   try {
     const saved = await extensionStorage.getItem(LAST_SUCCESSFUL_NETWORK_KEY);
     if (saved === 'mainnet' || saved === 'testnet' || saved === 'futurenet') {
@@ -121,12 +123,33 @@ export async function loadLastSuccessfulNetwork(): Promise<NetworkMode | undefin
   return undefined;
 }
 
+/**
+ * Last successful network, read from storage during hydration.
+ *
+ * `persist`'s `merge` hook must return state synchronously — a promise is
+ * assigned as the replacement state, which wipes out every field and action.
+ * Zustand awaits `storage.getItem` before it calls `merge`, so priming this
+ * cache there is the only safe place for the async read.
+ */
+let cachedLastSuccessfulNetwork: NetworkMode | undefined;
+
+const hydratingStorage: StateStorage = {
+  getItem: async (name) => {
+    cachedLastSuccessfulNetwork = await loadLastSuccessfulNetwork();
+    return extensionStorage.getItem(name);
+  },
+  setItem: (name, value) => extensionStorage.setItem(name, value),
+  removeItem: (name) => extensionStorage.removeItem(name),
+};
+
 export const useSettingsStore = create<SettingsState>()(
   persist(
     (set) => ({
       ...DEFAULTS,
 
       setNetwork: (network) => {
+        // Must apply synchronously: `set(async () => ...)` hands zustand a
+        // promise as the state partial, so the update never lands.
         set({
           network,
           horizonUrl: NETWORK_HORIZON_URLS[network],
@@ -164,7 +187,7 @@ export const useSettingsStore = create<SettingsState>()(
     {
       name: 'ancore-settings',
       version: STORE_VERSION,
-      storage: createJSONStorage(() => extensionStorage),
+      storage: createJSONStorage(() => hydratingStorage),
       partialize: (state) => ({
         network: state.network,
         horizonUrl: state.horizonUrl,
@@ -186,8 +209,8 @@ export const useSettingsStore = create<SettingsState>()(
         const transferStepUpThreshold = persisted.transferStepUpThreshold;
         const horizonUrl = persisted.horizonUrl;
 
-        // Try to restore from last successful network if persisted network is invalid
-        const lastSuccessfulNetwork = loadLastSuccessfulNetwork();
+        // Restored by `hydratingStorage.getItem`, which zustand awaits first.
+        const lastSuccessfulNetwork = cachedLastSuccessfulNetwork;
 
         // Validate network and derive horizon URL if missing or invalid
         const validNetwork =

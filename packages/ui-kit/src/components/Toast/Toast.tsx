@@ -31,9 +31,10 @@ export interface ToastProps extends VariantProps<typeof toastVariants> {
 }
 
 export function Toast({ id, message, variant = 'info', onDismiss }: ToastProps) {
+  const safeVariant = variant ?? 'info';
   return (
-    <div role="alert" className={cn(toastVariants({ variant }))}>
-      {icons[variant!]}
+    <div role="alert" className={cn(toastVariants({ variant: safeVariant }))}>
+      {icons[safeVariant]}
       <span className="flex-1">{message}</span>
       <button
         onClick={() => onDismiss(id)}

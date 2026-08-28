@@ -6,6 +6,8 @@ import {
   type StatementRow,
   type StatementRowsPage,
 } from '@ancore/types';
+import jsPDF from 'jspdf';
+import autoTable from 'jspdf-autotable';
 
 const DEFAULT_PAGE_LIMIT = 100;
 const MAX_EXPORT_ROWS = 5_000;
@@ -97,71 +99,57 @@ export function toStatementCsv(rows: StatementRow[]): string {
   return [header, ...body].join('\n');
 }
 
-function escapePdfText(value: string): string {
-  return value.replace(/([\\()])/g, '\\$1').replace(/[\n\r]/g, ' ');
+/**
+ * Sanitize text for safe inclusion in PDF output.
+ * Strips C0 control characters (U+0000–U+001F except tab/newline/CR) and
+ * normalises line breaks to spaces. Prevents injection of PDF operators
+ * through untrusted memo fields.
+ */
+export function sanitizeMemo(value: string): string {
+  let result = '';
+  for (let i = 0; i < value.length; i++) {
+    const code = value.charCodeAt(i);
+    if (code === 9 || code === 10 || code === 13 || code >= 32) {
+      result += value[i];
+    }
+  }
+  return result.replace(/\r\n?|\n/g, ' ').trim();
 }
 
-function wrapPdfLine(value: string, maxLength = 96): string[] {
-  if (value.length <= maxLength) {
-    return [value];
-  }
+function toStatementPdf(rows: StatementRow[], filters: StatementExportFilters): Blob {
+  const doc = new jsPDF({ orientation: 'landscape', unit: 'mm', format: 'a4' });
 
-  const lines: string[] = [];
-  for (let index = 0; index < value.length; index += maxLength) {
-    lines.push(value.slice(index, index + maxLength));
-  }
-  return lines;
-}
+  const range = `${new Date(filters.from).toLocaleDateString()} — ${new Date(filters.to).toLocaleDateString()}`;
+  doc.setFontSize(16);
+  doc.text('Account Statement', 14, 20);
 
-function toStatementPdf(rows: StatementRow[], filters: StatementExportFilters): string {
-  const range = `${new Date(filters.from).toLocaleDateString()} - ${new Date(filters.to).toLocaleDateString()}`;
-  const lines = [
-    'Account statement',
-    `Account: ${filters.accountId}`,
-    `Date range: ${range}`,
-    '',
-    STATEMENT_COLUMNS.map((column) => column.header).join(' | '),
-    ...rows.flatMap((row) =>
-      wrapPdfLine(STATEMENT_COLUMNS.map((column) => String(row[column.key])).join(' | '))
-    ),
-  ];
+  doc.setFontSize(10);
+  doc.text(`Account: ${filters.accountId}`, 14, 28);
+  doc.text(`Date range: ${range}`, 14, 34);
+  doc.text(`Rows: ${rows.length}`, 14, 40);
 
   if (rows.length === 0) {
-    lines.push('No statement activity found.');
+    doc.setFontSize(11);
+    doc.text('No statement activity found for the selected date range.', 14, 52);
+    return doc.output('blob');
   }
 
-  const content = [
-    'BT',
-    '/F1 10 Tf',
-    '40 760 Td',
-    '14 TL',
-    ...lines.map((line, index) => `${index === 0 ? '' : 'T* '}(${escapePdfText(line)}) Tj`),
-    'ET',
-  ].join('\n');
+  const head = [STATEMENT_COLUMNS.map((column) => column.header)];
+  const body = rows.map((row) =>
+    STATEMENT_COLUMNS.map((column) => sanitizeMemo(String(row[column.key])))
+  );
 
-  const objects = [
-    '1 0 obj << /Type /Catalog /Pages 2 0 R >> endobj',
-    '2 0 obj << /Type /Pages /Kids [3 0 R] /Count 1 >> endobj',
-    '3 0 obj << /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] /Resources << /Font << /F1 4 0 R >> >> /Contents 5 0 R >> endobj',
-    '4 0 obj << /Type /Font /Subtype /Type1 /BaseFont /Helvetica >> endobj',
-    `5 0 obj << /Length ${content.length} >> stream\n${content}\nendstream endobj`,
-  ];
+  autoTable(doc, {
+    startY: 46,
+    head,
+    body,
+    styles: { fontSize: 8, cellPadding: 2 },
+    headStyles: { fillColor: [15, 23, 42] },
+    alternateRowStyles: { fillColor: [248, 250, 252] },
+    margin: { left: 14, right: 14 },
+  });
 
-  let pdf = '%PDF-1.4\n';
-  const offsets = [0];
-  for (const object of objects) {
-    offsets.push(pdf.length);
-    pdf += `${object}\n`;
-  }
-  const xrefOffset = pdf.length;
-  pdf += `xref\n0 ${objects.length + 1}\n`;
-  pdf += '0000000000 65535 f \n';
-  pdf += offsets
-    .slice(1)
-    .map((offset) => `${String(offset).padStart(10, '0')} 00000 n `)
-    .join('\n');
-  pdf += `\ntrailer << /Root 1 0 R /Size ${objects.length + 1} >>\nstartxref\n${xrefOffset}\n%%EOF`;
-  return pdf;
+  return doc.output('blob');
 }
 
 function buildFilename(filters: StatementExportFilters, format: StatementExportFormat) {
@@ -212,11 +200,11 @@ export class StatementExportService {
     const rows = await fetchStatementRows(filters);
 
     if (format === 'pdf') {
-      const pdf = toStatementPdf(rows, filters);
+      const blob = toStatementPdf(rows, filters);
       return {
         filename: buildFilename(filters, format),
         mimeType: 'application/pdf',
-        blob: new Blob([pdf], { type: 'application/pdf' }),
+        blob,
       };
     }
 

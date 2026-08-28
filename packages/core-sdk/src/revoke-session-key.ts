@@ -1,7 +1,12 @@
 import type { InvocationArgs } from '@ancore/account-abstraction';
 import { AccountContractError } from '@ancore/account-abstraction';
 
-import { AncoreSdkError, BuilderValidationError, SessionKeyManagementError } from './errors';
+import {
+  AncoreSdkError,
+  assertValidEd25519PublicKey,
+  BuilderValidationError,
+  SessionKeyManagementError,
+} from './errors';
 
 export interface RevokeSessionKeyParams {
   publicKey: string;
@@ -40,6 +45,8 @@ function validateRevokeSessionKeyParams(params: RevokeSessionKeyParams): void {
   if (typeof params.publicKey !== 'string' || params.publicKey.trim().length === 0) {
     throw new BuilderValidationError('revokeSessionKey requires a non-empty publicKey string.');
   }
+
+  assertValidEd25519PublicKey(params.publicKey);
 }
 
 function normalizeRevokeSessionKeyError(error: unknown): AncoreSdkError {

@@ -8,8 +8,9 @@ import {
   type ServiceUrlConfig,
 } from '@/config/urls';
 import { getChromeLocalStorage } from '../chrome-storage';
+import { createLogger } from '../logger';
 
-const logPrefix = '[ancore-extension/handlers/health]';
+const log = createLogger('[ancore-extension/handlers/health]');
 
 async function runServiceHealthProbes(): Promise<void> {
   let environment = 'production';
@@ -32,17 +33,17 @@ async function runServiceHealthProbes(): Promise<void> {
 
   const formatErrors = validateServiceUrls(config);
   if (formatErrors.length > 0) {
-    console.warn(`${logPrefix} invalid service URLs`, formatErrors);
+    log.warn('invalid service URLs', { errors: formatErrors });
     return;
   }
 
-  console.info(`${logPrefix} probing service health`, { environment });
+  log.info('probing service health', { environment });
   const results = await probeAllServiceHealth(config);
 
   for (const result of results) {
     setCachedHealth(result);
     if (result.status !== 'ok') {
-      console.warn(`${logPrefix} service health degraded`, result);
+      log.warn('service health degraded', result);
     }
   }
 }
@@ -57,7 +58,7 @@ export function registerHealthHandlers(): void {
         indexer: getCachedHealth('indexer'),
       };
     } catch (err) {
-      console.error(`${logPrefix} CHECK_SERVICE_HEALTH failed`, err);
+      log.error('CHECK_SERVICE_HEALTH failed', err);
       return {
         relayer: { service: 'relayer' as const, status: 'unreachable' as const },
         indexer: { service: 'indexer' as const, status: 'unreachable' as const },
@@ -65,9 +66,7 @@ export function registerHealthHandlers(): void {
     }
   });
 
-  if (import.meta.env.DEV) {
-    console.debug(`${logPrefix} registered`);
-  }
+  log.debug('registered');
 }
 
 /** Called on extension install/startup. */

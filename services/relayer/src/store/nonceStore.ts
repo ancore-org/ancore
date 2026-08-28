@@ -1,7 +1,5 @@
-/**
- * In-memory store to track seen nonces per session key with a configured TTL.
- * Prevents replay attacks by ensuring that nonces are only used once per session key.
- */
+import { rootLogger, redactSessionKey } from '../logging';
+import { nonceOperations } from '../metrics';
 
 export interface NonceStore {
   assertFresh(key: string, nonce: number): void | Promise<void>;
@@ -27,8 +25,19 @@ export class MemoryNonceStore implements NonceStore {
 
     const keyStore = this.seen.get(key);
     if (keyStore && keyStore.has(nonce)) {
+      nonceOperations.increment('replay');
+      rootLogger.warn(
+        { key: redactSessionKey(key), nonce, status: 'replay', outcome: 'validation_failed' },
+        'Nonce replay detected'
+      );
       throw new Error('Nonce already used');
     }
+
+    nonceOperations.increment('valid');
+    rootLogger.debug(
+      { key: redactSessionKey(key), nonce, status: 'valid', outcome: 'success' },
+      'Nonce asserted fresh'
+    );
   }
 
   /**

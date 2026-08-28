@@ -1,3 +1,5 @@
+import { DEFAULT_HORIZON_URLS } from '@ancore/wallet-shared';
+
 // ---------------------------------------------------------------------------
 // Types
 // ---------------------------------------------------------------------------
@@ -68,14 +70,9 @@ async function pollHorizonTransaction(
 }
 
 async function checkHorizonStatus(hash: string, network: string): Promise<TransactionPollStatus> {
-  const networkUrls: Record<string, string> = {
-    testnet: 'https://horizon-testnet.stellar.org',
-    mainnet: 'https://horizon.stellar.org',
-    futurenet: 'https://horizon-futurenet.stellar.org',
-    local: 'http://localhost:8000',
-  };
-
-  const baseUrl = networkUrls[network] ?? networkUrls.testnet;
+  const baseUrl =
+    DEFAULT_HORIZON_URLS[network as keyof typeof DEFAULT_HORIZON_URLS] ??
+    DEFAULT_HORIZON_URLS.testnet;
   const response = await fetch(`${baseUrl}/transactions/${hash}`);
 
   if (response.status === 404) {

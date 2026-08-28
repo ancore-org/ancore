@@ -136,6 +136,44 @@ A green local run of all of the above is not a guarantee — CI also runs on Lin
 things (headless Chromium, case-sensitive filesystem paths, Postgres-backed indexer tests) behave
 differently than macOS. Treat local green as necessary, not sufficient.
 
+## Supply-chain hardening
+
+This repo enforces an **install script allowlist** to prevent malicious transitive dependencies from
+executing arbitrary code during `pnpm install`.
+
+### Policy
+
+Only dependencies in `pnpm.onlyBuiltDependencies` (root `package.json`) may run `preinstall`,
+`install`, or `postinstall` scripts. Adding a new dependency with lifecycle hooks requires:
+
+1. **Justify** — add an entry to `.pnpm-install-scripts-allowlist.json` with a justification and
+   tracking issue URL.
+2. **Allowlist** — add the package name to `pnpm.onlyBuiltDependencies` in `package.json`.
+3. **Lockfile** — run `pnpm install` to update `pnpm-lock.yaml`.
+
+Most transitive packages that declare a lifecycle hook do **not** need it to run — `core-js`, for
+example, only prints a funding banner. For those, add the entry to the `denied` array instead and
+leave `pnpm.onlyBuiltDependencies` untouched: that documents the script as reviewed while pnpm keeps
+blocking it. Never silence the check by granting execution. The policy check fails if a `denied`
+package appears in `pnpm.onlyBuiltDependencies`.
+
+### CI enforcement
+
+The **Install Script Policy** job in CI runs `pnpm install --ignore-scripts` and validates that all
+packages with install scripts are in the allowlist. Any unallowlisted script causes a failure.
+
+### Local verification
+
+```bash
+corepack pnpm check:install-scripts   # validate allowlist consistency
+```
+
+### Current allowlist
+
+See `.pnpm-install-scripts-allowlist.json` for the current set of allowed packages and their
+justifications. Today only `esbuild` (platform binary download) and `protobufjs` (generated JS)
+are allowed.
+
 ## Known pitfalls that have broken CI here
 
 - **Rust dead-code false positives from duplicate module trees.** If a binary crate (`main.rs`)

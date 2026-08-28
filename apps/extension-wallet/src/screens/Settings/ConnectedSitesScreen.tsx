@@ -5,15 +5,11 @@ import { useAllowlistStore, type ConnectedSiteRecord } from '../../stores/allowl
 import { useAccountStore } from '../../stores/account';
 import { useSettingsStore } from '../../stores/settings';
 import { EmptyTransactions } from '../../components/EmptyTransactions';
+import { truncateAddress } from '../../utils/address';
 
 /** Stable empties so Zustand selectors do not allocate every snapshot (infinite re-render). */
 const EMPTY_APPROVED: string[] = [];
 const EMPTY_CONNECTED: Record<string, ConnectedSiteRecord> = {};
-
-function truncateAddress(address: string, chars = 8): string {
-  if (address.length <= chars * 2) return address;
-  return `${address.slice(0, chars)}…${address.slice(-chars)}`;
-}
 
 function getHostname(origin: string): string {
   try {

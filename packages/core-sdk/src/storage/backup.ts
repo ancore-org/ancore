@@ -3,6 +3,7 @@
  * Handles encrypted backup creation and restoration with versioning and migration support
  */
 
+import { timingSafeEqual } from '@ancore/crypto';
 import { encrypt, decrypt, type EncryptedPayload } from './encryption-primitives';
 import type { AccountData, SessionKeysData, StorageAdapter } from './types';
 
@@ -205,7 +206,17 @@ async function verifyBackupIntegrity(backup: BackupPayload): Promise<void> {
 
   const calculatedChecksum = await calculateChecksum(backupDataForChecksum);
 
-  if (checksum !== calculatedChecksum) {
+  // Timing-safe comparison: a naive `!==` on the checksum string leaks how many
+  // leading hex characters match via response timing, letting an attacker
+  // incrementally forge a colliding checksum. Both sides are fixed-length
+  // SHA-256 hex digests, so this never affects correctness — only timing.
+  const encoder = new (globalThis as any).TextEncoder();
+  const checksumMatches = timingSafeEqual(
+    encoder.encode(checksum),
+    encoder.encode(calculatedChecksum)
+  );
+
+  if (!checksumMatches) {
     throw createBackupError(
       'CHECKSUM_MISMATCH',
       'Backup integrity check failed: checksum mismatch. Backup may be corrupted or tampered with.'

@@ -27,6 +27,17 @@ export default defineConfig({
       '**/messaging/__tests__/messaging.test.ts',
       '**/SessionKeys/__tests__/**',
     ],
+    coverage: {
+      provider: 'v8',
+      include: ['src/background/handlers/**/*.ts'],
+      exclude: ['**/__tests__/**'],
+      thresholds: {
+        statements: 35,
+        branches: 75,
+        functions: 60,
+        lines: 35,
+      },
+    },
   },
   resolve: {
     alias: {

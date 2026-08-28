@@ -1,5 +1,7 @@
 import { describe, it, expect, vi, afterEach } from 'vitest';
+import * as React from 'react';
 import { render, screen, fireEvent, cleanup } from '@testing-library/react';
+import { NotificationProvider } from '@ancore/ui-kit';
 import { WelcomeScreen } from '../WelcomeScreen';
 import { MnemonicScreen } from '../MnemonicScreen';
 import { PasswordScreen } from '../PasswordScreen';
@@ -60,8 +62,12 @@ describe('Onboarding E2E Flow', () => {
     u4();
 
     // Step 5: Success Screen
-    render(<SuccessScreen publicKey="GABC123XYZ789" onComplete={vi.fn()} />);
-    expect(screen.getByText(/Congratulations!/i)).toBeInTheDocument();
+    render(
+      <NotificationProvider>
+        <SuccessScreen publicKey="GABC123XYZ789" onComplete={vi.fn()} />
+      </NotificationProvider>
+    );
+    expect(screen.getByText(/Wallet ready/i)).toBeInTheDocument();
   });
 
   it('should show password validation errors', () => {

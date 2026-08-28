@@ -1,3 +1,6 @@
+import { useCallback, useState } from 'react';
+import { copySecure } from '../../services/secure-clipboard';
+
 type Props = {
   mnemonic: string;
   onBack?: () => void;
@@ -14,6 +17,13 @@ export function MnemonicDisplayScreen({
   onContinue = noop,
 }: Props) {
   const words = mnemonic.split(' ');
+  const [copied, setCopied] = useState(false);
+
+  const handleCopy = useCallback(async () => {
+    await copySecure(mnemonic);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
+  }, [mnemonic]);
 
   return (
     <section aria-label="Recovery phrase" className="space-y-4">
@@ -37,6 +47,14 @@ export function MnemonicDisplayScreen({
           </div>
         ))}
       </div>
+
+      <button
+        onClick={handleCopy}
+        type="button"
+        className="mt-3 w-full rounded-lg border border-slate-300 px-4 py-2 text-sm font-medium text-slate-700 transition hover:bg-slate-100"
+      >
+        {copied ? '✓ Copied!' : 'Copy to clipboard'}
+      </button>
 
       <div className="flex gap-3">
         <button onClick={onBack} type="button">

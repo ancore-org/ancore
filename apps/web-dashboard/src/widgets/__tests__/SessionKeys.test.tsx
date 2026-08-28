@@ -1,6 +1,5 @@
 import { render, screen, fireEvent } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import React from 'react';
 import { SessionKeys, SessionKeysPanel } from '../SessionKeysPanel';
 
 // Mock lucide-react to avoid issues with SVG rendering in tests
@@ -104,10 +103,6 @@ describe('SessionKeys Widget', () => {
   });
 
   it('catches unhandled throw inside WidgetErrorBoundary and allows retry', () => {
-    const ThrowingComponent = () => {
-      throw new Error('Unexpected render crash');
-    };
-
     const onRetry = vi.fn();
 
     render(<SessionKeys error={new Error('Unexpected render crash')} onRetry={onRetry} />);

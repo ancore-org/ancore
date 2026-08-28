@@ -1,6 +1,5 @@
 import { render, screen } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import React from 'react';
 import { WidgetErrorBoundary } from '../WidgetErrorBoundary';
 
 // Mock lucide-react to avoid issues with SVG rendering in tests

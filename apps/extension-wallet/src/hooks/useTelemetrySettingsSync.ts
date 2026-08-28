@@ -16,7 +16,7 @@ export function useTelemetrySettingsSync(): void {
   useEffect(() => {
     let cancelled = false;
 
-    void useSettingsStore.persist.rehydrate().then(() => {
+    void Promise.resolve(useSettingsStore.persist.rehydrate()).then(() => {
       if (cancelled) return;
       applyTelemetryOptIn(useSettingsStore.getState().telemetryOptIn);
     });

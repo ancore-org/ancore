@@ -4,6 +4,7 @@ import { X, Link2, Share2 } from 'lucide-react';
 import { PaymentQRCode } from '@/components/PaymentQRCode';
 import downloadQrPng from '@/utils/export-qr';
 import { useCopyWithFeedback } from '@/hooks/useCopyWithFeedback';
+import { truncateAddress } from '@/utils/address';
 import type { Network } from '@ancore/types';
 
 export interface ReceiveScreenProps {
@@ -18,11 +19,6 @@ export interface ReceiveScreenProps {
 
 function buildPaymentUri(destination: string, network: Network): string {
   return `web+stellar:pay?destination=${encodeURIComponent(destination)}&network=${encodeURIComponent(network)}`;
-}
-
-function truncateMiddle(value: string, head = 6, tail = 6): string {
-  if (value.length <= head + tail + 1) return value;
-  return `${value.slice(0, head)}…${value.slice(-tail)}`;
 }
 
 /**
@@ -102,7 +98,7 @@ export function ReceiveScreen({
             className="mt-1 inline-flex items-center gap-1.5 text-[14px] text-muted-foreground transition-colors hover:text-foreground"
             aria-label="Copy address"
           >
-            <span className="font-mono">{truncateMiddle(smartAccountId, 8, 6)}</span>
+            <span className="font-mono">{truncateAddress(smartAccountId, 8, 6)}</span>
             <Link2 className="h-3.5 w-3.5 opacity-70" aria-hidden />
             {copied && <span className="text-[12px] text-emerald-400">Copied</span>}
           </button>
@@ -124,7 +120,7 @@ export function ReceiveScreen({
 
         {ownerPublicKey && (
           <p className="mb-6 max-w-[300px] text-center text-[11px] text-muted-foreground/70">
-            Owner key: <span className="font-mono">{truncateMiddle(ownerPublicKey, 6, 6)}</span>
+            Owner key: <span className="font-mono">{truncateAddress(ownerPublicKey, 6, 6)}</span>
           </p>
         )}
 

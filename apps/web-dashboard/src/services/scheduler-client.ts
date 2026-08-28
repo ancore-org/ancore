@@ -1,5 +1,6 @@
 export {
-  buildDefaultRelayPayload,
+  buildRelayCanonicalPayload,
+  buildSignedRelayPayload,
   createSchedulerClient,
   defaultScheduleStartAt,
   DEMO_ACCOUNT_ADDRESS,
@@ -7,6 +8,10 @@ export {
   resolveRelayerBaseUrl,
   SCHEDULE_FREQUENCY_OPTIONS,
   toIsoStartAt,
+  type CanonicalPayloadInput,
+  type RelaySigner,
+  type RelayExecuteParameters,
+  type SignedRelayPayload,
   type SchedulerClient,
   type SchedulerClientOptions,
 } from '@ancore/core-sdk';

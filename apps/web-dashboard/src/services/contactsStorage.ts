@@ -43,7 +43,19 @@ export function loadContacts(): Contact[] {
   try {
     const raw = localStorage.getItem(CONTACTS_STORAGE_KEY);
     if (!raw) return [];
-    return JSON.parse(raw) as Contact[];
+    const parsed = JSON.parse(raw);
+    if (!Array.isArray(parsed)) return [];
+    return parsed.filter((item): item is Contact => {
+      return (
+        typeof item === 'object' &&
+        item !== null &&
+        typeof item.id === 'string' &&
+        typeof item.alias === 'string' &&
+        typeof item.address === 'string' &&
+        typeof item.isFavorite === 'boolean' &&
+        typeof item.createdAt === 'number'
+      );
+    });
   } catch {
     return [];
   }

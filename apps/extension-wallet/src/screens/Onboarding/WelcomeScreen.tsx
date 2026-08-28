@@ -1,4 +1,4 @@
-import { ChevronRight, Download, Plus, HelpCircle } from 'lucide-react';
+import { ChevronRight, Download, Plus, HelpCircle, WalletCards, X } from 'lucide-react';
 
 /**
  * Welcome screen props
@@ -29,7 +29,6 @@ export function WelcomeScreen({
     {
       key: 'create',
       icon: Plus,
-      iconClass: 'bg-emerald-500 text-white',
       title: 'Create new wallet',
       description: 'Generate a new recovery phrase and smart account on Stellar.',
       onClick: onNext,
@@ -37,7 +36,6 @@ export function WelcomeScreen({
     {
       key: 'import',
       icon: Download,
-      iconClass: 'bg-sky-500 text-white',
       title: 'Import',
       description: 'Add an existing wallet with a 12 or 24-word recovery phrase.',
       onClick: onImport,
@@ -55,7 +53,7 @@ export function WelcomeScreen({
           onClick={onBack}
           disabled={!onBack}
         >
-          <span className="text-xl leading-none">×</span>
+          <X className="h-5 w-5" />
         </button>
         <button type="button" className="wallet-icon-btn" aria-label="Help">
           <HelpCircle className="h-5 w-5 text-muted-foreground" />
@@ -63,15 +61,9 @@ export function WelcomeScreen({
       </header>
 
       <div className="flex flex-1 flex-col px-6 pb-8 pt-4">
-        {/* Soft stacked-card illustration */}
         <div className="mb-8 flex justify-center" aria-hidden="true">
-          <div className="relative h-28 w-40">
-            <div className="absolute left-1/2 top-0 h-20 w-36 -translate-x-1/2 rounded-2xl bg-emerald-500/90" />
-            <div className="absolute left-1/2 top-3 h-20 w-36 -translate-x-1/2 rounded-2xl bg-amber-400/90" />
-            <div className="absolute left-1/2 top-6 flex h-20 w-36 -translate-x-1/2 items-center justify-between rounded-2xl bg-sky-500 px-4 shadow-lg">
-              <div className="h-8 w-8 rounded-full bg-white/30" />
-              <div className="h-2 w-12 rounded-full bg-white/40" />
-            </div>
+          <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-foreground text-background">
+            <WalletCards className="h-5 w-5" strokeWidth={2} />
           </div>
         </div>
 
@@ -87,7 +79,7 @@ export function WelcomeScreen({
         {error && (
           <div
             role="alert"
-            className="mb-4 rounded-2xl border border-red-500/30 bg-red-500/10 px-4 py-3 text-[13px] text-red-200"
+            className="wallet-status-error mb-4 rounded-2xl border px-4 py-3 text-[13px]"
           >
             {error}
           </div>
@@ -109,8 +101,8 @@ export function WelcomeScreen({
               onClick={() => void opt.onClick?.()}
               className="wallet-option-row disabled:opacity-40"
             >
-              <span className={`wallet-option-icon ${opt.iconClass}`}>
-                <opt.icon className="h-5 w-5" strokeWidth={2.25} />
+              <span className="wallet-option-icon">
+                <opt.icon className="h-5 w-5" strokeWidth={2} />
               </span>
               <span className="min-w-0 flex-1">
                 <span className="block text-[16px] font-semibold text-foreground">{opt.title}</span>

@@ -6,6 +6,8 @@ export interface TransferValidationContext {
   amount: number;
   todayTotal: number;
   policy: TransferPolicy;
+  /** Asset code shown in policy denial messages. Defaults to XLM. */
+  assetCode?: string;
 }
 
 export interface TransferValidationResult {
@@ -21,7 +23,12 @@ export interface TransferValidationResult {
 export function validateTransferPolicyConstraints(
   context: TransferValidationContext
 ): TransferValidationResult {
-  const result = validateTransferPolicy(context.amount, context.todayTotal, context.policy);
+  const result = validateTransferPolicy(
+    context.amount,
+    context.todayTotal,
+    context.policy,
+    context.assetCode
+  );
 
   if (result.action === 'block') {
     return {

@@ -17,6 +17,7 @@ import {
   getChromeSessionStorage,
   removeChromeSessionStorage,
   setChromeSessionStorage,
+  getChromeLocalStorage,
 } from './chrome-storage';
 
 let _sessionUnlocked = false;
@@ -29,13 +30,34 @@ export function setBackgroundSessionUnlocked(unlocked: boolean): void {
   _sessionUnlocked = unlocked;
 }
 
-export async function persistUnlockSession(
-  ttlMs: number = DEFAULT_UNLOCK_SESSION_TTL_MS
-): Promise<void> {
+/**
+ * Read auto-lock TTL from settings.
+ * Returns TTL in milliseconds based on autoLockMinutes setting.
+ * If autoLockMinutes is 0 or invalid, returns the default 24h TTL.
+ */
+async function getAutoLockTtlMs(): Promise<number> {
+  try {
+    const settingsData = await getChromeLocalStorage('ancore-settings');
+    const settings = settingsData as Record<string, unknown> | undefined;
+    const autoLockMinutes = settings?.autoLockMinutes as number | undefined;
+
+    if (typeof autoLockMinutes === 'number' && autoLockMinutes > 0) {
+      return autoLockMinutes * 60_000; // Convert minutes to milliseconds
+    }
+  } catch (err) {
+    console.warn('[session-state] Failed to read auto-lock settings, using default TTL', err);
+  }
+  return DEFAULT_UNLOCK_SESSION_TTL_MS;
+}
+
+export async function persistUnlockSession(ttlMs?: number): Promise<void> {
+  // If TTL not provided, read from settings
+  const effectiveTtlMs = ttlMs ?? (await getAutoLockTtlMs());
+
   const now = Date.now();
   const record: UnlockSessionRecord = {
     unlockedAt: now,
-    expiresAt: now + ttlMs,
+    expiresAt: now + effectiveTtlMs,
   };
   await setChromeSessionStorage(UNLOCK_SESSION_STORAGE_KEY, record);
   _sessionUnlocked = true;
@@ -68,4 +90,17 @@ export async function restoreUnlockSessionFromStorage(): Promise<boolean> {
     _sessionUnlocked = false;
     return false;
   }
+}
+
+/**
+ * Refresh session expiry when settings change while unlocked.
+ * Reads the new auto-lock TTL and updates the session expiration.
+ */
+export async function refreshSessionExpiry(): Promise<void> {
+  if (!_sessionUnlocked) {
+    return; // Only refresh if currently unlocked
+  }
+
+  const ttlMs = await getAutoLockTtlMs();
+  await persistUnlockSession(ttlMs);
 }

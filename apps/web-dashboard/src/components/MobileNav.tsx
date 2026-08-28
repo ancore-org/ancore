@@ -67,14 +67,14 @@ export const MobileNav: React.FC<MobileNavProps> = ({ links }) => {
     <div className="fixed inset-0 z-50 flex">
       {/* Backdrop */}
       <div
-        className="fixed inset-0 bg-background/80 backdrop-blur-sm"
+        className="fixed inset-0 bg-black/70 backdrop-blur-sm"
         onClick={() => setIsOpen(false)}
       />
 
       {/* Drawer Panel */}
       <div
         ref={drawerRef}
-        className="relative w-[280px] h-full bg-background border-r p-6 shadow-xl flex flex-col"
+        className="relative flex h-full w-[280px] flex-col border-r border-border bg-[hsl(var(--surface-sunken))] p-6"
         role="dialog"
         aria-modal="true"
       >
@@ -97,8 +97,8 @@ export const MobileNav: React.FC<MobileNavProps> = ({ links }) => {
               onClick={() => setIsOpen(false)}
               className={({ isActive }) =>
                 cn(
-                  'px-3 py-2 rounded-md text-sm transition-colors hover:bg-accent hover:text-accent-foreground',
-                  isActive ? 'bg-accent text-foreground font-medium' : 'text-muted-foreground'
+                  'rounded-xl px-3 py-2.5 text-sm transition-colors hover:bg-accent hover:text-accent-foreground',
+                  isActive ? 'bg-accent font-medium text-foreground' : 'text-muted-foreground'
                 )
               }
             >

@@ -1,4 +1,3 @@
-import * as React from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@ancore/ui-kit';
 import { Invoice, InvoiceStatus } from '@ancore/types';
 import { formatAddress, formatTime } from '@ancore/ui-kit';
@@ -73,12 +72,12 @@ export function InvoiceList({ invoices, onSelectInvoice }: InvoiceListProps) {
               </div>
               <div className="flex justify-between">
                 <span className="text-muted-foreground">Created</span>
-                <span>{formatTime(new Date(invoice.createdAt).getTime())}</span>
+                <span>{formatTime(new Date(invoice.createdAt))}</span>
               </div>
               {invoice.dueDate && (
                 <div className="flex justify-between">
                   <span className="text-muted-foreground">Due Date</span>
-                  <span>{formatTime(new Date(invoice.dueDate).getTime())}</span>
+                  <span>{formatTime(new Date(invoice.dueDate))}</span>
                 </div>
               )}
               {invoice.description && (

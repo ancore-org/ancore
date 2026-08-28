@@ -1,7 +1,7 @@
 /**
  * Supported Ancore network types.
  */
-export type AncoreNetwork = 'testnet' | 'mainnet' | 'futurenet';
+export type AncoreNetwork = 'testnet' | 'mainnet' | 'futurenet' | 'local';
 
 /**
  * Network profile with Stellar integration details.
@@ -42,6 +42,12 @@ export const NETWORK_PROFILES: Record<AncoreNetwork, NetworkProfile> = {
     sorobanRpcUrl: 'https://soroban-futurenet.stellar.org',
     description: 'Futurenet - for testing new Stellar features',
   },
+  local: {
+    networkPassphrase: 'Standalone Network ; February 2017',
+    horizonUrl: 'http://localhost:8000',
+    sorobanRpcUrl: 'http://localhost:8000/soroban/rpc',
+    description: 'Standalone Network - local development',
+  },
 };
 
 /**
@@ -49,7 +55,7 @@ export const NETWORK_PROFILES: Record<AncoreNetwork, NetworkProfile> = {
  */
 export function isAncoreNetwork(value: unknown): value is AncoreNetwork {
   if (typeof value !== 'string') return false;
-  return value === 'testnet' || value === 'mainnet' || value === 'futurenet';
+  return value === 'testnet' || value === 'mainnet' || value === 'futurenet' || value === 'local';
 }
 
 /**

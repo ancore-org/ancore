@@ -10,7 +10,8 @@
     "build:android": "react-native build-android",
     "lint": "eslint src/",
     "test": "jest --config jest.config.cjs",
-    "postinstall": "rn-nodeify --install buffer,crypto,stream,events,process --hack"
+    "postinstall": "rn-nodeify --install buffer,crypto,stream,events,process --hack",
+    "typecheck": "tsc --noEmit"
   },
   "dependencies": {
     "@ancore/mobile-wallet": "workspace:*",

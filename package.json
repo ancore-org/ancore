@@ -22,7 +22,7 @@
     "test:ui": "pnpm --filter @ancore/ui-kit run test",
     "test": "turbo run test",
     "lint": "turbo run lint",
-    "typecheck": "turbo run build",
+    "typecheck": "turbo run typecheck",
     "format": "prettier --write \"**/*.{ts,tsx,js,jsx,json,md}\"",
     "format:check": "prettier --check \"**/*.{ts,tsx,js,jsx,json,md}\"",
     "clean": "turbo run clean && rm -rf node_modules",
@@ -33,9 +33,11 @@
     "indexer:check": "cd services/indexer && cargo check",
     "indexer:lint-migrations": "node services/indexer/scripts/lint-migrations.mjs",
     "audit:security": "node tools/security-audit.js",
+    "check:install-scripts": "node scripts/check-install-scripts.js",
+    "coverage:gate": "node scripts/coverage-gate.js",
     "docs:validate-links": "node scripts/validate-doc-links.js",
     "docs:lint-openapi": "npx --yes @stoplight/spectral-cli lint --fail-severity=warn services/indexer/openapi.yaml",
-    "verify": "pnpm lint && pnpm typecheck && pnpm test",
+    "verify": "pnpm check:install-scripts && pnpm lint && pnpm typecheck && pnpm test",
     "prepare": "husky",
     "docs:check-structure": "node scripts/check-docs-repo-structure.mjs",
     "verify:theme-tokens": "node scripts/verify-theme-tokens.ts"
@@ -52,7 +54,8 @@
     "lint-staged": "^15.0.0",
     "prettier": "^3.2.5",
     "turbo": "^2.3.0",
-    "typescript": "^5.6.0"
+    "typescript": "^5.6.0",
+    "vitest": "^3.2.6"
   },
   "lint-staged": {
     "*.{ts,tsx,js,jsx,json,md}": [
@@ -99,21 +102,27 @@
     ]
   },
   "pnpm": {
+    "onlyBuiltDependencies": [
+      "esbuild",
+      "protobufjs"
+    ],
     "overrides": {
       "js-yaml": ">=4.3.0",
       "tmp": ">=0.2.4",
       "esbuild": "0.21.5",
       "@stellar/stellar-sdk": "^13.3.0",
-      "tar": ">=7.5.16",
+      "tar": "7.5.22",
       "vitest": ">=3.2.6 <4.0.0",
       "form-data": ">=4.0.6",
       "axios": ">=1.18.0",
       "postcss": ">=8.5.18",
       "@opentelemetry/propagator-jaeger": ">=2.9.0",
-      "brace-expansion@1": "1.1.16",
-      "brace-expansion@2": "2.1.2",
-      "brace-expansion@5": "5.0.8",
-      "brace-expansion@5.0.6": "5.0.8"
+      "brace-expansion@1": "1.1.18",
+      "brace-expansion@2": "2.1.4",
+      "brace-expansion@5": "5.0.9",
+      "brace-expansion@5.0.6": "5.0.9",
+      "protobufjs": ">=8.6.6",
+      "nanoid": ">=3.3.18"
     }
   },
   "packageManager": "pnpm@9.0.0",

@@ -7,7 +7,16 @@ jest.mock('../bridge', () => ({
   sendExternalRequest: (...args: unknown[]) => sendExternalRequest(...args),
 }));
 
-import { connect, getAddress, getNetwork, isConnected, requestSessionKey } from '../index';
+import {
+  connect,
+  getAddress,
+  getNetwork,
+  isConnected,
+  isWalletNetwork,
+  requestSessionKey,
+  signMessage,
+  signRelayPayload,
+} from '../index';
 import { WalletApiError, WalletNotInstalledError } from '../bridge';
 
 describe('wallet-api public methods', () => {
@@ -43,6 +52,29 @@ describe('wallet-api public methods', () => {
 
     await expect(getNetwork()).resolves.toBe('mainnet');
     expect(sendExternalRequest).toHaveBeenCalledWith(ExternalApiMethod.GET_NETWORK);
+  });
+
+  it.each(['mainnet', 'testnet', 'futurenet', 'local'])(
+    'getNetwork returns %s without narrowing it away (issue #1256)',
+    async (network) => {
+      sendExternalRequest.mockResolvedValue({ network });
+      await expect(getNetwork()).resolves.toBe(network);
+    }
+  );
+
+  it('getNetwork rejects an unrecognised background network instead of casting it (issue #1256)', async () => {
+    sendExternalRequest.mockResolvedValue({ network: 'regtest' });
+
+    await expect(getNetwork()).rejects.toThrow(WalletApiError);
+    await expect(getNetwork()).rejects.toThrow('Unsupported wallet network: regtest');
+  });
+
+  it('isWalletNetwork narrows only supported networks (issue #1256)', () => {
+    expect(isWalletNetwork('futurenet')).toBe(true);
+    expect(isWalletNetwork('local')).toBe(true);
+    expect(isWalletNetwork('regtest')).toBe(false);
+    expect(isWalletNetwork(undefined)).toBe(false);
+    expect(isWalletNetwork(42)).toBe(false);
   });
 
   it('isConnected returns allowlist status', async () => {
@@ -81,5 +113,36 @@ describe('wallet-api public methods', () => {
     });
 
     expect(sendExternalRequest).toHaveBeenCalledWith(ExternalApiMethod.REQUEST_SESSION_KEY, policy);
+  });
+
+  it("signMessage maps the background's real { signature } response to { signedMessage } (issue #1213)", async () => {
+    // The background resolves with { signature }, not { signedMessage } — this
+    // was previously a dead/mismatched field name that made the public API
+    // return `undefined` at runtime despite the extension signing correctly.
+    sendExternalRequest.mockResolvedValue({ signature: 'ab'.repeat(64) });
+
+    await expect(signMessage({ message: 'hello' })).resolves.toEqual({
+      signedMessage: 'ab'.repeat(64),
+    });
+    expect(sendExternalRequest).toHaveBeenCalledWith(ExternalApiMethod.SIGN_MESSAGE, {
+      message: 'hello',
+    });
+  });
+
+  it('signRelayPayload forwards operation/nonce and returns the real sessionKey + signature (issue #1213)', async () => {
+    sendExternalRequest.mockResolvedValue({
+      sessionKey: 'cd'.repeat(32),
+      signature: 'ef'.repeat(64),
+    });
+
+    await expect(signRelayPayload({ operation: 'relay_execute', nonce: 42 })).resolves.toEqual({
+      sessionKey: 'cd'.repeat(32),
+      signature: 'ef'.repeat(64),
+    });
+
+    expect(sendExternalRequest).toHaveBeenCalledWith(ExternalApiMethod.SIGN_RELAY_PAYLOAD, {
+      operation: 'relay_execute',
+      nonce: 42,
+    });
   });
 });

@@ -62,6 +62,14 @@ export interface AddressCopiedEvent extends TelemetryEvent {
   type: TelemetryEventType.ADDRESS_COPIED;
 }
 
+/**
+ * Union-aware `Omit`. The built-in `Omit<A | B, K>` is NOT distributive: it
+ * resolves `keyof (A | B)` to the *intersection* of their keys, so every
+ * member-specific field (failureReason, authType, operationType, ...) is
+ * silently dropped from the result.
+ */
+export type DistributiveOmit<T, K extends PropertyKey> = T extends unknown ? Omit<T, K> : never;
+
 export type AnyTelemetryEvent =
   | LockFailureEvent
   | AuthFailureEvent

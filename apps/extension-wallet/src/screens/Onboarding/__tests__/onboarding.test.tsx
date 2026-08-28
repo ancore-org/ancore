@@ -1,5 +1,7 @@
 import { describe, it, expect, vi } from 'vitest';
+import * as React from 'react';
 import { render, screen, fireEvent, waitFor, within } from '@testing-library/react';
+import { NotificationProvider } from '@ancore/ui-kit';
 import { WelcomeScreen } from '../WelcomeScreen';
 import { MnemonicScreen } from '../MnemonicScreen';
 import { VerifyMnemonicScreen } from '../VerifyMnemonicScreen';
@@ -218,7 +220,7 @@ describe('PasswordScreen', () => {
   it('renders password inputs', () => {
     render(<PasswordScreen onSubmit={vi.fn()} onBack={vi.fn()} />);
 
-    expect(screen.getByText('Create Your Password')).toBeInTheDocument();
+    expect(screen.getByText('Create your password')).toBeInTheDocument();
     expect(screen.getByPlaceholderText('Enter your password')).toBeInTheDocument();
     expect(screen.getByPlaceholderText('Confirm your password')).toBeInTheDocument();
   });
@@ -395,17 +397,23 @@ describe('DeployScreen', () => {
 describe('SuccessScreen', () => {
   const testPublicKey = 'GABC123DEF456GHI789JKL012MNO345PQR678STU901VWX234YZ';
 
-  it('renders success message', () => {
-    render(<SuccessScreen publicKey={testPublicKey} onComplete={vi.fn()} />);
+  // SuccessScreen copies addresses via useCopyWithFeedback, which requires the
+  // toast context the router provides in production.
+  function renderSuccessScreen(ui: React.ReactElement) {
+    return render(<NotificationProvider>{ui}</NotificationProvider>);
+  }
 
-    expect(screen.getByText('Congratulations!')).toBeInTheDocument();
+  it('renders success message', () => {
+    renderSuccessScreen(<SuccessScreen publicKey={testPublicKey} onComplete={vi.fn()} />);
+
+    expect(screen.getByText('Wallet ready')).toBeInTheDocument();
     expect(
       screen.getByText('Your Ancore wallet has been created successfully')
     ).toBeInTheDocument();
   });
 
   it('displays truncated public key', () => {
-    render(<SuccessScreen publicKey={testPublicKey} onComplete={vi.fn()} />);
+    renderSuccessScreen(<SuccessScreen publicKey={testPublicKey} onComplete={vi.fn()} />);
 
     // Should show truncated address
     expect(screen.getByText(/GABC12.*YZ/)).toBeInTheDocument();
@@ -413,7 +421,7 @@ describe('SuccessScreen', () => {
 
   it('displays contract ID if provided', () => {
     const contractId = 'CAS123DEF456GHI789JKL012MNO345PQR678STU901VWX2345';
-    render(
+    renderSuccessScreen(
       <SuccessScreen publicKey={testPublicKey} contractId={contractId} onComplete={vi.fn()} />
     );
 
@@ -421,7 +429,7 @@ describe('SuccessScreen', () => {
   });
 
   it('copies public key to clipboard', async () => {
-    render(<SuccessScreen publicKey={testPublicKey} onComplete={vi.fn()} />);
+    renderSuccessScreen(<SuccessScreen publicKey={testPublicKey} onComplete={vi.fn()} />);
 
     const copyButtons = screen.getAllByRole('button');
     const copyButton = copyButtons.find((btn) => {
@@ -439,20 +447,20 @@ describe('SuccessScreen', () => {
 
   it('calls onComplete when open wallet is clicked', () => {
     const onComplete = vi.fn();
-    render(<SuccessScreen publicKey={testPublicKey} onComplete={onComplete} />);
+    renderSuccessScreen(<SuccessScreen publicKey={testPublicKey} onComplete={onComplete} />);
 
     fireEvent.click(screen.getByText('Open Wallet'));
     expect(onComplete).toHaveBeenCalledTimes(1);
   });
 
   it('shows security reminder', () => {
-    render(<SuccessScreen publicKey={testPublicKey} onComplete={vi.fn()} />);
+    renderSuccessScreen(<SuccessScreen publicKey={testPublicKey} onComplete={vi.fn()} />);
 
     expect(screen.getByText(/recovery phrase/)).toBeInTheDocument();
   });
 
   it('has view on explorer button', () => {
-    render(<SuccessScreen publicKey={testPublicKey} onComplete={vi.fn()} />);
+    renderSuccessScreen(<SuccessScreen publicKey={testPublicKey} onComplete={vi.fn()} />);
 
     expect(screen.getByText('View on Stellar Expert')).toBeInTheDocument();
   });

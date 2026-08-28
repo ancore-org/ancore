@@ -6,20 +6,20 @@
 
 ## Glossary
 
-| Term               | Meaning                                                                                    |
-| ------------------ | ------------------------------------------------------------------------------------------ |
-| **Popup**          | Extension UI — React app at `src/popup/`, runs in the action popup (~360px)                |
-| **Background**     | Service worker at `src/background/` — vault unlock, health probes, message handlers        |
-| **Content Script** | _Planned_ — dApp bridge via `window.postMessage` (not implemented yet; see comparison doc) |
-| **Smart account**  | Soroban contract account (C-address) — not a classic G-address                             |
-| **Session key**    | Time-limited signing key registered on the smart account contract                          |
-| **XDR**            | Stellar binary serialization format for transactions and ledger entries                    |
-| **Soroban**        | Stellar smart contract platform; Ancore account contract lives here                        |
-| **Relayer**        | Ancore service that submits meta-transactions / contract executes                          |
-| **Indexer**        | Ancore REST service for account activity and history                                       |
-| **Horizon**        | Stellar REST API for classic ledger queries and submission                                 |
-| **Mnemonic**       | BIP-39 seed phrase; derived via `@ancore/crypto` (`m/44'/148'/…`)                          |
-| **Zustand store**  | Feature-scoped client state (`stores/account.ts`, `settings.ts`, etc.)                     |
+| Term               | Meaning                                                                                                  |
+| ------------------ | -------------------------------------------------------------------------------------------------------- |
+| **Popup**          | Extension UI — React app at `src/popup/`, runs in the action popup (~360px)                              |
+| **Background**     | Service worker at `src/background/` — vault unlock, health probes, message handlers                      |
+| **Content Script** | dApp bridge via `window.postMessage` at `src/content-script/` — origin prefilter before background relay |
+| **Smart account**  | Soroban contract account (C-address) — not a classic G-address                                           |
+| **Session key**    | Time-limited signing key registered on the smart account contract                                        |
+| **XDR**            | Stellar binary serialization format for transactions and ledger entries                                  |
+| **Soroban**        | Stellar smart contract platform; Ancore account contract lives here                                      |
+| **Relayer**        | Ancore service that submits meta-transactions / contract executes                                        |
+| **Indexer**        | Ancore REST service for account activity and history                                                     |
+| **Horizon**        | Stellar REST API for classic ledger queries and submission                                               |
+| **Mnemonic**       | BIP-39 seed phrase; derived via `@ancore/crypto` (`m/44'/148'/…`)                                        |
+| **Zustand store**  | Feature-scoped client state (`stores/account.ts`, `settings.ts`, etc.)                                   |
 
 ## Documentation
 
@@ -27,6 +27,7 @@
 - [Extension security](../../docs/security/extension-wallet.md)
 - [Extension build troubleshooting](../../docs/troubleshooting/extension-build.md)
 - [E2E smoke guide](../../docs/testing/extension-e2e-smoke.md)
+- [Handlers coverage thresholds](../../docs/testing/extension-handlers-coverage.md)
 - [Contributing (monorepo)](../../CONTRIBUTING.md)
 - [System architecture](../../docs/architecture/OVERVIEW.md)
 - Freighter reference: [AGENTS.md](https://github.com/stellar/freighter/blob/master/AGENTS.md), [API docs](https://docs.freighter.app)
@@ -105,32 +106,63 @@ apps/extension-wallet/
 └── scripts/                   # check-csp.js, analyze-bundle.js
 ```
 
-**Planned (Freighter parity):**
+**dApp bridge (Freighter parity):**
 
 ```
-packages/wallet-api/           # @ancore/wallet-api — dApp npm SDK ✅ scaffold
-packages/wallet-shared/      # protocol + network constants ✅ scaffold
-src/content-script/          # postMessage bridge ✅ stub
+packages/wallet-api/           # @ancore/wallet-api — dApp npm SDK
+packages/wallet-shared/        # protocol + network constants
+src/content-script/            # postMessage bridge + origin prefilter
 ```
 
 ## Architecture
 
-Two runtime contexts today (three when content script ships):
+Three runtime contexts:
 
 ```
-Popup (React)  ──chrome.runtime.sendMessage──►  Background (service worker)
-                                                      │
-                                                      ├─ SecureStorageManager (@ancore/core-sdk)
-                                                      ├─ UNLOCK_WALLET / LOCK_WALLET
-                                                      └─ CHECK_SERVICE_HEALTH
+dApp page ──postMessage──► Content script ──chrome.runtime.sendMessage──► Background (service worker)
+                             (origin prefilter)                               │
+                                                                             ├─ SecureStorageManager (@ancore/core-sdk)
+                                                                             ├─ UNLOCK_WALLET / LOCK_WALLET
+                                                                             ├─ CHECK_SERVICE_HEALTH
+                                                                             └─ External API handlers (allowlist)
+Popup (React) ──chrome.runtime.sendMessage───────────────────────────────────┘
 ```
 
-1. **Popup** — UI only. Sends typed messages via `messaging/sender.ts`. Must **not** hold decrypted private keys.
-2. **Background** — Registers handlers via `messaging/handler.ts`. Only context that should touch vault material after unlock.
+1. **Content script** — First line of defence for dApp requests: origin/protocol prefilter and method whitelist before relay to the background.
+2. **Popup** — UI only. Sends typed messages via `messaging/sender.ts`. Must **not** hold decrypted private keys.
+3. **Background** — Registers handlers via `messaging/handler.ts`; authoritative allowlist check for external dApp methods. Only context that should touch vault material after unlock.
 
 **Account abstraction path:** Session keys and contract ops go through `@ancore/account-abstraction` (`AncoreClient`) and `@ancore/stellar`. Smart account deployment and execute flows differ from Freighter’s classic G-address signing.
 
-**Current gaps vs Freighter:** No content script, no `@ancore/wallet-api`, `SIGN_TRANSACTION` / `SEND_TRANSACTION` types exist but background handlers are not fully wired; send flow still uses demo `SendService` in `hooks/useSendTransaction.ts`. See [FREIGHTER_COMPARISON.md](../../docs/wallets/FREIGHTER_COMPARISON.md).
+**Current gaps vs Freighter:** `SIGN_TRANSACTION` / `SEND_TRANSACTION` types exist but background handlers are not fully wired; send flow still uses demo `SendService` in `hooks/useSendTransaction.ts`. See [FREIGHTER_COMPARISON.md](../../docs/wallets/FREIGHTER_COMPARISON.md).
+
+## Content Script Security Model (dApp bridge, #970)
+
+Two-layer defence-in-depth — both layers must hold; neither is sufficient alone.
+
+**Layer 1 — content-script prefilter (`src/content-script/index.ts`):**
+
+- Only `http:`/`https:` origins relay to the background; known-blocked schemes
+  (`chrome-extension://`, `chrome://`, `about:`, `data:`, `blob:`, `file://`, `javascript:`) are short-circuited first.
+- Origin is taken from the browser-provided `event.origin` and cross-checked against
+  `window.location.origin`; any mismatch is dropped.
+- Every external method must appear in the `METHOD_TO_MESSAGE_TYPE` whitelist; unknown methods are rejected before relay.
+- Malformed/missing envelopes are dropped silently; errors returned to the page are generic (no internal details leak).
+
+**Layer 2 — background allowlist (authoritative boundary, `src/background/handlers/external/`):**
+
+- `service-worker.ts` re-validates `sender.origin` vs the claimed `origin` and fail-closes on any invalid field.
+- Every privileged handler calls `isAllowed(…)` against the persistent Zustand allowlist before acting.
+
+**Session-approval caching decision:** No in-memory origin cache in the content script. The allowlist lives
+in the background (`chrome.storage`), so a cache here would go stale after a revoke without a guaranteed
+invalidation signal. If a cache is added later it MUST subscribe to background revoke notifications.
+
+**Method→message-type map:** `GET_SMART_ACCOUNT` → `EXTERNAL_GET_SMART_ACCOUNT` (not sign-transaction);
+`SIGN_AUTH_ENTRY` / `SIGN_MESSAGE` / `REQUEST_SESSION_KEY` each map to their own dedicated type.
+
+**Tests:** malformed-postMessage fuzz cases and origin/method boundary coverage in
+`src/content-script/__tests__/content-script.test.ts`.
 
 ## Security-Sensitive Areas
 

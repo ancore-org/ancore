@@ -3,7 +3,6 @@
  */
 
 import { createIndexerActivityAdapter } from '../indexerActivityAdapter';
-import type { Transaction } from '../types';
 
 // Mock fetch globally
 global.fetch = jest.fn();

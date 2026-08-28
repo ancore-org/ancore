@@ -7,6 +7,7 @@
 
 import { create } from 'zustand';
 import { persist, createJSONStorage } from 'zustand/middleware';
+import { assertValidEd25519PublicKey } from '@ancore/core-sdk';
 import { extensionStorage } from './_storage';
 import type { Contact, ContactPayload } from '@ancore/types';
 
@@ -16,6 +17,13 @@ export class DuplicateAliasError extends Error {
   constructor(alias: string) {
     super(`A contact with alias "${alias}" already exists`);
     this.name = 'DuplicateAliasError';
+  }
+}
+
+export class InvalidContactAddressError extends Error {
+  constructor(address: string) {
+    super(`Invalid Stellar address: "${address}"`);
+    this.name = 'InvalidContactAddressError';
   }
 }
 
@@ -52,6 +60,14 @@ export interface ContactsState {
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
+function validateContactAddress(address: string): void {
+  try {
+    assertValidEd25519PublicKey(address);
+  } catch {
+    throw new InvalidContactAddressError(address);
+  }
+}
+
 function generateId(): string {
   // Use crypto.randomUUID if available (modern browsers / Node 14.17+)
   if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
@@ -71,6 +87,8 @@ export const useContactsStore = create<ContactsState>()(
       addContact: (payload: ContactPayload): Contact => {
         const { contacts } = get();
         const normalizedAlias = payload.alias.trim();
+
+        validateContactAddress(payload.address);
 
         if (contacts.some((c) => c.alias.toLowerCase() === normalizedAlias.toLowerCase())) {
           throw new DuplicateAliasError(normalizedAlias);
@@ -103,6 +121,10 @@ export const useContactsStore = create<ContactsState>()(
             throw new DuplicateAliasError(normalizedAlias);
           }
           patch = { ...patch, alias: normalizedAlias };
+        }
+
+        if (patch.address !== undefined) {
+          validateContactAddress(patch.address);
         }
 
         const updated: Contact = {

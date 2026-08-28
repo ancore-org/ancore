@@ -7,7 +7,7 @@
 //!
 //! ## Security Warning
 //! **UNAUDITED & TESTNET-ONLY**
-//! This contract is in active development and has not been audited. It is intended for 
+//! This contract is in active development and has not been audited. It is intended for
 //! testnet use only. Do not use in production or with real funds.
 //!
 //! ## Features
@@ -23,12 +23,18 @@
 //! - `executed`: Emitted when a transaction is executed with to, function, and nonce
 //! - `session_key_added`: Emitted when a session key is added with public_key and expires_at
 //! - `session_key_revoked`: Emitted when a session key is revoked with public_key
+//! - `allowed_contracts_set`: Emitted when allowed contracts are updated for a session key
+//! - `module_registered`: Emitted when a validation module is registered
+//! - `module_unregistered`: Emitted when a validation module is unregistered
 
 use soroban_sdk::xdr::ToXdr;
 use soroban_sdk::{
     contract, contracterror, contractimpl, contracttype, Address, BytesN, Env, Symbol, TryFromVal,
     Val, Vec,
 };
+
+/// Env-free validation helpers (also used by cargo-fuzz / property tests).
+pub mod validation;
 
 #[cfg(not(target_family = "wasm"))]
 use ed25519_dalek::{Signature as DalekSignature, VerifyingKey};
@@ -64,6 +70,8 @@ pub enum ContractError {
     ExceededSpendLimit = 17,
     /// Invalid spend policy configuration at session key registration
     InvalidSpendPolicy = 18,
+    /// Invalid threshold or owner configuration
+    InvalidThreshold = 19,
 }
 
 /// Event topic naming convention
@@ -111,6 +119,42 @@ mod events {
     pub fn session_key_ttl_refreshed(env: &Env) -> Symbol {
         Symbol::new(env, "session_key_ttl_refreshed")
     }
+
+    /// Event emitted when an owner is added.
+    /// Data: (new_owner: Address)
+    pub fn owner_added(env: &Env) -> Symbol {
+        Symbol::new(env, "owner_added")
+    }
+
+    /// Event emitted when an owner is removed.
+    /// Data: (removed_owner: Address)
+    pub fn owner_removed(env: &Env) -> Symbol {
+        Symbol::new(env, "owner_removed")
+    }
+
+    /// Event emitted when the threshold is changed.
+    /// Data: (new_threshold: u32)
+    pub fn threshold_changed(env: &Env) -> Symbol {
+        Symbol::new(env, "threshold_changed")
+    }
+
+    /// Event emitted when contract allowlist for a session key is updated.
+    /// Data: (public_key: BytesN<32>, allowed_contracts: Option<Vec<Address>>)
+    pub fn allowed_contracts_set(env: &Env) -> Symbol {
+        Symbol::new(env, "allowed_contracts_set")
+    }
+
+    /// Event emitted when a validation module is registered.
+    /// Data: (module: Address)
+    pub fn module_registered(env: &Env) -> Symbol {
+        Symbol::new(env, "module_registered")
+    }
+
+    /// Event emitted when a validation module is unregistered.
+    /// Data: (module: Address)
+    pub fn module_unregistered(env: &Env) -> Symbol {
+        Symbol::new(env, "module_unregistered")
+    }
 }
 
 #[contracttype]
@@ -141,6 +185,12 @@ pub enum DataKey {
     SessionKey(BytesN<32>),
     Version,
     ValidationModules,
+    /// Multi-owner: list of all owners
+    Owners,
+    /// Multi-owner: required number of confirmations
+    Threshold,
+    /// Multi-owner: pending owner additions (address -> expiry timestamp)
+    PendingOwner(Address),
 }
 
 /// Caller authorization path for [`AncoreAccount::execute`].
@@ -153,6 +203,9 @@ pub enum DataKey {
 pub enum CallerIdentity {
     Owner,
     SessionKey(BytesN<32>),
+    /// N-of-M multi-owner path: signers must be distinct owners totalling at least the
+    /// configured threshold. Each signer's `require_auth()` is invoked by the contract.
+    Quorum(Vec<Address>),
 }
 
 const DAY_IN_LEDGERS: u32 = 17280; // 24 hours * 60 min * 60 sec / 5 sec per ledger
@@ -161,14 +214,13 @@ const INSTANCE_BUMP_THRESHOLD: u32 = 15 * DAY_IN_LEDGERS; // 15 days
 const MIN_MILLISECONDS_TIMESTAMP: u64 = 100_000_000_000;
 
 /// Permission bit for send payment operations
-pub const PERMISSION_SEND_PAYMENT: u32 = 0;
-/// Permission bit for execute operations
+pub const PERMISSION_SEND_PAYMENT: u32 = validation::PERMISSION_SEND_PAYMENT;
 /// Permission bit for session-key execute authorization.
 /// Issue #188: Session keys must have this permission to invoke transactions.
 /// Without this bit set, execute() returns InsufficientPermission error.
-pub const PERMISSION_EXECUTE: u32 = 1;
+pub const PERMISSION_EXECUTE: u32 = validation::PERMISSION_EXECUTE;
 /// Permission bit for invoke contract operations
-pub const PERMISSION_INVOKE_CONTRACT: u32 = 2;
+pub const PERMISSION_INVOKE_CONTRACT: u32 = validation::PERMISSION_INVOKE_CONTRACT;
 
 #[contract]
 pub struct AncoreAccount;
@@ -282,6 +334,23 @@ impl AncoreAccount {
                 let owner = Self::get_owner(env.clone())?;
                 owner.require_auth();
             }
+            // N-of-M quorum path: reject session-key auth parameters; require threshold signers.
+            CallerIdentity::Quorum(signers) => {
+                if session_pub_key.is_some() || signature.is_some() || signature_payload.is_some() {
+                    return Err(ContractError::InvalidCallerIdentity);
+                }
+                let owners: Vec<Address> = env
+                    .storage()
+                    .instance()
+                    .get(&DataKey::Owners)
+                    .ok_or(ContractError::NotInitialized)?;
+                let threshold: u32 = env
+                    .storage()
+                    .instance()
+                    .get(&DataKey::Threshold)
+                    .ok_or(ContractError::NotInitialized)?;
+                Self::require_multi_owner_quorum(&env, &owners, threshold, &signers)?;
+            }
             CallerIdentity::SessionKey(expected_session_pk) => {
                 let session_pk = session_pub_key.ok_or(ContractError::InvalidCallerIdentity)?;
                 if session_pk != expected_session_pk {
@@ -349,8 +418,9 @@ impl AncoreAccount {
         );
 
         // Call each registered validation module before executing the operation.
-        // Modules expose `validate(to, function, args) -> Result<(), u32>`.
-        // Any module returning an error aborts execution with InsufficientPermission.
+        // Modules expose `validate(to, function, args) -> Result<(), ContractError>`.
+        // Returning `Ok(())` approves the operation. Returning `Err(_)` or panicking
+        // rejects the operation and keeps execute() fail-closed.
         let modules: Vec<Address> = env
             .storage()
             .instance()
@@ -362,10 +432,12 @@ impl AncoreAccount {
             let mut module_args: Vec<Val> = Vec::new(&env);
             module_args.push_back(to.clone().to_val());
             module_args.push_back(function.clone().to_val());
-            for arg in args.iter() {
-                module_args.push_back(arg);
+            module_args.push_back(args.clone().to_val());
+            let validation_result: Result<(), ContractError> =
+                env.invoke_contract(&module, &validate_fn, module_args);
+            if validation_result.is_err() {
+                return Err(ContractError::InsufficientPermission);
             }
-            let _: Val = env.invoke_contract(&module, &validate_fn, module_args);
         }
 
         let result: Val = env.invoke_contract(&to, &function, args.clone());
@@ -399,9 +471,9 @@ impl AncoreAccount {
             return Err(ContractError::InvalidExpiration);
         }
 
-        Self::validate_spend_policy(
-            &max_amount_per_call,
-            &cumulative_limit,
+        validation::validate_spend_policy(
+            max_amount_per_call,
+            cumulative_limit,
             spend_window_seconds,
         )?;
 
@@ -409,19 +481,16 @@ impl AncoreAccount {
         owner.require_auth();
 
         // Validate permission vector contains only valid/known permissions and no duplicates
-        let mut seen = Vec::new(&env);
+        let mut permission_buf = [0u32; 8];
+        let mut permission_len = 0usize;
         for permission in permissions.iter() {
-            if permission != PERMISSION_SEND_PAYMENT
-                && permission != PERMISSION_EXECUTE
-                && permission != PERMISSION_INVOKE_CONTRACT
-            {
+            if permission_len >= permission_buf.len() {
                 return Err(ContractError::InsufficientPermission);
             }
-            if seen.contains(permission) {
-                return Err(ContractError::InsufficientPermission);
-            }
-            seen.push_back(permission);
+            permission_buf[permission_len] = permission;
+            permission_len += 1;
         }
+        validation::validate_permissions(&permission_buf[..permission_len])?;
 
         if env
             .storage()
@@ -512,15 +581,21 @@ impl AncoreAccount {
         let mut session_key = Self::get_session_key(env.clone(), public_key.clone())
             .ok_or(ContractError::SessionKeyNotFound)?;
 
-        session_key.allowed_contracts = allowed_contracts;
+        session_key.allowed_contracts = allowed_contracts.clone();
 
         env.storage()
             .persistent()
-            .set(&DataKey::SessionKey(public_key), &session_key);
+            .set(&DataKey::SessionKey(public_key.clone()), &session_key);
 
         env.storage()
             .instance()
             .extend_ttl(INSTANCE_BUMP_THRESHOLD, INSTANCE_BUMP_AMOUNT);
+
+        // Emit allowed_contracts_set event
+        env.events().publish(
+            (events::allowed_contracts_set(&env),),
+            (public_key, allowed_contracts),
+        );
 
         Ok(())
     }
@@ -528,8 +603,9 @@ impl AncoreAccount {
     /// Register a validation module (owner only).
     ///
     /// The module must expose a `validate` function with signature
-    /// `fn validate(to: Address, function: Symbol, args: Vec<Val>) -> Result<(), u32>`.
-    /// It is called before each `execute()` invocation.
+    /// `fn validate(to: Address, function: Symbol, args: Vec<Val>) -> Result<(), ContractError>`.
+    /// It is called before each `execute()` invocation. Returning `Ok(())` approves
+    /// the operation; returning `Err(_)` rejects it with `InsufficientPermission`.
     pub fn register_module(env: Env, module: Address) -> Result<(), ContractError> {
         let owner = Self::get_owner(env.clone())?;
         owner.require_auth();
@@ -541,7 +617,7 @@ impl AncoreAccount {
             .unwrap_or_else(|| Vec::new(&env));
 
         if !modules.contains(&module) {
-            modules.push_back(module);
+            modules.push_back(module.clone());
         }
 
         env.storage()
@@ -550,6 +626,10 @@ impl AncoreAccount {
         env.storage()
             .instance()
             .extend_ttl(INSTANCE_BUMP_THRESHOLD, INSTANCE_BUMP_AMOUNT);
+
+        // Emit module_registered event
+        env.events()
+            .publish((events::module_registered(&env),), module);
 
         Ok(())
     }
@@ -579,6 +659,10 @@ impl AncoreAccount {
             .instance()
             .extend_ttl(INSTANCE_BUMP_THRESHOLD, INSTANCE_BUMP_AMOUNT);
 
+        // Emit module_unregistered event
+        env.events()
+            .publish((events::module_unregistered(&env),), module);
+
         Ok(())
     }
 
@@ -588,6 +672,226 @@ impl AncoreAccount {
             .instance()
             .get(&DataKey::ValidationModules)
             .unwrap_or_else(|| Vec::new(&env))
+    }
+
+    // ─── Multi-owner threshold authorization ────────────────────────────────
+
+    /// Verify that `signers` contains at least `threshold` distinct addresses that are
+    /// all present in `owners`, and call `require_auth()` on each distinct signer.
+    /// Returns `Unauthorized` if the quorum is not met.
+    fn require_multi_owner_quorum(
+        env: &Env,
+        owners: &Vec<Address>,
+        threshold: u32,
+        signers: &Vec<Address>,
+    ) -> Result<(), ContractError> {
+        let mut distinct: Vec<Address> = Vec::new(env);
+        for signer in signers.iter() {
+            if !owners.contains(signer.clone()) {
+                return Err(ContractError::Unauthorized);
+            }
+            if !distinct.contains(signer.clone()) {
+                distinct.push_back(signer.clone());
+                signer.require_auth();
+            }
+        }
+        if distinct.len() < threshold {
+            return Err(ContractError::Unauthorized);
+        }
+        Ok(())
+    }
+
+    /// Initialize multi-owner mode with a list of owners and threshold.
+    /// This migrates from single-owner to multi-owner mode.
+    /// Can only be called once; subsequent calls return AlreadyInitialized.
+    pub fn initialize_multi_owner(
+        env: Env,
+        owners: Vec<Address>,
+        threshold: u32,
+    ) -> Result<(), ContractError> {
+        if env.storage().instance().has(&DataKey::Owners) {
+            return Err(ContractError::AlreadyInitialized);
+        }
+
+        let owner = Self::get_owner(env.clone())?;
+        owner.require_auth();
+
+        if owners.is_empty() {
+            return Err(ContractError::InvalidThreshold);
+        }
+        if threshold == 0 || threshold > owners.len() {
+            return Err(ContractError::InvalidThreshold);
+        }
+
+        // Ensure all owners are unique
+        let mut seen = Vec::new(&env);
+        for o in owners.iter() {
+            if seen.contains(o.clone()) {
+                return Err(ContractError::InvalidThreshold);
+            }
+            seen.push_back(o);
+        }
+
+        env.storage().instance().set(&DataKey::Owners, &owners);
+        env.storage()
+            .instance()
+            .set(&DataKey::Threshold, &threshold);
+
+        env.storage()
+            .instance()
+            .extend_ttl(INSTANCE_BUMP_THRESHOLD, INSTANCE_BUMP_AMOUNT);
+
+        Ok(())
+    }
+
+    /// Get the list of owners.
+    pub fn get_owners(env: Env) -> Vec<Address> {
+        env.storage()
+            .instance()
+            .get(&DataKey::Owners)
+            .unwrap_or_else(|| Vec::new(&env))
+    }
+
+    /// Get the current threshold.
+    pub fn get_threshold(env: Env) -> Option<u32> {
+        env.storage().instance().get(&DataKey::Threshold)
+    }
+
+    /// Add an owner (requires quorum of existing owners).
+    /// Multi-owner mode must already be initialized via `initialize_multi_owner`.
+    /// The new owner is added immediately; threshold is not auto-adjusted.
+    pub fn add_owner(
+        env: Env,
+        signers: Vec<Address>,
+        new_owner: Address,
+    ) -> Result<(), ContractError> {
+        let mut owners: Vec<Address> = env
+            .storage()
+            .instance()
+            .get(&DataKey::Owners)
+            .ok_or(ContractError::NotInitialized)?;
+
+        let threshold: u32 = env
+            .storage()
+            .instance()
+            .get(&DataKey::Threshold)
+            .ok_or(ContractError::NotInitialized)?;
+
+        Self::require_multi_owner_quorum(&env, &owners, threshold, &signers)?;
+
+        if owners.contains(new_owner.clone()) {
+            return Err(ContractError::InvalidThreshold);
+        }
+
+        owners.push_back(new_owner.clone());
+        env.storage().instance().set(&DataKey::Owners, &owners);
+
+        env.storage()
+            .instance()
+            .extend_ttl(INSTANCE_BUMP_THRESHOLD, INSTANCE_BUMP_AMOUNT);
+
+        env.events()
+            .publish((events::owner_added(&env),), new_owner);
+
+        Ok(())
+    }
+
+    /// Remove an owner (requires quorum of existing owners).
+    /// Multi-owner mode must already be initialized via `initialize_multi_owner`.
+    /// Cannot remove the last owner. Threshold is auto-adjusted if it exceeds new count.
+    pub fn remove_owner(
+        env: Env,
+        signers: Vec<Address>,
+        owner_to_remove: Address,
+    ) -> Result<(), ContractError> {
+        let owners: Vec<Address> = env
+            .storage()
+            .instance()
+            .get(&DataKey::Owners)
+            .ok_or(ContractError::NotInitialized)?;
+
+        let threshold: u32 = env
+            .storage()
+            .instance()
+            .get(&DataKey::Threshold)
+            .ok_or(ContractError::NotInitialized)?;
+
+        Self::require_multi_owner_quorum(&env, &owners, threshold, &signers)?;
+
+        if !owners.contains(owner_to_remove.clone()) {
+            return Err(ContractError::InvalidThreshold);
+        }
+        if owners.len() <= 1 {
+            return Err(ContractError::InvalidThreshold);
+        }
+
+        let mut updated = Vec::new(&env);
+        for o in owners.iter() {
+            if o != owner_to_remove {
+                updated.push_back(o);
+            }
+        }
+
+        env.storage().instance().set(&DataKey::Owners, &updated);
+
+        // Auto-adjust threshold if it exceeds new owner count
+        if let Some(mut threshold) = Self::get_threshold(env.clone()) {
+            if threshold > updated.len() {
+                threshold = updated.len();
+                env.storage()
+                    .instance()
+                    .set(&DataKey::Threshold, &threshold);
+            }
+        }
+
+        env.storage()
+            .instance()
+            .extend_ttl(INSTANCE_BUMP_THRESHOLD, INSTANCE_BUMP_AMOUNT);
+
+        env.events()
+            .publish((events::owner_removed(&env),), owner_to_remove);
+
+        Ok(())
+    }
+
+    /// Set the threshold (requires quorum of existing owners).
+    /// Multi-owner mode must already be initialized via `initialize_multi_owner`.
+    /// Threshold must be > 0 and <= number of owners.
+    pub fn set_threshold(
+        env: Env,
+        signers: Vec<Address>,
+        new_threshold: u32,
+    ) -> Result<(), ContractError> {
+        let owners: Vec<Address> = env
+            .storage()
+            .instance()
+            .get(&DataKey::Owners)
+            .ok_or(ContractError::NotInitialized)?;
+
+        let threshold: u32 = env
+            .storage()
+            .instance()
+            .get(&DataKey::Threshold)
+            .ok_or(ContractError::NotInitialized)?;
+
+        Self::require_multi_owner_quorum(&env, &owners, threshold, &signers)?;
+
+        if new_threshold == 0 || new_threshold > owners.len() {
+            return Err(ContractError::InvalidThreshold);
+        }
+
+        env.storage()
+            .instance()
+            .set(&DataKey::Threshold, &new_threshold);
+
+        env.storage()
+            .instance()
+            .extend_ttl(INSTANCE_BUMP_THRESHOLD, INSTANCE_BUMP_AMOUNT);
+
+        env.events()
+            .publish((events::threshold_changed(&env),), new_threshold);
+
+        Ok(())
     }
 
     /// Upgrade the contract's WASM logic
@@ -777,30 +1081,6 @@ impl AncoreAccount {
         payload
     }
 
-    fn validate_spend_policy(
-        max_amount_per_call: &Option<i128>,
-        cumulative_limit: &Option<i128>,
-        spend_window_seconds: u64,
-    ) -> Result<(), ContractError> {
-        if let Some(limit) = max_amount_per_call {
-            if *limit <= 0 {
-                return Err(ContractError::InvalidSpendPolicy);
-            }
-        }
-
-        if let Some(limit) = cumulative_limit {
-            if *limit <= 0 || spend_window_seconds == 0 {
-                return Err(ContractError::InvalidSpendPolicy);
-            }
-        }
-
-        if spend_window_seconds > 0 && cumulative_limit.is_none() {
-            return Err(ContractError::InvalidSpendPolicy);
-        }
-
-        Ok(())
-    }
-
     fn extract_spend_amount(env: &Env, args: &Vec<Val>) -> Option<i128> {
         for index in 0..args.len() {
             let value = args.get(index).unwrap();
@@ -818,36 +1098,15 @@ impl AncoreAccount {
         session: &SessionKey,
         args: &Vec<Val>,
     ) -> Result<(), ContractError> {
-        let amount = match Self::extract_spend_amount(env, args) {
-            Some(value) => value,
-            None => return Ok(()),
-        };
-
-        if let Some(limit) = session.max_amount_per_call {
-            if amount > limit {
-                return Err(ContractError::ExceededSpendLimit);
-            }
-        }
-
-        if let Some(cumulative_limit) = session.cumulative_limit {
-            let now = env.ledger().timestamp();
-            let mut spent = session.spent_in_window;
-            let window_start = session.spend_window_start;
-
-            if now > window_start.saturating_add(session.spend_window_seconds) {
-                spent = 0;
-            }
-
-            let next_spent = spent
-                .checked_add(amount)
-                .ok_or(ContractError::ArithmeticOverflow)?;
-
-            if next_spent > cumulative_limit {
-                return Err(ContractError::ExceededSpendLimit);
-            }
-        }
-
-        Ok(())
+        validation::check_spend_limits(&validation::SpendCheckInput {
+            amount: Self::extract_spend_amount(env, args),
+            max_amount_per_call: session.max_amount_per_call,
+            cumulative_limit: session.cumulative_limit,
+            spend_window_start: session.spend_window_start,
+            spend_window_seconds: session.spend_window_seconds,
+            spent_in_window: session.spent_in_window,
+            now: env.ledger().timestamp(),
+        })
     }
 
     fn apply_spend_usage(
@@ -913,6 +1172,44 @@ mod test {
     fn init(env: &Env, client: &AncoreAccountClient, owner: &Address) {
         env.mock_all_auths();
         client.initialize(owner);
+    }
+
+    mod approving_validation_module {
+        use super::*;
+
+        #[contract]
+        pub struct Module;
+
+        #[contractimpl]
+        impl Module {
+            pub fn validate(
+                _env: Env,
+                _to: Address,
+                _function: Symbol,
+                _args: Vec<Val>,
+            ) -> Result<(), ContractError> {
+                Ok(())
+            }
+        }
+    }
+
+    mod rejecting_validation_module {
+        use super::*;
+
+        #[contract]
+        pub struct Module;
+
+        #[contractimpl]
+        impl Module {
+            pub fn validate(
+                _env: Env,
+                _to: Address,
+                _function: Symbol,
+                _args: Vec<Val>,
+            ) -> Result<(), ContractError> {
+                Err(ContractError::InsufficientPermission)
+            }
+        }
     }
 
     #[test]
@@ -1743,7 +2040,10 @@ mod test {
             &None,
             &0u64,
         );
-        assert_eq!(result, Err(Ok(ContractError::InsufficientPermission)));
+        assert!(matches!(
+            result,
+            Err(Ok(ContractError::InsufficientPermission))
+        ));
     }
 
     #[test]
@@ -1773,7 +2073,10 @@ mod test {
             &None,
             &0u64,
         );
-        assert_eq!(result, Err(Ok(ContractError::InsufficientPermission)));
+        assert!(matches!(
+            result,
+            Err(Ok(ContractError::InsufficientPermission))
+        ));
     }
 
     #[test]
@@ -1903,6 +2206,110 @@ mod test {
         let modules = client.get_modules();
         assert_eq!(modules.len(), 1);
         assert_eq!(modules.get_unchecked(0), module_addr);
+    }
+
+    #[test]
+    fn test_execute_validation_module_approval_allows_execution() {
+        let env = Env::default();
+        let contract_id = env.register_contract(None, AncoreAccount);
+        let client = AncoreAccountClient::new(&env, &contract_id);
+
+        let owner = Address::generate(&env);
+        init(&env, &client, &owner);
+        env.mock_all_auths();
+
+        let module_addr = env.register_contract(None, approving_validation_module::Module);
+        client.register_module(&module_addr);
+
+        let callee_id = env.register_contract(None, AncoreAccount);
+        let function = soroban_sdk::Symbol::new(&env, "get_version");
+        let args = Vec::new(&env);
+
+        let result = client.try_execute(
+            &CallerIdentity::Owner,
+            &callee_id,
+            &function,
+            &args,
+            &0u64,
+            &None,
+            &None,
+            &None,
+        );
+
+        assert!(result.is_ok());
+        assert_eq!(client.get_nonce(), 1);
+    }
+
+    #[test]
+    fn test_execute_validation_module_rejection_blocks_execution() {
+        let env = Env::default();
+        let contract_id = env.register_contract(None, AncoreAccount);
+        let client = AncoreAccountClient::new(&env, &contract_id);
+
+        let owner = Address::generate(&env);
+        init(&env, &client, &owner);
+        env.mock_all_auths();
+
+        let module_addr = env.register_contract(None, rejecting_validation_module::Module);
+        client.register_module(&module_addr);
+
+        let callee_id = env.register_contract(None, AncoreAccount);
+        let function = soroban_sdk::Symbol::new(&env, "get_version");
+        let args = Vec::new(&env);
+
+        let result = client.try_execute(
+            &CallerIdentity::Owner,
+            &callee_id,
+            &function,
+            &args,
+            &0u64,
+            &None,
+            &None,
+            &None,
+        );
+
+        assert!(matches!(
+            result,
+            Err(Ok(ContractError::InsufficientPermission))
+        ));
+        assert_eq!(client.get_nonce(), 0);
+    }
+
+    #[test]
+    fn test_execute_multiple_validation_modules_rejection_blocks_execution() {
+        let env = Env::default();
+        let contract_id = env.register_contract(None, AncoreAccount);
+        let client = AncoreAccountClient::new(&env, &contract_id);
+
+        let owner = Address::generate(&env);
+        init(&env, &client, &owner);
+        env.mock_all_auths();
+
+        let approving_module = env.register_contract(None, approving_validation_module::Module);
+        let rejecting_module = env.register_contract(None, rejecting_validation_module::Module);
+        client.register_module(&approving_module);
+        client.register_module(&rejecting_module);
+
+        let callee_id = env.register_contract(None, AncoreAccount);
+        let function = soroban_sdk::Symbol::new(&env, "get_version");
+        let args = Vec::new(&env);
+
+        let result = client.try_execute(
+            &CallerIdentity::Owner,
+            &callee_id,
+            &function,
+            &args,
+            &0u64,
+            &None,
+            &None,
+            &None,
+        );
+
+        assert!(matches!(
+            result,
+            Err(Ok(ContractError::InsufficientPermission))
+        ));
+        assert_eq!(client.get_nonce(), 0);
     }
 
     #[test]
@@ -2165,5 +2572,292 @@ mod test {
 
         assert!(matches!(result, Err(Ok(ContractError::ExceededSpendLimit))));
         assert_eq!(client.get_nonce(), 0);
+    }
+
+    #[test]
+    fn test_initialize_multi_owner() {
+        let env = Env::default();
+        let contract_id = env.register_contract(None, AncoreAccount);
+        let client = AncoreAccountClient::new(&env, &contract_id);
+
+        let owner = Address::generate(&env);
+        init(&env, &client, &owner);
+        env.mock_all_auths();
+
+        let owner2 = Address::generate(&env);
+        let owner3 = Address::generate(&env);
+        let mut owners = Vec::new(&env);
+        owners.push_back(owner.clone());
+        owners.push_back(owner2.clone());
+        owners.push_back(owner3.clone());
+
+        client.initialize_multi_owner(&owners, &2);
+
+        assert_eq!(client.get_owners().len(), 3);
+        assert_eq!(client.get_threshold(), Some(2));
+    }
+
+    #[test]
+    fn test_add_and_remove_owner() {
+        let env = Env::default();
+        let contract_id = env.register_contract(None, AncoreAccount);
+        let client = AncoreAccountClient::new(&env, &contract_id);
+
+        let owner = Address::generate(&env);
+        init(&env, &client, &owner);
+        env.mock_all_auths();
+
+        let owner2 = Address::generate(&env);
+        let owner3 = Address::generate(&env);
+        let mut owners = Vec::new(&env);
+        owners.push_back(owner.clone());
+        owners.push_back(owner2.clone());
+
+        client.initialize_multi_owner(&owners, &1);
+        assert_eq!(client.get_owners().len(), 2);
+
+        // threshold=1 — one existing owner is sufficient to authorize
+        let mut signers = Vec::new(&env);
+        signers.push_back(owner.clone());
+
+        client.add_owner(&signers, &owner3);
+        assert_eq!(client.get_owners().len(), 3);
+
+        client.remove_owner(&signers, &owner2);
+        assert_eq!(client.get_owners().len(), 2);
+    }
+
+    #[test]
+    fn test_set_threshold() {
+        let env = Env::default();
+        let contract_id = env.register_contract(None, AncoreAccount);
+        let client = AncoreAccountClient::new(&env, &contract_id);
+
+        let owner = Address::generate(&env);
+        init(&env, &client, &owner);
+        env.mock_all_auths();
+
+        let owner2 = Address::generate(&env);
+        let owner3 = Address::generate(&env);
+        let mut owners = Vec::new(&env);
+        owners.push_back(owner.clone());
+        owners.push_back(owner2.clone());
+        owners.push_back(owner3.clone());
+
+        client.initialize_multi_owner(&owners, &1);
+        assert_eq!(client.get_threshold(), Some(1));
+
+        let mut one_signer = Vec::new(&env);
+        one_signer.push_back(owner.clone());
+        client.set_threshold(&one_signer, &2);
+        assert_eq!(client.get_threshold(), Some(2));
+
+        // threshold is now 2; need 2 distinct owners to authorize
+        let mut two_signers = Vec::new(&env);
+        two_signers.push_back(owner.clone());
+        two_signers.push_back(owner2.clone());
+        client.set_threshold(&two_signers, &3);
+        assert_eq!(client.get_threshold(), Some(3));
+    }
+
+    #[test]
+    fn test_remove_owner_auto_adjusts_threshold() {
+        let env = Env::default();
+        let contract_id = env.register_contract(None, AncoreAccount);
+        let client = AncoreAccountClient::new(&env, &contract_id);
+
+        let owner = Address::generate(&env);
+        init(&env, &client, &owner);
+        env.mock_all_auths();
+
+        let owner2 = Address::generate(&env);
+        let owner3 = Address::generate(&env);
+        let mut owners = Vec::new(&env);
+        owners.push_back(owner.clone());
+        owners.push_back(owner2.clone());
+        owners.push_back(owner3.clone());
+
+        client.initialize_multi_owner(&owners, &3);
+        assert_eq!(client.get_threshold(), Some(3));
+
+        // threshold=3 — all three owners must sign
+        let mut all_signers = Vec::new(&env);
+        all_signers.push_back(owner.clone());
+        all_signers.push_back(owner2.clone());
+        all_signers.push_back(owner3.clone());
+
+        client.remove_owner(&all_signers, &owner3);
+        assert_eq!(client.get_threshold(), Some(2));
+    }
+
+    #[test]
+    fn test_owner_management_requires_multi_owner_initialized() {
+        let env = Env::default();
+        let contract_id = env.register_contract(None, AncoreAccount);
+        let client = AncoreAccountClient::new(&env, &contract_id);
+
+        let owner = Address::generate(&env);
+        init(&env, &client, &owner);
+        env.mock_all_auths();
+
+        let other = Address::generate(&env);
+        let signers = Vec::new(&env); // empty — doesn't matter, should fail before quorum check
+
+        // Without calling initialize_multi_owner first, all management calls must fail
+        let result = client.try_add_owner(&signers, &other);
+        assert!(matches!(result, Err(Ok(ContractError::NotInitialized))));
+
+        let result = client.try_remove_owner(&signers, &other);
+        assert!(matches!(result, Err(Ok(ContractError::NotInitialized))));
+
+        let result = client.try_set_threshold(&signers, &1);
+        assert!(matches!(result, Err(Ok(ContractError::NotInitialized))));
+    }
+
+    #[test]
+    fn test_quorum_insufficient_signers_rejected() {
+        let env = Env::default();
+        let contract_id = env.register_contract(None, AncoreAccount);
+        let client = AncoreAccountClient::new(&env, &contract_id);
+
+        let owner = Address::generate(&env);
+        init(&env, &client, &owner);
+        env.mock_all_auths();
+
+        let owner2 = Address::generate(&env);
+        let owner3 = Address::generate(&env);
+        let mut owners = Vec::new(&env);
+        owners.push_back(owner.clone());
+        owners.push_back(owner2.clone());
+        owners.push_back(owner3.clone());
+        client.initialize_multi_owner(&owners, &2);
+
+        let owner4 = Address::generate(&env);
+
+        // Only 1 signer but threshold is 2 — must be rejected
+        let mut one_signer = Vec::new(&env);
+        one_signer.push_back(owner.clone());
+        let result = client.try_add_owner(&one_signer, &owner4);
+        assert!(matches!(result, Err(Ok(ContractError::Unauthorized))));
+    }
+
+    #[test]
+    fn test_register_multiple_modules() {
+        let env = Env::default();
+        let contract_id = env.register_contract(None, AncoreAccount);
+        let client = AncoreAccountClient::new(&env, &contract_id);
+
+        let owner = Address::generate(&env);
+        init(&env, &client, &owner);
+        env.mock_all_auths();
+
+        let module1 = Address::generate(&env);
+        let module2 = Address::generate(&env);
+
+        client.register_module(&module1);
+        client.register_module(&module2);
+
+        let modules = client.get_modules();
+        assert_eq!(modules.len(), 2);
+        assert!(modules.contains(&module1));
+        assert!(modules.contains(&module2));
+    }
+
+    #[test]
+    fn test_unregister_nonexistent_module_is_noop() {
+        let env = Env::default();
+        let contract_id = env.register_contract(None, AncoreAccount);
+        let client = AncoreAccountClient::new(&env, &contract_id);
+
+        let owner = Address::generate(&env);
+        init(&env, &client, &owner);
+        env.mock_all_auths();
+
+        let module = Address::generate(&env);
+        client.unregister_module(&module);
+
+        assert_eq!(client.get_modules().len(), 0);
+    }
+
+    #[test]
+    fn test_get_modules_empty_by_default() {
+        let env = Env::default();
+        let contract_id = env.register_contract(None, AncoreAccount);
+        let client = AncoreAccountClient::new(&env, &contract_id);
+
+        let owner = Address::generate(&env);
+        init(&env, &client, &owner);
+        env.mock_all_auths();
+
+        let modules = client.get_modules();
+        assert_eq!(modules.len(), 0);
+    }
+
+    #[test]
+    fn test_set_allowed_contracts_emits_event() {
+        let env = Env::default();
+        let contract_id = env.register_contract(None, AncoreAccount);
+        let client = AncoreAccountClient::new(&env, &contract_id);
+
+        let owner = Address::generate(&env);
+        init(&env, &client, &owner);
+        env.mock_all_auths();
+
+        let session_pk = BytesN::from_array(&env, &[1u8; 32]);
+        let expires_at = env.ledger().timestamp() + 1000;
+        let mut permissions = Vec::new(&env);
+        permissions.push_back(PERMISSION_EXECUTE);
+
+        client.add_session_key(
+            &session_pk,
+            &expires_at,
+            &permissions,
+            &None,
+            &None,
+            &None,
+            &0u64,
+        );
+
+        let target_contract = Address::generate(&env);
+        let mut allowed = Vec::new(&env);
+        allowed.push_back(target_contract.clone());
+
+        client.set_allowed_contracts(&session_pk, &Some(allowed.clone()));
+
+        let events = env.events().all();
+        let last_event = events.last().unwrap();
+        assert_eq!(
+            last_event.1,
+            (events::allowed_contracts_set(&env),).into_val(&env)
+        );
+    }
+
+    #[test]
+    fn test_register_and_unregister_module_emits_events() {
+        let env = Env::default();
+        let contract_id = env.register_contract(None, AncoreAccount);
+        let client = AncoreAccountClient::new(&env, &contract_id);
+
+        let owner = Address::generate(&env);
+        init(&env, &client, &owner);
+        env.mock_all_auths();
+
+        let module = Address::generate(&env);
+
+        client.register_module(&module);
+        let events = env.events().all();
+        let last_event = events.last().unwrap();
+        assert_eq!(
+            last_event.1,
+            (events::module_registered(&env),).into_val(&env)
+        );
+
+        client.unregister_module(&module);
+        let events = env.events().all();
+        let last_event = events.last().unwrap();
+        assert_eq!(
+            last_event.1,
+            (events::module_unregistered(&env),).into_val(&env)
+        );
     }
 }

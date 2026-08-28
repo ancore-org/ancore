@@ -51,8 +51,10 @@ export {
   validateMnemonic,
   validateMnemonicStrength,
   getEnglishWordlist,
+  MnemonicValidationError,
+  UnsupportedMnemonicLanguageError,
+  SUPPORTED_MNEMONIC_LANGUAGE,
 } from './mnemonic';
-export { MnemonicValidationError } from './mnemonic';
 
 // Key Derivation
 export { deriveKeypairFromMnemonic } from './key-derivation';
@@ -62,4 +64,3 @@ export { signPayload, signTransaction, verifySignature } from './signing';
 
 // Constant-time comparison
 export { timingSafeEqual } from './timing-safe';
-export { constantTimeEqual } from './compare';

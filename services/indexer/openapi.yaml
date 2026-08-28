@@ -14,7 +14,9 @@ info:
     `cursor_before`. Never construct or modify cursors client-side — the
     encoding is an implementation detail and may change.
 
-    Contract-event endpoints use `limit` / `offset` pagination.
+    Contract-event endpoints use the same opaque cursor-based pagination
+    (`cursor_after` / `cursor_before`). The legacy `offset` query parameter
+    is rejected with `400 INVALID_FILTER`.
 
     ## Session key events
     There is no dedicated `session_key_events` route. Session-key lifecycle
@@ -334,9 +336,13 @@ paths:
       parameters:
         - name: contract
           in: query
-          description: Filter by emitting contract address (C… address).
+          description: >
+            Filter by emitting contract address. Must be a valid Stellar
+            C-address (56 characters starting with C) when provided.
           schema:
             type: string
+            minLength: 56
+            maxLength: 56
           example: 'CAAQCAIBAEAQCAIBAEAQCAIBAEAQCAIBAEAQCAIBAEAQCAIBAEAQC526'
         - name: type
           in: query
@@ -369,11 +375,25 @@ paths:
             maximum: 200
         - name: offset
           in: query
-          description: Number of records to skip (offset pagination).
+          description: >
+            Deprecated. Offset pagination is not supported; requests that
+            include `offset` receive `400 INVALID_FILTER`. Use `cursor_after`
+            or `cursor_before` instead.
+          deprecated: true
           schema:
             type: integer
             format: int64
             minimum: 0
+        - name: cursor_after
+          in: query
+          description: Opaque cursor for forward pagination.
+          schema:
+            type: string
+        - name: cursor_before
+          in: query
+          description: Opaque cursor for backward pagination.
+          schema:
+            type: string
       responses:
         '200':
           description: Contract events ordered by ledger sequence (descending)

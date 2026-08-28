@@ -72,6 +72,8 @@ docs/ROADMAP_TEMPLATES.md
 
 # extension-wallet generated artifacts (tsc/vitest outputs)
 apps/extension-wallet/src/**/*.d.ts
+# ...but globals.d.ts is hand-written source, not a tsc output
+!apps/extension-wallet/src/globals.d.ts
 apps/extension-wallet/src/**/*.d.ts.map
 apps/extension-wallet/src/**/*.js
 apps/extension-wallet/src/**/*.js.map

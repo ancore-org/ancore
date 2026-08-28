@@ -1,8 +1,9 @@
 import { registerHandler } from '@/messaging';
 import { readAuthState } from '@/router/AuthGuard';
 import { isBackgroundSessionUnlocked } from '../session-state';
+import { createLogger } from '../logger';
 
-const logPrefix = '[ancore-extension/handlers/wallet-state]';
+const log = createLogger('[ancore-extension/handlers/wallet-state]');
 
 export function registerWalletStateHandlers(): void {
   registerHandler('GET_WALLET_STATE', async () => {
@@ -19,7 +20,5 @@ export function registerWalletStateHandlers(): void {
     return { state: 'unlocked' as const };
   });
 
-  if (import.meta.env.DEV) {
-    console.debug(`${logPrefix} registered`);
-  }
+  log.debug('registered');
 }

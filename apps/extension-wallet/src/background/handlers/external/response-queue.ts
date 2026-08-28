@@ -15,7 +15,7 @@ import type { ApprovalQueueEntry } from '@ancore/types';
 
 export interface SessionQueueEntry {
   requestId: string;
-  status: 'pending' | 'resolved' | 'rejected';
+  status: 'pending' | 'resolved' | 'rejected' | 'timed-out';
   result?: unknown;
   error?: string;
 }
@@ -25,7 +25,7 @@ function getChromeSession(): chrome['storage']['session'] | null {
   return chromeRef?.storage?.session ?? null;
 }
 
-function writeSessionEntry(entry: SessionQueueEntry): void {
+export function writeSessionEntry(entry: SessionQueueEntry): void {
   const session = getChromeSession();
   if (session) {
     session.set({ [entry.requestId]: entry });

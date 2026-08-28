@@ -21,7 +21,10 @@ describe('GET /health', () => {
 });
 
 describe('POST /agent/draft-intent', () => {
-  const validBody = { prompt: 'Send 10 XLM to Alice', accountId: 'GABC123' };
+  const validBody = {
+    prompt: 'Send 10 XLM to GDKRY7GNU3CJQX6FMT2BIPW5ELSZAHOV4DKRY7GNU3CJQX6FMT2BIPW5',
+    accountId: 'GABC123',
+  };
 
   it('returns 200 with a draft payment intent', async () => {
     const res = await request(app).post('/agent/draft-intent').send(validBody);

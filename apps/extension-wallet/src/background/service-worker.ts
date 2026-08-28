@@ -1,13 +1,24 @@
 import { installMessageDispatcher } from '@/messaging';
 import { registerInternalHandlers, probeServicesOnStartup } from './handlers';
-import { restoreUnlockSessionFromStorage } from './session-state';
+import { restoreUnlockSessionFromStorage, refreshSessionExpiry } from './session-state';
 import {
   registerAllExternalHandlers,
   dispatchExternalRequest,
 } from '@/background/handlers/external';
 import { openMockApproval } from './approval-window';
-import { resolveRequest, rejectRequest } from './handlers/external/response-queue';
-import type { ExternalApiRequest, ExternalApiMethodName } from '@ancore/types';
+import {
+  resolveRequest,
+  rejectRequest,
+  getApproval,
+  removeApproval,
+} from './handlers/external/response-queue';
+import { signAuthEntry } from './handlers/sign-auth-entry';
+import { signTransaction } from './handlers/sign-transaction';
+import { signMessage } from './handlers/sign-message';
+import { signRelayPayload } from './handlers/sign-relay-payload';
+import { ExternalApiMethodName } from '@ancore/types';
+import type { ExternalApiRequest } from '@ancore/types';
+import { createLogger } from './logger';
 
 type ChromeRuntimeManifest = {
   name: string;
@@ -58,7 +69,7 @@ declare const chrome: {
   };
 };
 
-const logPrefix = '[ancore-extension/background]';
+const log = createLogger('[ancore-extension/background]');
 
 const runtime = (globalThis as { chrome?: { runtime?: typeof chrome.runtime } }).chrome?.runtime;
 const manifest = (runtime?.getManifest?.() as ChromeRuntimeManifest | undefined) ?? {
@@ -66,25 +77,25 @@ const manifest = (runtime?.getManifest?.() as ChromeRuntimeManifest | undefined)
   version: '0.0.0',
 };
 
-console.info(`${logPrefix} booted`, {
+log.info('booted', {
   name: manifest.name,
   version: manifest.version,
 });
 
 void restoreUnlockSessionFromStorage().then((restored) => {
   if (restored) {
-    console.info(`${logPrefix} unlock session restored from chrome.storage.session`);
+    log.info('unlock session restored from chrome.storage.session');
   }
 });
 
 runtime?.onInstalled?.addListener((details: ChromeInstalledDetails) => {
-  console.info(`${logPrefix} installed`, { reason: details.reason });
+  log.info('installed', { reason: details.reason });
 });
 
 runtime?.onStartup?.addListener(() => {
-  console.info(`${logPrefix} startup`);
+  log.info('startup');
   void probeServicesOnStartup().catch((err) => {
-    console.warn(`${logPrefix} health probe failed on startup`, err);
+    log.warn('health probe failed on startup', err);
   });
 });
 
@@ -97,7 +108,7 @@ storage?.onChanged?.addListener((changes, areaName) => {
 
     // Check if network changed
     if (newSettings?.network !== oldSettings?.network) {
-      console.info(`${logPrefix} network changed`, {
+      log.info('network changed', {
         from: oldSettings?.network,
         to: newSettings?.network,
       });
@@ -119,6 +130,19 @@ storage?.onChanged?.addListener((changes, areaName) => {
         });
       });
     }
+
+    // Check if auto-lock settings changed
+    if (newSettings?.autoLockMinutes !== oldSettings?.autoLockMinutes) {
+      log.info('auto-lock settings changed', {
+        from: oldSettings?.autoLockMinutes,
+        to: newSettings?.autoLockMinutes,
+      });
+
+      // Refresh session expiry with new TTL if currently unlocked
+      void refreshSessionExpiry().then(() => {
+        log.info('session expiry refreshed with new auto-lock TTL');
+      });
+    }
   }
 });
 
@@ -132,6 +156,23 @@ registerAllExternalHandlers();
 /**
  * Handle EXTERNAL_API_REQUEST messages from content script.
  * These are requests from dApps to interact with the wallet.
+ *
+ * SECURITY: This handler is the authoritative second layer of defence.
+ * The content-script prefilter is the first layer; both must be correct.
+ *
+ * Checks (fail closed on any failure):
+ *   1. Message type must be exactly 'EXTERNAL_API_REQUEST'.
+ *   2. requestId must be a non-empty string (correlation, not trusted).
+ *   3. origin must be a non-empty string.
+ *   4. method must be a non-empty string that resolves to a registered handler.
+ *   5. sender.origin (browser-provided) must match the claimed origin when
+ *      present — prevents a compromised content script from escalating to a
+ *      different origin's permissions.
+ *   6. Every privileged handler independently validates the allowlist.
+ *      This file does NOT bypass that check.
+ *
+ * Error messages returned to the content script via sendResponse are generic
+ * for validation failures so internal routing details are not exposed.
  */
 chrome.runtime.onMessage.addListener(
   (
@@ -139,37 +180,67 @@ chrome.runtime.onMessage.addListener(
     sender: { url?: string; origin?: string; tab?: { id?: number } },
     sendResponse: (response: unknown) => void
   ) => {
-    const request = message as ExternalApiRequest;
-
-    if (request.type !== 'EXTERNAL_API_REQUEST') {
+    // ── 1. Type guard — ignore non-external messages.
+    if (
+      !message ||
+      typeof message !== 'object' ||
+      (message as Partial<ExternalApiRequest>).type !== 'EXTERNAL_API_REQUEST'
+    ) {
       return false;
     }
 
+    const request = message as Partial<ExternalApiRequest>;
     const { method, requestId, params, origin } = request;
 
-    // Validate origin
+    // ── 2. requestId must be a non-empty string.
+    if (!requestId || typeof requestId !== 'string') {
+      // Cannot send a useful response without a requestId; drop silently.
+      log.warn('EXTERNAL_API_REQUEST dropped: missing requestId');
+      return false;
+    }
+
+    // ── 3. origin must be a non-empty string.
     if (!origin || typeof origin !== 'string') {
       sendResponse({
         type: 'EXTERNAL_API_RESPONSE',
         requestId,
         ok: false,
-        error: 'Invalid origin',
+        error: 'Invalid request',
       });
       return true;
     }
 
-    // Validate sender origin matches
-    if (sender.origin && sender.origin !== origin) {
+    // ── 4. method must be a non-empty string.
+    if (!method || typeof method !== 'string') {
       sendResponse({
         type: 'EXTERNAL_API_RESPONSE',
         requestId,
         ok: false,
-        error: 'Origin mismatch',
+        error: 'Invalid request',
       });
       return true;
     }
 
-    // Dispatch to handler
+    // ── 5. Sender-origin check (browser-provided; cannot be forged by the page).
+    //       When the browser populates sender.origin it MUST match the claimed
+    //       origin or we reject — a mismatch means something is wrong.
+    if (sender.origin && sender.origin !== origin) {
+      log.warn('EXTERNAL_API_REQUEST rejected: sender.origin mismatch', {
+        senderOrigin: sender.origin,
+        claimedOrigin: origin,
+      });
+      sendResponse({
+        type: 'EXTERNAL_API_RESPONSE',
+        requestId,
+        ok: false,
+        error: 'Invalid request',
+      });
+      return true;
+    }
+
+    // ── 6. Dispatch to the registered external handler.
+    //       `dispatchExternalRequest` throws for unknown methods (fail closed).
+    //       Each handler independently verifies the allowlist.
     void dispatchExternalRequest(method as ExternalApiMethodName, {
       origin,
       params,
@@ -216,12 +287,67 @@ if (import.meta.env.DEV) {
 chrome.runtime.onMessage.addListener((message: unknown, _sender, sendResponse) => {
   const msg = message as { type?: string; requestId?: string };
   if (msg.type === 'APPROVE_SIGN_REQUEST' && msg.requestId) {
-    resolveRequest(msg.requestId, { signedXdr: 'AAAAAgAAAAA=' });
-    sendResponse({ ok: true });
+    const pending = getApproval(msg.requestId);
+    if (!pending) {
+      rejectRequest(msg.requestId, new Error('Approval request not found'));
+      sendResponse({ ok: false, error: 'Approval request not found' });
+      return true;
+    }
+    const signer =
+      pending.method === ExternalApiMethodName.SIGN_MESSAGE
+        ? signMessage
+        : pending.method === ExternalApiMethodName.SIGN_RELAY_PAYLOAD
+          ? signRelayPayload
+          : signTransaction;
+    void signer(pending.params as never)
+      .then((result) => {
+        resolveRequest(msg.requestId!, result);
+        removeApproval(msg.requestId!);
+        sendResponse({ ok: true });
+      })
+      .catch((err: Error) => {
+        rejectRequest(msg.requestId!, err);
+        removeApproval(msg.requestId!);
+        sendResponse({ ok: false, error: err.message });
+      });
     return true;
   }
   if (msg.type === 'REJECT_SIGN_REQUEST' && msg.requestId) {
     rejectRequest(msg.requestId, new Error('User rejected the sign request'));
+    sendResponse({ ok: true });
+    return true;
+  }
+  if (msg.type === 'APPROVE_AUTH_ENTRY_REQUEST' && msg.requestId) {
+    const pending = getApproval(msg.requestId);
+    if (!pending) {
+      rejectRequest(msg.requestId, new Error('Approval request not found'));
+      sendResponse({ ok: false, error: 'Approval request not found' });
+      return true;
+    }
+    const params = pending.params as { authEntry?: string; networkPassphrase?: string };
+    if (!params?.authEntry) {
+      rejectRequest(msg.requestId, new Error('Auth entry XDR not found in request'));
+      sendResponse({ ok: false, error: 'Auth entry XDR not found' });
+      return true;
+    }
+    void signAuthEntry({
+      authEntryXdr: params.authEntry,
+      networkPassphrase: params.networkPassphrase,
+    })
+      .then((result) => {
+        resolveRequest(msg.requestId!, result);
+        removeApproval(msg.requestId!);
+        sendResponse({ ok: true });
+      })
+      .catch((err: Error) => {
+        rejectRequest(msg.requestId!, err);
+        removeApproval(msg.requestId!);
+        sendResponse({ ok: false, error: err.message });
+      });
+    return true;
+  }
+  if (msg.type === 'REJECT_AUTH_ENTRY_REQUEST' && msg.requestId) {
+    rejectRequest(msg.requestId, new Error('User rejected the auth entry sign request'));
     sendResponse({ ok: true });
     return true;
   }

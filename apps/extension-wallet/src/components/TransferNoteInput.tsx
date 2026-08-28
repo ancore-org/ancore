@@ -1,5 +1,9 @@
 import React from 'react';
-import { getRemainingCharacters, MAX_NOTE_LENGTH } from '@/utils/note-validation';
+import {
+  getRemainingCharacters,
+  MAX_NOTE_LENGTH,
+  truncateTransferNote,
+} from '@/utils/note-validation';
 import { Field } from '@ancore/ui-kit';
 
 interface TransferNoteInputProps {
@@ -44,10 +48,9 @@ export function TransferNoteInput({
   };
 
   const handleBlur = () => {
-    // Validate on blur to enforce the limit
-    if (value.trim().length > MAX_NOTE_LENGTH) {
-      // Truncate to max length
-      onChange(value.trim().slice(0, MAX_NOTE_LENGTH));
+    const truncated = truncateTransferNote(value);
+    if (truncated !== value) {
+      onChange(truncated);
     }
   };
 

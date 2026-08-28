@@ -1,6 +1,11 @@
 import { MemoryNonceStore } from '../../src/store/nonceStore';
+import { nonceOperations } from '../../src/metrics';
 
 describe('NonceStore', () => {
+  beforeEach(() => {
+    nonceOperations.reset();
+  });
+
   it('allows fresh nonces and tracks them', () => {
     const store = new MemoryNonceStore();
     const key = 'session-1';
@@ -10,6 +15,19 @@ describe('NonceStore', () => {
 
     expect(() => store.assertFresh(key, 100)).toThrow('Nonce already used');
     expect(() => store.assertFresh(key, 101)).not.toThrow();
+  });
+
+  it('increments nonce_operations_total metric for valid and replay outcomes', () => {
+    const store = new MemoryNonceStore();
+    const key = 'session-test-key-12345';
+
+    store.assertFresh(key, 1);
+    store.track(key, 1);
+
+    expect(nonceOperations.snapshot().valid).toBe(1);
+
+    expect(() => store.assertFresh(key, 1)).toThrow('Nonce already used');
+    expect(nonceOperations.snapshot().replay).toBe(1);
   });
 
   it('keeps track of nonces per session key independently', () => {

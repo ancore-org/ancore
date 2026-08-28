@@ -1,0 +1,24 @@
+{
+  "packages": [
+    {
+      "name": "esbuild",
+      "scripts": ["postinstall"],
+      "justification": "esbuild postinstall downloads platform-specific binary. Required by Vite/turborepo build toolchain.",
+      "issue": "https://github.com/ancore-org/ancore/issues/1085"
+    },
+    {
+      "name": "protobufjs",
+      "scripts": ["postinstall"],
+      "justification": "protobufjs postinstall generates runtime JS files from .proto definitions. Transitive dependency of @stellar/stellar-sdk.",
+      "issue": "https://github.com/ancore-org/ancore/issues/1085"
+    }
+  ],
+  "denied": [
+    {
+      "name": "core-js",
+      "scripts": ["postinstall"],
+      "justification": "core-js's postinstall only prints a funding banner (node -e \"try{require('./postinstall')}catch(e){}\"). Deliberately withheld from pnpm.onlyBuiltDependencies so pnpm blocks it. Transitive dependency of jspdf -> canvg.",
+      "issue": "https://github.com/ancore-org/ancore/issues/1085"
+    }
+  ]
+}

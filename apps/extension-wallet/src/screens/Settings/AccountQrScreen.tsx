@@ -4,6 +4,7 @@ import { Download, ShieldCheck, Copy, Check } from 'lucide-react';
 import { Button } from '@ancore/ui-kit';
 import { PaymentQRCode } from '../../components/PaymentQRCode';
 import { useCopyWithFeedback } from '../../hooks/useCopyWithFeedback';
+import { truncateAddress } from '../../utils/address';
 import {
   downloadPublicAddressQrPng,
   isPublicAddress,
@@ -15,11 +16,6 @@ interface AccountQrScreenProps {
   /** Public receive address (G/C/M). Never a secret — see public-address-qr.ts. */
   address: string | null;
   onBack: () => void;
-}
-
-function truncateMiddle(value: string, head = 8, tail = 8): string {
-  if (value.length <= head + tail + 1) return value;
-  return `${value.slice(0, head)}…${value.slice(-tail)}`;
 }
 
 /**
@@ -35,8 +31,6 @@ export function AccountQrScreen({ address, onBack }: AccountQrScreenProps) {
   const [downloadError, setDownloadError] = React.useState<string | null>(null);
   const [downloading, setDownloading] = React.useState(false);
 
-  // Guard at the render boundary too: a malformed or secret-looking value
-  // never reaches the QR renderer, only the download helper.
   const exportable = address !== null && isPublicAddress(address);
 
   const handleDownload = React.useCallback(async () => {
@@ -77,7 +71,7 @@ export function AccountQrScreen({ address, onBack }: AccountQrScreenProps) {
                 className="flex items-center gap-2 rounded-lg bg-muted px-3 py-2 font-mono text-xs text-muted-foreground hover:bg-accent transition-colors"
                 aria-label={t('settings.accountQr.copyAddress')}
               >
-                {truncateMiddle(address)}
+                {truncateAddress(address)}
                 {copied ? (
                   <Check className="h-3.5 w-3.5 text-green-500" />
                 ) : (

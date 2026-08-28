@@ -29,6 +29,10 @@ export default defineConfig({
   test: {
     globals: true,
     environment: 'jsdom',
+    env: {
+      VITE_RELAYER_URL: 'http://localhost:3000',
+      VITE_INDEXER_BASE_URL: 'http://localhost:4000',
+    },
     setupFiles: ['../../packages/ensure-webcrypto.ts', './src/test/setup.ts'],
     testTimeout: 30000,
   },

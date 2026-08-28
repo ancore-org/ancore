@@ -26,12 +26,13 @@ const EXPECTED_EXPORTS = [
   'getEnglishWordlist',
 
   'MnemonicValidationError',
+  'UnsupportedMnemonicLanguageError',
+  'SUPPORTED_MNEMONIC_LANGUAGE',
   'deriveKeypairFromMnemonic',
   'signPayload',
   'signTransaction',
   'verifySignature',
   'timingSafeEqual',
-  'constantTimeEqual',
 ] as const;
 
 describe('@ancore/crypto smoke test', () => {

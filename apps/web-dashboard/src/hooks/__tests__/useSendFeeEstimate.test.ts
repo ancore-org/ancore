@@ -85,4 +85,31 @@ describe('useSendFeeEstimate', () => {
     expect(result.current.fee).toBe('0.0000100');
     expect(result.current.minBalance).toBe('0.0050100');
   });
+
+  it('handles unparseable fee as an error state', async () => {
+    vi.mock('@ancore/stellar', async (importOriginal) => {
+      const actual = await importOriginal<typeof import('@ancore/stellar')>();
+      return {
+        ...actual,
+        createStellarClient: () => ({
+          simulateTransaction: vi.fn().mockResolvedValue({ fee: 'not-a-number' }),
+        }),
+      };
+    });
+
+    const { useSendFeeEstimate } = await import('../useSendFeeEstimate');
+    const { result } = renderHook(() => useSendFeeEstimate(VALID_ADDRESS, '10', { debounceMs: 0 }));
+
+    await vi.advanceTimersByTimeAsync(100);
+
+    await waitFor(() => {
+      expect(result.current.loading).toBe(false);
+    });
+
+    expect(result.current.fee).toBe('0.0000100');
+    expect(result.current.minBalance).toBe('0.0050100');
+    expect(result.current.error).toBe('fee unavailable');
+
+    vi.doUnmock('@ancore/stellar');
+  });
 });

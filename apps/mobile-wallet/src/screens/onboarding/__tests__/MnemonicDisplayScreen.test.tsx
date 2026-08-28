@@ -4,6 +4,11 @@ import { fireEvent, render, screen } from '@testing-library/react';
 
 import { MnemonicDisplayScreen } from '../MnemonicDisplayScreen';
 
+// Mock the secure-clipboard service
+jest.mock('../../../services/secure-clipboard', () => ({
+  copySecure: jest.fn().mockResolvedValue(undefined),
+}));
+
 const TEST_MNEMONIC =
   'abandon ability able about above absent absorb abstract absurd abuse access accident';
 
@@ -46,5 +51,16 @@ describe('MnemonicDisplayScreen', () => {
 
     fireEvent.click(screen.getByRole('button', { name: /^cancel$/i }));
     expect(onCancel).toHaveBeenCalledTimes(1);
+  });
+
+  it('calls copySecure when Copy to clipboard is clicked', async () => {
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    const { copySecure } = require('../../../services/secure-clipboard');
+
+    render(<MnemonicDisplayScreen mnemonic={TEST_MNEMONIC} />);
+
+    fireEvent.click(screen.getByRole('button', { name: /copy to clipboard/i }));
+
+    expect(copySecure).toHaveBeenCalledWith(TEST_MNEMONIC);
   });
 });

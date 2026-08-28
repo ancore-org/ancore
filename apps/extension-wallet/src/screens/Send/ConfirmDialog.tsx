@@ -52,10 +52,10 @@ export function ConfirmDialog({
       }}
     >
       <DialogContent className="p-0 border-none bg-transparent shadow-none max-w-md w-full">
-        <Card className="w-full max-w-md bg-slate-950 border-white/10 shadow-2xl overflow-hidden animate-in fade-in zoom-in-95 duration-300">
-          <CardHeader className="bg-gradient-to-br from-amber-500/10 to-orange-500/5 pb-6 border-b border-white/5">
-            <CardTitle className="text-white uppercase tracking-widest text-xs flex items-center justify-center gap-2 font-black">
-              <KeyRound className="text-amber-400 w-4 h-4" />
+        <Card className="w-full max-w-md overflow-hidden border border-border bg-card shadow-2xl">
+          <CardHeader className="border-b border-border/70 bg-card pb-6">
+            <CardTitle className="flex items-center justify-center gap-2 text-xs font-semibold uppercase tracking-[0.16em] text-foreground">
+              <KeyRound className="h-4 w-4 text-primary" />
               Sign Transaction
             </CardTitle>
           </CardHeader>
@@ -90,7 +90,7 @@ export function ConfirmDialog({
                     setPassword(event.target.value)
                   }
                   error={error}
-                  className="bg-white/5 border-white/10 text-white rounded-2xl h-14 focus:border-amber-400/50 transition-all"
+                  className="h-14 rounded-2xl border-border bg-background text-foreground transition-colors focus:border-primary/60"
                   autoFocus
                 />
               </div>
@@ -108,7 +108,7 @@ export function ConfirmDialog({
                 <Button
                   type="submit"
                   disabled={loading || !password}
-                  className="flex-[2] bg-amber-400 text-slate-950 font-black uppercase tracking-widest rounded-2xl h-12 shadow-[0_10px_20px_rgba(251,191,36,0.2)] hover:bg-amber-300 disabled:opacity-50 disabled:grayscale transition-all flex items-center justify-center gap-2 text-[10px]"
+                  className="flex h-12 flex-[2] items-center justify-center gap-2 rounded-full bg-white text-[11px] font-semibold text-black hover:bg-white/90 disabled:opacity-40"
                 >
                   {loading ? (
                     <span className="flex items-center gap-2">

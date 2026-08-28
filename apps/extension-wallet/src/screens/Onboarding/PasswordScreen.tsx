@@ -51,9 +51,9 @@ const PASSWORD_REQUIREMENTS: PasswordRequirements[] = [
  * Get strength color based on score
  */
 function getStrengthColor(score: number): string {
-  if (score <= 2) return 'bg-red-500';
-  if (score <= 4) return 'bg-yellow-500';
-  return 'bg-green-500';
+  if (score <= 2) return 'bg-destructive';
+  if (score <= 4) return 'bg-warning';
+  return 'bg-success';
 }
 
 /**
@@ -70,9 +70,9 @@ function getStrengthLabel(score: number): string {
  * Get strength color for text based on score
  */
 function getStrengthTextColor(score: number): string {
-  if (score <= 2) return 'text-red-600';
-  if (score <= 4) return 'text-yellow-600';
-  return 'text-green-600';
+  if (score <= 2) return 'text-destructive';
+  if (score <= 4) return 'text-warning';
+  return 'text-success';
 }
 
 /**
@@ -119,7 +119,7 @@ export function PasswordScreen({ onSubmit, onBack }: PasswordScreenProps) {
   );
 
   return (
-    <div className="flex flex-col min-h-screen bg-background">
+    <div className="wallet-sheet">
       {/* Header */}
       <div className="px-6 pt-6 pb-4">
         <button
@@ -131,14 +131,16 @@ export function PasswordScreen({ onSubmit, onBack }: PasswordScreenProps) {
       </div>
 
       {/* Content */}
-      <div className="flex-1 px-6 overflow-y-auto">
+      <div className="flex-1 overflow-y-auto px-6">
         {/* Title */}
-        <div className="text-center mb-6">
-          <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-primary/20 to-purple-700/20 flex items-center justify-center mx-auto mb-4">
-            <Lock className="w-8 h-8 text-primary" />
+        <div className="mb-8">
+          <div className="mb-5 flex h-11 w-11 items-center justify-center rounded-full bg-accent">
+            <Lock className="h-5 w-5 text-foreground" />
           </div>
-          <h1 className="text-xl font-bold text-foreground mb-2">Create Your Password</h1>
-          <p className="text-sm text-muted-foreground">
+          <h1 className="text-[26px] font-semibold tracking-[-0.03em] text-foreground">
+            Create your password
+          </h1>
+          <p className="mt-2 text-sm leading-6 text-muted-foreground">
             This password will be used to unlock your wallet. Make sure it's strong and memorable.
           </p>
         </div>
@@ -156,7 +158,7 @@ export function PasswordScreen({ onSubmit, onBack }: PasswordScreenProps) {
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 placeholder="Enter your password"
-                className="w-full px-4 py-3 pr-12 bg-card border border-border rounded-xl text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/50 transition-all"
+                className="wallet-field pr-12"
                 autoComplete="new-password"
               />
               <button
@@ -183,7 +185,7 @@ export function PasswordScreen({ onSubmit, onBack }: PasswordScreenProps) {
                   <div
                     key={index}
                     className={`h-1.5 flex-1 rounded-full transition-all ${
-                      index <= strengthScore - 1 ? getStrengthColor(strengthScore) : 'bg-gray-200'
+                      index <= strengthScore - 1 ? getStrengthColor(strengthScore) : 'bg-muted'
                     }`}
                   />
                 ))}
@@ -192,7 +194,7 @@ export function PasswordScreen({ onSubmit, onBack }: PasswordScreenProps) {
           )}
 
           {/* Requirements */}
-          <div className="bg-card rounded-xl border border-border/50 p-4 space-y-2">
+          <div className="wallet-card space-y-2">
             <h4 className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-3">
               Requirements
             </h4>
@@ -201,11 +203,13 @@ export function PasswordScreen({ onSubmit, onBack }: PasswordScreenProps) {
               return (
                 <div key={req.id} className="flex items-center gap-2">
                   {isMet ? (
-                    <Check className="w-4 h-4 text-green-600" />
+                    <Check className="h-4 w-4 text-success" />
                   ) : (
-                    <X className="w-4 h-4 text-gray-300" />
+                    <X className="h-4 w-4 text-muted-foreground" />
                   )}
-                  <span className={`text-sm ${isMet ? 'text-green-700' : 'text-muted-foreground'}`}>
+                  <span
+                    className={`text-sm ${isMet ? 'text-foreground' : 'text-muted-foreground'}`}
+                  >
                     {req.label}
                   </span>
                 </div>
@@ -225,12 +229,8 @@ export function PasswordScreen({ onSubmit, onBack }: PasswordScreenProps) {
                 value={confirmPassword}
                 onChange={(e) => setConfirmPassword(e.target.value)}
                 placeholder="Confirm your password"
-                className={`w-full px-4 py-3 pr-12 bg-card border rounded-xl text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/50 transition-all ${
-                  passwordsMismatch
-                    ? 'border-red-500 bg-red-50'
-                    : passwordsMatch
-                      ? 'border-green-500 bg-green-50'
-                      : 'border-border'
+                className={`wallet-field pr-12 ${
+                  passwordsMismatch ? 'border-destructive' : passwordsMatch ? 'border-success' : ''
                 }`}
                 autoComplete="new-password"
               />
@@ -242,24 +242,28 @@ export function PasswordScreen({ onSubmit, onBack }: PasswordScreenProps) {
                 {showConfirmPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
               </button>
             </div>
-            {passwordsMismatch && <p className="text-xs text-red-600">Passwords do not match</p>}
-            {passwordsMatch && <p className="text-xs text-green-600">Passwords match</p>}
+            {passwordsMismatch && (
+              <p className="text-xs text-destructive">Passwords do not match</p>
+            )}
+            {passwordsMatch && <p className="text-xs text-success">Passwords match</p>}
           </div>
 
           {/* Error Message */}
           {localError && (
-            <div className="p-4 bg-red-50 border border-red-200 rounded-xl flex items-start gap-3">
-              <AlertTriangle className="w-5 h-5 text-red-600 flex-shrink-0 mt-0.5" />
-              <p className="text-sm text-red-700">{localError}</p>
+            <div className="wallet-status-error flex items-start gap-3 rounded-xl border p-4">
+              <AlertTriangle className="mt-0.5 h-5 w-5 flex-shrink-0" />
+              <p className="text-sm">{localError}</p>
             </div>
           )}
 
           {/* Warning */}
-          <div className="bg-amber-50 border border-amber-200 rounded-xl p-4 flex items-start gap-3">
-            <AlertTriangle className="w-5 h-5 text-amber-600 flex-shrink-0 mt-0.5" />
+          <div className="wallet-status-warning flex items-start gap-3 rounded-xl border p-4">
+            <AlertTriangle className="mt-0.5 h-5 w-5 flex-shrink-0" />
             <div>
-              <p className="text-sm text-amber-900 font-medium mb-1">Can't recover your password</p>
-              <p className="text-xs text-amber-700 leading-relaxed">
+              <p className="mb-1 text-sm font-medium text-foreground">
+                Can't recover your password
+              </p>
+              <p className="text-xs leading-relaxed text-muted-foreground">
                 There is no password reset feature. If you forget your password, you'll need your
                 recovery phrase to access your wallet.
               </p>
@@ -269,14 +273,14 @@ export function PasswordScreen({ onSubmit, onBack }: PasswordScreenProps) {
       </div>
 
       {/* Footer */}
-      <div className="px-6 py-6 pb-8 bg-background border-t border-border/50">
+      <div className="border-t border-border bg-background px-6 pb-8 pt-6">
         <button
           onClick={handleSubmit}
           disabled={!allRequirementsMet || !passwordsMatch}
-          className="w-full py-4 px-6 bg-primary hover:bg-primary/90 disabled:bg-muted disabled:text-muted-foreground text-primary-foreground font-semibold rounded-xl transition-all duration-200 flex items-center justify-center gap-2 shadow-lg shadow-primary/25 disabled:shadow-none active:scale-[0.98]"
+          className="wallet-pill-btn"
         >
           Continue
-          <ChevronRight className="w-5 h-5" />
+          <ChevronRight className="h-4 w-4" />
         </button>
       </div>
     </div>

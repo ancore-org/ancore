@@ -32,6 +32,14 @@ export interface Messages {
       | { error: string }
       | { requiresHardware: true; xdr: string; networkPassphrase: string };
   };
+  SIGN_MESSAGE: {
+    request: { message: string; networkPassphrase?: string };
+    response: { signature: string } | { error: string };
+  };
+  SIGN_RELAY_PAYLOAD: {
+    request: { operation: string; nonce: number };
+    response: { sessionKey: string; signature: string } | { error: string };
+  };
   GET_WALLET_STATE: {
     request: Record<string, never>;
     response: { state: WalletState };
@@ -78,6 +86,30 @@ export interface Messages {
   EXTERNAL_IS_CONNECTED: {
     request: { origin: string };
     response: { connected: boolean };
+  };
+  /** dApp queries the smart account's on-chain deployment status. */
+  EXTERNAL_GET_SMART_ACCOUNT: {
+    request: { origin: string; network?: string; smartAccountId?: string };
+    response: {
+      contractId: string;
+      deploymentStatus: 'deployed' | 'pending' | 'not_deployed' | 'unknown';
+      network: string;
+    };
+  };
+  /** dApp requests the wallet to sign an auth entry. */
+  EXTERNAL_SIGN_AUTH_ENTRY: {
+    request: { authEntry: string; origin: string; networkPassphrase?: string };
+    response: { signedAuthEntry: string };
+  };
+  /** dApp requests the wallet to sign an arbitrary message. */
+  EXTERNAL_SIGN_MESSAGE: {
+    request: { message: string; origin: string };
+    response: { signature: string };
+  };
+  /** dApp requests a time-limited session key. */
+  EXTERNAL_REQUEST_SESSION_KEY: {
+    request: { origin: string; expiresAt: number; permissions: number };
+    response: { publicKey: string; expiresAt: number };
   };
 }
 

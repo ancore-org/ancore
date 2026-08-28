@@ -19,6 +19,7 @@ import request from 'supertest';
 import {
   ROUTE_RATE_LIMIT_CONFIG,
   DEFAULT_ROUTE_CONFIG,
+  IP_KEYED_ROUTES,
   createRouteRateLimiter,
   resolveRouteConfig,
 } from '../routeRateLimiter';
@@ -29,6 +30,15 @@ function buildApp(route: string, rpm: number) {
   const app = express();
   app.use(express.json());
   app.post(route, createRouteRateLimiter(route, { rpm }), (_req, res) => {
+    res.status(200).json({ ok: true });
+  });
+  return app;
+}
+
+function buildGetApp(route: string, rpm: number) {
+  const app = express();
+  app.set('trust proxy', true);
+  app.get(route, createRouteRateLimiter(route, { rpm }), (_req, res) => {
     res.status(200).json({ ok: true });
   });
   return app;
@@ -278,5 +288,49 @@ describe('createRouteRateLimiter – override', () => {
   it('unknown route falls back to DEFAULT_ROUTE_CONFIG', async () => {
     const cfg = resolveRouteConfig('/relay/totally-new-route');
     expect(cfg.rpm).toBe(DEFAULT_ROUTE_CONFIG.rpm);
+  });
+});
+
+// ─── IP Keying for unauthenticated routes ─────────────────────────────────────
+
+describe('createRouteRateLimiter – IP keying for unauthenticated routes (/health, /relay/status)', () => {
+  it('identifies /health and /relay/status as IP-keyed routes', () => {
+    expect(IP_KEYED_ROUTES.has('/health')).toBe(true);
+    expect(IP_KEYED_ROUTES.has('/relay/status')).toBe(true);
+    expect(IP_KEYED_ROUTES.has('/relay/execute')).toBe(false);
+  });
+
+  it('/health keys by IP so different callers do not share an unknown bucket', async () => {
+    const RPM = 2;
+    const app = buildGetApp('/health', RPM);
+
+    // Exhaust client 1 (IP 192.168.1.10)
+    for (let i = 0; i < RPM; i++) {
+      const res = await request(app).get('/health').set('X-Forwarded-For', '192.168.1.10');
+      expect(res.status).toBe(200);
+    }
+    const blocked1 = await request(app).get('/health').set('X-Forwarded-For', '192.168.1.10');
+    expect(blocked1.status).toBe(429);
+
+    // Client 2 (IP 192.168.1.20) has its own fresh bucket and is not blocked
+    const res2 = await request(app).get('/health').set('X-Forwarded-For', '192.168.1.20');
+    expect(res2.status).toBe(200);
+  });
+
+  it('/relay/status keys by IP so different callers do not share an unknown bucket', async () => {
+    const RPM = 2;
+    const app = buildGetApp('/relay/status', RPM);
+
+    // Exhaust client 1 (IP 10.0.0.1)
+    for (let i = 0; i < RPM; i++) {
+      const res = await request(app).get('/relay/status').set('X-Forwarded-For', '10.0.0.1');
+      expect(res.status).toBe(200);
+    }
+    const blocked1 = await request(app).get('/relay/status').set('X-Forwarded-For', '10.0.0.1');
+    expect(blocked1.status).toBe(429);
+
+    // Client 2 (IP 10.0.0.2) has its own fresh bucket and is not blocked
+    const res2 = await request(app).get('/relay/status').set('X-Forwarded-For', '10.0.0.2');
+    expect(res2.status).toBe(200);
   });
 });

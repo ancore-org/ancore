@@ -8,7 +8,8 @@ export const STATEMENT_COLUMNS = [
 ] as const;
 
 export type StatementColumnKey = (typeof STATEMENT_COLUMNS)[number]['key'];
-export type StatementStatus = 'completed' | 'pending' | 'failed' | 'unknown';
+export const STATEMENT_STATUSES = ['completed', 'pending', 'failed', 'unknown'] as const;
+export type StatementStatus = (typeof STATEMENT_STATUSES)[number];
 export type StatementExportFormat = 'csv' | 'pdf';
 
 export interface StatementRow {

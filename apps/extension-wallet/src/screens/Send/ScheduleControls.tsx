@@ -27,10 +27,10 @@ export function ScheduleControls({
   error,
 }: ScheduleControlsProps) {
   return (
-    <div className="space-y-4 rounded-2xl border border-white/10 bg-white/5 p-4">
+    <div className="space-y-4 rounded-[18px] border border-border/70 bg-card p-4">
       <div className="flex items-center gap-2">
-        <CalendarClock className="h-4 w-4 text-cyan-400" />
-        <span className="text-[10px] font-black uppercase tracking-widest text-slate-300">
+        <CalendarClock className="h-4 w-4 text-primary" />
+        <span className="text-[10px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">
           Transfer Timing
         </span>
       </div>
@@ -42,10 +42,10 @@ export function ScheduleControls({
             type="button"
             variant={timing === option ? 'default' : 'outline'}
             className={cn(
-              'h-11 rounded-xl text-[10px] font-black uppercase tracking-widest',
+              'h-11 rounded-xl text-[10px] font-semibold uppercase tracking-[0.15em]',
               timing === option
-                ? 'bg-cyan-400 text-slate-950'
-                : 'border-white/10 bg-transparent text-slate-400'
+                ? 'bg-white text-black hover:bg-white/90'
+                : 'border-border bg-transparent text-muted-foreground hover:bg-accent'
             )}
             onClick={() => onTimingChange(option)}
           >
@@ -57,11 +57,11 @@ export function ScheduleControls({
       {timing === 'scheduled' && (
         <div className="space-y-3">
           <label className="block space-y-2">
-            <span className="text-[10px] font-bold uppercase tracking-widest text-slate-500">
+            <span className="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground">
               Frequency
             </span>
             <select
-              className="w-full rounded-xl border border-white/10 bg-slate-950 px-3 py-3 text-sm text-white outline-none focus:border-cyan-400/50"
+              className="w-full rounded-xl border border-border bg-background px-3 py-3 text-sm text-foreground outline-none focus:border-primary/60"
               value={schedule.frequency}
               onChange={(event) =>
                 onScheduleChange({
@@ -79,12 +79,12 @@ export function ScheduleControls({
           </label>
 
           <label className="block space-y-2">
-            <span className="text-[10px] font-bold uppercase tracking-widest text-slate-500">
+            <span className="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground">
               Start date & time
             </span>
             <input
               type="datetime-local"
-              className="w-full rounded-xl border border-white/10 bg-slate-950 px-3 py-3 text-sm text-white outline-none focus:border-cyan-400/50"
+              className="w-full rounded-xl border border-border bg-background px-3 py-3 text-sm text-foreground outline-none focus:border-primary/60"
               value={schedule.startAt}
               onChange={(event) =>
                 onScheduleChange({
@@ -97,12 +97,12 @@ export function ScheduleControls({
 
           {schedule.frequency !== 'once' && (
             <label className="block space-y-2">
-              <span className="text-[10px] font-bold uppercase tracking-widest text-slate-500">
+              <span className="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground">
                 End date (optional)
               </span>
               <input
                 type="datetime-local"
-                className="w-full rounded-xl border border-white/10 bg-slate-950 px-3 py-3 text-sm text-white outline-none focus:border-cyan-400/50"
+                className="w-full rounded-xl border border-border bg-background px-3 py-3 text-sm text-foreground outline-none focus:border-primary/60"
                 value={schedule.endAt ?? ''}
                 onChange={(event) =>
                   onScheduleChange({

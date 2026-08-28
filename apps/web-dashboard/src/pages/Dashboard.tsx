@@ -33,18 +33,18 @@ const AccountFetchAlert: React.FC<{
   return (
     <div
       role="alert"
-      className="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-900"
+      className="rounded-2xl border border-destructive/20 bg-destructive/10 px-4 py-3 text-sm text-destructive"
     >
       <div className="flex items-start justify-between gap-4">
         <div>
           <p className="font-medium">{title}</p>
-          <p className="mt-1 text-red-800">{message}</p>
+          <p className="mt-1">{message}</p>
         </div>
         <button
           type="button"
           onClick={() => void onRetry()}
           disabled={retrying}
-          className="rounded-md border border-red-300 bg-white px-3 py-1.5 font-medium text-red-900 hover:bg-red-100 disabled:cursor-not-allowed disabled:opacity-60"
+          className="rounded-full border border-destructive/30 px-3 py-1.5 font-medium transition-colors hover:bg-destructive/10 disabled:cursor-not-allowed disabled:opacity-60"
         >
           {retrying ? 'Retrying...' : 'Retry'}
         </button>
@@ -92,7 +92,7 @@ export const Dashboard: React.FC = () => {
         emptyAction={
           <Link
             to="/send"
-            className="inline-flex items-center rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700"
+            className="inline-flex h-11 items-center rounded-full bg-primary px-5 text-sm font-semibold text-primary-foreground transition-transform active:scale-[0.98]"
           >
             Send your first payment
           </Link>
@@ -103,7 +103,7 @@ export const Dashboard: React.FC = () => {
           <button
             onClick={loadMore}
             disabled={txLoading}
-            className="px-4 py-2 text-sm border rounded hover:bg-gray-50 disabled:opacity-50"
+            className="rounded-full border border-border px-4 py-2 text-sm transition-colors hover:bg-accent disabled:opacity-50"
           >
             {txLoading ? 'Loading...' : 'Load more'}
           </button>

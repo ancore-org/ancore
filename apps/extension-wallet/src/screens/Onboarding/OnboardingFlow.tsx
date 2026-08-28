@@ -57,28 +57,30 @@ function WalletImportScreen({
   }
 
   return (
-    <div className="flex flex-col min-h-screen bg-background">
-      <div className="px-6 pt-6 pb-4">
+    <div className="wallet-sheet">
+      <div className="px-6 pb-4 pt-6">
         <button
           onClick={onBack}
-          className="text-sm text-muted-foreground hover:text-foreground transition-colors"
+          className="text-sm text-muted-foreground transition-colors hover:text-foreground"
         >
           ← Back
         </button>
       </div>
 
-      <div className="flex-1 px-6 overflow-y-auto">
-        <div className="text-center mb-6">
-          <div className="w-16 h-16 rounded-2xl bg-primary/10 flex items-center justify-center mx-auto mb-4">
-            <Download className="w-8 h-8 text-primary" />
+      <div className="flex-1 overflow-y-auto px-6">
+        <div className="mb-8">
+          <div className="mb-5 flex h-11 w-11 items-center justify-center rounded-full bg-accent">
+            <Download className="h-5 w-5 text-foreground" />
           </div>
-          <h1 className="text-xl font-bold text-foreground mb-2">Import Wallet</h1>
-          <p className="text-sm text-muted-foreground">
+          <h1 className="text-[26px] font-semibold tracking-[-0.03em] text-foreground">
+            Import wallet
+          </h1>
+          <p className="mt-2 text-sm leading-6 text-muted-foreground">
             Enter your 12 or 24-word recovery phrase to restore your wallet.
           </p>
         </div>
 
-        <form onSubmit={handleSubmit} className="space-y-5">
+        <form id="wallet-import-form" onSubmit={handleSubmit} className="space-y-5">
           <div className="space-y-2">
             <label className="text-sm font-medium text-foreground">Recovery Phrase</label>
             <textarea
@@ -86,7 +88,7 @@ function WalletImportScreen({
               onChange={(e) => setMnemonic(e.target.value)}
               placeholder="Enter your recovery phrase words separated by spaces"
               rows={4}
-              className="w-full px-4 py-3 bg-card border border-border rounded-xl text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/50 transition-all resize-none font-mono text-sm"
+              className="wallet-textarea font-mono"
               autoComplete="off"
               autoCapitalize="off"
               spellCheck={false}
@@ -100,7 +102,7 @@ function WalletImportScreen({
               value={password}
               onChange={(e) => setPassword(e.target.value)}
               placeholder="Create a password for this wallet"
-              className="w-full px-4 py-3 bg-card border border-border rounded-xl text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/50 transition-all"
+              className="wallet-field"
               autoComplete="new-password"
             />
           </div>
@@ -112,27 +114,28 @@ function WalletImportScreen({
               value={confirmPassword}
               onChange={(e) => setConfirmPassword(e.target.value)}
               placeholder="Confirm your password"
-              className="w-full px-4 py-3 bg-card border border-border rounded-xl text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/50 transition-all"
+              className="wallet-field"
               autoComplete="new-password"
             />
           </div>
 
           {error && (
-            <div className="p-4 bg-red-50 border border-red-200 rounded-xl">
-              <p className="text-sm text-red-700">{error}</p>
+            <div className="wallet-status-error rounded-xl border p-4">
+              <p className="text-sm">{error}</p>
             </div>
           )}
         </form>
       </div>
 
-      <div className="px-6 py-6 pb-8 bg-background border-t border-border/50">
+      <div className="border-t border-border bg-background px-6 pb-8 pt-6">
         <button
-          onClick={handleSubmit as unknown as React.MouseEventHandler}
+          form="wallet-import-form"
+          type="submit"
           disabled={!mnemonic.trim() || !password || !confirmPassword}
-          className="w-full py-4 px-6 bg-primary hover:bg-primary/90 disabled:bg-muted disabled:text-muted-foreground text-primary-foreground font-semibold rounded-xl transition-all duration-200 flex items-center justify-center gap-2 shadow-lg shadow-primary/25 disabled:shadow-none active:scale-[0.98]"
+          className="wallet-pill-btn"
         >
-          Import Wallet
-          <ChevronRight className="w-5 h-5" />
+          Import wallet
+          <ChevronRight className="h-4 w-4" />
         </button>
       </div>
     </div>

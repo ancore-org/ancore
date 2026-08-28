@@ -6,7 +6,9 @@
  * and independent of indexer work.
  */
 
-const HORIZON_URL = import.meta.env.VITE_HORIZON_URL ?? 'https://horizon-testnet.stellar.org';
+import { env } from './env';
+
+const HORIZON_URL = env.VITE_HORIZON_URL;
 
 export interface HorizonAccountData {
   id: string;

@@ -1204,4 +1204,64 @@ describe('StellarClient', () => {
       expect(getAccountActivityPage).toHaveBeenCalledTimes(1);
     });
   });
+  describe('simulateTransaction', () => {
+    const RPC_URL = 'https://sim-rpc.example.com';
+
+    const makeClient = () => new StellarClient({ network: 'testnet', rpcUrls: [RPC_URL] });
+
+    it('simulates a Transaction object through RPC failover', async () => {
+      const client = makeClient();
+      const server = getMockRpcServer(RPC_URL) as MockRpcServer & {
+        simulateTransaction: jest.Mock;
+      };
+      const response = { transactionData: {}, minResourceFee: '100' };
+      server.simulateTransaction = jest.fn().mockResolvedValue(response);
+
+      const tx = { fake: 'transaction' } as unknown as Transaction;
+      await expect(client.simulateTransaction(tx)).resolves.toBe(response);
+      expect(server.simulateTransaction).toHaveBeenCalledWith(tx);
+    });
+
+    it('rethrows the underlying NetworkError when retries are exhausted', async () => {
+      const client = makeClient();
+      const server = getMockRpcServer(RPC_URL) as MockRpcServer & {
+        simulateTransaction: jest.Mock;
+      };
+      const networkError = new NetworkError('rpc unreachable');
+      server.simulateTransaction = jest.fn().mockRejectedValue(networkError);
+
+      await expect(
+        client.simulateTransaction({ fake: 'transaction' } as unknown as Transaction)
+      ).rejects.toBe(networkError);
+    });
+
+    it('resolves an unparseable XDR string to an error result instead of throwing', async () => {
+      const client = makeClient();
+      mockTransactionFromXDR.mockImplementation(() => {
+        throw new Error('bad xdr');
+      });
+
+      await expect(client.simulateTransaction('not-xdr')).resolves.toMatchObject({
+        fee: '0.0000000',
+        error: expect.any(String),
+      });
+    });
+
+    it('never rejects for the XDR overload even when RPC fails', async () => {
+      const client = makeClient();
+      const server = getMockRpcServer(RPC_URL) as MockRpcServer & {
+        simulateTransaction: jest.Mock;
+      };
+      server.simulateTransaction = jest.fn().mockRejectedValue(new Error('boom'));
+      // A Soroban op is what routes the XDR overload to the RPC simulate call.
+      mockTransactionFromXDR.mockImplementation(() => ({
+        operations: [{ type: 'invokeHostFunction' }],
+        toXDR: () => 'xdr',
+      }));
+
+      const result = await client.simulateTransaction('AAAA');
+      expect(result).toMatchObject({ fee: '0.0000000', authEntries: [], footprint: '' });
+      expect(typeof (result as { error?: string }).error).toBe('string');
+    });
+  });
 });

@@ -88,7 +88,8 @@ export function SettingsScreen() {
 
   function handleNetworkChange(network: Network) {
     updateSettings({ network });
-    setRuntimeNetwork(network);
+    if (network === 'local') return;
+    void setRuntimeNetwork(network);
   }
 
   if (view === 'network') {
@@ -171,31 +172,13 @@ export function SettingsScreen() {
       : t('settings.hardware.software');
 
   return (
-    <div className="flex flex-col min-h-screen bg-background">
-      {/* Header */}
-      <div className="bg-gradient-to-br from-primary to-purple-800 px-5 pt-10 pb-8 text-white">
-        <h1 className="text-xl font-bold tracking-tight">{t('settings.title')}</h1>
-        <p className="text-sm text-white/60 mt-0.5">{t('settings.subtitle')}</p>
-
-        {/* Account card */}
-        <div className="mt-5 flex items-center gap-3 rounded-xl bg-white/10 backdrop-blur px-4 py-3">
-          <div className="flex h-10 w-10 items-center justify-center rounded-full bg-white/20 text-white font-bold text-lg select-none">
-            A
-          </div>
-          <div className="flex-1 min-w-0">
-            <p className="text-sm font-semibold truncate">{t('settings.account.name')}</p>
-            <p className="text-xs text-white/60 truncate">{t('settings.account.address')}</p>
-          </div>
-          <span
-            className={`text-[10px] font-semibold px-2 py-0.5 rounded-full ${settings.network === 'mainnet' ? 'bg-green-400/20 text-green-300' : 'bg-yellow-400/20 text-yellow-300'}`}
-          >
-            {networkLabel}
-          </span>
-        </div>
+    <div className="flex min-h-screen flex-col bg-background">
+      <div className="px-5 pb-7 pt-6">
+        <h1 className="text-[26px] font-semibold tracking-[-0.03em]">{t('settings.title')}</h1>
+        <p className="mt-2 text-sm text-muted-foreground">{t('settings.subtitle')}</p>
       </div>
 
-      {/* Settings groups */}
-      <div className="flex-1 space-y-5 p-4 -mt-3 rounded-t-2xl bg-background">
+      <div className="flex-1 space-y-5 px-4 pb-24">
         <SettingsGroup title={t('settings.groups.account')}>
           <SettingItem
             label={t('settings.accountQr.label')}

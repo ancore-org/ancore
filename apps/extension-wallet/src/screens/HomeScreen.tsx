@@ -1,9 +1,12 @@
 import React from 'react';
 import { useAccountBalance, formatBalance } from '@/hooks/useAccountBalance';
 import { EmptyState, Skeleton } from '@ancore/ui-kit';
+import { useServiceHealth } from '@/hooks/useServiceHealth';
+import { ServiceHealthBanner } from '@/components/ServiceHealthBanner';
 
 const HomeScreen: React.FC = () => {
   const { balance, isLoading, error, refreshBalance } = useAccountBalance();
+  const { configErrors, isChecking, retry } = useServiceHealth();
 
   if (error) {
     return (
@@ -36,6 +39,7 @@ const HomeScreen: React.FC = () => {
 
   return (
     <div className="flex flex-col gap-4">
+      <ServiceHealthBanner errors={configErrors} onRetry={isChecking ? undefined : retry} />
       <header className="rounded-3xl border border-white/10 bg-white/5 p-4 backdrop-blur-sm">
         <p className="text-xs uppercase tracking-[0.25em] text-cyan-400">Main Account</p>
         <div className="mt-1 h-8 flex items-center">

@@ -116,10 +116,10 @@ export const AccountSelector: React.FC<AccountSelectorProps> = ({
         onClick={() => setIsOpen(!isOpen)}
         onKeyDown={handleKeyDown}
         className={cn(
-          'flex items-center gap-2 px-3 py-2 text-sm rounded-md border',
-          'bg-background hover:bg-accent transition-colors',
-          'focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2',
-          isOpen && 'ring-2 ring-primary ring-offset-2'
+          'flex h-10 items-center gap-2 rounded-full border px-3 text-sm',
+          'bg-card transition-colors hover:bg-accent',
+          'focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2',
+          isOpen && 'ring-2 ring-ring ring-offset-2'
         )}
         aria-haspopup="listbox"
         aria-expanded={isOpen}
@@ -138,7 +138,7 @@ export const AccountSelector: React.FC<AccountSelectorProps> = ({
       </button>
 
       {isOpen && (
-        <div className="absolute top-full left-0 right-0 mt-1 bg-background border rounded-md shadow-lg z-50">
+        <div className="absolute left-0 right-0 top-full z-50 mt-2 overflow-hidden rounded-2xl border border-border bg-popover">
           <div className="p-2 border-b">
             <div className="relative">
               <Search className="absolute left-2 top-1/2 transform -translate-y-1/2 w-4 h-4 text-muted-foreground" />

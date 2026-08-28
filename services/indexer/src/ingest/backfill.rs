@@ -291,4 +291,127 @@ mod tests {
         let result = cmd.run().await;
         assert!(result.is_err());
     }
+
+    mod postgres_integration {
+        use super::*;
+        use crate::ingest::checkpoint::{Checkpoint, CheckpointStore, PostgresCheckpointStore};
+        use crate::ingest::postgres_sink::PostgresEventSink;
+        use sqlx::PgPool;
+
+        async fn setup_test_db() -> PgPool {
+            dotenvy::dotenv().ok();
+            let database_url = std::env::var("TEST_DATABASE_URL").unwrap_or_else(|_| {
+                "postgresql://postgres:postgres@localhost:5432/ancore_test".to_string()
+            });
+            PgPool::connect(&database_url)
+                .await
+                .expect("failed to connect to test database (run migrations first)")
+        }
+
+        fn backfill_raw_event(tag: &str, ledger_seq: u32) -> RawEvent {
+            RawEvent {
+                ledger_seq,
+                ledger_close_time: Utc::now(),
+                tx_hash: format!("{:0>64}", tag),
+                contract_id: "CTESTBACKFILL000000000000000000000000000000000000000".into(),
+                topics: vec!["transfer".into()],
+                data: String::new(),
+            }
+        }
+
+        #[tokio::test]
+        #[ignore] // Requires test database
+        async fn backfill_persists_to_real_postgres_and_replay_is_a_no_op() {
+            let pool = setup_test_db().await;
+            let tx_hash = format!("{:0>64}", "backfillrt1");
+            sqlx::query("DELETE FROM contract_events WHERE tx_hash = $1")
+                .bind(&tx_hash)
+                .execute(&pool)
+                .await
+                .unwrap();
+            sqlx::query("DELETE FROM account_activity WHERE tx_hash = $1")
+                .bind(&tx_hash)
+                .execute(&pool)
+                .await
+                .unwrap();
+
+            let events = vec![backfill_raw_event("backfillrt1", 900_200)];
+            let cmd = BackfillCommand::new(
+                BackfillConfig {
+                    from_ledger: 900_200,
+                    to_ledger: 900_200,
+                    batch_size: 10,
+                },
+                VecSource::new(events.clone()),
+                PostgresEventSink::new(pool.clone()),
+            );
+            let stats = cmd.run().await.unwrap();
+            assert_eq!(stats.persisted, 1);
+
+            let count: i64 =
+                sqlx::query_scalar("SELECT COUNT(*) FROM contract_events WHERE tx_hash = $1")
+                    .bind(&tx_hash)
+                    .fetch_one(&pool)
+                    .await
+                    .unwrap();
+            assert_eq!(count, 1);
+
+            // Replay the exact same range — simulates an operator re-running a
+            // backfill over an overlapping window. Must not double-write.
+            let cmd2 = BackfillCommand::new(
+                BackfillConfig {
+                    from_ledger: 900_200,
+                    to_ledger: 900_200,
+                    batch_size: 10,
+                },
+                VecSource::new(events),
+                PostgresEventSink::new(pool.clone()),
+            );
+            cmd2.run().await.unwrap();
+
+            let count_after_replay: i64 =
+                sqlx::query_scalar("SELECT COUNT(*) FROM contract_events WHERE tx_hash = $1")
+                    .bind(&tx_hash)
+                    .fetch_one(&pool)
+                    .await
+                    .unwrap();
+            assert_eq!(
+                count_after_replay, 1,
+                "replaying the same backfill range must not double-write events"
+            );
+        }
+
+        #[tokio::test]
+        #[ignore] // Requires test database
+        async fn backfill_does_not_touch_the_live_ingest_checkpoint() {
+            let pool = setup_test_db().await;
+
+            let checkpoint_store = PostgresCheckpointStore::new(pool.clone());
+            checkpoint_store
+                .save(&Checkpoint {
+                    stream: "main".into(),
+                    last_ledger_seq: 54_321,
+                })
+                .await
+                .unwrap();
+
+            let events = vec![backfill_raw_event("backfillcheckpointsafety1", 900_300)];
+            let cmd = BackfillCommand::new(
+                BackfillConfig {
+                    from_ledger: 900_300,
+                    to_ledger: 900_300,
+                    batch_size: 10,
+                },
+                VecSource::new(events),
+                PostgresEventSink::new(pool.clone()),
+            );
+            cmd.run().await.unwrap();
+
+            let checkpoint_after = checkpoint_store.load("main").await.unwrap().unwrap();
+            assert_eq!(
+                checkpoint_after.last_ledger_seq, 54_321,
+                "backfill must never advance/alter the live ingest checkpoint"
+            );
+        }
+    }
 }

@@ -1,5 +1,9 @@
 import { test as base, chromium, expect, type Page, type BrowserContext } from '@playwright/test';
 import path from 'path';
+import { fileURLToPath } from 'url';
+
+// This package is "type": "module", so __dirname does not exist here.
+const dirname = path.dirname(fileURLToPath(import.meta.url));
 
 const AUTH_KEY = 'ancore_extension_auth';
 
@@ -10,20 +14,17 @@ const TEST_SMART_ACCOUNT_ID = 'CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA
 const AUTH_PRESETS = {
   fresh: {
     hasOnboarded: false,
-    isUnlocked: false,
     walletName: 'Ancore Wallet',
     accountAddress: 'GCFX...WALLET',
   },
   'onboarded-locked': {
     hasOnboarded: true,
-    isUnlocked: false,
     walletName: 'Test Wallet',
     accountAddress: 'GCFX...WALLET',
     smartAccountId: TEST_SMART_ACCOUNT_ID,
   },
   'onboarded-unlocked': {
     hasOnboarded: true,
-    isUnlocked: true,
     walletName: 'Test Wallet',
     accountAddress: 'GCFX...WALLET',
     smartAccountId: TEST_SMART_ACCOUNT_ID,
@@ -79,7 +80,7 @@ export const test = base.extend<ExtensionFixtures>({
   // Prerequisites: run `pnpm build` before the suite.
   // eslint-disable-next-line no-empty-pattern
   extensionContext: async ({}, use) => {
-    const distPath = path.resolve(__dirname, '../../dist');
+    const distPath = path.resolve(dirname, '../../dist');
     const context = await chromium.launchPersistentContext('', {
       headless: false,
       args: [

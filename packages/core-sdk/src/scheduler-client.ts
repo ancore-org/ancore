@@ -138,19 +138,6 @@ export function resetSchedulerClientForTests(): void {
   sharedClient = null;
 }
 
-const VALID_KEY = 'a'.repeat(64);
-const VALID_SIG = 'b'.repeat(128);
-
-export function buildDefaultRelayPayload(to: string, amount: string) {
-  return {
-    sessionKey: VALID_KEY,
-    operation: 'relay_execute' as const,
-    parameters: { to, amount, asset: 'XLM' },
-    signature: VALID_SIG,
-    nonce: Date.now() % 1_000_000,
-  };
-}
-
 export function toIsoStartAt(localDateTime: string): string {
   return new Date(localDateTime).toISOString();
 }

@@ -18,7 +18,8 @@
     "test": "jest --config ./jest.config.cjs --coverage --runInBand",
     "lint": "eslint src/",
     "clean": "rm -rf dist coverage",
-    "test:ci": "pnpm run build && pnpm run test"
+    "test:ci": "pnpm run build && pnpm run test",
+    "typecheck": "tsc --noEmit"
   },
   "dependencies": {
     "@ancore/core-sdk": "workspace:*",
@@ -28,6 +29,7 @@
     "@reown/walletkit": "^1.5.5",
     "@walletconnect/types": "^2.23.9",
     "@walletconnect/utils": "^2.23.9",
+    "jail-monkey": "^3.0.0",
     "react": "^18.3.1",
     "react-native-biometrics": "^3.0.1",
     "react-native-keychain": "^10.0.0"
