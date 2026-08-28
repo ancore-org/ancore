@@ -10,7 +10,7 @@ import { Invoice, InvoiceSchema } from './invoice';
 import { TransferPolicy, TransferPolicySchema } from './transfer-policy';
 import { ScheduledTransfer, ScheduledTransferSchema } from './scheduled-transfer';
 import { SessionKeyPolicy, SessionKeyPolicySchema } from './session-key-policy';
-import { StatementRow } from './statement';
+import { STATEMENT_STATUSES, StatementRow, StatementStatus } from './statement';
 
 export function isSmartAccount(value: unknown): value is SmartAccount {
   if (typeof value !== 'object' || value === null) return false;
@@ -112,11 +112,12 @@ export function isStatementRow(value: unknown): value is StatementRow {
   const v = value as Record<string, unknown>;
   return (
     typeof v.id === 'string' &&
-    typeof v.date === 'string' &&
-    typeof v.type === 'string' &&
+    typeof v.timestamp === 'string' &&
+    typeof v.counterparty === 'string' &&
     typeof v.amount === 'string' &&
     typeof v.asset === 'string' &&
+    typeof v.memoOrReference === 'string' &&
     typeof v.status === 'string' &&
-    ['completed', 'pending', 'failed', 'unknown'].includes(v.status as string)
+    STATEMENT_STATUSES.includes(v.status as StatementStatus)
   );
 }
