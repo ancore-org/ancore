@@ -45,6 +45,28 @@ describe('WalletConnect Deep Link Handler', () => {
       });
     });
 
+    it('should decode a percent-encoded pairing URI', () => {
+      const pairingUri = 'wc:abc123@2?relay-protocol=irn&symKey=xyz789';
+      const url = `ancore://wc?uri=${encodeURIComponent(pairingUri)}`;
+      const result = parseWalletConnectDeepLink(url);
+
+      expect(result).toEqual({ uri: pairingUri });
+    });
+
+    it('should reject an encoded non-wc URI after decoding', () => {
+      const url = `ancore://wc?uri=${encodeURIComponent('https://example.com')}`;
+      const result = parseWalletConnectDeepLink(url);
+
+      expect(result).toBeNull();
+    });
+
+    it('should fall back to the raw value for malformed percent escapes', () => {
+      const url = 'ancore://wc?uri=wc:abc123%ZZ';
+      const result = parseWalletConnectDeepLink(url);
+
+      expect(result).toEqual({ uri: 'wc:abc123%ZZ' });
+    });
+
     it('should handle malformed URLs gracefully', () => {
       const url = 'not-a-url';
       const result = parseWalletConnectDeepLink(url);
@@ -109,6 +131,13 @@ describe('WalletConnect Deep Link Handler', () => {
       const result = extractPairingUri(url);
 
       expect(result).toBe('wc:abc123@2?relay-protocol=irn&symKey=xyz789');
+    });
+
+    it('should extract a percent-encoded pairing URI', () => {
+      const pairingUri = 'wc:abc123@2?relay-protocol=irn&symKey=xyz789';
+      const url = `ancore://wc?uri=${encodeURIComponent(pairingUri)}`;
+
+      expect(extractPairingUri(url)).toBe(pairingUri);
     });
   });
 });

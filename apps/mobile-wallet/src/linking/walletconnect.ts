@@ -4,6 +4,9 @@
  * Handles deep links for WalletConnect pairing URIs in the format:
  * ancore://wc?uri=<pairing-uri>
  *
+ * The pairing URI may be percent-encoded, since it contains ':', '@', '?' and
+ * '&'; it is decoded before validation.
+ *
  * The pairing URI is extracted and passed to WalletKit.pair() to establish
  * a connection with a dApp.
  */
@@ -25,7 +28,19 @@ export const parseWalletConnectDeepLink = (url: string): WalletConnectDeepLinkPa
     }
 
     // Extract everything after uri= - the WalletConnect URI may contain its own query params
-    const uri = url.substring('ancore://wc?uri='.length);
+    const rawUri = url.substring('ancore://wc?uri='.length);
+
+    // A correctly built deep link percent-encodes the pairing URI, because it
+    // contains ':', '@', '?' and '&'. Decode it before validating. Links that
+    // were never encoded still work: decodeURIComponent is a no-op on them, and
+    // a malformed escape sequence falls back to the raw value rather than
+    // rejecting an otherwise usable link.
+    let uri: string;
+    try {
+      uri = decodeURIComponent(rawUri);
+    } catch {
+      uri = rawUri;
+    }
 
     // Validate that it's a WalletConnect URI
     if (!uri.startsWith('wc:')) {
