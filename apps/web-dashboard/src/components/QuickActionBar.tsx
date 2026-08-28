@@ -7,9 +7,7 @@ export const QuickActionBar: React.FC = () => {
   const navigate = useNavigate();
 
   const actions = [
-    { icon: Send, label: 'Send', path: '/send' },
-    { icon: ArrowDownLeft, label: 'Request', path: '/request' },
-    { icon: QrCode, label: 'Scan', path: '/scan' },
+    { icon: Send, label: 'Send', path: '/dashboard/send' },
   ];
 
   return (
