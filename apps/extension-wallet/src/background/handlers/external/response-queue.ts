@@ -28,7 +28,15 @@ function getChromeSession(): chrome['storage']['session'] | null {
 export function writeSessionEntry(entry: SessionQueueEntry): void {
   const session = getChromeSession();
   if (session) {
-    session.set({ [entry.requestId]: entry });
+    session.set({ [entry.requestId]: entry }, () => {
+      const lastError = (globalThis as { chrome?: typeof chrome }).chrome?.runtime?.lastError;
+      if (lastError) {
+        console.error(
+          `chrome.storage.session.set failed for ${entry.requestId}:`,
+          lastError.message ?? lastError
+        );
+      }
+    });
   }
 }
 
@@ -40,7 +48,16 @@ export function getSessionEntry(requestId: string): Promise<SessionQueueEntry | 
       return;
     }
     session.get(requestId, (result: Record<string, unknown>) => {
-      const entry = result[requestId];
+      const lastError = (globalThis as { chrome?: typeof chrome }).chrome?.runtime?.lastError;
+      if (lastError) {
+        console.error(
+          `chrome.storage.session.get failed for ${requestId}:`,
+          lastError.message ?? lastError
+        );
+        resolve(null);
+        return;
+      }
+      const entry = result ? result[requestId] : undefined;
       resolve((entry as SessionQueueEntry | undefined) ?? null);
     });
   });
@@ -49,7 +66,15 @@ export function getSessionEntry(requestId: string): Promise<SessionQueueEntry | 
 export function clearSessionEntry(requestId: string): void {
   const session = getChromeSession();
   if (session) {
-    session.remove(requestId);
+    session.remove(requestId, () => {
+      const lastError = (globalThis as { chrome?: typeof chrome }).chrome?.runtime?.lastError;
+      if (lastError) {
+        console.error(
+          `chrome.storage.session.remove failed for ${requestId}:`,
+          lastError.message ?? lastError
+        );
+      }
+    });
   }
 }
 

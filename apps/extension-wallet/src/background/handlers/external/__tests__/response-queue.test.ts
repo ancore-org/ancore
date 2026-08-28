@@ -2,6 +2,8 @@
  * Unit tests for response queue
  */
 
+import { describe, it, expect, beforeEach, vi } from 'vitest';
+
 import {
   enqueueApproval,
   getApproval,
@@ -13,6 +15,8 @@ import {
   rejectRequest,
   clearResponseCallbacks,
   getSessionEntry,
+  writeSessionEntry,
+  clearSessionEntry,
   sweepStaleRequests,
 } from '../response-queue';
 
@@ -20,14 +24,16 @@ import {
 
 const sessionStore: Record<string, unknown> = {};
 const mockSession = {
-  set: vi.fn((data: Record<string, unknown>, _cb?: () => void) => {
+  set: vi.fn((data: Record<string, unknown>, cb?: () => void) => {
     Object.assign(sessionStore, data);
+    cb?.();
   }),
   get: vi.fn((key: string, cb: (result: Record<string, unknown>) => void) => {
     cb({ [key]: sessionStore[key] });
   }),
-  remove: vi.fn((key: string) => {
+  remove: vi.fn((key: string, cb?: () => void) => {
     delete sessionStore[key];
+    cb?.();
   }),
 };
 
@@ -273,7 +279,8 @@ describe('response queue', () => {
       expect(mockSession.set).toHaveBeenCalledWith(
         expect.objectContaining({
           'req-1': expect.objectContaining({ requestId: 'req-1', status: 'pending' }),
-        })
+        }),
+        expect.any(Function)
       );
     });
 
@@ -312,6 +319,36 @@ describe('response queue', () => {
     it('getSessionEntry returns null for unknown requestId', async () => {
       const entry = await getSessionEntry('no-such-id');
       expect(entry).toBeNull();
+    });
+
+    it('handles chrome.runtime.lastError gracefully on session storage operations', async () => {
+      const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+
+      (globalThis as any).chrome = {
+        storage: { session: mockSession },
+        runtime: { lastError: { message: 'Quota exceeded' } },
+      };
+
+      writeSessionEntry({ requestId: 'err-1', status: 'pending' });
+      expect(consoleSpy).toHaveBeenCalledWith(
+        'chrome.storage.session.set failed for err-1:',
+        'Quota exceeded'
+      );
+
+      const entry = await getSessionEntry('err-1');
+      expect(entry).toBeNull();
+      expect(consoleSpy).toHaveBeenCalledWith(
+        'chrome.storage.session.get failed for err-1:',
+        'Quota exceeded'
+      );
+
+      clearSessionEntry('err-1');
+      expect(consoleSpy).toHaveBeenCalledWith(
+        'chrome.storage.session.remove failed for err-1:',
+        'Quota exceeded'
+      );
+
+      consoleSpy.mockRestore();
     });
   });
 
