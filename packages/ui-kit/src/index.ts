@@ -36,6 +36,11 @@ export { EmptyState } from './components/ui/empty-state';
 export type { EmptyStateProps } from './components/ui/empty-state';
 
 // Custom wallet components
+/**
+ * @deprecated Prefer `FormAmountInput` — `AmountInput` is a backwards-compatible
+ * wrapper around the same `AmountInputBase` implementation and gains nothing
+ * from being imported under this name.
+ */
 export { AmountInput } from './components/amount-input';
 export type { AmountInputProps } from './components/amount-input';
 
