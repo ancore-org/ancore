@@ -57,9 +57,12 @@ function resolveSupportedLocale(locale: string | string[]): string | string[] {
  * - If locale is invalid or unsupported, falls back to 'en-US'
  * - If Intl is not available or parameters are severely malformed, falls back to basic string formatting
  *
- * @param amount The numerical amount to format
+ * @param amount The numerical amount to format. Must be finite.
  * @param options Formatting options
  * @returns Formatted currency string
+ * @throws {RangeError} If `amount` is NaN, Infinity, or -Infinity. Intl.NumberFormat would
+ * otherwise render these as the literal strings "NaN" / "∞", silently producing a
+ * wrong-looking currency value instead of surfacing the bad input to the caller.
  */
 export function formatFiatAmount(amount: number, options: FiatFormatOptions = {}): string {
   const {
@@ -68,6 +71,12 @@ export function formatFiatAmount(amount: number, options: FiatFormatOptions = {}
     minimumFractionDigits = 2,
     maximumFractionDigits = 2,
   } = options;
+
+  // Guard before the try/catch: the fallback paths below would otherwise still
+  // format a non-finite amount into a plausible-looking string.
+  if (!Number.isFinite(amount)) {
+    throw new RangeError(`formatFiatAmount expected a finite amount, received ${String(amount)}.`);
+  }
 
   try {
     return new Intl.NumberFormat(resolveSupportedLocale(locale), {
