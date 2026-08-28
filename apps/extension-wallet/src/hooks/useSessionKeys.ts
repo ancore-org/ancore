@@ -107,20 +107,21 @@ export function useSessionKeys(): UseSessionKeysReturn {
       setError(null);
 
       const snapshot = keys.find((k: SessionKey) => k.publicKey === publicKey);
+      if (!snapshot) {
+        setIsLoading(false);
+        throw new Error('Session key not found');
+      }
+
       updateKey(publicKey, { expiresAt: newExpiresAt });
 
       try {
-        if (!snapshot) {
-          throw new Error('Session key not found');
-        }
-
         const client = createAccountClient(authState.accountAddress);
         client.refreshSessionKeyTtl({
           publicKey,
           expiresAt: snapshot.expiresAt,
         });
       } catch (err) {
-        if (snapshot) updateKey(publicKey, { expiresAt: snapshot.expiresAt });
+        updateKey(publicKey, { expiresAt: snapshot.expiresAt });
         const msg = err instanceof Error ? err.message : 'Failed to refresh session key';
         setError(msg);
         throw err;
