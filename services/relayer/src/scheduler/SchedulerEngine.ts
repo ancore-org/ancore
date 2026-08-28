@@ -16,7 +16,10 @@ export interface SchedulerEngineOptions {
  * leases (PgScheduledTransferStore) or in-process locks (ScheduledTransferStore)
  * to prevent double-execution across concurrent worker instances.
  *
- * Records scheduler_jobs_* Prometheus metrics for each execution tick.
+ * Records scheduler_jobs_* Prometheus metrics for every execution tick —
+ * successful, idle (zero due transfers), and failed alike — so that a
+ * persistently failing or permanently idle scheduler is visible to monitoring
+ * rather than indistinguishable from one that is simply not running.
  */
 export class SchedulerEngine {
   private readonly service: ScheduledTransferService;
@@ -24,6 +27,13 @@ export class SchedulerEngine {
   private readonly now: () => Date;
   private running = false;
   private pollTimer: ReturnType<typeof setTimeout> | null = null;
+  /**
+   * Count of consecutive failed ticks. Distinct from the per-transfer
+   * `consecutiveFailures` tracked by ScheduledTransferService: this counts
+   * whole-tick failures (e.g. the store being unreachable), not failures of
+   * an individual transfer.
+   */
+  private consecutiveFailures = 0;
 
   constructor(service: ScheduledTransferService, options: SchedulerEngineOptions = {}) {
     this.service = service;
@@ -45,27 +55,53 @@ export class SchedulerEngine {
     }
   }
 
-  /** Process due transfers immediately (useful in tests). */
+  /**
+   * Process due transfers immediately (useful in tests).
+   *
+   * Rethrows a failing tick so callers can assert on the error. The metric is
+   * recorded either way; the polling loop swallows the rejection separately.
+   */
   async tick(): Promise<number> {
     return this.runTick();
   }
 
   private async runTick(): Promise<number> {
     const before = this.now();
-    const processed = await this.service.processDueTransfers(before);
-    const lagMs = Date.now() - before.getTime();
 
-    if (processed > 0) {
-      recordSchedulerExecution({ outcome: 'success', lagMs, consecutiveFailures: 0 });
+    try {
+      const processed = await this.service.processDueTransfers(before);
+      this.consecutiveFailures = 0;
+      // Record on every successful tick, including idle ones. An idle tick is a
+      // healthy scheduler with nothing due; omitting it made "working but idle"
+      // and "not running at all" look identical on the dashboard.
+      recordSchedulerExecution({
+        outcome: 'success',
+        lagMs: Date.now() - before.getTime(),
+        consecutiveFailures: 0,
+      });
+      return processed;
+    } catch (error) {
+      this.consecutiveFailures += 1;
+      recordSchedulerExecution({
+        outcome: 'failed',
+        lagMs: Date.now() - before.getTime(),
+        consecutiveFailures: this.consecutiveFailures,
+      });
+      throw error;
     }
-
-    return processed;
   }
 
   private schedulePoll(): void {
     if (!this.running) return;
     this.pollTimer = setTimeout(() => {
-      void this.runTick().finally(() => this.schedulePoll());
+      // runTick() rethrows so that the public tick() surfaces errors. Here the
+      // rejection is deliberately swallowed after being recorded as a failure
+      // metric: an unhandled rejection would otherwise terminate the process
+      // under Node's default --unhandled-rejections=throw, taking down the
+      // relayer over a transient DB blip. The loop must keep polling.
+      void this.runTick()
+        .catch(() => undefined)
+        .finally(() => this.schedulePoll());
     }, this.pollIntervalMs);
   }
 }
