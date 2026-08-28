@@ -9,8 +9,21 @@ import { ExternalApiMethod } from '@ancore/wallet-shared';
 import type { RequestSessionKeyResult, SessionKeyPolicy } from '@ancore/types';
 import { sendExternalRequest, WalletApiError, WalletNotInstalledError } from './bridge';
 
-/** Stellar networks exposed to dApps via getNetwork(). */
-export type WalletNetwork = 'mainnet' | 'testnet';
+/**
+ * Stellar networks exposed to dApps via getNetwork().
+ *
+ * Mirrors the `Network` union in @ancore/types — the extension supports
+ * futurenet and local alongside mainnet/testnet, so narrowing this to two
+ * values made getNetwork() misreport those networks to typed callers.
+ */
+export type WalletNetwork = 'mainnet' | 'testnet' | 'futurenet' | 'local';
+
+const WALLET_NETWORKS: readonly WalletNetwork[] = ['mainnet', 'testnet', 'futurenet', 'local'];
+
+/** Narrows an arbitrary background value to a supported WalletNetwork. */
+export function isWalletNetwork(value: unknown): value is WalletNetwork {
+  return typeof value === 'string' && (WALLET_NETWORKS as readonly string[]).includes(value);
+}
 
 export interface RequestAccessResult {
   smartAccountId: string;
@@ -95,12 +108,20 @@ export async function getAddress(): Promise<GetAddressResult> {
   }
 }
 
-/** Returns the wallet's active Stellar network. */
+/**
+ * Returns the wallet's active Stellar network.
+ *
+ * The background value is validated rather than cast, so an unrecognised
+ * network surfaces as an error instead of a value that lies about its type.
+ */
 export async function getNetwork(): Promise<WalletNetwork> {
   const result = await sendExternalRequest<BackgroundGetNetworkResult>(
     ExternalApiMethod.GET_NETWORK
   );
-  return result.network as WalletNetwork;
+  if (!isWalletNetwork(result.network)) {
+    throw new WalletApiError(`Unsupported wallet network: ${String(result.network)}`);
+  }
+  return result.network;
 }
 
 /** Whether the current origin is allowlisted for the active account. */
