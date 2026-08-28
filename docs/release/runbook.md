@@ -2,6 +2,10 @@
 
 Step-by-step guide for cutting an Ancore release and operating the release gate.
 
+> This covers the contracts/backend release train (`v*.*.*` tags). The
+> mobile app (`apps/mobile-app`) ships separately — see
+> [`mobile-release.md`](./mobile-release.md).
+
 ---
 
 ## Prerequisites

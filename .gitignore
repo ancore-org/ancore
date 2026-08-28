@@ -88,3 +88,8 @@ implementation.md
 submission_details.md
 brief.md
 checks.md
+
+# fastlane local bundler install / run artifacts (mobile release pipeline)
+fastlane/vendor/
+fastlane/.bundle/
+fastlane/report.xml

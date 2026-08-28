@@ -22,7 +22,7 @@ android {
         applicationId "org.ancore.wallet"
         minSdkVersion rootProject.ext.minSdkVersion
         targetSdkVersion rootProject.ext.targetSdkVersion
-        versionCode 1
+        versionCode 100
         versionName "0.1.0"
     }
 
@@ -32,6 +32,22 @@ android {
             storePassword "android"
             keyAlias "androiddebugkey"
             keyPassword "android"
+        }
+        // Release signing is sourced from the environment (CI secrets) —
+        // ANCORE_RELEASE_STORE_FILE points at a keystore written from a
+        // secret at runtime (see .github/workflows/mobile-release.yml and
+        // fastlane/Fastfile's android beta lane). Never committed.
+        // Falls back to the debug keystore when unset so `assembleRelease`/
+        // `bundleRelease` still work for local testing without real signing
+        // material — CI always sets these, so a real release build is
+        // never silently debug-signed there.
+        if (System.getenv("ANCORE_RELEASE_STORE_FILE")) {
+            release {
+                storeFile file(System.getenv("ANCORE_RELEASE_STORE_FILE"))
+                storePassword System.getenv("ANCORE_RELEASE_STORE_PASSWORD")
+                keyAlias System.getenv("ANCORE_RELEASE_KEY_ALIAS")
+                keyPassword System.getenv("ANCORE_RELEASE_KEY_PASSWORD")
+            }
         }
     }
 
@@ -43,7 +59,7 @@ android {
         release {
             minifyEnabled enableProguardInReleaseBuilds
             proguardFiles getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro"
-            signingConfig signingConfigs.debug
+            signingConfig System.getenv("ANCORE_RELEASE_STORE_FILE") ? signingConfigs.release : signingConfigs.debug
         }
     }
 }

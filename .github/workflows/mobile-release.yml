@@ -1,0 +1,161 @@
+name: Mobile Release
+
+# Separate tag namespace from the contract/backend release train
+# (.github/workflows/release.yml uses v*.*.*) — mobile ships on its own
+# cadence, versioned from apps/mobile-app/package.json.
+on:
+  push:
+    tags:
+      - 'mobile-v*.*.*'
+  workflow_dispatch:
+    inputs:
+      platform:
+        description: 'Which platform to release'
+        required: true
+        default: 'both'
+        type: choice
+        options: ['both', 'ios', 'android']
+      dry_run:
+        description: 'Build and sign but skip the store upload'
+        required: false
+        default: 'false'
+        type: choice
+        options: ['true', 'false']
+
+concurrency:
+  group: mobile-release-${{ github.ref }}
+  cancel-in-progress: false
+
+env:
+  DRY_RUN: ${{ github.event.inputs.dry_run || 'false' }}
+  PLATFORM: ${{ github.event.inputs.platform || 'both' }}
+
+jobs:
+  release-ios:
+    name: iOS — TestFlight
+    if: ${{ github.event_name == 'push' || github.event.inputs.platform == 'both' || github.event.inputs.platform == 'ios' }}
+    runs-on: macos-14
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Xcode
+        uses: maxim-lobanov/setup-xcode@v1
+        with:
+          xcode-version: 15.0
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'pnpm'
+
+      - name: Install pnpm
+        uses: pnpm/action-setup@v2
+        with:
+          version: 9
+
+      - name: Install workspace dependencies
+        run: corepack pnpm install --frozen-lockfile
+
+      - name: Install CocoaPods dependencies
+        working-directory: apps/mobile-app/ios
+        run: pod install
+
+      - name: Install fastlane
+        working-directory: fastlane
+        run: bundle install
+
+      - name: Write App Store Connect API key
+        run: |
+          echo "$ASC_API_KEY_CONTENT" | base64 --decode > "$RUNNER_TEMP/asc-api-key.p8"
+          echo "ASC_API_KEY_PATH=$RUNNER_TEMP/asc-api-key.p8" >> "$GITHUB_ENV"
+        env:
+          ASC_API_KEY_CONTENT: ${{ secrets.ASC_API_KEY_CONTENT }}
+
+      - name: Release to TestFlight
+        working-directory: fastlane
+        run: bundle exec fastlane ios beta dry_run:${{ env.DRY_RUN }}
+        env:
+          MATCH_GIT_URL: ${{ secrets.MATCH_GIT_URL }}
+          MATCH_PASSWORD: ${{ secrets.MATCH_PASSWORD }}
+          MATCH_GIT_BASIC_AUTHORIZATION: ${{ secrets.MATCH_GIT_BASIC_AUTHORIZATION }}
+          ASC_KEY_ID: ${{ secrets.ASC_KEY_ID }}
+          ASC_ISSUER_ID: ${{ secrets.ASC_ISSUER_ID }}
+          ASC_TEAM_ID: ${{ secrets.ASC_TEAM_ID }}
+          CI: true
+
+      - name: Upload build artifact
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: ios-release-build
+          path: apps/mobile-app/ios/build
+          retention-days: 14
+          if-no-files-found: ignore
+
+  release-android:
+    name: Android — Play internal track
+    if: ${{ github.event_name == 'push' || github.event.inputs.platform == 'both' || github.event.inputs.platform == 'android' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'pnpm'
+
+      - name: Install pnpm
+        uses: pnpm/action-setup@v2
+        with:
+          version: 9
+
+      - name: Setup Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '17'
+
+      - name: Setup Android SDK
+        uses: android-actions/setup-android@v2
+        with:
+          api-level: 33
+          ndk: '25.2.9519653'
+
+      - name: Install workspace dependencies
+        run: corepack pnpm install --frozen-lockfile
+
+      - name: Install fastlane
+        working-directory: fastlane
+        run: bundle install
+
+      - name: Write release keystore and Play service account key
+        run: |
+          echo "$ANCORE_RELEASE_STORE_FILE_CONTENT" | base64 --decode > "$RUNNER_TEMP/release.keystore"
+          echo "ANCORE_RELEASE_STORE_FILE=$RUNNER_TEMP/release.keystore" >> "$GITHUB_ENV"
+          echo "$GOOGLE_PLAY_JSON_KEY_CONTENT" > "$RUNNER_TEMP/play-key.json"
+          echo "GOOGLE_PLAY_JSON_KEY_PATH=$RUNNER_TEMP/play-key.json" >> "$GITHUB_ENV"
+        env:
+          ANCORE_RELEASE_STORE_FILE_CONTENT: ${{ secrets.ANCORE_RELEASE_STORE_FILE_CONTENT }}
+          GOOGLE_PLAY_JSON_KEY_CONTENT: ${{ secrets.GOOGLE_PLAY_JSON_KEY_CONTENT }}
+
+      - name: Release to Play internal track
+        working-directory: fastlane
+        run: bundle exec fastlane android beta dry_run:${{ env.DRY_RUN }}
+        env:
+          ANCORE_RELEASE_STORE_PASSWORD: ${{ secrets.ANCORE_RELEASE_STORE_PASSWORD }}
+          ANCORE_RELEASE_KEY_ALIAS: ${{ secrets.ANCORE_RELEASE_KEY_ALIAS }}
+          ANCORE_RELEASE_KEY_PASSWORD: ${{ secrets.ANCORE_RELEASE_KEY_PASSWORD }}
+          CI: true
+
+      - name: Upload build artifact
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: android-release-bundle
+          path: apps/mobile-app/android/app/build/outputs/bundle/release
+          retention-days: 14
+          if-no-files-found: ignore

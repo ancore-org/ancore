@@ -1,0 +1,14 @@
+# Per-environment identifiers live in the Fastfile (dev vs prod bundle
+# ID/package name differ by build configuration/type — see
+# ios_app_identifier / android_package_name in each lane below) rather than
+# here, since Appfile constants are evaluated once for the whole run and
+# can't vary per-lane.
+#
+# team_id / itc_team_id: set via ASC_TEAM_ID / ASC_TEAM_ID env vars in CI
+# (values are Apple-account-specific and not committed).
+team_id(ENV["ASC_TEAM_ID"]) if ENV["ASC_TEAM_ID"]
+itc_team_id(ENV["ASC_TEAM_ID"]) if ENV["ASC_TEAM_ID"]
+
+# json_key_file for Play Console (supply) — set per-lane instead of here so
+# CI can point at a path written from a secret at runtime; see
+# GOOGLE_PLAY_JSON_KEY_PATH in the Android lanes.
