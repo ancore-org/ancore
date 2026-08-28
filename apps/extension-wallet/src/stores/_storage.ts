@@ -28,25 +28,61 @@ function isBrowserExtension(): boolean {
  * Async storage backed by chrome.storage.local or browser.storage.local.
  * Zustand's createJSONStorage accepts async getItem/setItem/removeItem.
  */
+/**
+ * Read and clear chrome.runtime.lastError, returning it as an Error.
+ *
+ * chrome.storage reports failures (quota exceeded, extension context
+ * invalidated, serialization failure) only through chrome.runtime.lastError
+ * inside the callback — it never throws. The property must always be accessed
+ * in the callback to avoid "Unchecked runtime.lastError" console warnings.
+ */
+function takeRuntimeError(operation: string): Error | null {
+  const runtimeError = chrome.runtime?.lastError;
+  if (!runtimeError) return null;
+  return new Error(runtimeError.message ?? `[storage] Unknown runtime error during ${operation}`);
+}
+
 const chromeExtensionStorage: StateStorage = {
   getItem: (name: string): Promise<string | null> => {
-    return new Promise((resolve) => {
+    return new Promise((resolve, reject) => {
       chrome.storage.local.get(name, (result: Record<string, unknown>) => {
-        const value = result[name];
+        const error = takeRuntimeError(`getItem('${name}')`);
+        if (error) {
+          reject(error);
+          return;
+        }
+
+        const value = result?.[name];
         resolve(typeof value === 'string' ? value : null);
       });
     });
   },
 
   setItem: (name: string, value: string): Promise<void> => {
-    return new Promise((resolve) => {
-      chrome.storage.local.set({ [name]: value }, resolve);
+    return new Promise((resolve, reject) => {
+      chrome.storage.local.set({ [name]: value }, () => {
+        const error = takeRuntimeError(`setItem('${name}')`);
+        if (error) {
+          reject(error);
+          return;
+        }
+
+        resolve();
+      });
     });
   },
 
   removeItem: (name: string): Promise<void> => {
-    return new Promise((resolve) => {
-      chrome.storage.local.remove(name, resolve);
+    return new Promise((resolve, reject) => {
+      chrome.storage.local.remove(name, () => {
+        const error = takeRuntimeError(`removeItem('${name}')`);
+        if (error) {
+          reject(error);
+          return;
+        }
+
+        resolve();
+      });
     });
   },
 };
