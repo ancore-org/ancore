@@ -81,5 +81,8 @@ export function getThresholdAnnouncement(threshold: ExpiryThreshold): string {
       return 'Session key has expired';
     case 'revoked':
       return 'Session key has been revoked';
+    default:
+      const exhaustiveCheck: never = threshold;
+      throw new Error(`Unknown expiry threshold: ${exhaustiveCheck}`);
   }
 }
