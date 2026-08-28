@@ -1,4 +1,3 @@
-// @ts-nocheck
 import { createReadOnlyAccount, type ReadOnlyAccount } from '../accounts';
 import {
   loadMobileWalletEnvironment,
