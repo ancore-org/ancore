@@ -2,7 +2,6 @@ import {
   handleResolutionResponseSchema,
   normalizeUsernameHandle,
   type HandleResolver,
-  type UsernameHandle,
 } from '@ancore/types';
 
 export interface EndpointHandleResolverOptions {
