@@ -8,8 +8,7 @@ import {
 import { createMobileWalletSdkClient, type MobileWalletSdkClient } from '../sdk';
 
 import { MobileSecureVault } from '../security';
-import { KeychainSecureStoreAdapter } from '../security/KeychainAdapter';
-import { MemorySecureStoreAdapter } from '../storage/mobile-secure-storage-adapter';
+import { createSecureStoreAdapter } from '../storage/secure-store-factory';
 
 export interface MobileWalletBootstrap {
   environment: MobileWalletEnvironment;
@@ -27,8 +26,7 @@ export const bootstrapMobileWallet = (source: MobileWalletEnvSource): MobileWall
     network: sdk.network,
   });
 
-  const isTest = typeof process !== 'undefined' && process.env?.NODE_ENV === 'test';
-  const adapter = isTest ? new MemorySecureStoreAdapter() : new KeychainSecureStoreAdapter();
+  const adapter = createSecureStoreAdapter();
   const vault = new MobileSecureVault(adapter);
 
   return {

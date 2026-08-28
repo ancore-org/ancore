@@ -19,12 +19,21 @@ android/app/build/
 android/build/
 android/captures/
 android/local.properties
+android/keystores/*.keystore
 *.apk
 *.aab
+
+# Fastlane
+fastlane/report.xml
+fastlane/Preview.html
+fastlane/screenshots
+fastlane/test_output
+fastlane/metadata/android/en-US/changelogs/*.txt
 
 # Environment
 .env
 .env*.local
+.release-notes.txt
 
 # IDE
 .vscode/

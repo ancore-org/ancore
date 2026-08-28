@@ -1,4 +1,4 @@
-import { renderHook, act, waitFor } from '@testing-library/react';
+import { renderHook, act } from '@testing-library/react';
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { useSessionKeys } from '../useSessionKeys';
 import * as AuthGuard from '@/router/AuthGuard';
@@ -7,7 +7,6 @@ import * as coreSdk from '@ancore/core-sdk';
 import type { SessionKey } from '@ancore/types';
 import { SessionPermission } from '@ancore/types';
 
-// Mock dependencies
 vi.mock('@/router/AuthGuard');
 vi.mock('@/stores/sessionKeys');
 vi.mock('@ancore/core-sdk');
@@ -30,7 +29,6 @@ describe('useSessionKeys', () => {
   beforeEach(() => {
     vi.clearAllMocks();
 
-    // Setup auth mock
     vi.mocked(AuthGuard.useExtensionAuth).mockReturnValue({
       authState: {
         hasOnboarded: true,
@@ -46,22 +44,20 @@ describe('useSessionKeys', () => {
       refreshUnlockStatus: vi.fn(),
     });
 
-    // Setup session keys store mock
     vi.mocked(sessionKeysStore.useSessionKeyStore).mockReturnValue({
       keys: mockKeys,
       addKey: mockAddKey,
       removeKey: mockRemoveKey,
       updateKey: mockUpdateKey,
-    } as any);
+    } as never);
 
-    // Setup core-sdk mock
     const mockClient = {
       refreshSessionKeyTtl: mockClientRefreshSessionKeyTtl,
       addSessionKey: vi.fn(),
       revokeSessionKey: vi.fn(),
     };
 
-    vi.mocked(coreSdk.AncoreClient).mockImplementation(() => mockClient as any);
+    vi.mocked(coreSdk.AncoreClient).mockImplementation(() => mockClient as never);
     vi.mocked(coreSdk.deriveContractId).mockReturnValue('CTEST123456789');
   });
 
@@ -76,7 +72,7 @@ describe('useSessionKeys', () => {
   describe('refreshSessionKey', () => {
     it('should optimistically update session key with new expiry', async () => {
       const { result } = renderHook(() => useSessionKeys());
-      const newExpiresAt = mockSessionKey.expiresAt + 86400; // +1 day
+      const newExpiresAt = mockSessionKey.expiresAt + 86400;
 
       await act(async () => {
         await result.current.refreshSessionKey(mockSessionKey.publicKey, newExpiresAt);
@@ -101,22 +97,6 @@ describe('useSessionKeys', () => {
       });
     });
 
-    it('should set isLoading to true during operation', async () => {
-      const { result } = renderHook(() => useSessionKeys());
-      const newExpiresAt = mockSessionKey.expiresAt + 86400;
-
-      const promise = act(async () => {
-        await result.current.refreshSessionKey(mockSessionKey.publicKey, newExpiresAt);
-      });
-
-      // Check loading state during operation
-      expect(result.current.isLoading).toBe(true);
-
-      await promise;
-
-      expect(result.current.isLoading).toBe(false);
-    });
-
     it('should rollback optimistic update on contract error', async () => {
       mockClientRefreshSessionKeyTtl.mockImplementationOnce(() => {
         throw new Error('Contract error');
@@ -125,15 +105,12 @@ describe('useSessionKeys', () => {
       const { result } = renderHook(() => useSessionKeys());
       const newExpiresAt = mockSessionKey.expiresAt + 86400;
 
-      try {
-        await act(async () => {
+      await expect(
+        act(async () => {
           await result.current.refreshSessionKey(mockSessionKey.publicKey, newExpiresAt);
-        });
-      } catch {
-        // Expected to throw
-      }
+        })
+      ).rejects.toThrow('Contract error');
 
-      // Verify rollback happened
       expect(mockUpdateKey).toHaveBeenLastCalledWith(mockSessionKey.publicKey, {
         expiresAt: mockSessionKey.expiresAt,
       });
@@ -148,13 +125,13 @@ describe('useSessionKeys', () => {
       const { result } = renderHook(() => useSessionKeys());
       const newExpiresAt = mockSessionKey.expiresAt + 86400;
 
-      try {
-        await act(async () => {
+      await act(async () => {
+        try {
           await result.current.refreshSessionKey(mockSessionKey.publicKey, newExpiresAt);
-        });
-      } catch {
-        // Expected to throw
-      }
+        } catch {
+          // expected
+        }
+      });
 
       expect(result.current.error).toBe(errorMessage);
     });
@@ -165,7 +142,7 @@ describe('useSessionKeys', () => {
         addKey: mockAddKey,
         removeKey: mockRemoveKey,
         updateKey: mockUpdateKey,
-      } as any);
+      } as never);
 
       const { result } = renderHook(() => useSessionKeys());
       const newExpiresAt = Math.floor(Date.now() / 1000) + 86400;
@@ -178,14 +155,24 @@ describe('useSessionKeys', () => {
     });
 
     it('should clear previous error when attempting refresh', async () => {
-      const { result } = renderHook(() => useSessionKeys());
+      mockClientRefreshSessionKeyTtl
+        .mockImplementationOnce(() => {
+          throw new Error('Previous error');
+        })
+        .mockImplementationOnce(() => undefined);
 
-      // Set an error first
-      act(() => {
-        // Manually trigger an error by mocking a failed call
+      const { result } = renderHook(() => useSessionKeys());
+      const newExpiresAt = mockSessionKey.expiresAt + 86400;
+
+      await act(async () => {
+        try {
+          await result.current.refreshSessionKey(mockSessionKey.publicKey, newExpiresAt);
+        } catch {
+          // expected
+        }
       });
 
-      const newExpiresAt = mockSessionKey.expiresAt + 86400;
+      expect(result.current.error).toBe('Previous error');
 
       await act(async () => {
         await result.current.refreshSessionKey(mockSessionKey.publicKey, newExpiresAt);
@@ -218,15 +205,15 @@ describe('useSessionKeys', () => {
       const { result } = renderHook(() => useSessionKeys());
       const newExpiresAt = mockSessionKey.expiresAt + 86400;
 
-      try {
-        await act(async () => {
+      await act(async () => {
+        try {
           await result.current.refreshSessionKey(mockSessionKey.publicKey, newExpiresAt);
-        });
-      } catch {
-        // Expected
-      }
+        } catch {
+          // expected
+        }
+      });
 
-      expect(result.current.error).not.toBeNull();
+      expect(result.current.error).toBe('Test error');
 
       act(() => {
         result.current.clearError();

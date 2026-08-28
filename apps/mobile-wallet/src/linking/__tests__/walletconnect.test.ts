@@ -15,6 +15,15 @@ describe('WalletConnect Deep Link Handler', () => {
       });
     });
 
+    it('should parse dev scheme WalletConnect deep links', () => {
+      const url = 'ancoredev://wc?uri=wc:abc123def456';
+      const result = parseWalletConnectDeepLink(url);
+
+      expect(result).toEqual({
+        uri: 'wc:abc123def456',
+      });
+    });
+
     it('should return null for invalid URL format', () => {
       const url = 'https://example.com?uri=wc:abc123';
       const result = parseWalletConnectDeepLink(url);

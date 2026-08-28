@@ -57,6 +57,7 @@
 |----------|---------|
 | [Release checklist](release/checklist.md) | CI-parsed gate checklist for releases |
 | [Release runbook](release/runbook.md) | Step-by-step release procedure |
+| [Mobile release](release/mobile.md) | TestFlight / Play internal pipeline |
 
 ## Other
 

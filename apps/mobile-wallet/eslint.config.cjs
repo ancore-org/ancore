@@ -41,6 +41,7 @@ module.exports = [
         TextDecoder: 'readonly',
         crypto: 'readonly',
         PublicKeyCredential: 'readonly',
+        __DEV__: 'readonly',
       },
     },
     plugins: {

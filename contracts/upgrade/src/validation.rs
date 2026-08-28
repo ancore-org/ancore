@@ -8,7 +8,9 @@
 //! independently verify that the declaration matches the actual WASM at
 //! `new_wasm_hash` before signing or broadcasting the proposal.
 
-use soroban_sdk::{BytesN, Env, String, Vec};
+use soroban_sdk::{BytesN, Env};
+#[cfg(test)]
+use soroban_sdk::{String, Vec};
 
 use crate::{ContractValidation, UpgradeError, WasmAttestation};
 
@@ -53,6 +55,7 @@ pub fn validate_wasm_metadata(
 }
 
 /// Build a validation policy that requires specific exported function names.
+#[cfg(test)]
 pub fn require_exports(env: &Env, names: Vec<String>) -> ContractValidation {
     ContractValidation {
         min_wasm_size: 1024,
@@ -63,6 +66,7 @@ pub fn require_exports(env: &Env, names: Vec<String>) -> ContractValidation {
 }
 
 /// Build a validation policy that forbids specific import patterns.
+#[cfg(test)]
 pub fn forbid_imports(env: &Env, patterns: Vec<String>) -> ContractValidation {
     ContractValidation {
         min_wasm_size: 1024,
@@ -73,6 +77,7 @@ pub fn forbid_imports(env: &Env, patterns: Vec<String>) -> ContractValidation {
 }
 
 /// Merge two validation configs (intersection of constraints).
+#[cfg(test)]
 pub fn merge_validation(
     env: &Env,
     a: &ContractValidation,
@@ -283,8 +288,14 @@ mod tests {
             v
         });
         let merged = merge_validation(&env, &a, &b);
-        assert!(merged.required_exports.contains(String::from_str(&env, "upgrade")));
-        assert!(!merged.required_exports.contains(String::from_str(&env, "get_version")));
-        assert!(!merged.required_exports.contains(String::from_str(&env, "migrate")));
+        assert!(merged
+            .required_exports
+            .contains(String::from_str(&env, "upgrade")));
+        assert!(!merged
+            .required_exports
+            .contains(String::from_str(&env, "get_version")));
+        assert!(!merged
+            .required_exports
+            .contains(String::from_str(&env, "migrate")));
     }
 }

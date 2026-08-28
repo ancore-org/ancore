@@ -114,9 +114,9 @@ pub struct MultisigConfig {
     pub signers: Vec<Address>,
 }
 
-mod validation;
-mod multisig;
 pub mod factory;
+mod multisig;
+mod validation;
 
 mod events {
     use soroban_sdk::{Env, Symbol};
@@ -208,12 +208,7 @@ impl UpgradeGovernor {
                 forbidden_imports: Vec::new(&env),
             });
 
-        validation::validate_wasm_metadata(
-            &env,
-            &new_wasm_hash,
-            &policy,
-            &attestation,
-        )?;
+        validation::validate_wasm_metadata(&env, &new_wasm_hash, &policy, &attestation)?;
 
         let timelock_delay: u64 = env
             .storage()
@@ -448,8 +443,8 @@ impl UpgradeGovernor {
             return Err(UpgradeError::InvalidSigner);
         }
 
-        let proposal = Self::get_proposal(env.clone(), proposal_id)
-            .ok_or(UpgradeError::ProposalNotFound)?;
+        let proposal =
+            Self::get_proposal(env.clone(), proposal_id).ok_or(UpgradeError::ProposalNotFound)?;
 
         if proposal.executed {
             return Err(UpgradeError::ProposalAlreadyExecuted);
@@ -481,12 +476,9 @@ impl UpgradeGovernor {
     ///
     /// Anyone may call this once both the signature threshold and the timelock
     /// delay are satisfied.
-    pub fn execute_multisig_upgrade(
-        env: Env,
-        proposal_id: u32,
-    ) -> Result<(), UpgradeError> {
-        let proposal = Self::get_proposal(env.clone(), proposal_id)
-            .ok_or(UpgradeError::ProposalNotFound)?;
+    pub fn execute_multisig_upgrade(env: Env, proposal_id: u32) -> Result<(), UpgradeError> {
+        let proposal =
+            Self::get_proposal(env.clone(), proposal_id).ok_or(UpgradeError::ProposalNotFound)?;
 
         if proposal.executed {
             return Err(UpgradeError::ProposalAlreadyExecuted);
@@ -856,7 +848,10 @@ mod test {
         };
 
         let result = client.try_propose_upgrade(&wasm_hash, &attestation);
-        assert!(matches!(result, Err(Ok(UpgradeError::MissingRequiredExport))));
+        assert!(matches!(
+            result,
+            Err(Ok(UpgradeError::MissingRequiredExport))
+        ));
     }
 
     #[test]
@@ -889,7 +884,10 @@ mod test {
         };
 
         let result = client.try_propose_upgrade(&wasm_hash, &attestation);
-        assert!(matches!(result, Err(Ok(UpgradeError::ForbiddenImportDetected))));
+        assert!(matches!(
+            result,
+            Err(Ok(UpgradeError::ForbiddenImportDetected))
+        ));
     }
 
     #[test]
@@ -1087,7 +1085,10 @@ mod test {
         env.ledger().set_timestamp(1011);
 
         let result = client.try_execute_multisig_upgrade(&proposal_id);
-        assert!(matches!(result, Err(Ok(UpgradeError::InsufficientSignatures))));
+        assert!(matches!(
+            result,
+            Err(Ok(UpgradeError::InsufficientSignatures))
+        ));
     }
 
     #[test]

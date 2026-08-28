@@ -8,3 +8,8 @@
 
 // eslint-disable-next-line @typescript-eslint/triple-slash-reference -- ambient global declarations have no importable binding
 /// <reference path="../../../packages/core-sdk/src/types/webextension-global.d.ts" />
+
+interface Window {
+  /** Set by Playwright e2e fixtures when seeding an unlocked wallet in dev mode. */
+  __E2E_INITIALLY_UNLOCKED__?: boolean;
+}

@@ -160,20 +160,20 @@ describe('SessionApprovalSheet component', () => {
   });
 
   describe('action buttons', () => {
-    it('renders Connect and Reject buttons', () => {
+    it('renders Approve and Reject buttons', () => {
       render(
         <SessionApprovalSheet proposal={mockProposal} onApprove={jest.fn()} onReject={jest.fn()} />
       );
-      expect(screen.getByRole('button', { name: /Connect/i })).toBeInTheDocument();
+      expect(screen.getByRole('button', { name: /Approve/i })).toBeInTheDocument();
       expect(screen.getByRole('button', { name: /Reject/i })).toBeInTheDocument();
     });
 
-    it('calls onApprove when Connect is clicked', () => {
+    it('calls onApprove when Approve is clicked', () => {
       const onApprove = jest.fn();
       render(
         <SessionApprovalSheet proposal={mockProposal} onApprove={onApprove} onReject={jest.fn()} />
       );
-      fireEvent.click(screen.getByRole('button', { name: /Connect/i }));
+      fireEvent.click(screen.getByRole('button', { name: /Approve/i }));
       expect(onApprove).toHaveBeenCalledTimes(1);
     });
 
@@ -236,7 +236,7 @@ describe('SessionApprovalSheet via WalletKitProvider', () => {
       mockWalletKit.triggerEvent('session_proposal', mockProposal);
     });
 
-    fireEvent.click(screen.getByRole('button', { name: /Connect/i }));
+    fireEvent.click(screen.getByRole('button', { name: /Approve/i }));
 
     await waitFor(() => {
       expect(mockWalletKit.approveSession).toHaveBeenCalledWith({
@@ -292,7 +292,7 @@ describe('SessionApprovalSheet via WalletKitProvider', () => {
 
     expect(screen.getByText('Test dApp')).toBeInTheDocument();
 
-    fireEvent.click(screen.getByRole('button', { name: /Connect/i }));
+    fireEvent.click(screen.getByRole('button', { name: /Approve/i }));
 
     await waitFor(() => {
       expect(screen.queryByText('Test dApp')).not.toBeInTheDocument();
