@@ -126,8 +126,8 @@ export class RelayService implements RelayServiceContract {
         }
 
         if (request.transferPolicy) {
-          const { policy, amount, todayTotal } = request.transferPolicy;
-          const policyResult = validateTransferPolicy(amount, todayTotal, policy);
+          const { policy, amount, todayTotal, assetCode } = request.transferPolicy;
+          const policyResult = validateTransferPolicy(amount, todayTotal, policy, assetCode);
           if (policyResult.action === 'block') {
             const error: RelayError = {
               code: RelayErrorCodes.POLICY_DENIED,
