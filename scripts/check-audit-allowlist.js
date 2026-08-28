@@ -81,6 +81,48 @@ if (unallowed.length > 0) {
   process.exit(1);
 }
 
+// An allowlist entry is only justified when there is nothing to upgrade to.
+// pnpm reports "<0.0.0" for advisories with no patched release. If a fix has
+// since shipped, the entry must go and the dependency must be bumped —
+// otherwise a now-patchable vulnerability stays suppressed behind a green gate.
+const nowPatchable = highOrWorse.filter(
+  (advisory) =>
+    (allowed.has(String(advisory.id)) || allowed.has(String(advisory.github_advisory_id))) &&
+    advisory.patched_versions &&
+    advisory.patched_versions.trim() !== '<0.0.0'
+);
+
+if (nowPatchable.length > 0) {
+  console.warn('WARNING: allowlisted advisories now have an upstream fix available:');
+  for (const advisory of nowPatchable) {
+    console.warn(
+      `- ${advisory.id || advisory.github_advisory_id}: ${advisory.module_name} -> upgrade to ${advisory.patched_versions}`
+    );
+  }
+  console.warn(
+    'These are no longer unfixable. Upgrade the dependency and drop the entry from .pnpm-audit-allowlist.json.'
+  );
+  console.warn(
+    'Reported as a warning rather than a failure so the surfacing change does not itself break CI; the entry expiry date remains the hard deadline.'
+  );
+}
+
+// Entries that no longer match anything are dead weight: they keep a stale
+// suppression alive and obscure which advisories are actually in effect.
+const reportedIds = new Set(
+  highOrWorse.flatMap((advisory) =>
+    [advisory.id, advisory.github_advisory_id].filter(Boolean).map(String)
+  )
+);
+const stale = (allowlist.advisories ?? []).filter((entry) => !reportedIds.has(String(entry.id)));
+if (stale.length > 0) {
+  console.warn(
+    `Note: ${stale.length} allowlist entr${stale.length === 1 ? 'y is' : 'ies are'} no longer reported by pnpm audit and can be removed: ${stale
+      .map((entry) => entry.id)
+      .join(', ')}`
+  );
+}
+
 console.warn(
   `pnpm audit reported ${highOrWorse.length} high/critical advisories, all allowlisted.`
 );
