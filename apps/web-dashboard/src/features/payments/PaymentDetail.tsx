@@ -1,5 +1,6 @@
 import { MerchantBadge } from '@ancore/ui-kit';
 
+import { formatAssetAmount } from '../../lib/format-asset-amount';
 import type { Transaction } from '../../components/transactions/transaction-types';
 
 interface PaymentDetailProps {
@@ -31,7 +32,9 @@ export function PaymentDetail({ transaction }: PaymentDetailProps) {
       <dl className="mt-4 grid gap-3 text-sm sm:grid-cols-3">
         <div>
           <dt className="text-slate-500">Amount</dt>
-          <dd className="font-medium text-slate-900">${transaction.amount.toFixed(2)}</dd>
+          <dd className="font-medium text-slate-900">
+            {formatAssetAmount(transaction.amount, transaction.asset)}
+          </dd>
         </div>
         <div>
           <dt className="text-slate-500">Status</dt>
