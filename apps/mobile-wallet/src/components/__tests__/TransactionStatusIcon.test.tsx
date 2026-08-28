@@ -1,3 +1,4 @@
+import { StrictMode } from 'react';
 import { render, screen } from '@testing-library/react';
 
 import { TransactionStatusIcon } from '../TransactionStatusIcon';
@@ -42,6 +43,51 @@ describe('TransactionStatusIcon', () => {
       render(<TransactionStatusIcon status={invalidStatus} onUnknownStatus={onUnknownStatus} />);
 
       expect(onUnknownStatus).toHaveBeenCalledWith(invalidStatus);
+    });
+
+    it('calls onUnknownStatus only once under StrictMode double-rendering', () => {
+      const onUnknownStatus = jest.fn();
+      const invalidStatus = 'invalid-status' as TransactionStatus;
+
+      render(
+        <StrictMode>
+          <TransactionStatusIcon status={invalidStatus} onUnknownStatus={onUnknownStatus} />
+        </StrictMode>
+      );
+
+      expect(onUnknownStatus).toHaveBeenCalledTimes(1);
+    });
+
+    it('does not re-report the same status on an unrelated re-render', () => {
+      const onUnknownStatus = jest.fn();
+      const invalidStatus = 'invalid-status' as TransactionStatus;
+
+      const { rerender } = render(
+        <TransactionStatusIcon status={invalidStatus} onUnknownStatus={onUnknownStatus} />
+      );
+      rerender(<TransactionStatusIcon status={invalidStatus} onUnknownStatus={onUnknownStatus} />);
+
+      expect(onUnknownStatus).toHaveBeenCalledTimes(1);
+    });
+
+    it('reports again when the status changes to a different unknown value', () => {
+      const onUnknownStatus = jest.fn();
+
+      const { rerender } = render(
+        <TransactionStatusIcon
+          status={'bogus-a' as TransactionStatus}
+          onUnknownStatus={onUnknownStatus}
+        />
+      );
+      rerender(
+        <TransactionStatusIcon
+          status={'bogus-b' as TransactionStatus}
+          onUnknownStatus={onUnknownStatus}
+        />
+      );
+
+      expect(onUnknownStatus).toHaveBeenNthCalledWith(1, 'bogus-a');
+      expect(onUnknownStatus).toHaveBeenNthCalledWith(2, 'bogus-b');
     });
 
     it('does not call onUnknownStatus for valid statuses', () => {
