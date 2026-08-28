@@ -27,6 +27,8 @@ export interface RelayExecuteRequest {
     policy: TransferPolicy;
     amount: number;
     todayTotal: number;
+    /** Asset code shown in policy denial messages. Defaults to XLM. */
+    assetCode?: string;
   };
 }
 
