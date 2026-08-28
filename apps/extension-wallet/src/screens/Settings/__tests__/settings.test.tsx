@@ -345,6 +345,17 @@ describe('AboutScreen', () => {
     await userEvent.click(screen.getByRole('button', { name: /go back/i }));
     expect(onBack).toHaveBeenCalled();
   });
+
+  it('reads version from chrome.runtime.getManifest if available', () => {
+    (globalThis as any).chrome = {
+      runtime: {
+        getManifest: () => ({ version: '2.5.0' }),
+      },
+    };
+    render(<AboutScreen onBack={vi.fn()} />);
+    expect(screen.getByText(/2\.5\.0/)).toBeInTheDocument();
+    delete (globalThis as any).chrome;
+  });
 });
 
 // ── SettingsScreen (integration) ─────────────────────────────────────────────

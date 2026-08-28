@@ -13,6 +13,7 @@ import {
   rejectRequest,
   clearResponseCallbacks,
   getSessionEntry,
+  sweepStaleRequests,
 } from '../response-queue';
 
 // ── chrome.storage.session mock ───────────────────────────────────────────────
@@ -311,6 +312,39 @@ describe('response queue', () => {
     it('getSessionEntry returns null for unknown requestId', async () => {
       const entry = await getSessionEntry('no-such-id');
       expect(entry).toBeNull();
+    });
+  });
+
+  describe('sweepStaleRequests', () => {
+    it('sweeps and rejects pending approvals older than specified TTL', () => {
+      let rejectedError: Error | null = null;
+      enqueueApproval('stale-1', 'https://example.com', 'signTransaction', {});
+      registerResponseCallbacks(
+        'stale-1',
+        () => {},
+        (err) => {
+          rejectedError = err;
+        }
+      );
+
+      const now = Date.now();
+      const spy = vi.spyOn(Date, 'now').mockReturnValue(now + 20 * 60 * 1000);
+
+      const sweptCount = sweepStaleRequests(15 * 60 * 1000);
+      expect(sweptCount).toBe(1);
+      expect(getApproval('stale-1')).toBeUndefined();
+      expect(rejectedError).toBeInstanceOf(Error);
+      expect((rejectedError as unknown as Error).message).toBe('Approval request timed out');
+
+      spy.mockRestore();
+    });
+
+    it('removes approval entry when resolved or rejected', () => {
+      enqueueApproval('req-active', 'https://example.com', 'signTransaction', {});
+      expect(getApproval('req-active')).toBeDefined();
+
+      resolveRequest('req-active', { ok: true });
+      expect(getApproval('req-active')).toBeUndefined();
     });
   });
 });

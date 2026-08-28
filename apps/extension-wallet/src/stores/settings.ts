@@ -109,7 +109,7 @@ async function saveLastSuccessfulNetwork(network: NetworkMode): Promise<void> {
  * Load the last successfully used network from separate storage.
  * Returns undefined if no saved network exists or on error.
  */
-async function loadLastSuccessfulNetwork(): Promise<NetworkMode | undefined> {
+export async function loadLastSuccessfulNetwork(): Promise<NetworkMode | undefined> {
   try {
     const saved = await extensionStorage.getItem(LAST_SUCCESSFUL_NETWORK_KEY);
     if (saved === 'mainnet' || saved === 'testnet' || saved === 'futurenet') {
@@ -126,14 +126,13 @@ export const useSettingsStore = create<SettingsState>()(
     (set) => ({
       ...DEFAULTS,
 
-      setNetwork: (network) =>
-        set(async () => {
-          await saveLastSuccessfulNetwork(network);
-          return {
-            network,
-            horizonUrl: NETWORK_HORIZON_URLS[network],
-          };
-        }),
+      setNetwork: (network) => {
+        set({
+          network,
+          horizonUrl: NETWORK_HORIZON_URLS[network],
+        });
+        return saveLastSuccessfulNetwork(network);
+      },
       setHorizonUrl: (url) =>
         set((state) => {
           // Validate against the current network profile before persisting.
@@ -178,7 +177,7 @@ export const useSettingsStore = create<SettingsState>()(
         telemetryOptIn: state.telemetryOptIn,
       }),
       migrate: (persistedState) => persistedState as SettingsState,
-      merge: async (persistedState, currentState) => {
+      merge: (persistedState, currentState) => {
         const persisted = (persistedState as Partial<SettingsState> | undefined) ?? {};
         const network = persisted.network;
         const theme = persisted.theme;
@@ -188,8 +187,8 @@ export const useSettingsStore = create<SettingsState>()(
         const horizonUrl = persisted.horizonUrl;
 
         // Try to restore from last successful network if persisted network is invalid
-        const lastSuccessfulNetwork = await loadLastSuccessfulNetwork();
-        
+        const lastSuccessfulNetwork = loadLastSuccessfulNetwork();
+
         // Validate network and derive horizon URL if missing or invalid
         const validNetwork =
           network === 'mainnet' || network === 'testnet' || network === 'futurenet'

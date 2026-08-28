@@ -201,14 +201,16 @@ chrome.runtime.onMessage.addListener(
 registerInternalHandlers();
 installMessageDispatcher();
 
-// Dev-only: handle mock approval requests from popup
-chrome.runtime.onMessage.addListener((message: unknown, _sender, sendResponse) => {
-  if ((message as { type?: string }).type === 'DEV_OPEN_APPROVAL') {
-    void openMockApproval().then(() => sendResponse({ ok: true }));
-    return true;
-  }
-  return false;
-});
+if (import.meta.env.DEV) {
+  // Dev-only: handle mock approval requests from popup
+  chrome.runtime.onMessage.addListener((message: unknown, _sender, sendResponse) => {
+    if ((message as { type?: string }).type === 'DEV_OPEN_APPROVAL') {
+      void openMockApproval().then(() => sendResponse({ ok: true }));
+      return true;
+    }
+    return false;
+  });
+}
 
 // Handle approve/reject from side panel or popup approval screen
 chrome.runtime.onMessage.addListener((message: unknown, _sender, sendResponse) => {

@@ -1,6 +1,20 @@
 import { DASHBOARD_SETTINGS_STORAGE_KEY } from '../state/dashboard-settings';
 import { getChromeLocalStorage } from './chrome-storage';
-import { enqueueApproval } from './handlers/external/response-queue';
+import { enqueueApproval, rejectRequest, getApproval } from './handlers/external/response-queue';
+
+const approvalWindowMap = new Map<number, string>();
+
+if (typeof chrome !== 'undefined' && chrome.windows?.onRemoved) {
+  chrome.windows.onRemoved.addListener((windowId: number) => {
+    const requestId = approvalWindowMap.get(windowId);
+    if (requestId) {
+      approvalWindowMap.delete(windowId);
+      if (getApproval(requestId)) {
+        rejectRequest(requestId, new Error('User closed approval window'));
+      }
+    }
+  });
+}
 
 type ChromeSidePanel = {
   setOptions(options: { path?: string; enabled?: boolean; tabId?: number }): Promise<void>;
@@ -48,12 +62,15 @@ function buildApprovalUrl(
 }
 
 async function openPopupApproval(route: ApprovalRoute, requestId: string): Promise<void> {
-  await chrome.windows.create({
+  const win = await chrome.windows.create({
     url: buildApprovalUrl('popup', route, requestId),
     type: 'popup',
     width: 360,
     height: 600,
   });
+  if (win?.id) {
+    approvalWindowMap.set(win.id, requestId);
+  }
 }
 
 async function openSidePanelApproval(route: ApprovalRoute, requestId: string): Promise<boolean> {
