@@ -1,11 +1,5 @@
 import { useFormContext } from 'react-hook-form';
-import {
-  Form,
-  Field,
-  AddressInput,
-  AmountInput as FormAmountInput,
-  FormSubmit,
-} from '@ancore/ui-kit';
+import { Form, Field, AddressInput, FormAmountInput, FormSubmit } from '@ancore/ui-kit';
 import { Card, CardContent, CardHeader, CardTitle } from '@ancore/ui-kit';
 import { Input } from '@ancore/ui-kit';
 import { createInvoiceSchema } from '@ancore/types';
