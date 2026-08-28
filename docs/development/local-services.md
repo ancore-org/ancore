@@ -1,287 +1,347 @@
-# Local Services Setup
+# Local Services Development
 
-This guide explains how to set up and run Ancore services locally for full-stack development.
+This guide explains how to run the full Ancore service stack locally using Docker Compose.
+
+## Overview
+
+The `docker-compose.dev.yml` stack provides:
+
+- **PostgreSQL 16**: Database for the indexer
+- **Indexer Service**: Blockchain indexer with REST API
+- **Relayer Service**: Transaction relay service
 
 ## Prerequisites
 
-- Node.js >= 20.0.0
-- pnpm >= 9.0.0
-- curl (for health checks)
+- Docker 20.10+
+- Docker Compose 2.0+
+- 4GB+ available RAM
+- Ports 3000, 3001, 5432, 9090 available
 
-## Services Overview
+## Quick Start
 
-| Service | Port | Purpose | Status |
-|---------|------|---------|--------|
-| **Indexer** | 8080 | Blockchain data indexing & GraphQL API | ✓ Available |
-| **Relayer** | 3001 | Transaction relay & execution | ✓ Available |
-| **AI Agent** | 3002 | Intent validation & workflow orchestration | ✓ Available (scaffold) |
-
-## Environment Setup
-
-### 1. Copy Environment File
+### 1. Start the Stack
 
 ```bash
-cp .env.example .env.local
+# From repository root
+docker compose -f docker-compose.dev.yml up
 ```
 
-This creates a local environment file with default values pointing to localhost services.
+This will:
+- Pull the PostgreSQL image
+- Build the indexer and relayer services
+- Start all containers with health checks
+- Expose services on localhost
 
-### 2. Review Service URLs
-
-Open `.env.local` and verify service URLs match your setup:
+### 2. Verify Services
 
 ```bash
-INDEXER_URL=http://localhost:8080
-RELAYER_URL=http://localhost:3001
-AI_AGENT_URL=http://localhost:3002
+# Check PostgreSQL
+psql postgres://postgres:ancore@localhost:5432/ancore_indexer -c "SELECT version();"
+
+# Check indexer health
+curl http://localhost:3000/health
+
+# Check indexer Prometheus metrics
+curl http://localhost:9090/metrics
+
+# Check relayer status
+curl http://localhost:3001/relay/status
 ```
 
-## Starting Services
+### 3. Run Indexer Migrations
 
-### Start All Services (Terminal Sessions)
-
-In separate terminal windows, run:
+The indexer requires database migrations to be run before it can operate:
 
 ```bash
-# Terminal 1: Indexer
-pnpm --filter @ancore/indexer dev
+# Option 1: Run migrations inside the container
+docker compose -f docker-compose.dev.yml exec indexer \
+  psql $DATABASE_URL -f migrations/001_create_account_activity_table.sql
 
-# Terminal 2: Relayer
-pnpm --filter @ancore/relayer dev
+docker compose -f docker-compose.dev.yml exec indexer \
+  psql $DATABASE_URL -f migrations/002_create_ingest_checkpoints_table.sql
 
-# Terminal 3: AI Agent
-pnpm --filter @ancore/ai-agent dev
-```
+# Option 2: Run migrations from host (requires psql)
+psql postgres://postgres:ancore@localhost:5432/ancore_indexer \
+  -f services/indexer/migrations/001_create_account_activity_table.sql
 
-### Validate Service Health
+psql postgres://postgres:ancore@localhost:5432/ancore_indexer \
+  -f services/indexer/migrations/002_create_ingest_checkpoints_table.sql
 
-Once all services are running, validate they're healthy:
-
-```bash
-make validate-env
-```
-
-Or manually:
-
-```bash
-curl http://localhost:8080/health
-curl http://localhost:3001/health
-curl http://localhost:3002/health
+# Option 3: Use sqlx CLI (if installed)
+cd services/indexer
+DATABASE_URL=postgres://postgres:ancore@localhost:5432/ancore_indexer \
+  sqlx migrate run
 ```
 
 ## Service Details
 
-### Indexer (Port 8080)
+### PostgreSQL
 
-Provides blockchain data indexing and GraphQL API.
+- **Host Port**: 5432
+- **Container**: `ancore-postgres`
+- **Database**: `ancore_indexer`
+- **User**: `postgres`
+- **Password**: `ancore`
+- **Connection String**: `postgres://postgres:ancore@localhost:5432/ancore_indexer`
 
-**Key Endpoints:**
+**Data Persistence**: Data is stored in a Docker volume (`postgres_data`) and persists across container restarts.
 
-- `GET /health` — Health check
-- `GET /graphql` — GraphQL playground
-- `POST /graphql` — GraphQL queries
+### Indexer
 
-**Environment Variables:**
+- **API Port**: 3000
+- **Metrics Port**: 9090
+- **Container**: `ancore-indexer`
+- **Health Check**: `GET http://localhost:3000/health`
 
-```bash
-# In .env.local or service .env
-INDEXER_PORT=8080
-SOROBAN_RPC_URL=https://soroban-testnet.stellar.org
-STELLAR_NETWORK=testnet
-```
+**Endpoints**:
+- `GET /health` - Health status with lag metrics
+- `GET /metrics` - JSON metrics (cursor staleness)
+- `GET /api/v1/accounts/:account_id/activity` - Transaction history
+- Prometheus metrics on port 9090
 
-**Start Development:**
+**Environment Variables**:
+- `DATABASE_URL` - PostgreSQL connection string
+- `PROMETHEUS_PORT` - Metrics port (default: 9090)
+- `RUST_LOG` - Log level (info, debug, trace)
 
-```bash
-pnpm --filter @ancore/indexer dev
-```
+### Relayer
 
-**Read More:**
+- **Host Port**: 3001
+- **Container**: `ancore-relayer`
+- **Health Check**: `GET http://localhost:3001/relay/status`
 
-- [Indexer README](../../services/indexer/README.md)
+**Endpoints**:
+- `GET /relay/status` - Service status
+- `POST /relay/execute` - Execute a signed relay transaction
+- `POST /relay/validate` - Pre-flight validation without executing
 
-### Relayer (Port 3001)
+**Environment Variables**:
+- `PORT` - Service port (default: 3000, mapped to 3001 on host)
+- `NODE_ENV` - Environment (development, production)
+- `STELLAR_NETWORK` - Stellar network (testnet, mainnet, futurenet, local)
+- `RELAYER_AUTH_SECRET` - Bearer token secret; **unset falls back to a stub that accepts any token**
+- `RELAYER_USE_MOCK_SUBMISSION` - Dev-only: skip Stellar submission entirely
 
-Handles transaction relay and smart account operations.
+Full table (limits, timers, RPC configuration) and the mock-mode warning:
+[services/relayer/README.md → Environment Variables](../../services/relayer/README.md#environment-variables).
 
-**Key Endpoints:**
+## Configuration
 
-- `GET /health` — Health check
-- `POST /v1/transactions/relay` — Submit transactions
+### Custom Environment Variables
 
-**Environment Variables:**
-
-```bash
-# In .env.local or service .env
-RELAYER_PORT=3001
-INDEXER_URL=http://localhost:8080
-```
-
-**Start Development:**
-
-```bash
-pnpm --filter @ancore/relayer dev
-```
-
-**Read More:**
-
-- [Relayer README](../../services/relayer/README.md)
-
-### AI Agent (Port 3002)
-
-Validates intents and orchestrates financial workflows (currently scaffold with health endpoint).
-
-**Key Endpoints:**
-
-- `GET /health` — Health check
-- `POST /v1/intents/validate` — Intent validation (under development)
-
-**Environment Variables:**
+Create a `.env.docker` file from the example:
 
 ```bash
-# In .env.local or service .env
-PORT=3002
+cp .env.docker.example .env.docker
 ```
 
-**Start Development:**
+Then edit `.env.docker` with your configuration. Docker Compose will automatically load it.
+
+### Custom Ports
+
+If default ports conflict with existing services, modify `docker-compose.dev.yml`:
+
+```yaml
+services:
+  postgres:
+    ports:
+      - '15432:5432'  # Use port 15432 on host
+  
+  indexer:
+    ports:
+      - '13000:3000'  # Use port 13000 on host
+      - '19090:9090'  # Use port 19090 on host
+  
+  relayer:
+    ports:
+      - '13001:3000'  # Use port 13001 on host
+```
+
+## Development Workflow
+
+### Rebuild After Code Changes
 
 ```bash
-pnpm --filter @ancore/ai-agent dev
+# Rebuild and restart a specific service
+docker compose -f docker-compose.dev.yml up --build indexer
+
+# Rebuild all services
+docker compose -f docker-compose.dev.yml up --build
 ```
 
-**Read More:**
-
-- [AI Agent README](../../services/ai-agent/README.md)
-
-## App Configuration
-
-### Extension Wallet
-
-Uses these environment variables:
+### View Logs
 
 ```bash
-REACT_APP_INDEXER_URL=http://localhost:8080
-REACT_APP_RELAYER_URL=http://localhost:3001
-REACT_APP_AI_AGENT_URL=http://localhost:3002
+# All services
+docker compose -f docker-compose.dev.yml logs -f
+
+# Specific service
+docker compose -f docker-compose.dev.yml logs -f indexer
+
+# Last 100 lines
+docker compose -f docker-compose.dev.yml logs --tail=100 relayer
 ```
 
-Set in `.env` in `apps/extension-wallet/` before starting.
-
-### Mobile Wallet
-
-Uses Expo public environment variables:
+### Execute Commands in Containers
 
 ```bash
-EXPO_PUBLIC_INDEXER_URL=http://localhost:8080
-EXPO_PUBLIC_RELAYER_URL=http://localhost:3001
-EXPO_PUBLIC_AI_AGENT_URL=http://localhost:3002
+# Open shell in indexer container
+docker compose -f docker-compose.dev.yml exec indexer sh
+
+# Run psql in postgres container
+docker compose -f docker-compose.dev.yml exec postgres psql -U postgres -d ancore_indexer
+
+# Check indexer binary version
+docker compose -f docker-compose.dev.yml exec indexer ancore-indexer --version
 ```
 
-Set in `.env.local` in `apps/mobile-wallet/` before starting.
-
-See [Mobile Wallet README](../../apps/mobile-wallet/README.md).
-
-### Web Dashboard
-
-Uses Vite environment variables:
+### Database Operations
 
 ```bash
-VITE_INDEXER_URL=http://localhost:8080
-VITE_RELAYER_URL=http://localhost:3001
-VITE_AI_AGENT_URL=http://localhost:3002
+# Connect to database
+docker compose -f docker-compose.dev.yml exec postgres \
+  psql -U postgres -d ancore_indexer
+
+# Backup database
+docker compose -f docker-compose.dev.yml exec postgres \
+  pg_dump -U postgres ancore_indexer > backup.sql
+
+# Restore database
+docker compose -f docker-compose.dev.yml exec -T postgres \
+  psql -U postgres -d ancore_indexer < backup.sql
+
+# Reset database (WARNING: destroys all data)
+docker compose -f docker-compose.dev.yml exec postgres \
+  psql -U postgres -c "DROP DATABASE ancore_indexer; CREATE DATABASE ancore_indexer;"
 ```
 
-Set in `.env` in `apps/web-dashboard/` before starting.
+## Teardown
 
-## Docker Compose (Optional)
-
-For container-based local development:
+### Stop Services (Keep Data)
 
 ```bash
-docker-compose up -d
+docker compose -f docker-compose.dev.yml down
 ```
 
-Services will be available on the same ports. Update `.env.local` if using Docker hostnames (e.g., `http://indexer:8080`).
+This stops and removes containers but preserves the `postgres_data` volume.
 
-See [docker-compose.yml](../../docker-compose.yml) for configuration.
+### Stop and Remove All Data
+
+```bash
+docker compose -f docker-compose.dev.yml down -v
+```
+
+This removes containers **and** the PostgreSQL data volume.
+
+### Clean Up Everything
+
+```bash
+# Remove containers, volumes, and images
+docker compose -f docker-compose.dev.yml down -v --rmi all
+
+# Remove orphaned volumes
+docker volume prune
+```
 
 ## Troubleshooting
 
-### Service Won't Start
+### Port Already in Use
 
-**Check Node.js version:**
+If you see "port is already allocated":
 
+1. Check what's using the port:
+   ```bash
+   # Windows
+   netstat -ano | findstr :3000
+   
+   # Linux/Mac
+   lsof -i :3000
+   ```
+
+2. Either stop the conflicting service or use custom ports (see Configuration above)
+
+### Indexer Won't Start
+
+Check the logs:
 ```bash
-node --version  # Should be >= 20.0.0
+docker compose -f docker-compose.dev.yml logs indexer
 ```
 
-**Check pnpm version:**
+Common issues:
+- **Database connection failed**: Ensure postgres is healthy
+- **Migrations not run**: Run migrations (see Quick Start step 3)
+- **Port conflict**: Change ports in docker-compose.dev.yml
 
+### PostgreSQL Connection Refused
+
+Ensure the postgres service is healthy:
 ```bash
-pnpm --version  # Should be >= 9.0.0
+docker compose -f docker-compose.dev.yml ps postgres
 ```
 
-**Clear cache:**
-
+If unhealthy, check logs:
 ```bash
-rm -rf node_modules pnpm-lock.yaml
-pnpm install
+docker compose -f docker-compose.dev.yml logs postgres
 ```
 
-### Connection Refused
+### Build Failures
 
-**Check if service is running:**
-
+Clear Docker cache and rebuild:
 ```bash
-curl -v http://localhost:8080/health
+docker compose -f docker-compose.dev.yml build --no-cache
 ```
 
-**Verify URL in .env.local:**
+### Out of Disk Space
 
+Clean up Docker resources:
 ```bash
-grep INDEXER_URL .env.local
+docker system prune -a --volumes
 ```
 
-**Check port conflict:**
+## Integration with Applications
 
+### Extension Wallet
+
+Update `apps/extension-wallet/.env`:
 ```bash
-lsof -i :8080  # Check port 8080 in use
+VITE_INDEXER_URL=http://localhost:3000
+VITE_RELAYER_URL=http://localhost:3001
 ```
 
-### Service Crashes on Startup
+### Mobile Wallet
 
-**Check logs:**
-
+Update `apps/mobile-wallet/.env`:
 ```bash
-pnpm --filter @ancore/indexer dev 2>&1 | head -50
+EXPO_PUBLIC_INDEXER_URL=http://localhost:3000
+EXPO_PUBLIC_RELAYER_URL=http://localhost:3001
 ```
 
-**Check environment variables:**
+### Web Dashboard
 
+Update `apps/web-dashboard/.env`:
 ```bash
-env | grep INDEXER  # Verify env vars are set
+VITE_INDEXER_URL=http://localhost:3000
+VITE_RELAYER_URL=http://localhost:3001
 ```
 
-## Health Check Command
+## Production Considerations
 
-Quick validation of all services:
+This docker-compose stack is **for development only**. For production:
 
-```bash
-make validate-env
-```
+- Use managed PostgreSQL (AWS RDS, Google Cloud SQL, etc.)
+- Configure proper secrets management
+- Set up monitoring and alerting
+- Use container orchestration (Kubernetes, ECS, etc.)
+- Configure proper networking and security groups
+- Enable SSL/TLS for all services
+- Set up automated backups
+- Configure log aggregation
 
-This runs the validation script and reports the status of all configured services.
+See [docs/ops/README.md](../ops/README.md) for observability configuration.
 
 ## Next Steps
 
-- [Read Extension Wallet guide](../../apps/extension-wallet/README.md)
-- [Read Mobile Wallet guide](../../apps/mobile-wallet/README.md)
-- [Read Web Dashboard guide](../../apps/web-dashboard/README.md)
-- [View Contract Documentation](../../docs/README.md)
-
-## Related Issues
-
-- [#565](https://github.com/ancore-org/ancore/issues/565) - AI Agent health & intent validation
-- [#620](https://github.com/ancore-org/ancore/issues/620) - Mobile wallet dev setup
-- [#666](https://github.com/ancore-org/ancore/issues/666) - Makefile targets
-- [#669](https://github.com/ancore-org/ancore/issues/669) - Full-stack .env setup
+- [Indexer API Documentation](../../services/indexer/README.md)
+- [Relayer API Documentation](../../services/relayer/README.md)
+- [Ops overview](../ops/README.md)
+- [SLO definitions](../ops/slo-definitions.md)

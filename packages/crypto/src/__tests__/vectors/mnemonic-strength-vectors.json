@@ -1,0 +1,85 @@
+{
+  "$comment": "Test vectors for validateMnemonicStrength. Mirrors the documented examples in src/mnemonic.ts.",
+  "vectors": [
+    {
+      "id": "valid-12",
+      "description": "accepts a canonical 12-word English mnemonic",
+      "input": "abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon about",
+      "expectThrow": false
+    },
+    {
+      "id": "valid-24",
+      "description": "accepts a canonical 24-word English mnemonic",
+      "input": "abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon art",
+      "expectThrow": false
+    },
+    {
+      "id": "valid-12-extra-whitespace",
+      "description": "collapses runs of whitespace between words",
+      "input": "abandon   abandon  abandon abandon abandon abandon abandon abandon abandon abandon abandon    about",
+      "expectThrow": false
+    },
+    {
+      "id": "valid-12-surrounding-whitespace",
+      "description": "trims leading and trailing whitespace",
+      "input": "  abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon about  ",
+      "expectThrow": false
+    },
+    {
+      "id": "empty-string",
+      "description": "rejects an empty string",
+      "input": "",
+      "expectThrow": true,
+      "expectedCode": "INVALID_TYPE"
+    },
+    {
+      "id": "whitespace-only",
+      "description": "rejects a whitespace-only string",
+      "input": "     ",
+      "expectThrow": true,
+      "expectedCode": "INVALID_TYPE"
+    },
+    {
+      "id": "too-few-words",
+      "description": "rejects a 3-word phrase",
+      "input": "abandon abandon abandon",
+      "expectThrow": true,
+      "expectedCode": "INVALID_LENGTH"
+    },
+    {
+      "id": "eleven-words",
+      "description": "rejects an 11-word phrase",
+      "input": "abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon about",
+      "expectThrow": true,
+      "expectedCode": "INVALID_LENGTH"
+    },
+    {
+      "id": "thirteen-words",
+      "description": "rejects a 13-word phrase",
+      "input": "abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon about",
+      "expectThrow": true,
+      "expectedCode": "INVALID_LENGTH"
+    },
+    {
+      "id": "unknown-word",
+      "description": "rejects a phrase containing a non-BIP39 word",
+      "input": "notaword abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon about",
+      "expectThrow": true,
+      "expectedCode": "UNKNOWN_WORDS"
+    },
+    {
+      "id": "non-english-wordlist",
+      "description": "rejects words drawn from a non-English BIP39 wordlist",
+      "input": "página biblioteca école escuela bibliothek abandon abandon abandon abandon abandon abandon abandon",
+      "expectThrow": true,
+      "expectedCode": "UNKNOWN_WORDS"
+    },
+    {
+      "id": "bad-checksum",
+      "description": "rejects 12 valid words whose checksum does not verify",
+      "input": "abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon about abandon",
+      "expectThrow": true,
+      "expectedCode": "INVALID_CHECKSUM"
+    }
+  ]
+}

@@ -10,6 +10,8 @@ export interface Toast {
   variant: ToastVariant;
 }
 
+export type ToastItem = Toast;
+
 interface NotificationContextValue {
   toast: (message: string, variant?: ToastVariant, duration?: number) => void;
 }

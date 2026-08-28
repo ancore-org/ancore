@@ -181,12 +181,13 @@ const transaction = await builder.build();
 
 ### Error Types
 
-| Error                        | Code                 | When                                          |
-| ---------------------------- | -------------------- | --------------------------------------------- |
-| `BuilderValidationError`     | `BUILDER_VALIDATION` | Invalid params or no operations               |
-| `SimulationFailedError`      | `SIMULATION_FAILED`  | Soroban simulation returned an error          |
-| `SimulationExpiredError`     | `SIMULATION_EXPIRED` | Simulation result requires ledger restoration |
-| `TransactionSubmissionError` | `SUBMISSION_FAILED`  | Network submission failed                     |
+| Error                        | Code                              | When                                                        |
+| ---------------------------- | --------------------------------- | ----------------------------------------------------------- |
+| `BuilderValidationError`     | `BUILDER_VALIDATION`              | Invalid params or no operations                             |
+| `SimulationFailedError`      | `SIMULATION_FAILED`               | Soroban simulation returned an error                        |
+| `SimulationExpiredError`     | `SIMULATION_EXPIRED`              | Simulation result requires ledger restoration               |
+| `TransactionSubmissionError` | `SUBMISSION_FAILED`               | Network submission failed                                   |
+| `StrKeyValidationError`      | `INVALID_G_KEY` / `INVALID_C_KEY` | Invalid Stellar StrKey (G... public key / C... contract id) |
 
 ### Contract Parameter Helpers
 
@@ -221,43 +222,225 @@ The Core SDK acts as the orchestration layer that wires together:
 - **@ancore/account-abstraction**: Smart contract account abstraction layer
 - **@ancore/types**: Shared TypeScript types and interfaces
 
+## LedgerSigningAdapter
+
+`LedgerSigningAdapter` (`src/signing/ledger-adapter.ts`) signs a transaction XDR
+using a Ledger hardware wallet's Stellar app over WebHID. It is a **stub
+adapter**: enough to sign a transaction with a Ledger connected, not a
+full hardware-wallet UX (no device/app detection, no retry, no path
+selection). Full productization is tracked in
+[issue #872](https://github.com/ancore-org/ancore/issues/872).
+
+### Supported Ledger app version
+
+Requires the [Ledger Stellar app](https://github.com/LedgerHQ/app-stellar)
+compatible with `@ledgerhq/hw-app-str@^7.7.4` (bundled as a dependency of this
+package). Older Stellar app versions that predate Soroban/Fee-Bump transaction
+parsing may reject or misdisplay newer transaction envelope types — update the
+Stellar app via Ledger Live before signing.
+
+### BIP44 derivation path
+
+The adapter hardcodes the first Stellar account path, `44'/148'/0'`
+(SLIP-0044 coin type 148, account `0`). There is no way to sign with a
+different account index or pass a custom path — every call signs against the
+same derived key. Multi-account support requires #872.
+
+### Error cases
+
+`sign()` does not catch or translate errors — callers must handle whatever
+`@ledgerhq/hw-transport-webhid` / `@ledgerhq/hw-app-str` throw:
+
+| Cause                                      | What happens                                                                      |
+| ------------------------------------------ | --------------------------------------------------------------------------------- |
+| No Ledger device connected                 | `TransportWebHID.create()` rejects (device picker cancelled/empty)                |
+| Stellar app not open on the device         | `signTransaction` rejects with a `TransportStatusError` (wrong app/locked device) |
+| User rejects the signing request on-device | `signTransaction` rejects with a status-`0x6985` `TransportStatusError`           |
+| Browser lacks WebHID support               | `TransportWebHID.create()` throws — see feature detection below                   |
+| Transaction too large / unsupported opcode | `signTransaction` rejects with a parsing error from the Stellar app               |
+
+None of these are wrapped in Ancore-specific error types today; catch and
+map them at the call site.
+
+### Browser permissions (WebHID)
+
+WebHID is only available in Chromium-based browsers (Chrome, Edge, Brave;
+not Firefox or Safari) and only in secure contexts (HTTPS or `localhost`).
+The user must grant device access via the browser's HID permission prompt —
+`TransportWebHID.create()` triggers this automatically the first time, but it
+requires a user gesture (e.g. a click handler), so it cannot be called from
+app startup code.
+
+### Example: feature detection before use
+
+```typescript
+import TransportWebHID from '@ledgerhq/hw-transport-webhid';
+import { LedgerSigningAdapter } from '@ancore/core-sdk';
+
+async function signWithLedgerIfAvailable(xdr: string): Promise<string> {
+  if (!(await TransportWebHID.isSupported())) {
+    throw new Error('This browser does not support WebHID; Ledger signing is unavailable.');
+  }
+
+  const adapter = new LedgerSigningAdapter();
+  try {
+    return await adapter.sign(xdr);
+  } catch (error) {
+    // Map to a user-facing message: device not connected, wrong/locked app,
+    // or the user rejected the request on-device.
+    throw new Error(`Ledger signing failed: ${error instanceof Error ? error.message : error}`);
+  }
+}
+```
+
 ## API Reference
 
 ### AncoreClient
 
-The main client class that provides the unified API.
+The main client class for managing smart account actions, primarily session keys.
 
 #### Constructor
 
 ```typescript
-new AncoreClient(config: AncoreClientConfig)
+new AncoreClient(options: AncoreClientOptions)
 ```
+
+- `options.accountContractId`: The C... contract ID of the deployed Ancore account contract.
 
 #### Methods
 
-- `createAccount(options?)`: Create a new smart account
-- `importAccount(options)`: Import an existing account
-- `getBalances(publicKey)`: Get account balances
-- `accountExists(publicKey)`: Check if account exists
-- `addSessionKey(account, options)`: Add a session key
-- `revokeSessionKey(account, publicKey)`: Revoke a session key
-- `getSessionKey(account, publicKey)`: Query a session key
-- `executeWithSessionKey(account, sessionKey, operations)`: Execute operations
-- `getNetwork()`: Get current network
-- `getNetworkPassphrase()`: Get network passphrase
-- `isNetworkHealthy()`: Check network health
-- `verifySignature(message, signature, publicKey)`: Verify a signature
+- `addSessionKey(params: AddSessionKeyParams): InvocationArgs`
+  Generates invocation arguments to add a session key to the smart account.
+- `revokeSessionKey(params: RevokeSessionKeyParams): InvocationArgs`
+  Generates invocation arguments to revoke a session key from the smart account.
 
-### Error Types
+---
 
-The SDK provides comprehensive error types for different failure scenarios:
+### Exported Modules & Functions
 
-- `AncoreClientError`: General client errors
-- `WalletCreationError`: Account creation/import failures
-- `SessionKeyError`: Session key operation failures
-- `TransactionError`: Transaction execution failures
-- `SimulationFailedError`: Soroban simulation failures
-- `BuilderValidationError`: Transaction builder validation errors
+All other core functionalities are exported as standalone, modular functions, classes, and types:
+
+#### Wallet Management
+
+- `createWallet(options: CreateWalletOptions): Promise<WalletMaterial>`
+- `importWallet(options: ImportWalletOptions): Promise<WalletMaterial>`
+- `restoreWallet(options: RestoreWalletOptions): Promise<WalletMaterial>`
+- `deriveContractId(ownerPublicKey: string, salt: string): string`
+
+#### Session Key Helpers
+
+- `addSessionKey` (standalone)
+- `revokeSessionKey` (standalone)
+- `permissionToLabel`
+- `permissionsToLabels`
+- `formatPermissions`
+- `isSessionKeyActive`
+- `getSessionKeyInactiveReason`
+
+#### Payments & Requests
+
+- `sendPayment(params: SendPaymentParams, deps: SendPaymentDeps): Promise<any>`
+- `parsePaymentRequest(urlOrString: string): PaymentRequest`
+- `normalizeAmount(amount: string, options?: NormalizationOptions): string`
+- `formatFiatAmount(amount: number, options?: FiatFormatOptions): string`
+
+#### Transaction Builder
+
+- `AccountTransactionBuilder`
+
+#### Scheduled Transfers & Relayer
+
+- `HttpSchedulerClient`
+- `createSchedulerClient`
+- `getSchedulerClient`
+- `resetSchedulerClientForTests`
+- `resolveRelayerBaseUrl`
+- `buildDefaultRelayPayload`
+- `toIsoStartAt`
+- `defaultScheduleStartAt`
+- `SCHEDULE_FREQUENCY_OPTIONS`
+- `DEMO_ACCOUNT_ADDRESS`
+
+#### Session Key Execution
+
+- `mapExecuteWithSessionKeyError`
+
+#### Smart Contract Parameter Encoding Helpers
+
+- `toScAddress`
+- `toScOperationsVec`
+- `toScPermissionsVec`
+- `toScU32`
+- `toScU64`
+
+#### Secure Storage & Encryption
+
+- `SecureStorageManager`
+- `saveSessionKeys`
+- `getSessionKeys`
+- `deriveKey`
+- `encrypt`
+- `decrypt`
+- `exportBackup`
+- `importBackup`
+- `ChromeStorageAdapter`
+- `BrowserStorageAdapter`
+- `LocalStorageAdapter`
+- `createStorageAdapter`
+
+#### Error Types
+
+- `AncoreSdkError`
+- `BuilderValidationError`
+- `SessionKeyExecutionError`
+- `SessionKeyExecutionValidationError`
+- `SessionKeyManagementError`
+- `SimulationExpiredError`
+- `SimulationFailedError`
+- `TransactionSubmissionError`
+- `PaymentRequestValidationError`
+- `InvalidAmountError`
+- `StorageError`
+- `normalizeError`
+
+#### Retry Presets
+
+- `LOW_LATENCY`
+- `RELIABLE`
+- `AGGRESSIVE`
+- `RETRY_PRESETS`
+- `getRetryPreset`
+
+#### Other Constants and Utilities
+
+- `SDK_VERSION`
+
+#### Supporting Types, Interfaces, & Constants
+
+- `IsSessionKeyActiveOptions`
+- `PaymentSigner`
+- `AccountTransactionBuilderOptions`
+- `ErrorCategory`
+- `NormalizedError`
+- `RetryPresetName`
+- `SchedulerClientOptions`
+- `ExecuteWithSessionKeyParams`
+- `ExecuteWithSessionKeyResult`
+- `SessionKeyExecutionLayer`
+- `SessionKeyExecutionRequest`
+- `SessionKeySignerInputs`
+- `SecureStorageManagerOptions`
+- `SESSION_KEYS_STORAGE_KEY`
+- `SaveSessionKeysDeps`
+- `GetSessionKeysDeps`
+- `AccountData`
+- `EncryptedPayload`
+- `RecentRecipient`
+- `RecentRecipientsData`
+- `SessionKeysData`
+- `EncryptionPayload`
+- `BackupPayload`
+- `StorageErrorCode`
 
 ## Development
 

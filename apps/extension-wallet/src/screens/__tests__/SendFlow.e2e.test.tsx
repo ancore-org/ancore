@@ -60,6 +60,20 @@ describe('Send flow e2e', () => {
     );
   }, 15000);
 
+  it('disables MAX when balance is unknown', async () => {
+    const service = createService();
+    const user = userEvent.setup();
+
+    render(<SendScreen service={service} pollIntervalMs={10} />);
+
+    expect(screen.getByRole('button', { name: /max/i })).toBeDisabled();
+    await user.type(
+      screen.getByLabelText('Recipient'),
+      'GAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAWHF'
+    );
+    expect(screen.getByRole('button', { name: /max/i })).toBeDisabled();
+  });
+
   it('resolves @username handles before review', async () => {
     const service = createService();
     const user = userEvent.setup();
@@ -87,5 +101,26 @@ describe('Send flow e2e', () => {
 
     expect(await screen.findByText('Handle not found')).toBeInTheDocument();
     expect(screen.queryByText('Review transaction')).not.toBeInTheDocument();
+  });
+
+  it('fills the amount with MAX and keeps the input editable', async () => {
+    const service = createService();
+    const user = userEvent.setup();
+
+    render(<SendScreen balance={2} service={service} pollIntervalMs={10} />);
+
+    await user.type(
+      screen.getByLabelText('Recipient'),
+      'GAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAWHF'
+    );
+
+    await user.click(screen.getByRole('button', { name: /max/i }));
+
+    const amountInput = screen.getByLabelText('Amount') as HTMLInputElement;
+    expect(amountInput.value).toBe('0.99998');
+
+    await user.clear(amountInput);
+    await user.type(amountInput, '0.5');
+    expect(amountInput.value).toBe('0.5');
   });
 });

@@ -86,14 +86,15 @@ describe('bulk payout execution queue', () => {
   });
 
   it('submits payouts to the relayer with idempotency and surfaces relay failures', async () => {
-    const fetchImpl = vi.fn(async () =>
-      new Response(
-        JSON.stringify({
-          success: false,
-          error: { message: 'Missing required parameter: signedTransactionXdr' },
-        }),
-        { status: 422, headers: { 'Content-Type': 'application/json' } }
-      )
+    const fetchImpl = vi.fn(
+      async () =>
+        new Response(
+          JSON.stringify({
+            success: false,
+            error: { message: 'Missing required parameter: signedTransactionXdr' },
+          }),
+          { status: 422, headers: { 'Content-Type': 'application/json' } }
+        )
     );
     const submitPayout = createRelayerPayoutSubmitter({
       baseUrl: 'https://relayer.test/',

@@ -8,8 +8,8 @@ import {
   Button,
   EmptyState,
 } from '@ancore/ui-kit';
-import { Download, Clock, ChevronUp, ChevronDown } from 'lucide-react';
-import type { Transaction } from '../types/dashboard';
+import { Download, Clock, ChevronUp, ChevronDown, Inbox, SearchX } from 'lucide-react';
+import type { Transaction, TransactionStatus } from '../types/dashboard';
 import { useTableDensity } from '../contexts/TableDensityContext';
 import { formatTxDate } from '../lib/formatDate';
 
@@ -17,6 +17,11 @@ interface TransactionListProps {
   transactions: Transaction[];
   pageSize?: number;
   optimisticTransaction?: Transaction | null;
+  /**
+   * Optional call to action rendered in the empty state, e.g. a link to the
+   * send flow. Kept as a prop so this component stays router-independent.
+   */
+  emptyAction?: React.ReactNode;
 }
 
 type SortField = 'date' | 'amount' | 'status';
@@ -26,6 +31,7 @@ export const TransactionList: React.FC<TransactionListProps> = ({
   transactions,
   pageSize = 5,
   optimisticTransaction = null,
+  emptyAction,
 }) => {
   const { density } = useTableDensity();
   const [page, setPage] = useState(0);
@@ -111,14 +117,17 @@ export const TransactionList: React.FC<TransactionListProps> = ({
     window.URL.revokeObjectURL(url);
   };
 
-  const getStatusBadgeVariant = (status: 'confirmed' | 'pending', isOptimistic: boolean) => {
+  const getStatusBadgeVariant = (status: TransactionStatus, isOptimistic: boolean) => {
     if (isOptimistic && status === 'pending') {
       return 'secondary';
+    }
+    if (status === 'failed') {
+      return 'destructive';
     }
     return status === 'confirmed' ? 'default' : 'secondary';
   };
 
-  const getStatusDisplay = (status: 'confirmed' | 'pending', isOptimistic: boolean) => {
+  const getStatusDisplay = (status: TransactionStatus, isOptimistic: boolean) => {
     if (isOptimistic && status === 'pending') {
       return 'pending (optimistic)';
     }
@@ -176,8 +185,21 @@ export const TransactionList: React.FC<TransactionListProps> = ({
             </div>
           </div>
         )}
-        {visible.length === 0 ? (
-          <EmptyState title="No transactions found." />
+        {allTransactions.length === 0 ? (
+          // The indexer returned an empty page — say so, rather than leaving a
+          // blank card that reads as a broken widget.
+          <EmptyState
+            icon={<Inbox className="h-5 w-5" />}
+            title="No transactions yet"
+            description="Payments sent from or received by this account will appear here once the indexer picks them up."
+            action={emptyAction}
+          />
+        ) : visible.length === 0 ? (
+          <EmptyState
+            icon={<SearchX className="h-5 w-5" />}
+            title="Nothing on this page"
+            description="Go back a page to see this account's transactions."
+          />
         ) : (
           visible.map((tx: Transaction, index: number) => {
             const isOptimistic = tx.id === optimisticTransaction?.id;

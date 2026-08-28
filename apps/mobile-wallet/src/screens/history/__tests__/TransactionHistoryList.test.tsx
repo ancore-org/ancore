@@ -1,7 +1,9 @@
-import { render, screen } from '@testing-library/react';
+import { fireEvent, render, screen } from '@testing-library/react';
 
 import { TransactionHistoryList } from '../../../components/TransactionHistoryList';
 import type { Transaction } from '../types';
+
+const formatSnapshotTimestamp = () => '5/29/2026, 11:00:00 AM';
 
 const mockTransaction = (overrides?: Partial<Transaction>): Transaction => ({
   id: 'tx-1',
@@ -29,6 +31,7 @@ describe('TransactionHistoryList', () => {
           onRetry={jest.fn()}
           onRefresh={jest.fn()}
           onLoadMore={jest.fn()}
+          formatTimestamp={formatSnapshotTimestamp}
         />
       );
 
@@ -51,6 +54,7 @@ describe('TransactionHistoryList', () => {
           onRetry={jest.fn()}
           onRefresh={jest.fn()}
           onLoadMore={jest.fn()}
+          formatTimestamp={formatSnapshotTimestamp}
         />
       );
 
@@ -72,6 +76,7 @@ describe('TransactionHistoryList', () => {
           onRetry={jest.fn()}
           onRefresh={jest.fn()}
           onLoadMore={jest.fn()}
+          formatTimestamp={formatSnapshotTimestamp}
         />
       );
 
@@ -92,6 +97,7 @@ describe('TransactionHistoryList', () => {
           onRetry={jest.fn()}
           onRefresh={jest.fn()}
           onLoadMore={jest.fn()}
+          formatTimestamp={formatSnapshotTimestamp}
         />
       );
 
@@ -174,6 +180,7 @@ describe('TransactionHistoryList', () => {
           onRetry={jest.fn()}
           onRefresh={jest.fn()}
           onLoadMore={jest.fn()}
+          formatTimestamp={formatSnapshotTimestamp}
         />
       );
 
@@ -194,6 +201,7 @@ describe('TransactionHistoryList', () => {
           onRetry={jest.fn()}
           onRefresh={jest.fn()}
           onLoadMore={jest.fn()}
+          formatTimestamp={formatSnapshotTimestamp}
         />
       );
 
@@ -214,6 +222,7 @@ describe('TransactionHistoryList', () => {
           onRetry={jest.fn()}
           onRefresh={jest.fn()}
           onLoadMore={jest.fn()}
+          formatTimestamp={formatSnapshotTimestamp}
         />
       );
 
@@ -238,6 +247,7 @@ describe('TransactionHistoryList', () => {
           onRetry={jest.fn()}
           onRefresh={jest.fn()}
           onLoadMore={jest.fn()}
+          formatTimestamp={formatSnapshotTimestamp}
         />
       );
 
@@ -348,6 +358,82 @@ describe('TransactionHistoryList', () => {
       );
 
       expect(screen.getByText(/No transactions yet/)).toBeInTheDocument();
+    });
+
+    it('shows the refresh indicator while refresh is running', () => {
+      const onRefresh = jest.fn();
+
+      render(
+        <TransactionHistoryList
+          transactions={[mockTransaction()]}
+          isLoadingInitial={false}
+          isLoadingMore={false}
+          isRefreshing={true}
+          hasMore={false}
+          error={null}
+          onRetry={jest.fn()}
+          onRefresh={onRefresh}
+          onLoadMore={jest.fn()}
+        />
+      );
+
+      expect(screen.getByRole('status')).toHaveTextContent('Refreshing transactions...');
+
+      const pullTarget = screen.getByTestId('pull-to-refresh');
+      fireEvent.touchStart(pullTarget, { touches: [{ clientY: 0 }] });
+      fireEvent.touchMove(pullTarget, { touches: [{ clientY: 64 }] });
+      fireEvent.touchEnd(pullTarget);
+
+      expect(onRefresh).not.toHaveBeenCalled();
+    });
+
+    it('calls refresh when the pull gesture crosses the threshold', () => {
+      const onRefresh = jest.fn();
+
+      render(
+        <TransactionHistoryList
+          transactions={[mockTransaction()]}
+          isLoadingInitial={false}
+          isLoadingMore={false}
+          isRefreshing={false}
+          hasMore={false}
+          error={null}
+          onRetry={jest.fn()}
+          onRefresh={onRefresh}
+          onLoadMore={jest.fn()}
+        />
+      );
+
+      const pullTarget = screen.getByTestId('pull-to-refresh');
+      fireEvent.touchStart(pullTarget, { touches: [{ clientY: 0 }] });
+      fireEvent.touchMove(pullTarget, { touches: [{ clientY: 64 }] });
+      expect(screen.getByRole('status')).toHaveTextContent('Release to refresh');
+
+      fireEvent.touchEnd(pullTarget);
+
+      expect(onRefresh).toHaveBeenCalledTimes(1);
+    });
+
+    it('shows an offline banner and disables manual refresh while offline', () => {
+      const onRefresh = jest.fn();
+
+      render(
+        <TransactionHistoryList
+          transactions={[mockTransaction()]}
+          isLoadingInitial={false}
+          isLoadingMore={false}
+          isRefreshing={false}
+          isOffline={true}
+          hasMore={false}
+          error={null}
+          onRetry={jest.fn()}
+          onRefresh={onRefresh}
+          onLoadMore={jest.fn()}
+        />
+      );
+
+      expect(screen.getByText(/You are offline/)).toBeInTheDocument();
+      expect(screen.getByRole('button', { name: 'Refresh' })).toBeDisabled();
     });
   });
 });

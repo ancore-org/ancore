@@ -12,6 +12,7 @@ import {
   NotInitializedError,
   permissionsToScVal,
   publicKeyToBytes32ScVal,
+  StrKeyValidationError,
   scValToAddress,
   scValToOptionalSessionKey,
   scValToSessionKey,
@@ -81,6 +82,14 @@ describe('AccountContract', () => {
     it('returns method and single publicKey arg', () => {
       const inv = contract.revokeSessionKey(OWNER_ADDRESS);
       expect(inv.method).toBe('revoke_session_key');
+      expect(inv.args).toHaveLength(1);
+    });
+  });
+
+  describe('refreshSessionKeyTtl', () => {
+    it('returns method and single publicKey arg', () => {
+      const inv = contract.refreshSessionKeyTtl(OWNER_ADDRESS);
+      expect(inv.method).toBe('refresh_session_key_ttl');
       expect(inv.args).toHaveLength(1);
     });
   });
@@ -210,7 +219,7 @@ describe('XDR encoding helpers', () => {
     });
 
     it('throws for invalid public key format', () => {
-      expect(() => publicKeyToBytes32ScVal('invalid')).toThrow(TypeError);
+      expect(() => publicKeyToBytes32ScVal('invalid')).toThrow(StrKeyValidationError);
     });
 
     it('throws for wrong byte length', () => {

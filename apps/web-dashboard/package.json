@@ -8,23 +8,37 @@
     "build": "vite build",
     "test": "vitest run",
     "test:watch": "vitest",
-    "lint": "eslint src/"
+    "lint": "eslint src/",
+    "typecheck": "tsc --noEmit"
   },
   "dependencies": {
+    "@ancore/core-sdk": "workspace:*",
+    "@ancore/stellar": "workspace:*",
     "@ancore/types": "workspace:*",
     "@ancore/ui-kit": "workspace:*",
-    "zod": "^3.22.4",
+    "@ancore/wallet-api": "workspace:*",
+    "@ancore/wallet-shared": "workspace:*",
+    "@hookform/resolvers": "^3.3.0",
+    "@noble/hashes": "1",
+    "@stellar/stellar-sdk": "^13.3.0",
+    "bip39": "^3.1.0",
+    "buffer": "6",
+    "jspdf": "^4.2.1",
+    "jspdf-autotable": "^5.0.8",
     "lucide-react": "^0.462.0",
     "react": "^18.3.1",
     "react-dom": "^18.3.1",
     "react-error-boundary": "^4.1.2",
-    "react-router-dom": "^6.28.0"
+    "react-hook-form": "^7.49.0",
+    "react-router-dom": "^6.28.0",
+    "zod": "^3.22.4"
   },
   "devDependencies": {
     "@eslint/js": "^9.0.0",
     "@testing-library/jest-dom": "^6.9.1",
     "@testing-library/react": "^14.0.0",
     "@testing-library/user-event": "^14.5.0",
+    "@types/jspdf": "^2.0.0",
     "@types/node": "^25.5.0",
     "@types/react": "^18.3.0",
     "@types/react-dom": "^18.3.0",
@@ -41,6 +55,7 @@
     "tailwindcss": "^3.4.0",
     "typescript": "^5.6.0",
     "vite": "^5.4.0",
+    "vite-plugin-node-polyfills": "^0.28.0",
     "vitest": "^1.0.0"
   }
 }

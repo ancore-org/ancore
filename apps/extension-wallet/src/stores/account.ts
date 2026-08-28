@@ -13,6 +13,11 @@ export interface WalletAccount {
   id: string;
   address: string;
   label: string;
+  /**
+   * Deployed smart-account contract id (C-address) — the smartAccountId used
+   * for subsequent wallet operations. Persisted alongside the encrypted vault.
+   */
+  contractId?: string;
 }
 
 export interface AccountState {
@@ -64,6 +69,16 @@ export const useAccountStore = create<AccountState>()(
 /** Convenience selector — avoids re-renders when unrelated state changes. */
 export function getAccountState() {
   return useAccountStore.getState();
+}
+
+/**
+ * Return the smart-account contract id (smartAccountId / C-address) of the
+ * active account, or null when no account is active or no contract is deployed.
+ */
+export function getSmartAccountId(): string | null {
+  const { accounts, activeAccountId } = useAccountStore.getState();
+  const active = accounts.find((a) => a.id === activeAccountId) ?? accounts[0];
+  return active?.contractId ?? null;
 }
 
 /** @deprecated Use useAccountStore directly. Kept for router compatibility. */

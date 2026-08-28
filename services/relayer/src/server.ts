@@ -1,17 +1,32 @@
+// Tracing must be imported first to register the OpenTelemetry SDK before
+// any other module creates spans or instruments HTTP traffic.
+import './tracing';
+
 import express, { Express, Request, Response, NextFunction } from 'express';
+import cors from 'cors';
 import rateLimit from 'express-rate-limit';
 import { z } from 'zod';
+import { TransferPolicySchema } from '@ancore/types';
+import { loadEnvOrExit } from './config/env';
 import { RelayService } from './services/relayService';
 import { createStellarSubmitterFromEnv } from './services/stellarSubmitter';
 import { createAuthMiddleware } from './middleware/auth';
+import { createAccountRateLimiterMiddleware } from './middleware/accountRateLimiter';
 import { createIdempotencyMiddleware } from './middleware/idempotency';
 import { createPayloadGuardMiddleware } from './middleware/payloadGuard';
+import { createContentTypeGuardMiddleware } from './middleware/contentTypeGuard';
 import { createRequestLoggerMiddleware } from './middleware/requestLogger';
+import { createRequestIdMiddleware } from './middleware/requestId';
+import { createMetricsCollectorMiddleware, relayMockMode } from './middleware/metricsCollector';
+import { renderPrometheusMetrics } from './metrics';
 import { validateBody } from './validation/middleware';
 import { createExecuteRelayHandler } from './handlers/executeRelay';
 import { createValidateRelayHandler } from './handlers/validateRelay';
+import { createHealthHandler } from './routes/health';
 import { IdempotencyStore } from './store/idempotency';
+import { MemoryNonceStore, type NonceStore } from './store/nonceStore';
 import { JobQueue } from './queue/JobQueue';
+import { createBearerAuthService } from './services/bearerAuthService';
 import type {
   AuthServiceContract,
   SignatureServiceContract,
@@ -32,8 +47,6 @@ import {
   createListExecutionsHandler,
 } from './scheduler';
 
-// ── Request schema ────────────────────────────────────────────────────────────
-
 const relayRequestSchema = z.object({
   sessionKey: z
     .string()
@@ -46,9 +59,14 @@ const relayRequestSchema = z.object({
     .length(128)
     .regex(/^[0-9a-fA-F]+$/),
   nonce: z.number().int().nonnegative(),
+  transferPolicy: z
+    .object({
+      policy: TransferPolicySchema,
+      amount: z.number(),
+      todayTotal: z.number(),
+    })
+    .optional(),
 });
-
-// ── Stub implementations (replace with real services) ─────────────────────────
 
 const stubAuthService: AuthServiceContract = {
   async verifyToken(token: string) {
@@ -59,73 +77,94 @@ const stubAuthService: AuthServiceContract = {
 
 const defaultSignatureService: SignatureServiceContract = new Ed25519SignatureService();
 
-// ── App factory (exported for testing) ───────────────────────────────────────
-
 export function createApp(
-  authService: AuthServiceContract = stubAuthService,
+  authService?: AuthServiceContract,
   signatureService: SignatureServiceContract = defaultSignatureService,
   idempotencyStore: IdempotencyStore = new IdempotencyStore(),
   transactionSubmitter?: TransactionSubmitterContract,
-  relayOptions?: RelayServiceOptions
+  relayOptions?: RelayServiceOptions,
+  nonceStore: NonceStore = new MemoryNonceStore()
 ): Express {
+  // Fail fast on misconfiguration before any middleware or listener is wired up.
+  const env = loadEnvOrExit();
+
+  const authSecret = env.RELAYER_AUTH_SECRET;
+  const hasConfiguredAuth = Boolean(authService ?? authSecret);
+
+  if (env.NODE_ENV === 'production' && !hasConfiguredAuth) {
+    console.error('RELAYER_AUTH_SECRET must be set in production to avoid stub auth');
+    process.exit(1);
+  }
+
+  const resolvedAuthService =
+    authService ?? (authSecret ? createBearerAuthService(authSecret) : stubAuthService);
   const app = express();
 
-  app.use((req: Request, res: Response, next: NextFunction) => {
-    res.header('Access-Control-Allow-Origin', process.env.CORS_ORIGIN ?? '*');
-    res.header('Access-Control-Allow-Headers', 'Authorization, Content-Type');
-    res.header('Access-Control-Allow-Methods', 'GET, POST, PATCH, OPTIONS');
-    if (req.method === 'OPTIONS') {
-      res.sendStatus(204);
-      return;
-    }
-    next();
-  });
+  app.use(
+    cors({
+      origin: env.ALLOWED_ORIGINS,
+      methods: ['GET', 'POST', 'PATCH', 'OPTIONS'],
+      allowedHeaders: ['Authorization', 'Content-Type', 'X-Request-Id', 'x-request-id'],
+      exposedHeaders: ['X-Request-Id', 'x-request-id'],
+      credentials: true,
+    })
+  );
 
-  // Payload guard: reject oversized requests before body parsing to prevent
-  // resource abuse. Runs early in the stack, before express.json().
   app.use(createPayloadGuardMiddleware());
 
-  // Request logger: attaches req.log and emits start/complete structured logs.
-  // Registered after CORS and payload guard, before auth and body parsing.
+  app.use(createRequestIdMiddleware());
+
   app.use(createRequestLoggerMiddleware());
 
-  app.use(express.json());
-
   const useMockSubmission =
-    relayOptions?.useMockSubmission === true || process.env.RELAYER_USE_MOCK_SUBMISSION === 'true';
+    relayOptions?.useMockSubmission === true || env.RELAYER_USE_MOCK_SUBMISSION;
   const submitter =
     transactionSubmitter ?? (useMockSubmission ? undefined : createStellarSubmitterFromEnv());
 
-  // Rate limiting for relay operations
+  const mockMode = useMockSubmission || !submitter;
+  relayMockMode.set(mockMode ? 1 : 0);
+
+  app.use(createMetricsCollectorMiddleware(mockMode));
+
+  app.use(express.json());
+
   const relayLimiter = rateLimit({
-    windowMs: 15 * 60 * 1000, // 15 minutes
-    max: process.env.RELAY_RATE_LIMIT_MAX ? parseInt(process.env.RELAY_RATE_LIMIT_MAX) : 50, // limit each IP to 50 requests per windowMs
+    windowMs: 15 * 60 * 1000,
+    max: env.RELAY_RATE_LIMIT_MAX,
     message: 'Too many relay requests from this IP, please try again later.',
     keyGenerator: (req: Request) => {
-      // If authenticated, use callerId, else use IP
       const callerId = (req as any).callerId;
       return callerId || req.ip;
     },
   });
 
-  // Rate limiting for status
+  const accountLimiter = createAccountRateLimiterMiddleware();
+
   const statusLimiter = rateLimit({
-    windowMs: 15 * 60 * 1000, // 15 minutes
-    max: process.env.STATUS_RATE_LIMIT_MAX ? parseInt(process.env.STATUS_RATE_LIMIT_MAX) : 200, // higher limit for status
+    windowMs: 15 * 60 * 1000,
+    max: env.STATUS_RATE_LIMIT_MAX,
     message: 'Too many status requests from this IP, please try again later.',
   });
 
   const jobQueue = new JobQueue();
-  const relayService = new RelayService(signatureService, jobQueue, idempotencyStore, submitter, {
-    useMockSubmission,
-    ...relayOptions,
-  });
-  const auth = createAuthMiddleware(authService);
+  const relayService = new RelayService(
+    signatureService,
+    jobQueue,
+    idempotencyStore,
+    submitter,
+    {
+      useMockSubmission,
+      ...relayOptions,
+    },
+    nonceStore
+  );
+  const auth = createAuthMiddleware(resolvedAuthService);
   const validate = validateBody(relayRequestSchema);
   const idempotency = createIdempotencyMiddleware(idempotencyStore);
 
   const executeHandler = createExecuteRelayHandler(relayService);
   const validateHandler = createValidateRelayHandler(relayService);
+  const healthHandler = createHealthHandler(relayService);
 
   const scheduledTransferStore = new ScheduledTransferStore();
   const scheduledTransferService = new ScheduledTransferService(
@@ -133,9 +172,7 @@ export function createApp(
     relayService
   );
   const schedulerEngine = new SchedulerEngine(scheduledTransferService, {
-    pollIntervalMs: process.env.SCHEDULER_POLL_INTERVAL_MS
-      ? parseInt(process.env.SCHEDULER_POLL_INTERVAL_MS, 10)
-      : 1_000,
+    pollIntervalMs: env.SCHEDULER_POLL_INTERVAL_MS,
   });
 
   if (relayOptions?.startScheduler !== false) {
@@ -143,10 +180,25 @@ export function createApp(
   }
 
   const validateScheduledTransfer = validateBody(createScheduledTransferSchema);
+  const contentTypeGuard = createContentTypeGuardMiddleware();
 
-  app.post('/relay/execute', auth, relayLimiter, validate, idempotency, executeHandler);
-  app.post('/relay/validate', auth, relayLimiter, validate, validateHandler);
+  app.post(
+    '/relay/execute',
+    auth,
+    contentTypeGuard,
+    relayLimiter,
+    accountLimiter,
+    validate,
+    idempotency,
+    executeHandler
+  );
+  app.post('/relay/validate', auth, contentTypeGuard, relayLimiter, validate, validateHandler);
   app.get('/relay/status', statusLimiter, (_req, res) => res.json(relayService.health()));
+  app.get('/health', healthHandler);
+  app.get('/metrics', (_req, res) => {
+    res.set('Content-Type', 'text/plain; version=0.0.4; charset=utf-8');
+    res.send(renderPrometheusMetrics());
+  });
 
   app.post(
     '/api/v1/scheduled-transfers',
@@ -183,11 +235,12 @@ export function createApp(
   return app;
 }
 
-// ── Entrypoint ────────────────────────────────────────────────────────────────
-
 if (require.main === module) {
-  const PORT = process.env['PORT'] ?? 3000;
+  // Validate the whole environment before doing anything else, so a bad config
+  // is a clear boot-time failure rather than a runtime surprise.
+  const { PORT } = loadEnvOrExit();
   const app = createApp();
+
   app.listen(PORT, () => {
     console.log(`Relayer service listening on port ${PORT}`);
   });

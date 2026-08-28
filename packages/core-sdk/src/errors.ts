@@ -88,6 +88,20 @@ export class BuilderValidationError extends AncoreSdkError {
 }
 
 /**
+ * Thrown when an invalid or unknown retry preset name is requested.
+ */
+export class InvalidRetryPresetError extends AncoreSdkError {
+  public readonly presetName?: string;
+
+  constructor(presetName: string) {
+    super('INVALID_RETRY_PRESET', `Unknown retry preset: ${presetName}`);
+    this.name = 'InvalidRetryPresetError';
+    this.presetName = presetName;
+    Object.setPrototypeOf(this, new.target.prototype);
+  }
+}
+
+/**
  * Thrown when session-key management operations fail after delegating to the
  * account abstraction layer.
  */
@@ -183,6 +197,58 @@ export class InvalidAmountError extends AncoreSdkError {
 }
 
 // ---------------------------------------------------------------------------
+// StrKey validation errors + helpers
+// ---------------------------------------------------------------------------
+
+import { StrKey } from '@stellar/stellar-sdk';
+
+export type StrKeyErrorCode = 'INVALID_G_KEY' | 'INVALID_C_KEY';
+
+export class StrKeyValidationError extends AncoreSdkError {
+  constructor(
+    public readonly code: StrKeyErrorCode,
+    message: string,
+    public readonly input?: string
+  ) {
+    super(code, message);
+    this.name = 'StrKeyValidationError';
+    Object.setPrototypeOf(this, new.target.prototype);
+  }
+}
+
+/**
+ * Assert that the provided value is a valid Stellar Ed25519 public key (G...)
+ * Throws `StrKeyValidationError` with code `INVALID_G_KEY` on failure.
+ */
+export function assertValidEd25519PublicKey(publicKey: string): void {
+  if (typeof publicKey !== 'string' || !StrKey.isValidEd25519PublicKey(publicKey)) {
+    const snippet =
+      typeof publicKey === 'string' ? publicKey.slice(0, 8) + '...' : String(publicKey);
+    throw new StrKeyValidationError(
+      'INVALID_G_KEY',
+      `Invalid Ed25519 public key: expected G... format, got ${snippet}`,
+      typeof publicKey === 'string' ? publicKey : undefined
+    );
+  }
+}
+
+/**
+ * Assert that the provided value is a valid Stellar contract id (C...)
+ * Throws `StrKeyValidationError` with code `INVALID_C_KEY` on failure.
+ */
+export function assertValidContractId(contractId: string): void {
+  if (typeof contractId !== 'string' || !StrKey.isValidContract(contractId)) {
+    const snippet =
+      typeof contractId === 'string' ? contractId.slice(0, 8) + '...' : String(contractId);
+    throw new StrKeyValidationError(
+      'INVALID_C_KEY',
+      `Invalid contract id: expected C... format, got ${snippet}`,
+      typeof contractId === 'string' ? contractId : undefined
+    );
+  }
+}
+
+// ---------------------------------------------------------------------------
 // Normalization helpers (canonical contract with UI/frontend)
 // ---------------------------------------------------------------------------
 
@@ -225,7 +291,7 @@ const CONTRACT_PATTERNS = [
 
 function detectCategoryFromCode(code: string): ErrorCategory {
   if (!code) return 'UNKNOWN';
-  if (/^(ECONN|EAI_|ETIMEDOUT|ENOT|5\d{2}|4\d{2})/.test(code)) return 'NETWORK';
+  if (/^(ECONN|EAI_|ETIMEDOUT|ENOT|[45]\d{2}\b)/.test(code)) return 'NETWORK';
   if (
     /SIMULATION|SUBMISSION|SESSION_KEY|CONTRACT|INVALID|UNAUTHORIZED|INSUFFICIENT|NONCE|REVOKE|SESSION|INITIALIZED/.test(
       code

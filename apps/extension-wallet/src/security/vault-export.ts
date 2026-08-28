@@ -1,5 +1,10 @@
 import { decryptSecretKey, type EncryptedSecretKeyPayload } from '@ancore/crypto';
-import { SecureStorageManager, createStorageAdapter, type AccountData } from '@ancore/core-sdk';
+import {
+  ChromeStorageAdapter,
+  SecureStorageManager,
+  type AccountData,
+  type StorageAdapter,
+} from '@ancore/core-sdk';
 import { getSharedStorageManager, resetSharedStorageManagerForTests } from './storage-manager';
 
 export type VaultExportKind = 'privateKey' | 'mnemonic';
@@ -22,16 +27,19 @@ export function getVaultStorageManager(): StorageManagerInstance {
   return getSharedStorageManager();
 }
 
-export function resetVaultStorageManagerForTests(): void {
-  resetSharedStorageManagerForTests();
+export function resetVaultStorageManagerForTests(adapter?: StorageAdapter): void {
+  resetSharedStorageManagerForTests(adapter);
 }
 
 export function zeroizeBuffer(buffer: Uint8Array): void {
   buffer.fill(0);
 }
 
-export async function verifyVaultPassword(password: string): Promise<boolean> {
-  const verifier = new SecureStorageManager(createStorageAdapter());
+export async function verifyVaultPassword(
+  password: string,
+  options?: { storage?: StorageAdapter }
+): Promise<boolean> {
+  const verifier = new SecureStorageManager(options?.storage ?? new ChromeStorageAdapter());
   const unlocked = await verifier.unlock(password);
   verifier.lock();
   return unlocked;
@@ -47,23 +55,20 @@ async function ensureStorageAccess(
       throw new VaultExportError('Enter your password.');
     }
 
-    const valid = await verifyVaultPassword(password);
-    if (!valid) {
-      throw new VaultExportError('Incorrect password.');
-    }
-  } else if (!storageManager.isUnlocked) {
-    throw new VaultExportError('Wallet is locked. Unlock your wallet first.');
-  }
-
-  if (!storageManager.isUnlocked) {
-    if (!password) {
-      throw new VaultExportError('Wallet is locked.');
+    // Re-auth against the vault backing this manager (not a separate global adapter).
+    if (storageManager.isUnlocked) {
+      storageManager.lock();
     }
 
     const unlocked = await storageManager.unlock(password);
     if (!unlocked) {
       throw new VaultExportError('Incorrect password.');
     }
+    return;
+  }
+
+  if (!storageManager.isUnlocked) {
+    throw new VaultExportError('Wallet is locked. Unlock your wallet first.');
   }
 }
 

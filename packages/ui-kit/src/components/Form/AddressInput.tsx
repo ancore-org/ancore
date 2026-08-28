@@ -78,9 +78,9 @@ const AddressInputBase = React.forwardRef<HTMLInputElement, AddressInputBaseProp
                 key={recipient.address}
                 type="button"
                 onClick={() => onSelectRecent?.(recipient.address)}
-                className="inline-flex items-center gap-1.5 rounded-full bg-white/5 border border-white/10 px-2.5 py-1 text-[10px] font-bold text-slate-400 uppercase tracking-wider transition-all hover:bg-cyan-400/10 hover:border-cyan-400/30 hover:text-cyan-400 focus:outline-none focus:ring-1 focus:ring-cyan-400"
+                className="inline-flex items-center gap-1.5 rounded-full border border-border bg-muted/40 px-2.5 py-1 text-[10px] font-bold uppercase tracking-wider text-muted-foreground transition-all hover:border-primary/30 hover:bg-primary/10 hover:text-primary focus:outline-none focus:ring-1 focus:ring-ring"
               >
-                <div className="w-1 h-1 rounded-full bg-cyan-400/50" />
+                <div className="h-1 w-1 rounded-full bg-primary/50" />
                 {recipient.name ||
                   recipient.address.slice(0, 4) + '...' + recipient.address.slice(-4)}
               </button>

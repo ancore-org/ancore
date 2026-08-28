@@ -1,25 +1,22 @@
-import { useState } from 'react';
-import {
-  AddressInput,
-  Button,
-  Card,
-  CardContent,
-  CardHeader,
-  CardTitle,
-  FormAmountInput,
-  cn,
-} from '@ancore/ui-kit';
+import React, { useState, useEffect, useMemo } from 'react';
+import { isMemoRequired } from '@/utils/memoCheck';
+import { AddressInput, cn } from '@ancore/ui-kit';
+import { BASE_SEND_RESERVE, DEFAULT_SEND_FEE } from '@/utils/amount';
 import {
   useSendTransaction,
   type SendFormValues,
   type SendService,
 } from '@/hooks/useSendTransaction';
 import { useRecentRecipients } from '@/hooks/useRecentRecipients';
+import { useAccountStore } from '@/stores/account';
+import { DEMO_ACCOUNT_ADDRESS } from '@/services/scheduler-client';
 import { ConfirmDialog } from '@/screens/Send/ConfirmDialog';
 import { ReviewScreen } from '@/screens/Send/ReviewScreen';
 import { StatusScreen } from '@/screens/Send/StatusScreen';
+import { AiDraftPanel } from '@/screens/Send/AiDraftPanel';
+import type { AgentDraftIntent } from '@/services/ai-agent-client';
 import { TransferNoteInput } from '@/components/TransferNoteInput';
-import { SendHorizontal, Info, AlertCircle } from 'lucide-react';
+import { AlertCircle, ArrowLeftRight, Delete, Sparkles, X } from 'lucide-react';
 import {
   ScheduleControls,
   createDefaultScheduleConfig,
@@ -36,12 +33,18 @@ interface SendScreenProps {
   pollIntervalMs?: number;
 }
 
+const NUMPAD = ['1', '2', '3', '4', '5', '6', '7', '8', '9', '.', '0', 'back'] as const;
+
 /**
- * SendScreen — The initial form where the user enters transaction details.
- *
- * Implements a premium dark UI with real-time validation and simulation feedback.
+ * SendScreen — amount-first send form (ref: swap amount entry).
+ * Dark sheet, large amount, soft Continue pill, optional numpad for amount.
  */
-export function SendScreen({ balance, assetDecimals, service, pollIntervalMs }: SendScreenProps) {
+export function SendScreen({
+  balance,
+  assetDecimals = 7,
+  service,
+  pollIntervalMs,
+}: SendScreenProps) {
   const [form, setForm] = useState<SendFormValues>({
     to: '',
     amount: '',
@@ -52,18 +55,83 @@ export function SendScreen({ balance, assetDecimals, service, pollIntervalMs }: 
 
   const send = useSendTransaction({ balance, assetDecimals, service, pollIntervalMs });
   const { recipients, addRecipient } = useRecentRecipients();
+  const [memoWarning, setMemoWarning] = useState<string | null>(null);
+  const [showAiDraft, setShowAiDraft] = useState(false);
 
-  const onMax = () => {
-    setForm((current) => ({ ...current, amount: String(send.balance) }));
-    send.setMaxAmount();
+  const activeAccountId = useAccountStore((state) => state.activeAccountId);
+  const accounts = useAccountStore((state) => state.accounts);
+  const accountAddress = useMemo(
+    () => accounts.find((a) => a.id === activeAccountId)?.address ?? DEMO_ACCOUNT_ADDRESS,
+    [accounts, activeAccountId]
+  );
+
+  /**
+   * Accepts an AI-drafted intent and prefills the form for the user to
+   * review. GUARDRAIL: this only sets local form state — it does not touch
+   * `send.tx`, does not call `send.goToReview`, and does not submit
+   * anything. The user still has to go through Continue → Review → Confirm
+   * → Sign like any other send.
+   */
+  const handleAiDraftAccept = (intent: AgentDraftIntent) => {
+    if (intent.type === 'payment') {
+      setForm((current) => ({ ...current, to: intent.destination, amount: intent.amount }));
+    }
+    setShowAiDraft(false);
+  };
+
+  const isMainnet = send.tx?.fee?.network === 'mainnet' || !send.tx;
+
+  useEffect(() => {
+    setMemoWarning(null);
+    if (!form.to || !isMainnet) return;
+    isMemoRequired(form.to).then((required) => {
+      if (required && !form.note) {
+        setMemoWarning(
+          'This exchange requires a memo. Without it, your payment may not be credited to your account.'
+        );
+      }
+    });
+  }, [form.to, form.note, isMainnet]);
+
+  const balanceDisplay = balance !== undefined ? balance.toFixed(7).replace(/\.?0+$/, '') : '—';
+  const maxDisabled = balance === undefined || balance <= BASE_SEND_RESERVE + DEFAULT_SEND_FEE;
+
+  const onMax = async () => {
+    const maxAmount = await send.setMaxAmount({ to: form.to, asset: 'XLM' });
+    setForm((current) => ({ ...current, amount: maxAmount }));
   };
 
   const handleReview = async () => {
+    if (memoWarning) return;
     const success = await send.goToReview(form);
     if (success) {
       await addRecipient({ address: send.tx?.to ?? form.to });
     }
   };
+
+  const appendAmount = (key: (typeof NUMPAD)[number]) => {
+    setForm((current) => {
+      let next = current.amount || '';
+      if (key === 'back') {
+        next = next.slice(0, -1);
+      } else if (key === '.') {
+        if (next.includes('.')) return current;
+        next = next === '' ? '0.' : `${next}.`;
+      } else {
+        if (next === '0') next = key;
+        else next = `${next}${key}`;
+        const [, dec = ''] = next.split('.');
+        if (dec.length > assetDecimals) return current;
+      }
+      return { ...current, amount: next };
+    });
+  };
+
+  const amountLabel = form.amount || '0';
+  const approxUsd =
+    form.amount && !Number.isNaN(Number(form.amount))
+      ? `≈ ${(Number(form.amount) * 0.12).toFixed(2)} USD` // placeholder rate until price feed
+      : '';
 
   if (send.step === 'review' && send.tx) {
     return (
@@ -71,6 +139,7 @@ export function SendScreen({ balance, assetDecimals, service, pollIntervalMs }: 
         transaction={send.tx}
         timing={send.timing}
         schedule={send.schedule}
+        simulation={send.simulation}
         onBack={() => send.setStep('form')}
         onConfirm={send.requestConfirm}
       />
@@ -99,105 +168,159 @@ export function SendScreen({ balance, assetDecimals, service, pollIntervalMs }: 
   }
 
   return (
-    <Card className="w-full max-w-md bg-slate-950 border-white/10 shadow-2xl overflow-hidden animate-in fade-in duration-500">
-      <CardHeader className="bg-gradient-to-br from-slate-800/50 to-slate-900/50 pb-6 border-b border-white/5">
-        <CardTitle className="text-white uppercase tracking-widest text-xs flex items-center justify-center gap-2 font-black">
-          <SendHorizontal className="text-cyan-400 w-4 h-4" />
-          Send Assets
-        </CardTitle>
-      </CardHeader>
+    <div className="wallet-sheet">
+      <header className="wallet-header flex items-center justify-between">
+        <h1 className="wallet-title">Send</h1>
+        <div className="flex items-center gap-1">
+          <button
+            type="button"
+            onClick={() => setShowAiDraft((current) => !current)}
+            className="flex items-center gap-1.5 rounded-full bg-white/[0.07] px-3 py-1.5 text-[11px] font-medium text-muted-foreground transition-colors hover:text-foreground"
+          >
+            <Sparkles className="h-3.5 w-3.5 text-primary" aria-hidden />
+            {showAiDraft ? 'Manual' : 'AI draft'}
+          </button>
+          <button
+            type="button"
+            className="wallet-icon-btn"
+            aria-label="Close send"
+            onClick={() => window.history.back()}
+          >
+            <X className="h-5 w-5" />
+          </button>
+        </div>
+      </header>
 
-      <CardContent className="space-y-6 pt-8 px-6 pb-8">
-        <div className="space-y-6">
+      <div className="flex flex-1 flex-col gap-4 overflow-y-auto px-5 pb-6">
+        {showAiDraft && (
+          <AiDraftPanel
+            accountId={accountAddress}
+            onAccept={handleAiDraftAccept}
+            onClose={() => setShowAiDraft(false)}
+          />
+        )}
+
+        {/* Source asset card */}
+        <div className="wallet-card space-y-5">
+          <div className="flex items-center justify-between gap-3">
+            <div className="flex min-w-0 items-center gap-3">
+              <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-primary text-sm font-bold text-primary-foreground">
+                X
+              </div>
+              <div className="min-w-0">
+                <p className="text-[15px] font-semibold text-foreground">Stellar</p>
+                <p className="truncate text-[13px] text-muted-foreground">{balanceDisplay} XLM</p>
+              </div>
+            </div>
+            <button
+              type="button"
+              onClick={() => void onMax()}
+              disabled={maxDisabled}
+              className="shrink-0 rounded-full bg-white/10 px-3.5 py-1.5 text-[13px] font-medium text-foreground transition-colors hover:bg-white/15 disabled:opacity-40"
+            >
+              Use Max
+            </button>
+          </div>
+
+          <div className="text-center">
+            <p className="wallet-amount-display text-foreground">
+              {amountLabel}
+              <span className="ml-1 text-[28px] font-medium text-muted-foreground">XLM</span>
+            </p>
+            {approxUsd && (
+              <p className="mt-2 flex items-center justify-center gap-1 text-[13px] text-muted-foreground">
+                <span className="inline-flex h-4 w-4 items-center justify-center rounded-full bg-primary/15 text-[10px] text-primary">
+                  $
+                </span>
+                {approxUsd}
+                <ArrowLeftRight className="h-3 w-3 opacity-50" aria-hidden />
+              </p>
+            )}
+            {send.errors.amount && (
+              <p className="mt-2 text-[13px] text-red-400">{send.errors.amount}</p>
+            )}
+          </div>
+        </div>
+
+        {/* Recipient */}
+        <div className="wallet-card space-y-3">
           <AddressInput
-            label="Recipient"
-            placeholder="@username or G..."
+            label="To"
+            placeholder="@username or G…"
             value={form.to}
             error={send.errors.to}
-            className="group"
             recentRecipients={recipients}
             onSelectRecent={(address) => setForm((current) => ({ ...current, to: address }))}
             onChange={(event: React.ChangeEvent<HTMLInputElement>) =>
               setForm((current) => ({ ...current, to: event.target.value }))
             }
           />
-
-          <FormAmountInput
-            label="Amount"
-            asset="XLM"
-            balance={send.balance.toString()}
-            value={form.amount}
-            error={send.errors.amount}
-            onMax={onMax}
-            onChange={(event: React.ChangeEvent<HTMLInputElement>) =>
-              setForm((current) => ({
-                ...current,
-                amount: event.target.value,
-              }))
-            }
-          />
-
           <TransferNoteInput
             value={form.note || ''}
             onChange={(note) => setForm((current) => ({ ...current, note }))}
             error={send.errors.note}
-            placeholder="Add a note (optional)"
-          />
-
-          <ScheduleControls
-            timing={(form.timing ?? 'immediate') as TransferTiming}
-            schedule={(form.schedule ?? createDefaultScheduleConfig()) as ScheduleConfig}
-            error={send.errors.simulation}
-            onTimingChange={(timing) =>
-              setForm((current) => ({
-                ...current,
-                timing,
-                schedule: current.schedule ?? createDefaultScheduleConfig(),
-              }))
-            }
-            onScheduleChange={(schedule) =>
-              setForm((current) => ({
-                ...current,
-                timing: 'scheduled',
-                schedule,
-              }))
-            }
+            placeholder="Memo (optional)"
           />
         </div>
 
-        {send.errors.simulation && (
-          <div className="p-4 rounded-2xl bg-red-500/10 border border-red-500/20 text-[10px] text-red-400 mb-4 animate-in fade-in slide-in-from-top-2 duration-300 flex items-start gap-3">
-            <AlertCircle className="w-4 h-4 shrink-0" />
-            <div className="space-y-1">
-              <strong className="block uppercase tracking-wider font-black">
-                Simulation Failed
-              </strong>
-              <p className="font-medium leading-relaxed">{send.errors.simulation}</p>
-            </div>
+        <ScheduleControls
+          timing={(form.timing ?? 'immediate') as TransferTiming}
+          schedule={(form.schedule ?? createDefaultScheduleConfig()) as ScheduleConfig}
+          error={send.errors.simulation}
+          onTimingChange={(timing) =>
+            setForm((current) => ({
+              ...current,
+              timing,
+              schedule: current.schedule ?? createDefaultScheduleConfig(),
+            }))
+          }
+          onScheduleChange={(schedule) =>
+            setForm((current) => ({
+              ...current,
+              timing: 'scheduled',
+              schedule,
+            }))
+          }
+        />
+
+        {memoWarning && (
+          <div className="flex items-start gap-3 rounded-2xl border border-amber-500/20 bg-amber-500/10 p-4 text-[13px] text-amber-200">
+            <AlertCircle className="mt-0.5 h-4 w-4 shrink-0" />
+            <p className="leading-relaxed">{memoWarning}</p>
           </div>
         )}
 
-        <div className="pt-2">
-          <Button
-            type="button"
-            className={cn(
-              'w-full h-14 rounded-2xl font-black uppercase tracking-[0.2em] text-[11px] transition-all duration-300',
-              'bg-cyan-400 text-slate-950 shadow-[0_15px_30px_rgba(34,211,238,0.15)] hover:bg-cyan-300 hover:scale-[1.02] hover:shadow-[0_20px_40px_rgba(34,211,238,0.2)]',
-              'disabled:opacity-50 disabled:grayscale disabled:scale-100'
-            )}
-            onClick={handleReview}
-            loading={send.submitting}
-            disabled={send.submitting}
-          >
-            {send.submitting ? 'Calculating...' : 'Review Transaction'}
-          </Button>
+        {send.errors.simulation && (
+          <div className="flex items-start gap-3 rounded-2xl border border-red-500/20 bg-red-500/10 p-4 text-[13px] text-red-300">
+            <AlertCircle className="mt-0.5 h-4 w-4 shrink-0" />
+            <p className="leading-relaxed">{send.errors.simulation}</p>
+          </div>
+        )}
+
+        {/* Numpad */}
+        <div className="grid grid-cols-3 gap-1 px-1 pt-2">
+          {NUMPAD.map((key) => (
+            <button
+              key={key}
+              type="button"
+              className="wallet-numpad-key"
+              aria-label={key === 'back' ? 'Delete' : key}
+              onClick={() => appendAmount(key)}
+            >
+              {key === 'back' ? <Delete className="h-6 w-6" strokeWidth={1.75} /> : key}
+            </button>
+          ))}
         </div>
 
-        <div className="flex items-center justify-center gap-1.5 text-[8px] text-slate-700 uppercase tracking-widest font-black pt-2">
-          <Info className="w-3 h-3 opacity-50" />
-          Fees are estimated based on current network load
-        </div>
-      </CardContent>
-    </Card>
+        <button
+          type="button"
+          className={cn('wallet-pill-btn mt-2')}
+          disabled={Boolean(memoWarning) || send.submitting}
+          onClick={() => void handleReview()}
+        >
+          Continue
+        </button>
+      </div>
+    </div>
   );
 }

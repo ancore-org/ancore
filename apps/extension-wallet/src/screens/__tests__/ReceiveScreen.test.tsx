@@ -1,157 +1,159 @@
+import React from 'react';
 import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { vi } from 'vitest';
+import { NotificationProvider } from '@ancore/ui-kit';
 
-vi.mock('qrcode.react', () => ({
-  QRCodeSVG: ({ value, 'aria-label': ariaLabel }: { value: string; 'aria-label'?: string }) => (
-    <svg data-testid="qr-code-svg" data-value={value} aria-label={ariaLabel} />
-  ),
+vi.mock('qrcode.react', () => {
+  const MockQRCodeSVG = ({
+    value,
+    'aria-label': ariaLabel,
+  }: {
+    value: string;
+    'aria-label'?: string;
+  }) => <svg data-testid="qr-code-svg" data-value={value} aria-label={ariaLabel} />;
+  MockQRCodeSVG.displayName = 'QRCodeSVG';
+  return { QRCodeSVG: MockQRCodeSVG };
+});
+
+vi.mock('@/router/AuthGuard', () => ({
+  useExtensionAuth: () => ({
+    authState: { smartAccountId: undefined, accountAddress: 'GCFX...WALLET' },
+  }),
 }));
 
 import { ReceiveScreen } from '@/screens/ReceiveScreen';
 
-const MAINNET_ACCOUNT = {
-  publicKey: 'GABC1234567890DEFGHIJKLMNOPQRSTUVWXYZ',
-  name: 'Primary Wallet',
-};
+const SMART_ACCOUNT_ID = 'CA3D5K7UQJZ5BFPZ5G2FYJ3GX7CJYJ2CQZ5BFPZ5G2FYJ3GX7CJYJ2C';
+const OWNER_PUBLIC_KEY = 'GA7QNPKKJ3ZYXPWLUVFXZNXUVXJTQPWMQHZMDMQHLS5VNLQBQNPFLM';
 
-const TESTNET_ACCOUNT = {
-  publicKey: 'GTEST9876543210ABCDEFGHIJKLMNOPQRSTUV',
-};
+function renderReceive(ui: React.ReactElement) {
+  return render(<NotificationProvider>{ui}</NotificationProvider>);
+}
 
-// ─── Test suite ──────────────────────────────────────────────────────────────
 describe('ReceiveScreen', () => {
-  describe('rendering', () => {
-    it('renders the screen title', () => {
-      render(<ReceiveScreen account={MAINNET_ACCOUNT} />);
+  describe('empty state', () => {
+    it('renders empty state when no smartAccountId is provided', () => {
+      renderReceive(<ReceiveScreen />);
+      expect(
+        screen.getByText('Complete onboarding to get your receive address')
+      ).toBeInTheDocument();
+    });
+
+    it('does not crash when neither props nor auth context have smartAccountId', () => {
+      renderReceive(<ReceiveScreen />);
       expect(screen.getByRole('heading', { name: /receive/i })).toBeInTheDocument();
-    });
-
-    it('renders the QR code with the correct address value', () => {
-      render(<ReceiveScreen account={MAINNET_ACCOUNT} />);
-      const qr = screen.getByTestId('qr-code-svg');
-      expect(qr).toBeInTheDocument();
-      expect(qr).toHaveAttribute('data-value', MAINNET_ACCOUNT.publicKey);
-    });
-
-    it('renders the QR code without a name', () => {
-      render(<ReceiveScreen account={TESTNET_ACCOUNT} network="testnet" />);
-      const qr = screen.getByTestId('qr-code-svg');
-      expect(qr).toHaveAttribute('data-value', TESTNET_ACCOUNT.publicKey);
-    });
-
-    it('shows the optional account name', () => {
-      render(<ReceiveScreen account={MAINNET_ACCOUNT} />);
-      expect(screen.getByText('Primary Wallet')).toBeInTheDocument();
-    });
-
-    it('does not render the account name when not provided', () => {
-      render(<ReceiveScreen account={TESTNET_ACCOUNT} network="testnet" />);
-      expect(screen.queryByText('Primary Wallet')).not.toBeInTheDocument();
-    });
-
-    it('renders the address display label', () => {
-      render(<ReceiveScreen account={MAINNET_ACCOUNT} />);
-      expect(screen.getByText('Your address')).toBeInTheDocument();
     });
   });
 
-  describe('network indicator', () => {
-    it('shows "Mainnet" badge by default', () => {
-      render(<ReceiveScreen account={MAINNET_ACCOUNT} />);
-      expect(screen.getByText('Mainnet')).toBeInTheDocument();
+  describe('rendering', () => {
+    it('renders the screen title', () => {
+      renderReceive(<ReceiveScreen smartAccountId={SMART_ACCOUNT_ID} />);
+      expect(screen.getByRole('heading', { name: /receive/i })).toBeInTheDocument();
     });
 
-    it('shows "Testnet" badge when network is testnet', () => {
-      render(<ReceiveScreen account={TESTNET_ACCOUNT} network="testnet" />);
-      expect(screen.getByText('Testnet')).toBeInTheDocument();
+    it('renders the QR code with the SEP-7 payment URI', () => {
+      renderReceive(<ReceiveScreen smartAccountId={SMART_ACCOUNT_ID} network="testnet" />);
+      const qr = screen.getByTestId('qr-code-svg');
+      expect(qr).toBeInTheDocument();
+      expect(qr).toHaveAttribute(
+        'data-value',
+        `web+stellar:pay?destination=${encodeURIComponent(SMART_ACCOUNT_ID)}&network=testnet`
+      );
     });
 
-    it('shows "Futurenet" badge when network is futurenet', () => {
-      render(<ReceiveScreen account={TESTNET_ACCOUNT} network="futurenet" />);
-      expect(screen.getByText('Futurenet')).toBeInTheDocument();
+    it('renders wallet name and share action', () => {
+      renderReceive(<ReceiveScreen smartAccountId={SMART_ACCOUNT_ID} walletName="Ancore Wallet" />);
+      expect(screen.getByText('Ancore Wallet')).toBeInTheDocument();
+      expect(screen.getByRole('button', { name: /share address/i })).toBeInTheDocument();
+    });
+
+    it('renders owner public key hint when provided', () => {
+      renderReceive(
+        <ReceiveScreen smartAccountId={SMART_ACCOUNT_ID} ownerPublicKey={OWNER_PUBLIC_KEY} />
+      );
+      expect(screen.getByText(/Owner key:/i)).toBeInTheDocument();
+    });
+
+    it('does not render owner public key when not provided', () => {
+      renderReceive(<ReceiveScreen smartAccountId={SMART_ACCOUNT_ID} />);
+      expect(screen.queryByText(/Owner key:/i)).not.toBeInTheDocument();
     });
   });
 
   describe('navigation', () => {
-    it('calls onBack when the back button is clicked', async () => {
+    it('calls onBack when the close button is clicked', async () => {
       const user = userEvent.setup();
       const handleBack = vi.fn();
-      render(<ReceiveScreen account={MAINNET_ACCOUNT} onBack={handleBack} />);
+      renderReceive(<ReceiveScreen smartAccountId={SMART_ACCOUNT_ID} onBack={handleBack} />);
 
-      await user.click(screen.getByRole('button', { name: /go back/i }));
+      await user.click(screen.getByRole('button', { name: /close/i }));
 
       expect(handleBack).toHaveBeenCalledTimes(1);
     });
+
+    it('does not render close button when onBack is not provided', () => {
+      renderReceive(<ReceiveScreen smartAccountId={SMART_ACCOUNT_ID} />);
+      expect(screen.queryByRole('button', { name: /close/i })).not.toBeInTheDocument();
+    });
   });
 
-  describe('copy address', () => {
-    it('copies the address to the clipboard when the copy button is clicked', async () => {
+  describe('copy addresses', () => {
+    it('copies the smart account ID when copy address is clicked', async () => {
       const user = userEvent.setup();
       const writeText = vi.spyOn(navigator.clipboard, 'writeText');
       writeText.mockResolvedValue(undefined);
 
-      render(<ReceiveScreen account={MAINNET_ACCOUNT} />);
+      renderReceive(<ReceiveScreen smartAccountId={SMART_ACCOUNT_ID} />);
 
-      const copyBtn = screen.getByRole('button', { name: /copy address/i });
-      await user.click(copyBtn);
+      await user.click(screen.getByRole('button', { name: /copy address/i }));
 
-      expect(writeText).toHaveBeenCalledWith(MAINNET_ACCOUNT.publicKey);
+      expect(writeText).toHaveBeenCalledWith(SMART_ACCOUNT_ID);
     });
 
-    it('shows a confirmation checkmark after copying', async () => {
+    it('shows copied feedback after copying', async () => {
       const user = userEvent.setup();
       vi.spyOn(navigator.clipboard, 'writeText').mockResolvedValue(undefined);
 
-      render(<ReceiveScreen account={MAINNET_ACCOUNT} />);
+      renderReceive(<ReceiveScreen smartAccountId={SMART_ACCOUNT_ID} />);
 
       await user.click(screen.getByRole('button', { name: /copy address/i }));
 
       await waitFor(() => {
-        // After copying the button aria-label changes inside AddressDisplay
-        // The icon swaps to a check – verify the button is still in the DOM
-        expect(screen.getByRole('button', { name: /copy address/i })).toBeInTheDocument();
+        expect(screen.getByText('Copied')).toBeInTheDocument();
       });
     });
   });
 
-  describe('print', () => {
-    it('renders a print button', () => {
-      render(<ReceiveScreen account={MAINNET_ACCOUNT} />);
-      expect(screen.getByRole('button', { name: /print qr code/i })).toBeInTheDocument();
+  describe('QR generation', () => {
+    it('encodes SEP-7 payment URI in the QR code', () => {
+      const smartAccountId = 'CA3D5K7UQJZ5BFPZ5G2FYJ3GX7CJYJ2CQZ5BFPZ5G2FYJ3GX7CJYJ2C';
+      renderReceive(<ReceiveScreen smartAccountId={smartAccountId} network="testnet" />);
+      const expectedUri = `web+stellar:pay?destination=${encodeURIComponent(smartAccountId)}&network=testnet`;
+      expect(screen.getByTestId('qr-code-svg')).toHaveAttribute('data-value', expectedUri);
     });
 
-    it('calls window.print when the print button is clicked', async () => {
-      const user = userEvent.setup();
-      const printSpy = vi.spyOn(window, 'print').mockImplementation(() => {});
+    it('renders a different QR value when network changes', () => {
+      const { rerender } = renderReceive(
+        <ReceiveScreen smartAccountId={SMART_ACCOUNT_ID} network="testnet" />
+      );
+      const testnetUri = `web+stellar:pay?destination=${encodeURIComponent(SMART_ACCOUNT_ID)}&network=testnet`;
+      expect(screen.getByTestId('qr-code-svg')).toHaveAttribute('data-value', testnetUri);
 
-      render(<ReceiveScreen account={MAINNET_ACCOUNT} />);
-      await user.click(screen.getByRole('button', { name: /print qr code/i }));
-
-      expect(printSpy).toHaveBeenCalledTimes(1);
-      printSpy.mockRestore();
+      rerender(
+        <NotificationProvider>
+          <ReceiveScreen smartAccountId={SMART_ACCOUNT_ID} network="mainnet" />
+        </NotificationProvider>
+      );
+      const mainnetUri = `web+stellar:pay?destination=${encodeURIComponent(SMART_ACCOUNT_ID)}&network=mainnet`;
+      expect(screen.getByTestId('qr-code-svg')).toHaveAttribute('data-value', mainnetUri);
     });
   });
 
-  describe('QR generation', () => {
-    it('encodes exactly the publicKey in the QR code', () => {
-      const publicKey = 'GD6SZQJNKL3ZYXPWLUVFXZNXUVXJTQPWMQHZMDMQHLS5VNLQBQNPFLM';
-      render(<ReceiveScreen account={{ publicKey }} />);
-      expect(screen.getByTestId('qr-code-svg')).toHaveAttribute('data-value', publicKey);
-    });
-
-    it('renders a different QR value when account changes', () => {
-      const { rerender } = render(<ReceiveScreen account={MAINNET_ACCOUNT} />);
-      expect(screen.getByTestId('qr-code-svg')).toHaveAttribute(
-        'data-value',
-        MAINNET_ACCOUNT.publicKey
-      );
-
-      rerender(<ReceiveScreen account={TESTNET_ACCOUNT} />);
-      expect(screen.getByTestId('qr-code-svg')).toHaveAttribute(
-        'data-value',
-        TESTNET_ACCOUNT.publicKey
-      );
+  describe('download QR', () => {
+    it('renders a download QR control', () => {
+      renderReceive(<ReceiveScreen smartAccountId={SMART_ACCOUNT_ID} />);
+      expect(screen.getByRole('button', { name: /download qr/i })).toBeInTheDocument();
     });
   });
 });

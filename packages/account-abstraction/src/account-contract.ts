@@ -12,6 +12,7 @@ import {
   publicKeyToBytes32ScVal,
   scValToAddress,
   scValToOptionalSessionKey,
+  scValToU32,
   scValToU64,
   symbolToScVal,
   u64ToScVal,
@@ -22,6 +23,7 @@ import {
   type ExecuteOptions,
   type ExecuteResult,
 } from './execute';
+import type { SimulationError } from './types/simulation';
 
 /** Options for read calls (getOwner, getNonce, getSessionKey) when using a server */
 export interface AccountContractReadOptions {
@@ -43,14 +45,6 @@ export interface InvocationArgs {
 export interface AccountContractWriteResult {
   invocation: InvocationArgs;
   operation: ReturnType<AccountContract['buildInvokeOperation']>;
-}
-
-interface SimulateErrorShape {
-  error?: string;
-  message?: string;
-  result?: {
-    retval?: xdr.ScVal;
-  };
 }
 
 /**
@@ -149,6 +143,17 @@ export class AccountContract {
   }
 
   /**
+   * Build invocation for refresh_session_key_ttl(public_key).
+   * Extends Soroban persistent storage TTL; does not change logical expires_at.
+   */
+  refreshSessionKeyTtl(publicKey: string | Uint8Array): InvocationArgs {
+    return {
+      method: 'refresh_session_key_ttl',
+      args: [publicKeyToBytes32ScVal(publicKey)],
+    };
+  }
+
+  /**
    * Build invocation for get_session_key(public_key).
    * Use getSessionKey() with options.server to run the read and decode the result.
    */
@@ -171,6 +176,13 @@ export class AccountContract {
    */
   getNonceInvocation(): InvocationArgs {
     return { method: 'get_nonce', args: [] };
+  }
+
+  /**
+   * Build invocation for get_version (read-only).
+   */
+  getVersionInvocation(): InvocationArgs {
+    return { method: 'get_version', args: [] };
   }
 
   /**
@@ -201,6 +213,15 @@ export class AccountContract {
   async getNonce(options: AccountContractReadOptions): Promise<number> {
     const result = await this.simulateRead('get_nonce', [], options);
     return scValToU64(result);
+  }
+
+  /**
+   * Get the contract's current version. Returns 0 if the version key is absent
+   * (pre-initialize state). Requires server and source account for simulation.
+   */
+  async getVersion(options: AccountContractReadOptions): Promise<number> {
+    const result = await this.simulateRead('get_version', [], options);
+    return scValToU32(result);
   }
 
   /**
@@ -271,7 +292,7 @@ export class AccountContract {
 
     const raw = txBuilder.build();
 
-    const sim = (await server.simulateTransaction(raw)) as SimulateErrorShape;
+    const sim = (await server.simulateTransaction(raw)) as SimulationError;
 
     if (sim && typeof sim === 'object' && ('error' in sim || 'message' in sim)) {
       const errMsg =

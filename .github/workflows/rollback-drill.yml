@@ -50,10 +50,12 @@ jobs:
         id: tags
         run: |
           if [[ "${{ github.event_name }}" == "workflow_dispatch" ]]; then
-            echo "release_tag=${{ github.event.inputs.release_tag }}"   >> "$GITHUB_OUTPUT"
-            echo "previous_tag=${{ github.event.inputs.previous_tag }}" >> "$GITHUB_OUTPUT"
-            echo "dry_run=${{ github.event.inputs.dry_run }}"           >> "$GITHUB_OUTPUT"
-            echo "env=${{ github.event.inputs.env }}"                   >> "$GITHUB_OUTPUT"
+            {
+              echo "release_tag=${{ github.event.inputs.release_tag }}"
+              echo "previous_tag=${{ github.event.inputs.previous_tag }}"
+              echo "dry_run=${{ github.event.inputs.dry_run }}"
+              echo "env=${{ github.event.inputs.env }}"
+            } >> "$GITHUB_OUTPUT"
           else
             # Scheduled: use the two most recent semver tags
             TAGS=$(git tag --sort=-version:refname | grep -E '^v[0-9]+\.[0-9]+\.[0-9]+$' | head -2)

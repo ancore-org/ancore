@@ -9,7 +9,8 @@ export const AA_VERSION = '0.1.0';
 export { AccountContract } from './account-contract';
 export type { AccountContractReadOptions, InvocationArgs } from './account-contract';
 
-export { getOwner, getNonce } from './get-owner-nonce';
+export { getOwner, getNonce, getVersion } from './get-owner-nonce';
+export { getSessionKey } from './get-session-key';
 
 export {
   AccountContractError,
@@ -28,6 +29,8 @@ export {
 } from './errors';
 export { toCanonicalError as toCanonicalAccountError } from './errors';
 
+export { StrKeyValidationError } from './strkey-validation';
+
 export {
   addressToScVal,
   decodeAddSessionKeyArgs,
@@ -39,6 +42,7 @@ export {
   decodeOwnerResult,
   decodeRevokeSessionKeyArgs,
   decodeSessionKeyResult,
+  decodeVersionResult,
   decodeVoidResult,
   publicKeyToBytes32ScVal,
   u64ToScVal,
@@ -50,6 +54,7 @@ export {
   encodeInitializeArgs,
   encodeRevokeSessionKeyArgs,
   scValToAddress,
+  scValToU32,
   scValToU64,
   bytes32ScValToPublicKey,
   scValToSessionKey,
@@ -64,9 +69,52 @@ export {
 } from './permission-formatter';
 
 export {
+  ALL_SESSION_PERMISSIONS,
+  PERM_BITS,
+  PERMISSION_EXECUTE,
+  bitmaskToContractVec,
+  bitmaskToPermissions,
+  contractVecToPermissions,
+  hasPermission,
+  permissionsToBitmask,
+  permissionsToContractVec,
+  togglePermission,
+} from './permissions';
+
+export {
   NonceDriftKind,
   NONCE_DRIFT_RETRY_GUIDANCE,
   isValidNonce,
   detectNonceDrift,
 } from './nonce-drift';
 export type { NonceDriftResult, NonceDriftOptions } from './nonce-drift';
+
+export type { SimulationResult, SimulationError } from './types/simulation';
+
+export { TransactionBuilder } from './transaction-builder';
+export type {
+  TransactionBuilderOptions,
+  ContractExecuteParams,
+  RefreshSessionKeyTtlParams,
+} from './transaction-builder';
+
+export {
+  PasskeyError,
+  PasskeyNotSupportedError,
+  PasskeyRegistrationError,
+  PasskeySigningError,
+  isPasskeyNotSupportedError,
+  isPasskeyRegistrationError,
+  isPasskeySigningError,
+  registerPasskey,
+  buildAddSessionKeyInvocation,
+  signRelayPayload,
+} from './passkey/passkeyModule';
+export type {
+  P256PublicKey,
+  PasskeyRegistrationResult,
+  PasskeySignatureResult,
+  RegisterPasskeyOptions,
+  SignRelayPayloadOptions,
+  UnsignedRelayPayload,
+} from './passkey/passkeyModule';

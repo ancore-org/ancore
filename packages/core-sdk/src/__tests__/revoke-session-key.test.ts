@@ -5,6 +5,7 @@ import {
   AncoreClient,
   BuilderValidationError,
   SessionKeyManagementError,
+  StrKeyValidationError,
   type RevokeSessionKeyParams,
 } from '../index';
 
@@ -111,9 +112,21 @@ describe('revokeSessionKey', () => {
     expect(() =>
       client.revokeSessionKey({
         ...params,
-        publicKey: 'BADKEY',
       })
     ).toThrow(BuilderValidationError);
+  });
+
+  it('rejects invalid StrKey public key before delegation', () => {
+    const client = new AncoreClient({ accountContractId: CONTRACT_ID });
+
+    expect(() =>
+      client.revokeSessionKey({
+        ...params,
+        publicKey: 'BADKEY',
+      })
+    ).toThrow(StrKeyValidationError);
+
+    expect(mockedAccountAbstraction.__mocked.revokeSessionKey).not.toHaveBeenCalled();
   });
 
   it('rejects malformed public parameters before delegation', () => {

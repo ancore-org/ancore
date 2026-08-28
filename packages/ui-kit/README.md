@@ -220,29 +220,52 @@ Inherits from Tailwind's default typography scale.
 
 ## Dark Mode
 
-Enable dark mode by adding the `dark` class to your root element:
+The ui-kit uses Tailwind's class-based dark mode strategy. Consumers must put the
+`dark` class on the document root (`<html>`), not on an inner app container, so
+all portal, dialog, and overlay components inherit the same theme tokens.
 
 ```tsx
 <html className="dark">{/* Your app */}</html>
 ```
 
-Or toggle dynamically:
+### App and extension setup
+
+1. Import `@ancore/ui-kit/dist/styles/globals.css` once in your application entry.
+2. Extend the ui-kit Tailwind preset and include ui-kit output in `content`.
+3. Persist the user's theme preference in app storage. Browser extensions should
+   read that preference before rendering and set `class="dark"` on `document.documentElement`.
+4. Toggle by adding or removing the `dark` class on `<html>`; avoid wrapping only
+   the extension popup or dashboard shell because Radix portals render outside
+   those wrappers.
 
 ```tsx
 function ThemeToggle() {
   const [isDark, setIsDark] = useState(false);
 
   useEffect(() => {
-    if (isDark) {
-      document.documentElement.classList.add('dark');
-    } else {
-      document.documentElement.classList.remove('dark');
-    }
+    document.documentElement.classList.toggle('dark', isDark);
+    localStorage.setItem('ancore-theme', isDark ? 'dark' : 'light');
   }, [isDark]);
 
   return <Button onClick={() => setIsDark(!isDark)}>Toggle Theme</Button>;
 }
 ```
+
+### Token enforcement
+
+Components should use semantic Tailwind tokens such as `bg-background`,
+`text-foreground`, `border-border`, `bg-primary`, `text-muted-foreground`,
+`bg-success`, `bg-warning`, and `bg-info`. Avoid hardcoded palette utilities such
+as `bg-white`, `text-black`, `bg-gray-800`, or raw hex colors in ui-kit source.
+
+Run the verifier before opening a ui-kit PR:
+
+```bash
+pnpm --dir packages/ui-kit verify:theme-tokens
+```
+
+The ui-kit lint script runs the same verifier so CI fails when exported ui-kit
+components reintroduce hardcoded colors.
 
 ## Development
 

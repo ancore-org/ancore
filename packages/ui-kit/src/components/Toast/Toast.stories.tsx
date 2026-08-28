@@ -7,25 +7,25 @@ function ToastDemo() {
   return (
     <div className="flex flex-col gap-3 w-64">
       <button
-        className="rounded bg-green-600 px-4 py-2 text-white text-sm"
+        className="rounded bg-success px-4 py-2 text-sm text-success-foreground"
         onClick={() => showSuccess('Transaction sent successfully!')}
       >
         Show Success
       </button>
       <button
-        className="rounded bg-red-600 px-4 py-2 text-white text-sm"
+        className="rounded bg-destructive px-4 py-2 text-sm text-destructive-foreground"
         onClick={() => showError('Failed to send transaction')}
       >
         Show Error
       </button>
       <button
-        className="rounded bg-yellow-500 px-4 py-2 text-white text-sm"
+        className="rounded bg-warning px-4 py-2 text-sm text-warning-foreground"
         onClick={() => showWarning('Low balance detected')}
       >
         Show Warning
       </button>
       <button
-        className="rounded bg-blue-600 px-4 py-2 text-white text-sm"
+        className="rounded bg-info px-4 py-2 text-sm text-info-foreground"
         onClick={() => showInfo('Address copied to clipboard')}
       >
         Show Info
@@ -58,7 +58,7 @@ export const QueueDemo: Story = {
     const { toast } = useToast();
     return (
       <button
-        className="rounded bg-gray-800 px-4 py-2 text-white text-sm"
+        className="rounded bg-primary px-4 py-2 text-sm text-primary-foreground"
         onClick={() => {
           toast('First message', 'success');
           toast('Second message', 'info');

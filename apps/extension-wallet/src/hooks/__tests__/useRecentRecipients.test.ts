@@ -6,6 +6,7 @@ const mockGetRecentRecipients = vi.fn();
 const mockSaveRecentRecipients = vi.fn();
 
 vi.mock('@ancore/core-sdk', () => ({
+  ChromeStorageAdapter: class {},
   SecureStorageManager: class {
     get isUnlocked() {
       return true;
@@ -13,7 +14,6 @@ vi.mock('@ancore/core-sdk', () => ({
     getRecentRecipients = mockGetRecentRecipients;
     saveRecentRecipients = mockSaveRecentRecipients;
   },
-  createStorageAdapter: () => ({}),
 }));
 
 describe('useRecentRecipients', () => {

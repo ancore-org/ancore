@@ -63,6 +63,25 @@ export const WithLabel: Story = {
   ),
 };
 
+export const WithError: Story = {
+  args: {
+    id: 'amount',
+    placeholder: 'Enter amount',
+    error: 'Amount must be greater than 0',
+  },
+};
+
+export const WithErrorAndLabel: Story = {
+  render: () => (
+    <div className="w-[350px] space-y-1">
+      <label htmlFor="recipient" className="text-sm font-medium">
+        Recipient Address
+      </label>
+      <Input id="recipient" placeholder="G..." error="Invalid Stellar address" />
+    </div>
+  ),
+};
+
 export const FormExample: Story = {
   render: () => (
     <div className="w-[350px] space-y-4">

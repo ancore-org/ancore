@@ -3,7 +3,7 @@
   "compilerOptions": {
     "rootDir": "./src",
     "outDir": "./dist",
-    "composite": false,
+    "composite": true,
     "declarationDir": "./dist",
     "tsBuildInfoFile": "./dist/.tsbuildinfo"
   },

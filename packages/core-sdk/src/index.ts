@@ -16,12 +16,27 @@ export {
   type WalletMaterial,
 } from './wallet';
 
+// Create wallet orchestration (standalone + exposed via AncoreClient.createWallet)
+export {
+  createWallet as createWalletOrchestration,
+  type CreateWalletParams,
+  type CreateWalletResult,
+} from './create-wallet';
+
 // Client
 export { AncoreClient, type AncoreClientOptions } from './ancore-client';
 
 // Session key helpers
 export { addSessionKey, type AddSessionKeyParams } from './add-session-key';
 export { revokeSessionKey, type RevokeSessionKeyParams } from './revoke-session-key';
+export {
+  refreshSessionKeyTtl,
+  parseSessionKeyTtlRefreshedEvent,
+  type RefreshSessionKeyTtlParams,
+  type RefreshSessionKeyTtlOptions,
+  type RefreshSessionKeyTtlResult,
+  type SessionKeyTtlRefreshedEvent,
+} from './refresh-session-key-ttl';
 export {
   permissionToLabel,
   permissionsToLabels,
@@ -66,6 +81,7 @@ export {
 export {
   AncoreSdkError,
   BuilderValidationError,
+  InvalidRetryPresetError,
   SessionKeyExecutionError,
   SessionKeyExecutionValidationError,
   SessionKeyManagementError,
@@ -74,6 +90,9 @@ export {
   TransactionSubmissionError,
   PaymentRequestValidationError,
   InvalidAmountError,
+  StrKeyValidationError,
+  assertValidEd25519PublicKey,
+  assertValidContractId,
 } from './errors';
 
 // Normalization helpers
@@ -90,6 +109,23 @@ export {
   getRetryPreset,
 } from './retry-presets';
 
+// Account sequence fetch helper — re-exported from @ancore/stellar for SDK consumers.
+// Use fetchAccountSequence to retrieve a Stellar account's current sequence number
+// before building transactions in the send flow.
+//
+// Example:
+//   import { fetchAccountSequence } from '@ancore/core-sdk';
+//   const { sequence } = await fetchAccountSequence(horizonServer, publicKey, {
+//     maxRetries: 3,
+//     cacheTtlMs: 5_000,
+//   });
+export {
+  fetchAccountSequence,
+  clearSequenceCache,
+  type AccountSequenceResult,
+  type FetchAccountSequenceOptions,
+} from '@ancore/stellar';
+
 // Scheduled transfers
 export {
   HttpSchedulerClient,
@@ -97,14 +133,25 @@ export {
   getSchedulerClient,
   resetSchedulerClientForTests,
   resolveRelayerBaseUrl,
-  buildDefaultRelayPayload,
   toIsoStartAt,
   defaultScheduleStartAt,
   SCHEDULE_FREQUENCY_OPTIONS,
   DEMO_ACCOUNT_ADDRESS,
+  ConfigError,
   type SchedulerClient,
   type SchedulerClientOptions,
 } from './scheduler-client';
+
+// Real relay-payload signing (issue #1213 — replaces the removed
+// buildDefaultRelayPayload, which hardcoded a fake sessionKey/signature).
+export {
+  buildRelayCanonicalPayload,
+  buildSignedRelayPayload,
+  type CanonicalPayloadInput,
+  type RelaySigner,
+  type RelayExecuteParameters,
+  type SignedRelayPayload,
+} from './relay-payload';
 
 export {
   mapExecuteWithSessionKeyError,
@@ -129,6 +176,7 @@ export { getSessionKeys, type GetSessionKeysDeps } from './storage/get-session-k
 export type {
   AccountData,
   EncryptedPayload,
+  PlatformStorageAdapter,
   RecentRecipient,
   RecentRecipientsData,
   SessionKeysData,
@@ -155,3 +203,17 @@ export {
   StorageError,
   StorageErrorCode,
 } from './storage/storage-adapter';
+export * from './signing/ledger-adapter';
+
+// Invoice lifecycle
+export {
+  InvoiceClient,
+  InvoiceClientError,
+  type InvoiceClientOptions,
+  type PayInvoiceParams,
+  type OpenInvoiceResult,
+  type PayInvoiceResult,
+  type CancelInvoiceResult,
+  type ExpireInvoiceResult,
+  type ListInvoicesResult,
+} from './invoice-client';

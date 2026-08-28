@@ -174,3 +174,82 @@ export function detectNonceDrift(
     retryGuidance: NONCE_DRIFT_RETRY_GUIDANCE[NonceDriftKind.ObservedBehind],
   };
 }
+
+// ── fetchAndIncrementNonce (#862) ─────────────────────────────────────────────
+
+/** Fetches the on-chain nonce for an account. */
+export type NonceFetcher = (accountAddress: string) => Promise<number>;
+
+/** Options for `fetchAndIncrementNonce`. */
+export interface FetchAndIncrementNonceOptions {
+  /**
+   * Maximum number of retries on `InvalidNonce` errors before giving up.
+   * @default 3
+   */
+  maxRetries?: number;
+  /**
+   * Base delay in milliseconds between retries (doubles each attempt).
+   * @default 200
+   */
+  baseDelayMs?: number;
+}
+
+/**
+ * Fetch the current on-chain nonce for `accountAddress` and return the next
+ * nonce to use (`observed + 1`).
+ *
+ * Retries automatically when the underlying fetcher throws an error whose
+ * message contains `"InvalidNonce"`, applying exponential backoff.  All
+ * other errors are rethrown immediately.
+ *
+ * @param accountAddress - The account whose nonce to fetch.
+ * @param fetchNonce     - Async function that reads the current nonce from chain.
+ * @param options        - Optional retry configuration.
+ * @returns The next nonce value to include in the transaction (`observed + 1`).
+ *
+ * @example
+ * ```ts
+ * const nonce = await fetchAndIncrementNonce(
+ *   'G...',
+ *   (addr) => sorobanRpc.getAccount(addr).then(a => a.sequenceNumber),
+ * );
+ * ```
+ */
+export async function fetchAndIncrementNonce(
+  accountAddress: string,
+  fetchNonce: NonceFetcher,
+  options?: FetchAndIncrementNonceOptions
+): Promise<number> {
+  const maxRetries = options?.maxRetries ?? 3;
+  const baseDelayMs = options?.baseDelayMs ?? 200;
+
+  let lastError: unknown;
+
+  for (let attempt = 0; attempt <= maxRetries; attempt++) {
+    try {
+      const current = await fetchNonce(accountAddress);
+
+      if (!isValidNonce(current)) {
+        throw new Error(
+          `fetchAndIncrementNonce: fetcher returned invalid nonce ${current} for ${accountAddress}`
+        );
+      }
+
+      return current + 1;
+    } catch (err) {
+      lastError = err;
+
+      const isInvalidNonce = err instanceof Error && err.message.includes('InvalidNonce');
+
+      if (!isInvalidNonce || attempt === maxRetries) {
+        throw err;
+      }
+
+      // Exponential backoff before retry
+      const delay = baseDelayMs * Math.pow(2, attempt);
+      await new Promise((resolve) => globalThis.setTimeout(resolve, delay));
+    }
+  }
+
+  throw lastError;
+}

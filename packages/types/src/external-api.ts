@@ -1,0 +1,180 @@
+/**
+ * External API Types for dApp Integration
+ *
+ * Defines the message types and data structures for communication
+ * between dApps and the Ancore wallet extension via content scripts.
+ */
+
+/**
+ * External API method names that dApps can call.
+ * These correspond to the methods in @ancore/wallet-api SDK.
+ */
+export enum ExternalApiMethodName {
+  REQUEST_ACCESS = 'requestAccess',
+  CONNECT = 'connect',
+  GET_ADDRESS = 'getAddress',
+  GET_NETWORK = 'getNetwork',
+  IS_CONNECTED = 'isConnected',
+  GET_SMART_ACCOUNT = 'getSmartAccount',
+  GET_PUBLIC_KEY = 'getPublicKey',
+  SIGN_TRANSACTION = 'signTransaction',
+  SIGN_AUTH_ENTRY = 'signAuthEntry',
+  SIGN_MESSAGE = 'signMessage',
+  SIGN_RELAY_PAYLOAD = 'signRelayPayload',
+  REQUEST_SESSION_KEY = 'requestSessionKey',
+}
+
+/**
+ * Request message sent from dApp → content script → background.
+ */
+export interface ExternalApiRequest {
+  readonly type: 'EXTERNAL_API_REQUEST';
+  readonly method: ExternalApiMethodName;
+  readonly requestId: string;
+  readonly params: unknown;
+  readonly origin: string;
+}
+
+/**
+ * Response message sent from background → content script → dApp.
+ */
+export interface ExternalApiResponse {
+  readonly type: 'EXTERNAL_API_RESPONSE';
+  readonly requestId: string;
+  readonly ok: boolean;
+  readonly result?: unknown;
+  readonly error?: string;
+}
+
+/**
+ * Context provided to external handlers.
+ */
+export interface ExternalHandlerContext {
+  readonly origin: string;
+  readonly params: unknown;
+  readonly requestId: string;
+  readonly sender: {
+    readonly origin?: string;
+    readonly tab?: { id?: number };
+    readonly id?: string;
+  };
+}
+
+/**
+ * Handler function for external API methods.
+ */
+export type ExternalHandler = (ctx: ExternalHandlerContext) => Promise<unknown>;
+
+/**
+ * Allowlist entry keyed by (network, smartAccountId, origin).
+ */
+export interface AllowlistEntry {
+  readonly network: string;
+  readonly smartAccountId: string;
+  readonly origin: string;
+  readonly approvedAt: number; // Unix timestamp
+}
+
+/**
+ * Storage key for the allowlist.
+ */
+export const ALLOWLIST_STORAGE_KEY = 'ancore_allowlist';
+
+/**
+ * Approval queue entry for pending user approvals.
+ */
+export interface ApprovalQueueEntry {
+  readonly requestId: string;
+  readonly origin: string;
+  readonly method: ExternalApiMethodName;
+  readonly params: unknown;
+  readonly timestamp: number;
+}
+
+/**
+ * Result from requestAccess handler.
+ */
+export interface RequestAccessResult {
+  readonly smartAccountId: string;
+  readonly network: string;
+}
+
+/**
+ * Result from getAddress handler.
+ */
+export interface GetAddressResult {
+  readonly address: string; // Smart account C-address
+  readonly network: string;
+}
+
+/**
+ * Result from getNetwork handler.
+ */
+export interface GetNetworkResult {
+  readonly network: string;
+  readonly networkPassphrase: string;
+}
+
+/**
+ * Result from isConnected handler.
+ */
+export interface IsConnectedResult {
+  readonly connected: boolean;
+}
+
+/**
+ * Result from getSmartAccount handler.
+ */
+export interface GetSmartAccountResult {
+  readonly contractId: string;
+  readonly deploymentStatus: 'deployed' | 'pending' | 'not_deployed' | 'unknown';
+  readonly network: string;
+}
+
+/**
+ * Result from signTransaction handler.
+ */
+export interface SignTransactionResult {
+  readonly signedXdr: string;
+}
+
+/**
+ * Result from signAuthEntry handler.
+ */
+export interface SignAuthEntryResult {
+  readonly signedAuthEntry: string;
+}
+
+/**
+ * Result from signMessage handler.
+ */
+export interface SignMessageResult {
+  readonly signature: string;
+}
+
+/**
+ * Result from getPublicKey handler.
+ * Returns the deployed smart-account C-address as the wallet's public identity.
+ */
+export interface GetPublicKeyResult {
+  readonly publicKey: string;
+}
+
+/**
+ * Params for signRelayPayload handler (issue #1213).
+ */
+export interface SignRelayPayloadParams {
+  readonly operation: string;
+  readonly nonce: number;
+}
+
+/**
+ * Result from signRelayPayload handler.
+ * The wallet computes its own sessionKey (real public key) and signs the
+ * canonical payload internally, returning both atomically — the caller never
+ * needs a separate "get my public key" round trip.
+ */
+export interface SignRelayPayloadResult {
+  readonly sessionKey: string;
+  readonly signature: string;
+}

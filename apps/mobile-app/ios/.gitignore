@@ -1,0 +1,7 @@
+Pods/
+build/
+*.xcworkspace
+*.hmap
+*.ipa
+DerivedData/
+.xcode.env.local

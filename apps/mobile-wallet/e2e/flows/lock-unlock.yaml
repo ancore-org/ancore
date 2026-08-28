@@ -1,0 +1,17 @@
+appId: org.ancore.wallet.dev
+---
+- launchApp
+- tapOn: "Unlock Wallet"
+- tapOn: "Use Password Instead"
+- tapOn: "Password"
+- inputText: ${E2E_TEST_PASSWORD}
+- tapOn: "Continue"
+- assertVisible: "Settings"
+- tapOn: "Settings"
+- tapOn: "Lock wallet"
+- assertVisible: "Unlock Wallet"
+- tapOn: "Use Password Instead"
+- tapOn: "Password"
+- inputText: ${E2E_TEST_PASSWORD}
+- tapOn: "Continue"
+- assertVisible: "Account"

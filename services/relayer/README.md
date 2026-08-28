@@ -4,6 +4,52 @@ Transaction relay service for the Ancore account abstraction layer. Accepts sign
 
 ---
 
+## Quickstart
+
+Two ways to get a relayer answering on localhost. Full stack setup — Postgres, indexer, health
+checks, teardown, troubleshooting — lives in
+**[docs/development/local-services.md](../../docs/development/local-services.md)**.
+
+### Option A — Docker Compose (relayer + indexer + Postgres)
+
+Use this when you need the whole stack, e.g. to see relayed transactions appear in the indexer.
+
+```bash
+# From the repository root
+docker compose -f docker-compose.dev.yml up
+
+# Verify (compose maps the relayer to host port 3001)
+curl http://localhost:3001/relay/status
+```
+
+Teardown: `docker compose -f docker-compose.dev.yml down` (add `-v` to drop the Postgres volume).
+See [Local Services Setup → Quick Start](../../docs/development/local-services.md#quick-start).
+
+### Option B — pnpm only (relayer alone)
+
+Fastest loop when you are working on the relayer itself.
+
+```bash
+# From the repository root
+pnpm install
+pnpm --filter @ancore/relayer build
+
+# Dev-only: skip real Stellar submission, no RPC node needed. See "Mock mode" below.
+RELAYER_USE_MOCK_SUBMISSION=true pnpm --filter @ancore/relayer start
+
+# Verify (defaults to host port 3000)
+curl http://localhost:3000/relay/status
+```
+
+> **Port note:** the service listens on `PORT` (default `3000`) in both cases. Compose remaps it to
+> **3001** on the host so it does not collide with the indexer, which also uses `3000`. Point apps at
+> `http://localhost:3001` when using Compose and `http://localhost:3000` when running it directly.
+
+Wiring the wallets and dashboard to a local relayer:
+[Local Services Setup → Integration with Applications](../../docs/development/local-services.md#integration-with-applications).
+
+---
+
 ## Deployment Requirements
 
 | Requirement     | Value                            |
@@ -14,17 +60,165 @@ Transaction relay service for the Ancore account abstraction layer. Accepts sign
 
 ### Environment Variables
 
-| Variable | Required | Description                        |
-| -------- | -------- | ---------------------------------- |
-| `PORT`   | No       | HTTP listen port (default: `3000`) |
+Every variable is optional — the service boots with the defaults below. Defaults are tuned for local
+development, so read the **Prod** column before deploying.
 
-> **MVP note:** Authentication and signature verification use stub implementations. Replace `stubAuthService` and `stubSignatureService` in `src/server.ts` before production deployment.
+All variables are declared in a single Zod schema at [`src/config/env.ts`](./src/config/env.ts) and
+validated **at boot**. A value that is missing its scheme, is not a number, or falls outside the
+bounds below is a startup failure: the process prints every offending variable at once and exits
+with code `1`.
+
+```
+[relayer/env] Invalid environment configuration:
+  RELAY_RATE_LIMIT_MAX: must be at least 1
+  RPC_URL: must be a valid URL (include http:// or https://)
+
+Fix the variables listed above and restart. See services/relayer/README.md
+for the full list of supported variables, their defaults, and bounds.
+```
+
+An empty value (`FOO=`) is treated as unset and falls back to the default. Application code reads
+configuration through `getEnv()` rather than `process.env` — the one exception is `src/tracing.ts`,
+which owns the standard `OTEL_*` variables and must run before any other module is imported.
+
+**Server and auth**
+
+| Variable              | Default | Prod         | Description                                                                                                                                       |
+| --------------------- | ------- | ------------ | ------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `PORT`                | `3000`  | as needed    | HTTP listen port. Must be an integer in `1…65535`                                                                                                 |
+| `RELAYER_AUTH_SECRET` | _unset_ | **required** | Bearer token secret for protected `/relay` routes. **When unset the service falls back to a stub auth service that accepts any non-empty token.** |
+| `ALLOWED_ORIGINS`     | `*`     | **set it**   | Comma-separated CORS allowlist, e.g. `http://localhost:5173,https://app.example.com`                                                              |
+
+**Stellar network**
+
+| Variable                     | Default                               | Description                                                                                 |
+| ---------------------------- | ------------------------------------- | ------------------------------------------------------------------------------------------- |
+| `STELLAR_NETWORK`            | `testnet`                             | One of `testnet`, `mainnet`, `futurenet`, `local`. **Unrecognised values now fail at boot** |
+| `STELLAR_NETWORK_PASSPHRASE` | derived from `STELLAR_NETWORK`        | Overrides the passphrase used by the transaction submitter                                  |
+| `RPC_URL`                    | `https://soroban-testnet.stellar.org` | Soroban RPC endpoint used for on-chain session-key lookups. Must be an absolute URL         |
+| `NETWORK_PASSPHRASE`         | `Test SDF Network ; September 2015`   | Passphrase used for those session-key lookups. Must be non-empty                            |
+
+**Limits and timers**
+
+All values below must be whole numbers within the stated range. Zero, negative, fractional, and
+non-numeric values fail at boot rather than falling back to the default.
+
+| Variable                              | Default            | Range        | Description                                                               |
+| ------------------------------------- | ------------------ | ------------ | ------------------------------------------------------------------------- |
+| `RELAY_RATE_LIMIT_RPM`                | `30`               | `1…100000`   | Per-**account** requests/minute on `/relay/execute` (429 + `Retry-After`) |
+| `RELAY_RATE_LIMIT_MAX`                | `50`               | `1…1000000`  | Per-**caller/IP** requests per 15-minute window on `/relay/*`             |
+| `STATUS_RATE_LIMIT_MAX`               | `200`              | `1…1000000`  | Per-IP requests per 15-minute window on `/relay/status`                   |
+| `RELAY_MAX_PAYLOAD_BYTES`             | `524288` (512 KiB) | `1…16777216` | Request bodies above this are rejected before JSON parsing                |
+| `SCHEDULER_POLL_INTERVAL_MS`          | `1000`             | `50…3600000` | Scheduled-transfer engine poll interval                                   |
+| `SIGNATURE_SERVICE_HEALTH_TIMEOUT_MS` | `5000`             | `1…120000`   | Timeout for the signature-service health probe                            |
+
+**Dev-only flags**
+
+| Variable                      | Default | Description                                                             |
+| ----------------------------- | ------- | ----------------------------------------------------------------------- |
+| `RELAYER_USE_MOCK_SUBMISSION` | `false` | Must be exactly `true` or `false`. `true` enables mock mode — see below |
+
+#### Mock mode — never enable outside local development
+
+`RELAYER_USE_MOCK_SUBMISSION=true` makes `/relay/execute` **skip Stellar entirely**. Signature,
+nonce, and rate-limit checks still run, but instead of building and submitting a transaction the
+service returns a randomly generated `transactionId` with `gasUsed: 0` — an id that corresponds to
+nothing on any network. `/relay/status` also reports RPC as healthy (`"Mock submission mode"`)
+without contacting a node, so a broken RPC configuration looks fine.
+
+That combination is exactly what you want for a fast local loop and exactly what you must not ship:
+callers receive `success: true` for payments that never happened, and the health endpoint will not
+tell you. Enable it only via a per-shell variable (as in [Option B](#option-b--pnpm-only-relayer-alone)),
+never in a committed `.env` or deployment manifest. Mock-flag hardening — refusing to start with
+mock mode on when `NODE_ENV=production`, and surfacing the flag in the status payload — is tracked in
+[issue #968](https://github.com/ancore-org/ancore/issues/968).
+
+The same warning applies to leaving `RELAYER_AUTH_SECRET` unset: the fallback stub auth service
+accepts **any** non-empty Bearer token.
+
+> **MVP note:** signature verification is real (`Ed25519SignatureService`), but nonce replay tracking
+> and gas enforcement are not production-complete — see [Security Model](#security-model).
 
 ---
 
 ## API
 
 All endpoints accept and return `application/json`.
+
+### OpenAPI Specification
+
+The service publishes an OpenAPI 3.1 specification that documents all endpoints, request/response schemas, and authentication requirements.
+
+**Specification file:** `services/relayer/openapi.yaml`
+
+**View the spec:**
+
+```bash
+# View raw specification
+cat services/relayer/openapi.yaml
+
+# Or use a tool like Redoc locally
+npx @redocly/cli preview-docs services/relayer/openapi.yaml
+```
+
+### Generated TypeScript Types
+
+The OpenAPI specification can be used to generate TypeScript types for use in external integrations (e.g., wallet teams). This ensures type safety when calling the relayer API.
+
+**Regenerate types:**
+
+```bash
+# From repository root
+pnpm install -D openapi-typescript
+pnpm generate:openapi-types
+
+# Or run the script directly
+npx ts-node scripts/generate-openapi-types.ts
+```
+
+**Generated file:** `services/relayer/src/api/openapi-types.ts`
+
+The generated types include:
+
+- Request schemas (`RelayExecuteRequest`, `RelayValidateRequest`)
+- Response schemas (`RelayExecuteResponse`, `ValidationResult`, `HealthResponse`)
+- Error schemas (`RelayError`, `ValidationErrorResponse`)
+
+**Usage in external projects:**
+
+```typescript
+import type {
+  RelayExecuteRequest,
+  RelayExecuteResponse,
+  ValidationErrorResponse,
+} from '@ancore/relayer/src/api/openapi-types';
+
+// Type-safe request construction
+const request: RelayExecuteRequest = {
+  sessionKey: 'a'.repeat(64),
+  operation: 'relay_execute',
+  parameters: {
+    /* ... */
+  },
+  signature: 'b'.repeat(128),
+  nonce: 1,
+};
+```
+
+### Contract Tests
+
+The service includes contract tests that verify the actual API implementation matches the OpenAPI specification. These tests boot the real Express app and assert that routes, status codes, and response schemas align with the documented specification.
+
+**Run contract tests:**
+
+```bash
+pnpm --filter @ancore/relayer test -- tests/contract
+```
+
+If contract tests fail, it indicates either:
+
+1. The implementation has changed and the spec needs updating
+2. The spec has changed and the implementation needs updating
 
 ### `POST /relay/execute`
 
@@ -50,7 +244,7 @@ Execute a signed relay transaction.
 {
   "success": true,
   "transactionId": "<64-char hex>",
-  "gasUsed": 21000
+  "gasUsed": 0
 }
 ```
 
@@ -115,6 +309,7 @@ Health check. No authentication required.
 | `400`       | `VALIDATION_ERROR` — request body failed schema validation                                            |
 | `401`       | `UNAUTHORIZED` — missing or invalid Bearer token                                                      |
 | `422`       | `INVALID_SIGNATURE`, `SESSION_KEY_EXPIRED`, `NONCE_REPLAY`, `GAS_LIMIT_EXCEEDED`, `SIMULATION_FAILED` |
+| `429`       | `RATE_LIMITED` — request rate limit exceeded per account (includes `Retry-After` header)              |
 | `500`       | `INTERNAL_ERROR` — unexpected server-side error                                                       |
 
 **Client handling guide (TypeScript)**
@@ -195,7 +390,14 @@ The service rejects negative nonces at the validation layer. Full replay trackin
 
 ### Rate Limiting
 
-Not implemented in the MVP skeleton. Add an Express rate-limit middleware (e.g. `express-rate-limit`) in `src/server.ts` before exposing the service publicly.
+Per-account rate limiting is enforced via `createAccountRateLimiterMiddleware` (default: 30 requests/minute per account session key or address, configurable via `RELAY_RATE_LIMIT_RPM`).
+
+When an account exceeds its limit, the relayer returns `HTTP 429 Too Many Requests` with:
+
+- **Header:** `Retry-After: 60`
+- **Body:** `{ "error": "RATE_LIMITED", "retryAfter": 60 }`
+
+Note: uses in-memory store by default (unit-only unless a Redis store like `rate-limit-redis` is configured for multi-instance deployments).
 
 ### Gas Limit Enforcement
 
@@ -233,6 +435,10 @@ pnpm --filter @ancore/relayer test
 pnpm --filter @ancore/relayer start
 ```
 
+For the full local stack (Postgres + indexer + relayer), env file setup, log tailing, and teardown,
+see [Local Services Setup](../../docs/development/local-services.md) — summarised in
+[Quickstart](#quickstart) above.
+
 ---
 
 ## Integration Guidelines
@@ -247,6 +453,51 @@ Dependent services should:
 
 ---
 
+## Example cURL Commands
+
+**Execute a relay transaction:**
+
+```bash
+curl -X POST http://localhost:3000/relay/execute \
+  -H "Authorization: Bearer YOUR_TOKEN" \
+  -H "Content-Type: application/json" \
+  -H "idempotency-key: unique-request-id" \
+  -d '{
+    "sessionKey": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "operation": "relay_execute",
+    "parameters": {
+      "accountAddress": "GBBM6BKZPEBWYY3A3YR4IK7T7XZM5JC5K7NYGR7KDCXYBCJVPQYV5YAA",
+      "to": "GD7OEZ2NYNQXK7FLTLQZZCNY2DZV5C7M3F4TNZBAYEBQKVU5RQV6SRQQ",
+      "functionName": "transfer",
+      "args": ["base64_encoded_xdr"]
+    },
+    "signature": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+    "nonce": 1
+  }'
+```
+
+**Validate a relay transaction:**
+
+```bash
+curl -X POST http://localhost:3000/relay/validate \
+  -H "Authorization: Bearer YOUR_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "sessionKey": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "operation": "relay_execute",
+    "parameters": {
+      "accountAddress": "GBBM6BKZPEBWYY3A3YR4IK7T7XZM5JC5K7NYGR7KDCXYBCJVPQYV5YAA",
+      "to": "GD7OEZ2NYNQXK7FLTLQZZCNY2DZV5C7M3F4TNZBAYEBQKVU5RQV6SRQQ",
+      "functionName": "transfer",
+      "args": ["base64_encoded_xdr"]
+    },
+    "signature": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+    "nonce": 1
+  }'
+```
+
+---
+
 ## Project Structure
 
 ```
@@ -256,14 +507,16 @@ services/relayer/
 │   ├── handlers/         # Express route handlers (factories)
 │   ├── middleware/        # Auth and validation middleware
 │   ├── services/         # Core business logic (RelayService)
-│   ├── api/              # Zod schemas for existing API surface
+│   ├── api/              # Zod schemas and OpenAPI types
 │   ├── queue/            # In-memory job queue
 │   ├── workers/          # Queue worker
 │   └── server.ts         # App factory + entrypoint
 ├── tests/
 │   ├── unit/             # Unit tests (RelayService, middleware)
-│   └── integration/      # Supertest integration tests (all endpoints)
+│   ├── integration/      # Supertest integration tests (all endpoints)
+│   └── contract/         # OpenAPI contract tests (validate spec compliance)
 ├── package.json
 ├── tsconfig.json
+├── openapi.yaml          # OpenAPI 3.1 specification
 └── README.md
 ```

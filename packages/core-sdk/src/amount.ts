@@ -71,7 +71,7 @@ export function normalizeAmount(
   }
 
   // 4. Split and validate precision
-  const [integerPart, fractionalPart = ''] = strAmount.split('.');
+  const [, fractionalPart = ''] = strAmount.split('.');
 
   if (fractionalPart.length > precision) {
     // Only throw if the extra decimals are non-zero

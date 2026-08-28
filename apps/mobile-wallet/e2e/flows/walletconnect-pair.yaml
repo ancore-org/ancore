@@ -1,0 +1,8 @@
+appId: com.ancore.mobile
+---
+- launchApp
+- tapOn: "Scan QR"
+- pasteText: "wc:mock-pairing-uri@2?relay-protocol=irn&symKey=test"
+- assertVisible: "Approve Session"
+- tapOn: "Approve"
+- assertVisible: "Session Active"

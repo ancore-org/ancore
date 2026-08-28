@@ -1,0 +1,4 @@
+appId: org.ancore.wallet.dev
+name: Ancore mobile wallet Maestro flows
+flows:
+  - e2e/flows

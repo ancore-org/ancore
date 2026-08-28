@@ -1,4 +1,5 @@
 import type { ScheduledTransferService } from './ScheduledTransferService';
+import { recordSchedulerExecution } from '../metrics/index';
 
 const DEFAULT_POLL_INTERVAL_MS = 1_000;
 
@@ -10,6 +11,12 @@ export interface SchedulerEngineOptions {
 /**
  * Off-chain scheduler that polls for due transfers and executes them
  * through the existing relayer pipeline.
+ *
+ * Uses the ScheduledTransferService which acquires per-transfer distributed
+ * leases (PgScheduledTransferStore) or in-process locks (ScheduledTransferStore)
+ * to prevent double-execution across concurrent worker instances.
+ *
+ * Records scheduler_jobs_* Prometheus metrics for each execution tick.
  */
 export class SchedulerEngine {
   private readonly service: ScheduledTransferService;
@@ -40,13 +47,25 @@ export class SchedulerEngine {
 
   /** Process due transfers immediately (useful in tests). */
   async tick(): Promise<number> {
-    return this.service.processDueTransfers(this.now());
+    return this.runTick();
+  }
+
+  private async runTick(): Promise<number> {
+    const before = this.now();
+    const processed = await this.service.processDueTransfers(before);
+    const lagMs = Date.now() - before.getTime();
+
+    if (processed > 0) {
+      recordSchedulerExecution({ outcome: 'success', lagMs, consecutiveFailures: 0 });
+    }
+
+    return processed;
   }
 
   private schedulePoll(): void {
     if (!this.running) return;
     this.pollTimer = setTimeout(() => {
-      void this.service.processDueTransfers(this.now()).finally(() => this.schedulePoll());
+      void this.runTick().finally(() => this.schedulePoll());
     }, this.pollIntervalMs);
   }
 }

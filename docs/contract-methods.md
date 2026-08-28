@@ -46,20 +46,26 @@ entries are bumped proportionally to their `expires_at` value.
 
 ## Session permissions
 
-Permission bits are stored as `Vec<u32>` on each session key.
+Permission bits are stored as a `Vec<u32>` on each `SessionKey` struct.
+The contract evaluates `session.permissions.contains(value)` — a key must
+hold the required bit value to pass the permission check.
 
-| Value | Constant | Description |
-|-------|----------|-------------|
-| `0` | `SEND_PAYMENT` | Authorize payment operations |
-| `1` | `MANAGE_DATA` | Authorize manage-data operations |
-| `2` | `INVOKE_CONTRACT` | Authorize arbitrary contract invocations |
+**Source of truth:** `contracts/account/src/lib.rs` — `pub const PERMISSION_EXECUTE: u32 = 1;`
 
-> **Important:** `execute()` requires the session key to contain the internal
-> `PERMISSION_EXECUTE` constant (`1`). This is a separate contract constant —
-> **not** the same as `SessionPermission.MANAGE_DATA` (which also has value `1`
-> in the TypeScript enum). The contract checks `session.permissions.contains(1)`.
-> Always include `1` in the permissions array for session keys that need to call
-> `execute()`, regardless of what other permissions are set.
+| Value | Constant (Rust) | Description |
+|-------|----------------|-------------|
+| `1` | `PERMISSION_EXECUTE` | Required to call `execute()`. A session key without this bit will be rejected with `InsufficientPermission` (error code 7). |
+
+> **Reserved values:** `0` and values ≥ `2` are reserved for future permission
+> flags. Do not rely on their behavior — they are not checked by the current
+> contract and will silently have no effect.
+
+> **TypeScript note:** The `SessionPermission` TypeScript enum in the SDK uses
+> different symbolic names (e.g. `SEND_PAYMENT`, `MANAGE_DATA`) that map onto
+> these same numeric slots. Always pass `1` for any session key that needs to
+> call `execute()`, regardless of the TS enum name at that position.
+
+See also: [`contracts/account/README.md` — Permission bits](../contracts/account/README.md#permission-bits)
 
 ---
 
@@ -125,7 +131,54 @@ Return the current contract version.
 pub fn get_version(env: Env) -> u32
 ```
 
-**Returns** `u32` (0 if version key is absent)
+**Returns** `u32` — current version integer. Returns `0` if the version key is absent
+(contract deployed but not yet initialized).
+
+**Errors** none
+
+**Lifecycle**
+
+| State | Value |
+|-------|-------|
+| Deployed, not initialized | `0` |
+| After `initialize()` | `1` |
+| After each `upgrade()` | previous + 1 |
+| After `migrate(n)` | `n` (must be strictly > previous) |
+
+**SDK usage**
+
+```typescript
+import { getVersion } from '@ancore/account-abstraction';
+
+const version = await getVersion(contractId, { server, sourceAccount });
+// version === 1 after initialize, 2 after first upgrade, etc.
+```
+
+Or via `AccountContract`:
+
+```typescript
+import { AccountContract } from '@ancore/account-abstraction';
+
+const contract = new AccountContract(contractId);
+const version = await contract.getVersion({ server, sourceAccount });
+```
+
+**Compatibility matrix**
+
+Use the version to gate client-side feature flags before attempting calls that
+only exist in newer contract versions.
+
+| Contract version | Supported features |
+|------------------|--------------------|
+| `0` | Not initialized — all calls will fail with `NotInitialized (2)` |
+| `1` | Baseline: `initialize`, `execute`, `add_session_key`, `revoke_session_key`, `get_owner`, `get_nonce`, `get_version`, `get_session_key` |
+| `≥ 2` | Same as v1 plus any additions introduced by `upgrade()` / `migrate()` |
+
+> **Caching policy:** `get_version` is a read-only simulation — cache the result
+> for the duration of a session or until an `upgrade`/`migrated` event is observed.
+> Re-fetch after any transaction that calls `upgrade()` or `migrate()`.
+
+See also: [`upgrade`](#upgrade), [`migrate`](#migrate)
 
 ---
 

@@ -29,8 +29,6 @@ jobs:
   dry-run:
     name: Dry-Run Gate
     runs-on: ubuntu-latest
-    outputs:
-      report: ${{ steps.report.outputs.json }}
     steps:
       - uses: actions/checkout@v4
 
@@ -45,7 +43,7 @@ jobs:
           mkdir -p ~/.local/bin
           curl -L https://github.com/stellar/stellar-cli/releases/download/v22.0.1/stellar-cli-22.0.1-x86_64-unknown-linux-gnu.tar.gz \
             | tar xz -C ~/.local/bin
-          echo "$HOME/.local/bin" >> $GITHUB_PATH
+          echo "$HOME/.local/bin" >> "$GITHUB_PATH"
           stellar version
 
       - name: Run dry-run script
@@ -135,7 +133,7 @@ jobs:
           mkdir -p ~/.local/bin
           curl -L https://github.com/stellar/stellar-cli/releases/download/v22.0.1/stellar-cli-22.0.1-x86_64-unknown-linux-gnu.tar.gz \
             | tar xz -C ~/.local/bin
-          echo "$HOME/.local/bin" >> $GITHUB_PATH
+          echo "$HOME/.local/bin" >> "$GITHUB_PATH"
           stellar version
 
       - name: Build contracts
@@ -161,7 +159,7 @@ jobs:
     name: Create GitHub Release
     needs: [build, contracts]
     runs-on: ubuntu-latest
-    if: env.DRY_RUN == 'false'
+    if: (github.event.inputs.dry_run || 'false') == 'false'
     steps:
       - uses: actions/checkout@v4
         with:
@@ -182,13 +180,16 @@ jobs:
       - name: Generate changelog
         id: changelog
         run: |
-          echo "## Changes" > CHANGELOG.md
-          git log $(git describe --tags --abbrev=0 HEAD^)..HEAD --pretty=format:"* %s" >> CHANGELOG.md
-          echo "" >> CHANGELOG.md
-          echo "## Dry-Run Report" >> CHANGELOG.md
-          echo '```json' >> CHANGELOG.md
-          cat dry-run-report.json >> CHANGELOG.md
-          echo '```' >> CHANGELOG.md
+          PREV_TAG=$(git describe --tags --abbrev=0 HEAD^)
+          {
+            echo "## Changes"
+            git log "${PREV_TAG}..HEAD" --pretty=format:"* %s"
+            echo ""
+            echo "## Dry-Run Report"
+            echo '```json'
+            cat dry-run-report.json
+            echo '```'
+          } > CHANGELOG.md
 
       - name: Create Release
         uses: softprops/action-gh-release@v2
@@ -249,11 +250,13 @@ jobs:
 
       - name: Rollback rehearsal summary
         run: |
-          echo "## Rollback Rehearsal Summary" >> "$GITHUB_STEP_SUMMARY"
-          echo "| Field | Value |" >> "$GITHUB_STEP_SUMMARY"
-          echo "|-------|-------|" >> "$GITHUB_STEP_SUMMARY"
-          echo "| Target tag | \`${{ github.event.inputs.rollback_tag }}\` |" >> "$GITHUB_STEP_SUMMARY"
-          echo "| Tag SHA | \`${{ steps.validate.outputs.tag_sha }}\` |" >> "$GITHUB_STEP_SUMMARY"
-          echo "| Build | ✓ passed |" >> "$GITHUB_STEP_SUMMARY"
-          echo "| Tests | ✓ passed |" >> "$GITHUB_STEP_SUMMARY"
-          echo "| Rehearsal status | PASS — rollback to this tag is viable |" >> "$GITHUB_STEP_SUMMARY"
+          {
+            echo "## Rollback Rehearsal Summary"
+            echo "| Field | Value |"
+            echo "|-------|-------|"
+            echo "| Target tag | \`${{ github.event.inputs.rollback_tag }}\` |"
+            echo "| Tag SHA | \`${{ steps.validate.outputs.tag_sha }}\` |"
+            echo "| Build | ✓ passed |"
+            echo "| Tests | ✓ passed |"
+            echo "| Rehearsal status | PASS — rollback to this tag is viable |"
+          } >> "$GITHUB_STEP_SUMMARY"

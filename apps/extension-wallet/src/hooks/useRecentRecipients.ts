@@ -1,12 +1,11 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { SecureStorageManager, type RecentRecipient } from '@ancore/core-sdk';
-import { createStorageAdapter } from '@ancore/core-sdk';
+import { ChromeStorageAdapter, SecureStorageManager, type RecentRecipient } from '@ancore/core-sdk';
 
 let _storageManager: InstanceType<typeof SecureStorageManager> | null = null;
 
 function getStorageManager() {
   if (!_storageManager) {
-    _storageManager = new SecureStorageManager(createStorageAdapter());
+    _storageManager = new SecureStorageManager(new ChromeStorageAdapter());
   }
   return _storageManager;
 }

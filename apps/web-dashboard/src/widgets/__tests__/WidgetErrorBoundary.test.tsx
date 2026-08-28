@@ -1,6 +1,5 @@
 import { render, screen } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import React from 'react';
 import { WidgetErrorBoundary } from '../WidgetErrorBoundary';
 
 // Mock lucide-react to avoid issues with SVG rendering in tests
@@ -53,7 +52,10 @@ describe('WidgetErrorBoundary', () => {
     // Verifies our useWidgetErrorLogger was triggered
     expect(console.error).toHaveBeenCalledWith(
       '[Widget Error Logger] Caught isolated widget failure:',
-      expect.any(Error)
+      {
+        name: 'Error',
+        message: 'Test Error: Widget Crashed',
+      }
     );
   });
 

@@ -11,7 +11,7 @@ export interface FiatFormatOptions {
   /**
    * Locale string for formatting
    * Fallback behavior: If the provided locale is invalid or unsupported,
-   * it falls back to the system default locale, and ultimately to 'en-US'.
+   * it falls back directly to 'en-US'.
    * @default 'en-US'
    */
   locale?: string | string[];
@@ -32,6 +32,21 @@ export interface FiatFormatOptions {
   maximumFractionDigits?: number;
 }
 
+function resolveSupportedLocale(locale: string | string[]): string | string[] {
+  try {
+    const requestedLocales = Array.isArray(locale) ? locale : [locale];
+    const supportedLocales = Intl.NumberFormat.supportedLocalesOf(requestedLocales);
+
+    if (supportedLocales.length > 0) {
+      return Array.isArray(locale) ? supportedLocales : supportedLocales[0];
+    }
+  } catch {
+    // Fall through to the stable fallback below.
+  }
+
+  return 'en-US';
+}
+
 /**
  * Formats a numeric amount as a fiat currency string.
  *
@@ -39,7 +54,7 @@ export interface FiatFormatOptions {
  * Uses standard Intl.NumberFormat rounding (half-expand).
  *
  * Fallback behavior:
- * - If locale is invalid, falls back to standard Intl fallback ('en-US' usually)
+ * - If locale is invalid or unsupported, falls back to 'en-US'
  * - If Intl is not available or parameters are severely malformed, falls back to basic string formatting
  *
  * @param amount The numerical amount to format
@@ -55,7 +70,7 @@ export function formatFiatAmount(amount: number, options: FiatFormatOptions = {}
   } = options;
 
   try {
-    return new Intl.NumberFormat(locale, {
+    return new Intl.NumberFormat(resolveSupportedLocale(locale), {
       style: 'currency',
       currency,
       minimumFractionDigits,

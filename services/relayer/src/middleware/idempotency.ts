@@ -41,7 +41,11 @@ export function createIdempotencyMiddleware(store: IdempotencyStore) {
     // Intercept res.json to capture the outgoing response before it is sent.
     const originalJson = res.json.bind(res) as (body: unknown) => Response;
     res.json = function (body: unknown): Response {
-      store.set(key, { statusCode: res.statusCode, body });
+      // Only cache successful responses (2xx). Error responses (4xx/5xx) or transient
+      // failures must not permanently poison the idempotency key for retries.
+      if (res.statusCode >= 200 && res.statusCode < 300) {
+        store.set(key, { statusCode: res.statusCode, body });
+      }
       return originalJson(body);
     };
 

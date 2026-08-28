@@ -13,19 +13,15 @@ test.describe('Session key management', () => {
     await expect(page).toHaveURL(/\/session-keys/);
   });
 
-  test('session keys screen shows active keys list', async ({ page }) => {
-    await expect(page.getByText('Active keys')).toBeVisible();
-    await expect(page.getByText('Trading bot')).toBeVisible();
-    await expect(page.getByText('Automation script')).toBeVisible();
+  test('session keys screen shows list section and empty state', async ({ page }) => {
+    await expect(page.getByRole('heading', { name: 'Session Keys' })).toBeVisible();
+    await expect(page.getByText('Active Keys')).toBeVisible();
+    await expect(page.getByText('No session keys yet.')).toBeVisible();
   });
 
-  test('session keys screen shows key validity info', async ({ page }) => {
-    await expect(page.getByText(/Valid for 12 more hours/)).toBeVisible();
-    await expect(page.getByText(/expires tomorrow/i)).toBeVisible();
-  });
-
-  test('add session key button is present', async ({ page }) => {
-    await expect(page.getByRole('button', { name: /Add session key/i })).toBeVisible();
+  test('session keys screen exposes add session key actions', async ({ page }) => {
+    await expect(page.getByRole('button', { name: /add session key/i }).first()).toBeVisible();
+    await expect(page.getByText('+ Add Session Key')).toBeVisible();
   });
 
   test('unauthenticated user cannot access session keys', async ({ page, clearWallet }) => {

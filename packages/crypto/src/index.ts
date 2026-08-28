@@ -46,13 +46,21 @@ export { encryptSecretKey, decryptSecretKey } from './encryption';
 export type { EncryptedSecretKeyPayload } from './encryption';
 
 // Mnemonics
-export { generateMnemonic, validateMnemonic } from './mnemonic';
+export {
+  generateMnemonic,
+  validateMnemonic,
+  validateMnemonicStrength,
+  getEnglishWordlist,
+  MnemonicValidationError,
+  UnsupportedMnemonicLanguageError,
+  SUPPORTED_MNEMONIC_LANGUAGE,
+} from './mnemonic';
 
 // Key Derivation
 export { deriveKeypairFromMnemonic } from './key-derivation';
 
 // Signing & Verification
-export { signTransaction, verifySignature } from './signing';
+export { signPayload, signTransaction, verifySignature } from './signing';
 
 // Constant-time comparison
-export { constantTimeEqual } from './compare';
+export { timingSafeEqual } from './timing-safe';

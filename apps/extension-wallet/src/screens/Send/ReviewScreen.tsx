@@ -2,13 +2,24 @@ import { useState } from 'react';
 import { Button, Card, CardContent, CardHeader, CardTitle, Separator, cn } from '@ancore/ui-kit';
 import type { SendTransactionDraft } from '@/hooks/useSendTransaction';
 import { TransferNotePreview } from '@/components/TransferNotePreview';
-import { ShieldCheck, ArrowRight, Wallet, Globe, Info, CalendarClock } from 'lucide-react';
+import {
+  ShieldCheck,
+  ArrowRight,
+  Wallet,
+  Globe,
+  Info,
+  AlertCircle,
+  CalendarClock,
+} from 'lucide-react';
 import type { ScheduleConfig, TransferTiming } from '@/screens/Send/ScheduleControls';
+import { SimulationPreview, type SimulationState } from './SimulationPreview';
 
 interface ReviewScreenProps {
   transaction: SendTransactionDraft;
   timing?: TransferTiming;
   schedule?: ScheduleConfig;
+  /** Simulation state — when provided, shows the preview panel above the fee summary. */
+  simulation?: SimulationState;
   onBack: () => void;
   onConfirm: () => void;
 }
@@ -24,16 +35,30 @@ export function ReviewScreen({
   transaction,
   timing,
   schedule,
+  simulation,
   onBack,
   onConfirm,
 }: ReviewScreenProps) {
   const [isConfirmed, setIsConfirmed] = useState(false);
+  const [simulationSkipped, setSimulationSkipped] = useState(false);
+  const isDev = import.meta.env.DEV;
+
+  const simulatedFee =
+    simulation?.status === 'success' ? simulation.simulatedFee : transaction.fee.totalFee;
+  const displayTotal =
+    simulation?.status === 'success'
+      ? (Number(transaction.amount) + Number(simulatedFee)).toFixed(7)
+      : transaction.total;
+
+  const simulationBlocksApprove =
+    simulation?.status === 'loading' ||
+    (simulation?.status === 'error' && !(isDev && simulationSkipped));
 
   return (
-    <Card className="w-full max-w-md bg-slate-950 border-white/10 shadow-2xl overflow-hidden animate-in fade-in zoom-in-95 duration-300">
-      <CardHeader className="bg-gradient-to-br from-cyan-500/10 to-blue-500/5 pb-6 border-b border-white/5">
-        <CardTitle className="text-white uppercase tracking-widest text-xs flex items-center justify-center gap-2 font-black">
-          <ShieldCheck className="text-cyan-400 w-4 h-4" />
+    <Card className="w-full overflow-hidden border-0 bg-background shadow-none">
+      <CardHeader className="border-b border-border/70 bg-background pb-6">
+        <CardTitle className="flex items-center justify-center gap-2 text-xs font-semibold uppercase tracking-[0.16em] text-foreground">
+          <ShieldCheck className="h-4 w-4 text-primary" />
           Review Transaction
         </CardTitle>
       </CardHeader>
@@ -48,8 +73,8 @@ export function ReviewScreen({
             </span>
           </div>
           {(transaction.resolvedHandle || transaction.recipientInput?.startsWith('@')) && (
-            <div className="rounded-2xl border border-cyan-400/20 bg-cyan-400/5 p-3 text-xs text-cyan-100">
-              <span className="font-black uppercase tracking-widest text-[10px] text-cyan-300">
+            <div className="rounded-2xl border border-primary/20 bg-primary/5 p-3 text-xs text-foreground">
+              <span className="text-[10px] font-semibold uppercase tracking-widest text-primary">
                 Resolved handle
               </span>
               <div className="mt-1 font-semibold">
@@ -60,7 +85,7 @@ export function ReviewScreen({
               </div>
             </div>
           )}
-          <div className="bg-white/5 border border-white/10 rounded-2xl p-4 break-all font-mono text-[11px] text-cyan-300 leading-relaxed shadow-inner group transition-colors hover:border-cyan-400/30">
+          <div className="group break-all rounded-2xl border border-border bg-card p-4 font-mono text-[11px] leading-relaxed text-foreground transition-colors hover:border-primary/30">
             {transaction.to}
           </div>
         </div>
@@ -84,8 +109,8 @@ export function ReviewScreen({
                 Network
               </span>
             </div>
-            <div className="capitalize text-emerald-400 font-bold text-sm flex items-center gap-1.5">
-              <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
+            <div className="flex items-center gap-1.5 text-sm font-bold capitalize text-primary">
+              <span className="h-1.5 w-1.5 rounded-full bg-primary" />
               {transaction.fee.network}
             </div>
           </div>
@@ -94,11 +119,25 @@ export function ReviewScreen({
         {/* Transfer Note */}
         {transaction.truncatedNote && <TransferNotePreview note={transaction.truncatedNote} />}
 
+        {transaction.policyAction === 'step_up' && transaction.policyMessage && (
+          <div className="p-4 rounded-2xl bg-amber-500/10 border border-amber-500/30 flex items-start gap-3 animate-in fade-in slide-in-from-top-2 duration-300">
+            <AlertCircle className="w-5 h-5 shrink-0 text-amber-400 mt-0.5" />
+            <div className="space-y-1">
+              <strong className="block text-[11px] uppercase tracking-widest text-amber-300 font-black">
+                Verification Required
+              </strong>
+              <p className="text-[10px] text-amber-200 leading-relaxed">
+                {transaction.policyMessage}
+              </p>
+            </div>
+          </div>
+        )}
+
         {timing === 'scheduled' && schedule && (
-          <div className="space-y-2 rounded-2xl border border-cyan-400/20 bg-cyan-400/5 p-4">
+          <div className="space-y-2 rounded-2xl border border-border bg-accent/60 p-4">
             <div className="flex items-center gap-2">
-              <CalendarClock className="h-4 w-4 text-cyan-400" />
-              <span className="text-[10px] font-black uppercase tracking-widest text-cyan-300">
+              <CalendarClock className="h-4 w-4 text-muted-foreground" />
+              <span className="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground">
                 Scheduled Transfer
               </span>
             </div>
@@ -125,26 +164,47 @@ export function ReviewScreen({
         {/* Fees Summary */}
         <div className="space-y-3 bg-white/5 border border-white/10 rounded-2xl p-5">
           <div className="flex justify-between items-center text-[10px] font-bold">
-            <span className="text-slate-500 uppercase tracking-widest">Base Network Fee</span>
-            <span className="text-slate-300 font-mono">{transaction.fee.baseFee} XLM</span>
+            <span className="text-slate-500 uppercase tracking-widest">
+              {simulation?.status === 'success' ? 'Simulated Network Fee' : 'Base Network Fee'}
+            </span>
+            <span className="text-slate-300 font-mono" data-testid="review-network-fee">
+              {simulatedFee} XLM
+            </span>
           </div>
           <Separator className="bg-white/5" />
           <div className="flex justify-between items-center">
             <span className="text-[10px] text-slate-400 uppercase tracking-widest font-bold">
               Total to Debit
             </span>
-            <span className="text-cyan-400 font-mono text-base font-black">
-              {transaction.total} XLM
+            <span
+              className="font-mono text-base font-semibold text-primary"
+              data-testid="review-total"
+            >
+              {displayTotal} XLM
             </span>
           </div>
         </div>
+
+        {/* Simulation Preview */}
+        {simulation && <SimulationPreview simulation={simulation} />}
+
+        {isDev && simulation?.status === 'error' && !simulationSkipped && (
+          <button
+            type="button"
+            className="w-full text-[10px] uppercase tracking-widest text-amber-300/80 hover:text-amber-200"
+            data-testid="skip-simulation-dev"
+            onClick={() => setSimulationSkipped(true)}
+          >
+            Skip simulation (dev only)
+          </button>
+        )}
 
         {/* Explicit Confirmation Step */}
         <div
           className={cn(
             'p-4 rounded-2xl border flex items-start gap-3 transition-all cursor-pointer select-none group',
             isConfirmed
-              ? 'bg-cyan-400/10 border-cyan-400/30'
+              ? 'bg-primary/10 border-primary/30'
               : 'bg-slate-800/50 border-white/5 hover:border-white/20'
           )}
           onClick={() => setIsConfirmed(!isConfirmed)}
@@ -153,8 +213,8 @@ export function ReviewScreen({
             className={cn(
               'mt-0.5 w-4 h-4 rounded border flex items-center justify-center transition-all shrink-0',
               isConfirmed
-                ? 'bg-cyan-400 border-cyan-400 text-slate-950 shadow-[0_0_10px_rgba(34,211,238,0.5)]'
-                : 'border-slate-600 group-hover:border-cyan-400/50'
+                ? 'bg-primary border-primary text-primary-foreground'
+                : 'border-slate-600 group-hover:border-primary/50'
             )}
           >
             {isConfirmed && (
@@ -191,8 +251,8 @@ export function ReviewScreen({
           </Button>
           <Button
             type="button"
-            disabled={!isConfirmed}
-            className="flex-[2] bg-cyan-400 text-slate-950 font-black uppercase tracking-widest rounded-2xl h-12 shadow-[0_10px_20px_rgba(34,211,238,0.2)] hover:bg-cyan-300 disabled:opacity-50 disabled:grayscale transition-all flex items-center justify-center gap-2 text-[10px]"
+            disabled={!isConfirmed || simulationBlocksApprove}
+            className="flex h-12 flex-[2] items-center justify-center gap-2 rounded-full bg-white text-[11px] font-semibold text-black hover:bg-white/90 disabled:opacity-40"
             onClick={onConfirm}
           >
             Continue to Sign

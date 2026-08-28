@@ -12,6 +12,7 @@ export enum TelemetryEventType {
   EXECUTE_FAILURE = 'wallet_execute_failure',
   TRANSACTION_INITIATED = 'wallet_tx_initiated',
   TRANSACTION_COMPLETED = 'wallet_tx_completed',
+  ADDRESS_COPIED = 'address_copied',
 }
 
 export interface TelemetryEvent {
@@ -57,10 +58,23 @@ export interface TransactionCompletedEvent extends TelemetryEvent {
   duration: number;
 }
 
+export interface AddressCopiedEvent extends TelemetryEvent {
+  type: TelemetryEventType.ADDRESS_COPIED;
+}
+
+/**
+ * Union-aware `Omit`. The built-in `Omit<A | B, K>` is NOT distributive: it
+ * resolves `keyof (A | B)` to the *intersection* of their keys, so every
+ * member-specific field (failureReason, authType, operationType, ...) is
+ * silently dropped from the result.
+ */
+export type DistributiveOmit<T, K extends PropertyKey> = T extends unknown ? Omit<T, K> : never;
+
 export type AnyTelemetryEvent =
   | LockFailureEvent
   | AuthFailureEvent
   | SendFailureEvent
   | ExecuteFailureEvent
   | TransactionInitiatedEvent
-  | TransactionCompletedEvent;
+  | TransactionCompletedEvent
+  | AddressCopiedEvent;

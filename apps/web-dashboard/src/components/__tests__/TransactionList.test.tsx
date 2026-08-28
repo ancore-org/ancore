@@ -53,9 +53,38 @@ describe('TransactionList', () => {
     expect(screen.getByText(/50\s*XLM/)).toBeInTheDocument();
   });
 
-  it('shows empty state when no transactions', () => {
+  it('shows a friendly empty state when the indexer returns no transactions', () => {
     renderWithProvider(<TransactionList transactions={[]} />);
-    expect(screen.getByText('No transactions found.')).toBeInTheDocument();
+
+    expect(screen.getByText('No transactions yet')).toBeInTheDocument();
+    expect(
+      screen.getByText(/will appear here once the indexer picks them up/i)
+    ).toBeInTheDocument();
+  });
+
+  it('renders the supplied empty-state action', () => {
+    renderWithProvider(
+      <TransactionList transactions={[]} emptyAction={<button>Send your first payment</button>} />
+    );
+
+    expect(screen.getByRole('button', { name: 'Send your first payment' })).toBeInTheDocument();
+  });
+
+  it('omits the empty-state action when none is supplied', () => {
+    renderWithProvider(<TransactionList transactions={[]} />);
+
+    expect(
+      screen.queryByRole('button', { name: 'Send your first payment' })
+    ).not.toBeInTheDocument();
+  });
+
+  it('keeps the empty state hidden while an optimistic transaction is in flight', () => {
+    renderWithProvider(
+      <TransactionList transactions={[]} optimisticTransaction={mockOptimisticTransaction} />
+    );
+
+    expect(screen.queryByText('No transactions yet')).not.toBeInTheDocument();
+    expect(screen.getByText(/pending \(optimistic\)/)).toBeInTheDocument();
   });
 
   it('displays optimistic transaction at top', () => {

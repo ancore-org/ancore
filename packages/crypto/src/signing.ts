@@ -11,14 +11,44 @@ function toMessageBytes(message: SignableValue): Uint8Array {
 /**
  * Signs a Stellar transaction with the provided keypair locally.
  *
- * @param tx - The transaction to sign (standard or fee-bump).
+ * Supported transaction envelope types:
+ * - Transaction: Standard Stellar transaction envelopes.
+ * - FeeBumpTransaction: Transaction envelopes that wrap another transaction to bump fees.
+ *
+ * Unsupported types (e.g., MuxedTransaction, TransactionEnvelope variants other than
+ * Transaction/FeeBumpTransaction) will throw a descriptive error. See CRYPTO_ASSUMPTIONS.md
+ * for the full envelope type assumptions.
+ *
+ * @param tx - The transaction to sign (must be Transaction or FeeBumpTransaction).
  * @param keypair - The Ed25519 keypair or secret key string to sign with.
  * @returns The produced signature as a Uint8Array.
+ * @throws Error if tx is not a supported transaction type.
  */
+export async function signPayload(
+  message: SignableValue,
+  keypair: SignableKeypair
+): Promise<Uint8Array> {
+  let kp: Keypair;
+
+  try {
+    kp = typeof keypair === 'string' ? Keypair.fromSecret(keypair) : keypair;
+  } catch {
+    throw new Error('Invalid secret key or keypair provided for signing.');
+  }
+
+  return Uint8Array.from(kp.sign(toMessageBytes(message) as unknown as Buffer));
+}
+
 export async function signTransaction(
   tx: Transaction | FeeBumpTransaction,
   keypair: SignableKeypair
 ): Promise<Uint8Array> {
+  // Runtime guard: verify envelope type before signing
+  if (!(tx instanceof Transaction) && !(tx instanceof FeeBumpTransaction)) {
+    throw new Error(
+      'Unsupported transaction type. Supported types: Transaction, FeeBumpTransaction. See CRYPTO_ASSUMPTIONS.md'
+    );
+  }
   let kp: Keypair;
 
   try {

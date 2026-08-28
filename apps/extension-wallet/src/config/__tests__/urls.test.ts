@@ -168,10 +168,7 @@ describe('probeServiceHealth', () => {
     vi.mocked(fetch).mockResolvedValueOnce(new Response('{}', { status: 200 }));
 
     await probeServiceHealth('https://relayer.ancore.io/', 'relayer');
-    expect(fetch).toHaveBeenCalledWith(
-      'https://relayer.ancore.io/health',
-      expect.anything()
-    );
+    expect(fetch).toHaveBeenCalledWith('https://relayer.ancore.io/health', expect.anything());
   });
 });
 

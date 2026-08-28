@@ -18,7 +18,7 @@ function LoadingState() {
       {Array.from({ length: 4 }).map((_, index) => (
         <div
           key={index}
-          className="h-20 animate-pulse rounded-lg border border-slate-200 bg-slate-100"
+          className="h-20 animate-pulse rounded-lg border border-border bg-muted"
           aria-hidden="true"
         />
       ))}
@@ -50,7 +50,7 @@ export function TransactionHistory({
           <div className="space-y-6">
             {groups.map((group) => (
               <section key={group.dateKey} aria-label={`Transactions for ${group.label}`}>
-                <h3 className="mb-3 text-xs font-semibold uppercase tracking-wide text-slate-500">
+                <h3 className="mb-3 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
                   {group.label}
                 </h3>
                 <div className="space-y-2">

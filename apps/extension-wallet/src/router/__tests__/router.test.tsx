@@ -1,21 +1,40 @@
-import { render, screen, within } from '@testing-library/react';
+import { render, screen, within, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { beforeEach, describe, expect, it } from 'vitest';
 import type { UnlockVerifier } from '../AuthGuard';
 import { AUTH_STORAGE_KEY, DEFAULT_AUTH_STATE } from '../AuthGuard';
 import { ExtensionRouterTestHarness, HistoryActivityList, filterHistoryEntries } from '..';
+import type { HistoryEntry, HistoryFilter } from '..';
+import { resetSharedStorageManagerForTests } from '../../security/storage-manager';
+
+async function waitForAuthReady() {
+  await waitFor(() => {
+    expect(screen.queryByTestId('auth-initializing')).not.toBeInTheDocument();
+  });
+}
 
 function renderRouter(
   pathname: string,
   authState = DEFAULT_AUTH_STATE,
-  options?: { unlockVerifier?: UnlockVerifier }
+  options?: { unlockVerifier?: UnlockVerifier; initiallyUnlocked?: boolean }
 ) {
+  resetSharedStorageManagerForTests();
   window.localStorage.setItem(AUTH_STORAGE_KEY, JSON.stringify(authState));
   return render(
     <ExtensionRouterTestHarness
       initialEntries={[pathname]}
       unlockVerifier={options?.unlockVerifier}
+      initiallyUnlocked={options?.initiallyUnlocked}
     />
+  );
+}
+
+/** Renders an onboarded, unlocked session — the state behind the AuthGuard. */
+function renderUnlockedRouter(pathname: string) {
+  return renderRouter(
+    pathname,
+    { ...DEFAULT_AUTH_STATE, hasOnboarded: true },
+    { initiallyUnlocked: true }
   );
 }
 
@@ -25,21 +44,23 @@ describe('extension router', () => {
     document.title = 'Ancore Extension';
   });
 
-  it('redirects first-time users to welcome when they hit a protected route', () => {
+  it('redirects first-time users to onboarding when they hit a protected route', async () => {
     renderRouter('/home');
+    await waitForAuthReady();
 
-    expect(screen.getByRole('heading', { name: /meet your ancore wallet/i })).toBeInTheDocument();
-    expect(document.title).toBe('Welcome | Ancore Extension');
+    expect(await screen.findByRole('heading', { name: /set up your wallet/i })).toBeInTheDocument();
+    expect(document.title).toBe('Create Wallet | Ancore Extension');
   });
 
-  it('redirects onboarded locked users to unlock', () => {
+  it('redirects onboarded locked users to unlock', async () => {
     renderRouter('/send', {
       ...DEFAULT_AUTH_STATE,
       hasOnboarded: true,
       walletName: 'Locked Wallet',
     });
+    await waitForAuthReady();
 
-    expect(screen.getByRole('heading', { name: /unlock wallet/i })).toBeInTheDocument();
+    expect(await screen.findByRole('heading', { name: /unlock wallet/i })).toBeInTheDocument();
     expect(document.title).toBe('Unlock Wallet | Ancore Extension');
   });
 
@@ -57,6 +78,7 @@ describe('extension router', () => {
       }
     );
 
+    await waitForAuthReady();
     await user.type(screen.getByLabelText(/password/i), 'wrong-password');
     await user.click(screen.getByRole('button', { name: /unlock/i }));
 
@@ -66,31 +88,22 @@ describe('extension router', () => {
     expect(document.title).toBe('Unlock Wallet | Ancore Extension');
     expect(JSON.parse(window.localStorage.getItem(AUTH_STORAGE_KEY) ?? '{}')).toMatchObject({
       hasOnboarded: true,
-      isUnlocked: false,
     });
   });
 
-  it('creates an account and lands on the protected home route', async () => {
-    const user = userEvent.setup();
-    renderRouter('/create-account');
+  it('starts onboarding from the onboarding route', async () => {
+    renderRouter('/onboarding');
+    await waitForAuthReady();
 
-    await user.clear(screen.getByLabelText(/wallet name/i));
-    await user.type(screen.getByLabelText(/wallet name/i), 'Router Test Wallet');
-    await user.click(screen.getByRole('button', { name: /create wallet/i }));
-
-    expect(await screen.findByRole('heading', { name: /home/i })).toBeInTheDocument();
-    expect(screen.getByText(/router test wallet/i)).toBeInTheDocument();
-    expect(screen.getByTestId('nav-bar')).toBeInTheDocument();
+    expect(await screen.findByRole('heading', { name: /set up your wallet/i })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /create new wallet/i })).toBeInTheDocument();
   });
 
   it('navigates between protected routes and updates titles', async () => {
     const user = userEvent.setup();
-    renderRouter('/home', {
-      ...DEFAULT_AUTH_STATE,
-      hasOnboarded: true,
-      isUnlocked: true,
-    });
+    renderUnlockedRouter('/home');
 
+    await waitForAuthReady();
     await user.click(screen.getByRole('link', { name: /settings/i }));
 
     expect(await screen.findByRole('heading', { name: /settings/i })).toBeInTheDocument();
@@ -99,29 +112,25 @@ describe('extension router', () => {
 
   it('shows a 404 screen for unknown routes and recovers to the right fallback', async () => {
     const user = userEvent.setup();
-    renderRouter('/not-a-real-route', {
-      ...DEFAULT_AUTH_STATE,
-      hasOnboarded: true,
-      isUnlocked: true,
-    });
+    renderUnlockedRouter('/not-a-real-route');
 
-    expect(screen.getByRole('heading', { name: '404' })).toBeInTheDocument();
+    await waitForAuthReady();
+    expect(await screen.findByRole('heading', { name: '404' })).toBeInTheDocument();
     expect(document.title).toBe('Page Not Found | Ancore Extension');
 
     await user.click(screen.getByRole('link', { name: /go back to safety/i }));
 
-    expect(await screen.findByRole('heading', { name: /home/i })).toBeInTheDocument();
+    expect(await screen.findByRole('heading', { name: /your wallet/i })).toBeInTheDocument();
   });
 
   it('supports back-style navigation for nested routes', async () => {
     const user = userEvent.setup();
-    renderRouter('/session-keys', {
-      ...DEFAULT_AUTH_STATE,
-      hasOnboarded: true,
-      isUnlocked: true,
-    });
+    renderUnlockedRouter('/session-keys');
 
-    expect(screen.getByRole('heading', { name: /session keys/i })).toBeInTheDocument();
+    await waitForAuthReady();
+    expect(
+      await screen.findByRole('heading', { level: 1, name: /session keys/i })
+    ).toBeInTheDocument();
 
     await user.click(screen.getByRole('button', { name: /go back/i }));
 
@@ -133,7 +142,6 @@ describe('extension router', () => {
     renderRouter('/settings', {
       ...DEFAULT_AUTH_STATE,
       hasOnboarded: true,
-      isUnlocked: true,
     });
 
     await user.click(screen.getByRole('button', { name: /environment/i }));
@@ -158,68 +166,122 @@ describe('extension router', () => {
   });
 });
 
-describe('extension transaction history filters', () => {
+describe('extension transaction history', () => {
   beforeEach(() => {
     window.localStorage.clear();
     document.title = 'Ancore Extension';
   });
 
-  const unlockedAuthState = {
-    ...DEFAULT_AUTH_STATE,
-    hasOnboarded: true,
-    isUnlocked: true,
-  };
+  const SAMPLE_ENTRIES: HistoryEntry[] = [
+    {
+      id: '1',
+      label: 'Received from Treasury',
+      amount: '+320 XLM',
+      date: 'Today',
+      kind: 'received',
+      status: 'confirmed',
+    },
+    {
+      id: '2',
+      label: 'Sent to Merchant',
+      amount: '-48 XLM',
+      date: 'Yesterday',
+      kind: 'sent',
+      status: 'confirmed',
+    },
+    {
+      id: '3',
+      label: 'Failed merchant payment',
+      amount: '-12 XLM',
+      date: 'Mar 23',
+      kind: 'failed',
+      status: 'failed',
+    },
+  ];
 
-  it('shows all transactions by default', () => {
-    renderRouter('/history', unlockedAuthState);
+  it('shows no-account placeholder when no smart account is configured', async () => {
+    renderUnlockedRouter('/history');
+    await waitForAuthReady();
 
-    expect(screen.getByText('Received from Treasury')).toBeInTheDocument();
+    expect(await screen.findByText('No account configured')).toBeInTheDocument();
+    expect(
+      screen.getByText('Set up a smart account to view transaction history.')
+    ).toBeInTheDocument();
+  });
+
+  it('renders all three sample entries in HistoryActivityList', () => {
+    render(
+      <HistoryActivityList activeFilter="all" entries={SAMPLE_ENTRIES} onFilterChange={() => {}} />
+    );
+
     expect(screen.getByText('Sent to Merchant')).toBeInTheDocument();
+    expect(screen.getByText('Received from Treasury')).toBeInTheDocument();
     expect(screen.getByText('Failed merchant payment')).toBeInTheDocument();
   });
 
-  it('filters history to sent transactions', async () => {
-    const user = userEvent.setup();
-    renderRouter('/history', unlockedAuthState);
-
-    await user.click(screen.getByRole('button', { name: 'Sent' }));
-
-    expect(screen.getByText('Sent to Merchant')).toBeInTheDocument();
-    expect(screen.queryByText('Received from Treasury')).not.toBeInTheDocument();
-    expect(screen.queryByText('Failed merchant payment')).not.toBeInTheDocument();
-  });
-
-  it('filters history to received transactions', async () => {
-    const user = userEvent.setup();
-    renderRouter('/history', unlockedAuthState);
-
-    await user.click(screen.getByRole('button', { name: 'Received' }));
+  it('filters history to received transactions via HistoryActivityList', () => {
+    render(
+      <HistoryActivityList
+        activeFilter="received"
+        entries={filterHistoryEntries(SAMPLE_ENTRIES, 'received')}
+        onFilterChange={() => {}}
+      />
+    );
 
     expect(screen.getByText('Received from Treasury')).toBeInTheDocument();
     expect(screen.queryByText('Sent to Merchant')).not.toBeInTheDocument();
     expect(screen.queryByText('Failed merchant payment')).not.toBeInTheDocument();
   });
 
-  it('filters history to failed transactions', async () => {
-    const user = userEvent.setup();
-    renderRouter('/history', unlockedAuthState);
-
-    await user.click(screen.getByRole('button', { name: 'Failed' }));
+  it('filters history to failed transactions via HistoryActivityList', () => {
+    render(
+      <HistoryActivityList
+        activeFilter="failed"
+        entries={filterHistoryEntries(SAMPLE_ENTRIES, 'failed')}
+        onFilterChange={() => {}}
+      />
+    );
 
     expect(screen.getByText('Failed merchant payment')).toBeInTheDocument();
     expect(screen.queryByText('Received from Treasury')).not.toBeInTheDocument();
     expect(screen.queryByText('Sent to Merchant')).not.toBeInTheDocument();
   });
 
-  it('stores the active chip in the URL and can return to all transactions', async () => {
+  it('stores the active filter chip and can return to all via URL', async () => {
     const user = userEvent.setup();
-    renderRouter('/history', unlockedAuthState);
+    let activeFilter: HistoryFilter = 'all';
+    const onFilterChange = (f: HistoryFilter) => {
+      activeFilter = f;
+    };
+
+    const { rerender } = render(
+      <HistoryActivityList
+        activeFilter={activeFilter}
+        entries={SAMPLE_ENTRIES}
+        onFilterChange={onFilterChange}
+      />
+    );
 
     await user.click(screen.getByRole('button', { name: 'Sent' }));
+    rerender(
+      <HistoryActivityList
+        activeFilter={activeFilter}
+        entries={SAMPLE_ENTRIES}
+        onFilterChange={onFilterChange}
+      />
+    );
 
+    expect(screen.getByRole('button', { name: 'All' })).toHaveAttribute('aria-pressed', 'false');
     expect(screen.getByRole('button', { name: 'Sent' })).toHaveAttribute('aria-pressed', 'true');
 
     await user.click(screen.getByRole('button', { name: 'All' }));
+    rerender(
+      <HistoryActivityList
+        activeFilter={activeFilter}
+        entries={SAMPLE_ENTRIES}
+        onFilterChange={onFilterChange}
+      />
+    );
 
     expect(screen.getByRole('button', { name: 'All' })).toHaveAttribute('aria-pressed', 'true');
     expect(screen.getByText('Received from Treasury')).toBeInTheDocument();
@@ -250,6 +312,8 @@ describe('extension transaction history filters', () => {
       />
     );
 
-    expect(screen.getByText('No transactions match this filter.')).toBeInTheDocument();
+    expect(screen.getByText('No received transactions')).toBeInTheDocument();
+    expect(screen.getByText('Incoming payments will appear here.')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Reset filter' })).toBeInTheDocument();
   });
 });

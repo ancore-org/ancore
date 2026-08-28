@@ -390,6 +390,35 @@ describe('backup', () => {
       );
     });
 
+    it('should reject a same-length tampered checksum via timing-safe compare', async () => {
+      // Regression test: the checksum comparison uses `timingSafeEqual` instead of
+      // `!==` so that mismatches on a valid-length SHA-256 hex digest (not just
+      // obviously-malformed ones) are still rejected without early-exit timing leaks.
+      const storage = new MockStorageAdapter();
+      const accountData: AccountData = { privateKey: 'SBXYZ...' };
+      await storage.set('account', accountData);
+
+      const backup = await exportBackup(storage, 'password');
+      expect(backup.metadata.checksum.length).toBe(64);
+
+      // Flip the last hex character, preserving the 64-char SHA-256 digest length.
+      const lastChar = backup.metadata.checksum.slice(-1);
+      const flippedChar = lastChar === '0' ? '1' : '0';
+      const sameLengthTamperedChecksum = backup.metadata.checksum.slice(0, -1) + flippedChar;
+
+      const tamperedBackup = {
+        ...backup,
+        metadata: {
+          ...backup.metadata,
+          checksum: sameLengthTamperedChecksum,
+        },
+      };
+
+      await expect(importBackup(tamperedBackup, storage, 'password')).rejects.toThrow(
+        'Backup integrity check failed: checksum mismatch'
+      );
+    });
+
     it('should reject malformed backups with actionable errors', async () => {
       const storage = new MockStorageAdapter();
 

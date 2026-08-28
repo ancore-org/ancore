@@ -1,5 +1,14 @@
 import * as React from 'react';
-import { Button, Card, CardContent, CardHeader, CardTitle, Separator, cn } from '@ancore/ui-kit';
+import {
+  Button,
+  Card,
+  CardContent,
+  CardHeader,
+  CardTitle,
+  Separator,
+  buttonVariants,
+  cn,
+} from '@ancore/ui-kit';
 import { format } from 'date-fns';
 import { ArrowLeft, Copy, ExternalLink } from 'lucide-react';
 
@@ -150,17 +159,19 @@ export function TransactionDetail({ transaction, onBack, className }: Transactio
                   <Copy className="h-4 w-4" aria-hidden="true" />
                   {copied ? 'Copied' : 'Copy'}
                 </Button>
-                <Button type="button" variant="outline" size="sm" asChild>
-                  <a
-                    href={explorerLink}
-                    target="_blank"
-                    rel="noreferrer"
-                    aria-label="View on Stellar Expert"
-                  >
-                    <ExternalLink className="h-4 w-4" aria-hidden="true" />
-                    View Explorer
-                  </a>
-                </Button>
+                <a
+                  href={explorerLink}
+                  target="_blank"
+                  rel="noreferrer"
+                  aria-label="View on Stellar Expert"
+                  className={cn(
+                    buttonVariants({ variant: 'outline', size: 'sm' }),
+                    'inline-flex items-center gap-2'
+                  )}
+                >
+                  <ExternalLink className="h-4 w-4" aria-hidden="true" />
+                  View Explorer
+                </a>
               </div>
             </dd>
           </div>

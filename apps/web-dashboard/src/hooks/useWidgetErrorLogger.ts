@@ -3,9 +3,12 @@ import type { ErrorInfo } from 'react';
 
 export function useWidgetErrorLogger() {
   return useCallback((error: Error, info: ErrorInfo) => {
-    // Invoking our centralized logging mechanism.
-    // In a production app, this would route to an external service (e.g., Sentry, Datadog).
-    console.error('[Widget Error Logger] Caught isolated widget failure:', error);
+    const sanitizedError = {
+      name: error.name,
+      message: error.message,
+    };
+
+    console.error('[Widget Error Logger] Caught isolated widget failure:', sanitizedError);
     console.error('[Widget Error Logger] Component Stack:', info.componentStack);
   }, []);
 }

@@ -50,7 +50,9 @@ export interface RelayExecuteRequest {
 export interface RelayerPayoutSubmitterOptions {
   baseUrl: string;
   getAuthToken: () => string | Promise<string>;
-  buildRelayRequest: (submission: PayoutSubmission) => RelayExecuteRequest;
+  buildRelayRequest: (
+    submission: PayoutSubmission
+  ) => RelayExecuteRequest | Promise<RelayExecuteRequest>;
   fetchImpl?: typeof fetch;
 }
 
@@ -100,13 +102,7 @@ export function parseBulkPayoutCsv(csv: string): BulkPayoutParseResult {
     const signedTransactionXdr =
       signedTransactionXdrIndex === -1 ? undefined : record[signedTransactionXdrIndex]?.trim();
     accumulator.push(
-      createRow(
-        lineNumber,
-        recipient,
-        amount,
-        signedTransactionXdr,
-        validateRow(recipient, amount)
-      )
+      createRow(lineNumber, recipient, amount, signedTransactionXdr, validateRow(recipient, amount))
     );
     return accumulator;
   }, []);
@@ -155,6 +151,7 @@ export function createRelayerPayoutSubmitter(
 
   return async (submission: PayoutSubmission) => {
     const token = await options.getAuthToken();
+    const relayRequest = await options.buildRelayRequest(submission);
     const response = await fetchImpl(`${baseUrl}/relay/execute`, {
       method: 'POST',
       headers: {
@@ -162,7 +159,7 @@ export function createRelayerPayoutSubmitter(
         Authorization: `Bearer ${token}`,
         'Idempotency-Key': submission.idempotencyKey,
       },
-      body: JSON.stringify(options.buildRelayRequest(submission)),
+      body: JSON.stringify(relayRequest),
     });
 
     const body = (await readJsonResponse(response)) as {
@@ -271,7 +268,10 @@ function validateRow(recipient: string, amount: string): string[] {
 }
 
 function normalizeHeader(value: string): string {
-  return value.trim().toLowerCase().replace(/[\s_-]+/g, '');
+  return value
+    .trim()
+    .toLowerCase()
+    .replace(/[\s_-]+/g, '');
 }
 
 function normalizeAmount(value: string): string {

@@ -10,6 +10,7 @@
  */
 
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
+import { Keypair } from '@stellar/stellar-sdk';
 import type { MessageEnvelope, ResponseEnvelope } from '../../../messaging/types';
 import type { AuthState } from '../../../router/AuthGuard';
 
@@ -38,6 +39,11 @@ interface ChromeMock {
       get: ReturnType<typeof vi.fn>;
       set: ReturnType<typeof vi.fn>;
     };
+    session: {
+      get: ReturnType<typeof vi.fn>;
+      set: ReturnType<typeof vi.fn>;
+      remove: ReturnType<typeof vi.fn>;
+    };
   };
 }
 
@@ -46,7 +52,9 @@ interface ChromeMock {
 // ---------------------------------------------------------------------------
 
 function buildChromeMock(): ChromeMock {
-  let capturedListener: OnMessageListener | null = null;
+  const capturedListeners: OnMessageListener[] = [];
+  const sessionStore: Record<string, unknown> = {};
+  const localStore: Record<string, unknown> = {};
 
   const mock: ChromeMock = {
     runtime: {
@@ -55,18 +63,47 @@ function buildChromeMock(): ChromeMock {
       onStartup: { addListener: vi.fn() },
       onMessage: {
         addListener: vi.fn((fn: OnMessageListener) => {
-          capturedListener = fn;
+          capturedListeners.push(fn);
         }),
         _trigger(msg, sender, respond) {
-          if (!capturedListener) throw new Error('No onMessage listener installed');
-          capturedListener(msg, sender, respond);
+          if (capturedListeners.length === 0) throw new Error('No onMessage listener installed');
+          for (const listener of capturedListeners) {
+            const result = listener(msg, sender, respond);
+            if (result === true) break;
+          }
         },
       },
     },
     storage: {
       local: {
-        get: vi.fn((_key: string, cb: (r: Record<string, unknown>) => void) => cb({})),
-        set: vi.fn((_items: Record<string, unknown>, cb?: () => void) => cb?.()),
+        get: vi.fn((key: string | string[], cb: (r: Record<string, unknown>) => void) => {
+          if (typeof key === 'string') {
+            cb({ [key]: localStore[key] });
+          } else {
+            const result: Record<string, unknown> = {};
+            for (const k of key) {
+              result[k] = localStore[k];
+            }
+            cb(result);
+          }
+        }),
+        set: vi.fn((items: Record<string, unknown>, cb?: () => void) => {
+          Object.assign(localStore, items);
+          cb?.();
+        }),
+      },
+      session: {
+        get: vi.fn((key: string, cb: (r: Record<string, unknown>) => void) =>
+          cb({ [key]: sessionStore[key] })
+        ),
+        set: vi.fn((items: Record<string, unknown>, cb?: () => void) => {
+          Object.assign(sessionStore, items);
+          cb?.();
+        }),
+        remove: vi.fn((key: string, cb?: () => void) => {
+          delete sessionStore[key];
+          cb?.();
+        }),
       },
     },
   };
@@ -102,18 +139,29 @@ let chromeMock: ChromeMock;
 function makeAuthState(overrides: Partial<AuthState> = {}): AuthState {
   return {
     hasOnboarded: false,
-    isUnlocked: false,
     walletName: 'Test Wallet',
     accountAddress: 'GCFX...WALLET',
     ...overrides,
   };
 }
 
-async function loadServiceWorker(authState: AuthState) {
+async function loadServiceWorker(
+  authState: AuthState,
+  options: { unlockReturns?: boolean; signingSecret?: string } = {}
+) {
   vi.doMock('@/router/AuthGuard', () => ({
     readAuthState: vi.fn(() => authState),
     DEFAULT_AUTH_STATE: makeAuthState(),
     AUTH_STORAGE_KEY: 'ancore_extension_auth',
+  }));
+
+  vi.doMock('@/security/storage-manager', () => ({
+    getSharedStorageManager: vi.fn(() => ({
+      unlock: vi.fn(async () => options.unlockReturns ?? true),
+      lock: vi.fn(),
+      getAccount: vi.fn(async () => ({ privateKey: options.signingSecret })),
+    })),
+    resetSharedStorageManagerForTests: vi.fn(),
   }));
 
   vi.doMock('@/messaging', async () => {
@@ -205,22 +253,6 @@ describe('LOCK_WALLET', () => {
     expect((stateResp.payload as any).state).toBe('locked');
     _resetHandlers();
   });
-
-  it('persists isUnlocked: false to chrome storage', async () => {
-    const { _resetHandlers } = await loadServiceWorker(makeAuthState({ hasOnboarded: true }));
-
-    await dispatch(chromeMock, 'LOCK_WALLET');
-
-    const setCall = chromeMock.storage.local.set.mock.calls.at(-1)?.[0] as Record<string, unknown>;
-    if (setCall) {
-      const stored = JSON.parse(setCall['ancore_extension_auth'] as string) as Record<
-        string,
-        unknown
-      >;
-      expect(stored.isUnlocked).toBe(false);
-    }
-    _resetHandlers();
-  });
 });
 
 // ---------------------------------------------------------------------------
@@ -271,22 +303,6 @@ describe('UNLOCK_WALLET', () => {
 
     expect(resp.ok).toBe(true);
     expect((resp.payload as any).success).toBe(true);
-    _resetHandlers();
-  });
-
-  it('persists isUnlocked: true to chrome storage on success', async () => {
-    const { _resetHandlers } = await loadServiceWorker(makeAuthState({ hasOnboarded: true }));
-
-    await dispatch(chromeMock, 'UNLOCK_WALLET', { password: 'any-password' });
-
-    const setCall = chromeMock.storage.local.set.mock.calls.at(-1)?.[0] as Record<string, unknown>;
-    if (setCall) {
-      const stored = JSON.parse(setCall['ancore_extension_auth'] as string) as Record<
-        string,
-        unknown
-      >;
-      expect(stored.isUnlocked).toBe(true);
-    }
     _resetHandlers();
   });
 
@@ -348,6 +364,274 @@ describe('UNLOCK_WALLET', () => {
     const resp = await dispatch(chromeMock, 'LOCK_WALLET');
 
     expect((resp.payload as any).success).toBe(false);
+    _resetHandlers();
+  });
+
+  describe('rate limiting', () => {
+    beforeEach(() => {
+      vi.useFakeTimers();
+    });
+
+    afterEach(() => {
+      vi.useRealTimers();
+    });
+
+    it('returns retryAfterMs after repeated failed password attempts', async () => {
+      const { _resetHandlers } = await loadServiceWorker(makeAuthState({ hasOnboarded: true }), {
+        unlockReturns: false,
+      });
+
+      for (let i = 0; i < 5; i += 1) {
+        await dispatch(chromeMock, 'UNLOCK_WALLET', { password: 'wrong-password' });
+      }
+
+      const resp = await dispatch(chromeMock, 'UNLOCK_WALLET', { password: 'wrong-password' });
+
+      expect((resp.payload as any).success).toBe(false);
+      expect((resp.payload as any).retryAfterMs).toBeGreaterThan(0);
+      expect((resp.payload as any).message).toContain('Try again in');
+      _resetHandlers();
+    });
+
+    it('rejects unlock attempts during lockout without verifying password', async () => {
+      const unlock = vi.fn(async () => false);
+      vi.doMock('@/security/storage-manager', () => ({
+        getSharedStorageManager: vi.fn(() => ({
+          unlock,
+          lock: vi.fn(),
+        })),
+        resetSharedStorageManagerForTests: vi.fn(),
+      }));
+      vi.doMock('@/router/AuthGuard', () => ({
+        readAuthState: vi.fn(() => makeAuthState({ hasOnboarded: true })),
+        DEFAULT_AUTH_STATE: makeAuthState(),
+        AUTH_STORAGE_KEY: 'ancore_extension_auth',
+      }));
+      vi.doMock('@/messaging', async () => {
+        const actual = await vi.importActual<typeof import('@/messaging')>('@/messaging');
+        return actual;
+      });
+      await import('../service-worker');
+      const { _resetHandlers } = await import('@/messaging/handler');
+
+      for (let i = 0; i < 5; i += 1) {
+        await dispatch(chromeMock, 'UNLOCK_WALLET', { password: 'wrong-password' });
+      }
+      unlock.mockClear();
+
+      const resp = await dispatch(chromeMock, 'UNLOCK_WALLET', { password: 'wrong-password' });
+
+      expect((resp.payload as any).retryAfterMs).toBeGreaterThan(0);
+      expect(unlock).not.toHaveBeenCalled();
+      _resetHandlers();
+    });
+
+    it('resets the failure counter after a successful unlock', async () => {
+      let unlockResult = false;
+      const unlock = vi.fn(async () => unlockResult);
+      vi.doMock('@/security/storage-manager', () => ({
+        getSharedStorageManager: vi.fn(() => ({
+          unlock,
+          lock: vi.fn(),
+        })),
+        resetSharedStorageManagerForTests: vi.fn(),
+      }));
+      vi.doMock('@/router/AuthGuard', () => ({
+        readAuthState: vi.fn(() => makeAuthState({ hasOnboarded: true })),
+        DEFAULT_AUTH_STATE: makeAuthState(),
+        AUTH_STORAGE_KEY: 'ancore_extension_auth',
+      }));
+      vi.doMock('@/messaging', async () => {
+        const actual = await vi.importActual<typeof import('@/messaging')>('@/messaging');
+        return actual;
+      });
+      await import('../service-worker');
+      const { _resetHandlers } = await import('@/messaging/handler');
+
+      for (let i = 0; i < 3; i += 1) {
+        await dispatch(chromeMock, 'UNLOCK_WALLET', { password: 'wrong-password' });
+      }
+
+      unlockResult = true;
+      const successResp = await dispatch(chromeMock, 'UNLOCK_WALLET', {
+        password: 'correct-password',
+      });
+      expect((successResp.payload as any).success).toBe(true);
+
+      unlockResult = false;
+      for (let i = 0; i < 4; i += 1) {
+        const resp = await dispatch(chromeMock, 'UNLOCK_WALLET', { password: 'wrong-password' });
+        expect((resp.payload as any).retryAfterMs).toBeUndefined();
+      }
+      _resetHandlers();
+    });
+
+    it('allows unlock again after lockout expires', async () => {
+      let unlockResult = false;
+      const unlock = vi.fn(async () => unlockResult);
+      vi.doMock('@/security/storage-manager', () => ({
+        getSharedStorageManager: vi.fn(() => ({
+          unlock,
+          lock: vi.fn(),
+        })),
+        resetSharedStorageManagerForTests: vi.fn(),
+      }));
+      vi.doMock('@/router/AuthGuard', () => ({
+        readAuthState: vi.fn(() => makeAuthState({ hasOnboarded: true })),
+        DEFAULT_AUTH_STATE: makeAuthState(),
+        AUTH_STORAGE_KEY: 'ancore_extension_auth',
+      }));
+      vi.doMock('@/messaging', async () => {
+        const actual = await vi.importActual<typeof import('@/messaging')>('@/messaging');
+        return actual;
+      });
+      await import('../service-worker');
+      const { _resetHandlers } = await import('@/messaging/handler');
+
+      for (let i = 0; i < 5; i += 1) {
+        await dispatch(chromeMock, 'UNLOCK_WALLET', { password: 'wrong-password' });
+      }
+
+      vi.advanceTimersByTime(61_000);
+      unlockResult = true;
+
+      const resp = await dispatch(chromeMock, 'UNLOCK_WALLET', { password: 'correct-password' });
+      expect((resp.payload as any).success).toBe(true);
+      _resetHandlers();
+    });
+  });
+});
+
+// ---------------------------------------------------------------------------
+// APPROVE_SIGN_REQUEST (dApp-facing sign/message bridge — issue #1213)
+// ---------------------------------------------------------------------------
+
+function approveSignRequest(
+  chrome: ChromeMock,
+  requestId: string
+): Promise<{ ok: boolean; error?: string }> {
+  return new Promise((resolve) => {
+    chrome.runtime.onMessage._trigger(
+      { type: 'APPROVE_SIGN_REQUEST', requestId },
+      {},
+      resolve as any
+    );
+  });
+}
+
+describe('APPROVE_SIGN_REQUEST', () => {
+  it('resolves a SIGN_TRANSACTION approval with a real, cryptographically signed XDR — not the old hardcoded fake', async () => {
+    const kp = Keypair.random();
+    const { _resetHandlers } = await loadServiceWorker(makeAuthState({ hasOnboarded: true }), {
+      signingSecret: kp.secret(),
+    });
+    await dispatch(chromeMock, 'UNLOCK_WALLET', { password: 'any' });
+
+    const { enqueueApproval, registerResponseCallbacks } =
+      await import('../handlers/external/response-queue');
+    const { Account, TransactionBuilder, Networks } = await import('@stellar/stellar-sdk');
+    const tx = new TransactionBuilder(new Account(kp.publicKey(), '1'), {
+      fee: '100',
+      networkPassphrase: Networks.TESTNET,
+    })
+      .setTimeout(0)
+      .build();
+    const xdr = tx.toXDR();
+
+    const requestId = 'req-sign-tx-1';
+    enqueueApproval(requestId, 'https://dapp.example', 'signTransaction', {
+      xdr,
+      networkPassphrase: Networks.TESTNET,
+    });
+    const waited = new Promise((resolve, reject) => {
+      registerResponseCallbacks(requestId, resolve, reject);
+    });
+
+    const ack = await approveSignRequest(chromeMock, requestId);
+    expect(ack.ok).toBe(true);
+
+    const result = (await waited) as { signedXdr?: string };
+    expect(result.signedXdr).toBeDefined();
+    expect(result.signedXdr).not.toEqual('AAAAAgAAAAA=');
+    expect(result.signedXdr).not.toEqual(xdr);
+    _resetHandlers();
+  });
+
+  it('resolves a SIGN_MESSAGE approval with a real, verifiable Ed25519 signature', async () => {
+    const kp = Keypair.random();
+    const { _resetHandlers } = await loadServiceWorker(makeAuthState({ hasOnboarded: true }), {
+      signingSecret: kp.secret(),
+    });
+    await dispatch(chromeMock, 'UNLOCK_WALLET', { password: 'any' });
+
+    const { enqueueApproval, registerResponseCallbacks } =
+      await import('../handlers/external/response-queue');
+
+    const message = '7b2273657373696f6e4b6579223a223078227d';
+    const requestId = 'req-sign-msg-1';
+    enqueueApproval(requestId, 'https://dapp.example', 'signMessage', { message });
+    const waited = new Promise((resolve, reject) => {
+      registerResponseCallbacks(requestId, resolve, reject);
+    });
+
+    const ack = await approveSignRequest(chromeMock, requestId);
+    expect(ack.ok).toBe(true);
+
+    const result = (await waited) as { signature?: string };
+    expect(result.signature).toMatch(/^[0-9a-f]{128}$/);
+    expect(kp.verify(Buffer.from(message, 'utf8'), Buffer.from(result.signature!, 'hex'))).toBe(
+      true
+    );
+    _resetHandlers();
+  });
+
+  it('resolves a SIGN_RELAY_PAYLOAD approval with a real sessionKey + signature (issue #1213)', async () => {
+    const kp = Keypair.random();
+    const { _resetHandlers } = await loadServiceWorker(makeAuthState({ hasOnboarded: true }), {
+      signingSecret: kp.secret(),
+    });
+    await dispatch(chromeMock, 'UNLOCK_WALLET', { password: 'any' });
+
+    const { enqueueApproval, registerResponseCallbacks } =
+      await import('../handlers/external/response-queue');
+    const { buildRelayCanonicalPayload } = await import('@ancore/core-sdk');
+
+    const requestId = 'req-sign-relay-1';
+    enqueueApproval(requestId, 'https://dapp.example', 'signRelayPayload', {
+      operation: 'relay_execute',
+      nonce: 99,
+    });
+    const waited = new Promise((resolve, reject) => {
+      registerResponseCallbacks(requestId, resolve, reject);
+    });
+
+    const ack = await approveSignRequest(chromeMock, requestId);
+    expect(ack.ok).toBe(true);
+
+    const result = (await waited) as { sessionKey?: string; signature?: string };
+    expect(result.sessionKey).not.toEqual('a'.repeat(64));
+    expect(result.signature).not.toEqual('b'.repeat(128));
+    expect(result.sessionKey).toMatch(/^[0-9a-f]{64}$/);
+    expect(result.signature).toMatch(/^[0-9a-f]{128}$/);
+
+    const canonicalPayload = buildRelayCanonicalPayload({
+      sessionKey: result.sessionKey!,
+      operation: 'relay_execute',
+      nonce: 99,
+    });
+    expect(
+      kp.verify(Buffer.from(canonicalPayload, 'utf8'), Buffer.from(result.signature!, 'hex'))
+    ).toBe(true);
+    _resetHandlers();
+  });
+
+  it('rejects when no matching approval is pending', async () => {
+    const { _resetHandlers } = await loadServiceWorker(makeAuthState({ hasOnboarded: true }));
+
+    const ack = await approveSignRequest(chromeMock, 'unknown-request-id');
+
+    expect(ack.ok).toBe(false);
+    expect(ack.error).toMatch(/not found/i);
     _resetHandlers();
   });
 });

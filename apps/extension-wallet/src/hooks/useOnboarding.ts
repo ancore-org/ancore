@@ -4,9 +4,20 @@ import {
   validatePasswordStrength,
   type EncryptedSecretKeyPayload,
 } from '@ancore/crypto';
-import { createWallet, importWallet, type WalletMaterial } from '@ancore/core-sdk';
-import { StellarClient } from '@ancore/stellar';
+import { createWallet, importWallet } from '@ancore/core-sdk';
 import type { Network } from '@ancore/types';
+import { useAccountStore } from '@/stores/account';
+import { createDeployClient, type DeployClient } from '@/services/deploy-account';
+import { getSharedStorageManager } from '@/security/storage-manager';
+
+import { writeChromeLocal } from '@/background/chrome-api';
+
+/** chrome.storage.local key for the deployed smart-account C-address. */
+export const CONTRACT_ADDRESS_KEY = 'ancore_contract_address';
+
+async function persistContractAddress(contractId: string): Promise<void> {
+  await writeChromeLocal(CONTRACT_ADDRESS_KEY, contractId);
+}
 
 /**
  * Onboarding step enum
@@ -18,7 +29,12 @@ export type OnboardingStep = 'welcome' | 'generate' | 'verify' | 'password' | 'd
  */
 export interface OnboardedAccount {
   publicKey: string;
+  /** Deployed smart-account contract id (C-address) — the smartAccountId. */
   contractId: string;
+  /** Deployment transaction hash, when the contract was freshly deployed. */
+  txHash?: string;
+  /** True when the contract already existed on-chain (reimport path). */
+  alreadyDeployed: boolean;
   encryptedMnemonic: EncryptedSecretKeyPayload;
 }
 
@@ -80,10 +96,25 @@ const WALLET_STATE_KEY = 'walletState';
 const ACCOUNTS_KEY = 'accounts';
 
 /**
+ * Options for {@link useOnboarding}. The deploy client is injectable so unit
+ * tests can supply a mocked client without standing up Stellar RPC.
+ */
+export interface UseOnboardingOptions {
+  deployClient?: DeployClient;
+  network?: Network;
+}
+
+/**
  * Onboarding hook for managing the complete onboarding flow
  */
-export function useOnboarding() {
+export function useOnboarding(options: UseOnboardingOptions = {}) {
   const [state, setState] = useState<OnboardingState>(DEFAULT_STATE);
+  const setAccountInStore = useAccountStore((s) => s.setAccount);
+
+  // Lazily build a deploy client once per hook instance. Tests inject a mock.
+  const [deployClient] = useState<DeployClient>(
+    () => options.deployClient ?? createDeployClient({ network: options.network ?? 'testnet' })
+  );
 
   /**
    * Move to the next step
@@ -142,16 +173,21 @@ export function useOnboarding() {
    * Generate a new mnemonic
    */
   const generateMnemonicHandler = useCallback(async () => {
+    setState((prev: OnboardingState) => ({ ...prev, isLoading: true, error: null }));
     try {
       const wallet = await createWallet();
       setState((prev: OnboardingState) => ({
         ...prev,
         mnemonic: wallet.mnemonic,
         step: 'generate',
+        isLoading: false,
+        error: null,
       }));
     } catch (error) {
+      console.error('[onboarding] createWallet failed', error);
       setState((prev: OnboardingState) => ({
         ...prev,
+        isLoading: false,
         error: error instanceof Error ? error.message : 'Failed to generate mnemonic',
       }));
     }
@@ -204,12 +240,25 @@ export function useOnboarding() {
   );
 
   /**
-   * Deploy the account contract to the network
+   * Deploy the Soroban smart account contract for the onboarding owner.
+   *
+   * Flow:
+   *  1. Derive the owner G-key via BIP44 m/44'/148'/0' (`deriveKeypairFromMnemonic`).
+   *  2. Encrypt the mnemonic for the vault.
+   *  3. Call the deploy client → { contractId, txHash }. The client recovers an
+   *     already-deployed contract id on reimport instead of redeploying.
+   *  4. Persist contractId (C-address) alongside encryptedMnemonic in the
+   *     account store, and clear both the plaintext mnemonic and the keypair.
+   *
+   * The keypair is created locally and never stored in React state; it is
+   * passed to the deploy call and dropped when this function returns.
    */
   const deployAccount = useCallback(
+    // Network is fixed at deploy-client construction (see useOnboarding options);
+    // the positional arg is kept for call-site compatibility with the flow.
     async (
-      network: Network = 'testnet'
-    ): Promise<{ publicKey: string; contractId: string } | null> => {
+      _network: Network = 'testnet'
+    ): Promise<{ publicKey: string; contractId: string; txHash?: string } | null> => {
       if (!state.mnemonic) {
         setState((prev: OnboardingState) => ({ ...prev, error: 'No mnemonic generated' }));
         return null;
@@ -222,55 +271,96 @@ export function useOnboarding() {
 
       setState((prev: OnboardingState) => ({ ...prev, isLoading: true, error: null }));
 
+      // Encrypt the mnemonic for vault persistence (keeps secretKey out of the
+      // returned material; we only need publicKey + encryptedMnemonic here).
+      const wallet = await importWallet({
+        mnemonic: state.mnemonic,
+        password: state.password,
+      });
+      const publicKey = wallet.publicKey;
+
+      // Derive the owner keypair (BIP44 m/44'/148'/0'). Kept in a local
+      // variable only — never placed in React state — and cleared in finally.
+      let signer: ReturnType<typeof deriveKeypairFromMnemonic> | null = deriveKeypairFromMnemonic(
+        state.mnemonic,
+        0
+      );
+
       try {
-        // Import wallet to get keys
-        const wallet = await importWallet({
-          mnemonic: state.mnemonic,
-          password: state.password,
+        const { contractId, txHash } = await deployClient.deployAccount({
+          ownerPublicKey: publicKey,
+          signer,
         });
 
-        const publicKey = wallet.publicKey;
-
-        // Initialize Stellar client
-        const client = new StellarClient({ network });
-
-        // Fund account with Friendbot on testnet
-        if (network === 'testnet') {
-          await client.fundWithFriendbot(publicKey);
-        }
-
-        // Wait for account to be created
-        await new Promise((resolve) => setTimeout(resolve, 3000));
-
-        // Use the derived contract ID from wallet
-        const contractId = wallet.contractId;
+        const alreadyDeployed = !txHash;
 
         const account: OnboardedAccount = {
           publicKey,
           contractId,
+          txHash,
+          alreadyDeployed,
           encryptedMnemonic: wallet.encryptedMnemonic,
         };
 
-        // Save to storage
+        // #815 — Unlock the AES-GCM vault and persist the mnemonic so that
+        // downstream features (send, sign, session keys) have real key material.
+        // Best-effort: vault write failures (e.g. in test environments without
+        // chrome.storage) must not abort the deploy flow.
+        try {
+          const vault = getSharedStorageManager();
+          const vaultReady = await vault.unlock(state.password!);
+          if (vaultReady) {
+            await vault.saveAccount({
+              privateKey: state.mnemonic!, // plaintext; vault re-encrypts with AES-GCM
+              publicKey,
+              contractId,
+            });
+          }
+        } catch {
+          // Non-fatal: chrome.storage unavailable or vault already locked.
+        }
+
+        // Persist contractId (smartAccountId) alongside the account in the
+        // vault auth state store.
+        setAccountInStore({
+          id: publicKey,
+          address: publicKey,
+          label: 'Ancore Wallet',
+          contractId,
+        });
+
+        // Save account and clear plaintext mnemonic from state.
         setState((prev: OnboardingState) => ({
           ...prev,
           account,
+          mnemonic: null,
           isLoading: false,
           step: 'success',
         }));
 
-        return { publicKey, contractId };
+        return { publicKey, contractId, txHash };
       } catch (error) {
+        // Keep the mnemonic so the user can retry without re-entering it.
         setState((prev: OnboardingState) => ({
           ...prev,
           isLoading: false,
           error: error instanceof Error ? error.message : 'Failed to deploy account',
         }));
         return null;
+      } finally {
+        // Drop the keypair reference so it is not retained after deploy returns.
+        signer = null;
       }
     },
-    [state.mnemonic, state.password]
+    [state.mnemonic, state.password, deployClient, setAccountInStore]
   );
+
+  /**
+   * Set mnemonic from an external source (import wallet path).
+   */
+  const setMnemonicForImport = useCallback((importedMnemonic: string) => {
+    setState((prev: OnboardingState) => ({ ...prev, mnemonic: importedMnemonic, step: 'deploy' }));
+  }, []);
 
   /**
    * Reset the onboarding state
@@ -307,6 +397,7 @@ export function useOnboarding() {
     checkPasswordStrength,
     encryptMnemonic,
     deployAccount,
+    setMnemonicForImport,
     reset,
     clearError,
   };

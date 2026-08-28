@@ -3,7 +3,7 @@
   "name": "Ancore Wallet",
   "short_name": "Ancore",
   "version": "0.1.0",
-  "description": "Account abstraction wallet for Stellar",
+  "description": "Non-custodial Stellar account abstraction wallet. Manage smart accounts, session keys, and Soroban contract interactions.",
   "icons": {
     "16": "icons/icon-16.png",
     "32": "icons/icon-32.png",
@@ -11,7 +11,7 @@
     "128": "icons/icon-128.png"
   },
   "action": {
-    "default_title": "Ancore Wallet",
+    "default_title": "Ancore Wallet — Stellar Account Abstraction",
     "default_popup": "popup/index.html",
     "default_icon": {
       "16": "icons/icon-16.png",
@@ -24,5 +24,19 @@
     "service_worker": "background/service-worker.js",
     "type": "module"
   },
-  "permissions": ["storage"]
+  "content_security_policy": {
+    "extension_pages": "script-src 'self'; object-src 'none'; connect-src 'self' https://*.stellar.org https://relayer.ancore.io https://relayer-staging.ancore.io https://indexer.ancore.io https://indexer-staging.ancore.io; img-src 'self' data:; style-src 'self' 'unsafe-inline'; default-src 'none'"
+  },
+  "permissions": ["storage", "sidePanel"],
+  "side_panel": {
+    "default_path": "sidepanel/index.html"
+  },
+  "content_scripts": [
+    {
+      "matches": ["http://*/*", "https://*/*"],
+      "js": ["content-script/content-script.js"],
+      "run_at": "document_start",
+      "all_frames": false
+    }
+  ]
 }

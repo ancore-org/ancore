@@ -3,5 +3,8 @@ export { OnboardingCompleteScreen } from './OnboardingCompleteScreen';
 export { WalletCreateScreen } from './WalletCreateScreen';
 export { WalletImportScreen } from './WalletImportScreen';
 export { WalletRecoverScreen } from './WalletRecoverScreen';
+export { MnemonicDisplayScreen } from './MnemonicDisplayScreen';
+export { VerifyMnemonicScreen } from './VerifyMnemonicScreen';
+export { PasswordScreen } from './PasswordScreen';
 export type { OnboardingFlow, OnboardingRoute, OnboardingState } from './types';
 export { DEFAULT_ONBOARDING_STATE } from './types';

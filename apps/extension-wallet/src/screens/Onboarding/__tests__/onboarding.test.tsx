@@ -1,5 +1,7 @@
 import { describe, it, expect, vi } from 'vitest';
-import { render, screen, fireEvent, waitFor } from '@testing-library/react';
+import * as React from 'react';
+import { render, screen, fireEvent, waitFor, within } from '@testing-library/react';
+import { NotificationProvider } from '@ancore/ui-kit';
 import { WelcomeScreen } from '../WelcomeScreen';
 import { MnemonicScreen } from '../MnemonicScreen';
 import { VerifyMnemonicScreen } from '../VerifyMnemonicScreen';
@@ -18,36 +20,43 @@ Object.defineProperty(navigator, 'clipboard', {
 });
 
 describe('WelcomeScreen', () => {
-  it('renders welcome message and features', () => {
+  it('renders setup chooser options', () => {
     const onNext = vi.fn();
-    render(<WelcomeScreen onNext={onNext} />);
+    render(<WelcomeScreen onNext={onNext} onImport={vi.fn()} />);
 
-    expect(screen.getByText('Welcome to Ancore')).toBeInTheDocument();
-    expect(screen.getByText('Create New Wallet')).toBeInTheDocument();
-    expect(screen.getByText('Secure')).toBeInTheDocument();
-    expect(screen.getByText('Smart Accounts')).toBeInTheDocument();
+    expect(screen.getByText('Set up your wallet')).toBeInTheDocument();
+    expect(screen.getByText('Create new wallet')).toBeInTheDocument();
+    expect(screen.getByText('Import')).toBeInTheDocument();
   });
 
-  it('calls onNext when create wallet button is clicked', () => {
+  it('calls onNext when create wallet is clicked', () => {
     const onNext = vi.fn();
-    render(<WelcomeScreen onNext={onNext} />);
+    render(<WelcomeScreen onNext={onNext} onImport={vi.fn()} />);
 
-    fireEvent.click(screen.getByText('Create New Wallet'));
+    fireEvent.click(screen.getByText('Create new wallet'));
     expect(onNext).toHaveBeenCalledTimes(1);
   });
 
-  it('shows back button when onBack is provided', () => {
+  it('calls onImport when import is clicked', () => {
+    const onImport = vi.fn();
+    render(<WelcomeScreen onNext={vi.fn()} onImport={onImport} />);
+
+    fireEvent.click(screen.getByText('Import'));
+    expect(onImport).toHaveBeenCalledTimes(1);
+  });
+
+  it('shows close control when onBack is provided', () => {
     const onBack = vi.fn();
     render(<WelcomeScreen onNext={vi.fn()} onBack={onBack} />);
 
-    fireEvent.click(screen.getByText('Back'));
+    fireEvent.click(screen.getByRole('button', { name: /close/i }));
     expect(onBack).toHaveBeenCalledTimes(1);
   });
 
-  it('shows security warning for recovery phrase', () => {
-    render(<WelcomeScreen onNext={vi.fn()} />);
+  it('mentions recovery phrase for import path', () => {
+    render(<WelcomeScreen onNext={vi.fn()} onImport={vi.fn()} />);
 
-    expect(screen.getByText(/recovery phrase/)).toBeInTheDocument();
+    expect(screen.getAllByText(/recovery phrase/i).length).toBeGreaterThan(0);
   });
 });
 
@@ -120,67 +129,90 @@ describe('VerifyMnemonicScreen', () => {
   const testMnemonic =
     'abandon ability able about above absent absorb abstract absurd abuse access accident';
 
-  it('renders verification inputs for selected words', () => {
+  function getChallengeContainers() {
+    return screen.getAllByText(/^Word #\d+$/).map((label) => {
+      const container = label.parentElement;
+      if (!container) {
+        throw new Error('Expected challenge container');
+      }
+      return { wordNumber: Number(label.textContent!.replace('Word #', '')), container };
+    });
+  }
+
+  function selectCorrectAnswers() {
+    const words = testMnemonic.split(' ');
+    getChallengeContainers().forEach(({ wordNumber, container }) => {
+      const correctWord = words[wordNumber - 1];
+      fireEvent.click(within(container).getByRole('button', { name: correctWord }));
+    });
+  }
+
+  function selectWrongAnswers() {
+    const words = testMnemonic.split(' ');
+    getChallengeContainers().forEach(({ wordNumber, container }) => {
+      const correctWord = words[wordNumber - 1];
+      const wrongButton = within(container)
+        .getAllByRole('button')
+        .find((button) => button.textContent?.trim() !== correctWord);
+      if (wrongButton) {
+        fireEvent.click(wrongButton);
+      }
+    });
+  }
+
+  it('renders verification challenges for selected words', () => {
     render(<VerifyMnemonicScreen mnemonic={testMnemonic} onSuccess={vi.fn()} onBack={vi.fn()} />);
 
     expect(screen.getByText(/Verify Your Backup/)).toBeInTheDocument();
-    expect(screen.getByPlaceholderText(/Enter word/)).toBeInTheDocument();
+    expect(screen.getAllByText(/^Word #\d+$/)).toHaveLength(3);
+    expect(screen.getAllByRole('button', { name: /verify & continue/i })).toHaveLength(1);
   });
 
-  it('shows word #3 input (1-indexed)', () => {
+  it('shows word position labels (1-indexed)', () => {
     render(<VerifyMnemonicScreen mnemonic={testMnemonic} onSuccess={vi.fn()} onBack={vi.fn()} />);
 
-    expect(screen.getByLabelText('Word #3')).toBeInTheDocument();
+    const labels = screen.getAllByText(/^Word #\d+$/).map((node) => node.textContent);
+    labels.forEach((label) => {
+      const position = Number(label!.replace('Word #', ''));
+      expect(position).toBeGreaterThanOrEqual(1);
+      expect(position).toBeLessThanOrEqual(12);
+    });
   });
 
-  it('calls onSuccess when correct words are entered', async () => {
+  it('calls onSuccess when correct words are selected', async () => {
     const onSuccess = vi.fn();
     render(<VerifyMnemonicScreen mnemonic={testMnemonic} onSuccess={onSuccess} onBack={vi.fn()} />);
 
-    // The screen renders inputs for specific words
-    // For our test mnemonic, words at positions 3, 7, 11 (1-indexed) would be:
-    // Position 3 = "able" (index 2)
-    // Position 7 = "absorb" (index 6)
-    // Position 11 = "access" (index 10)
-
-    const inputs = screen.getAllByPlaceholderText(/Enter word/);
-
-    // Fill in the inputs with correct words
-    // The exact order depends on which indices are selected
-    if (inputs.length >= 3) {
-      fireEvent.change(inputs[0], { target: { value: 'able' } });
-      // ... etc
-    }
-
+    selectCorrectAnswers();
     fireEvent.click(screen.getByText('Verify & Continue'));
-    // onSuccess is only called if all words are correct
+
+    await waitFor(() => {
+      expect(onSuccess).toHaveBeenCalledTimes(1);
+    });
   });
 
   it('shows error when words are incorrect', async () => {
     const onSuccess = vi.fn();
     render(<VerifyMnemonicScreen mnemonic={testMnemonic} onSuccess={onSuccess} onBack={vi.fn()} />);
 
+    selectWrongAnswers();
     fireEvent.click(screen.getByText('Verify & Continue'));
 
     await waitFor(() => {
       expect(screen.getByText(/Some words are incorrect/)).toBeInTheDocument();
     });
+    expect(onSuccess).not.toHaveBeenCalled();
   });
 
-  it('clears inputs when retry is clicked', () => {
+  it('keeps verify disabled until all challenges are answered', () => {
     render(<VerifyMnemonicScreen mnemonic={testMnemonic} onSuccess={vi.fn()} onBack={vi.fn()} />);
 
-    const inputs = screen.getAllByPlaceholderText(/Enter word/);
-    if (inputs.length > 0) {
-      fireEvent.change(inputs[0], { target: { value: 'wrong' } });
-    }
+    const verifyButton = screen.getByRole('button', { name: /verify & continue/i });
+    expect(verifyButton).toBeDisabled();
 
-    fireEvent.click(screen.getByText('Clear'));
-
-    const clearedInputs = screen.getAllByPlaceholderText(/Enter word/);
-    if (clearedInputs.length > 0) {
-      expect(clearedInputs[0].getAttribute('value')).toBe('');
-    }
+    const [{ container }] = getChallengeContainers();
+    fireEvent.click(within(container).getAllByRole('button')[0]);
+    expect(verifyButton).toBeDisabled();
   });
 });
 
@@ -188,7 +220,7 @@ describe('PasswordScreen', () => {
   it('renders password inputs', () => {
     render(<PasswordScreen onSubmit={vi.fn()} onBack={vi.fn()} />);
 
-    expect(screen.getByText('Create Your Password')).toBeInTheDocument();
+    expect(screen.getByText('Create your password')).toBeInTheDocument();
     expect(screen.getByPlaceholderText('Enter your password')).toBeInTheDocument();
     expect(screen.getByPlaceholderText('Confirm your password')).toBeInTheDocument();
   });
@@ -365,17 +397,23 @@ describe('DeployScreen', () => {
 describe('SuccessScreen', () => {
   const testPublicKey = 'GABC123DEF456GHI789JKL012MNO345PQR678STU901VWX234YZ';
 
-  it('renders success message', () => {
-    render(<SuccessScreen publicKey={testPublicKey} onComplete={vi.fn()} />);
+  // SuccessScreen copies addresses via useCopyWithFeedback, which requires the
+  // toast context the router provides in production.
+  function renderSuccessScreen(ui: React.ReactElement) {
+    return render(<NotificationProvider>{ui}</NotificationProvider>);
+  }
 
-    expect(screen.getByText('Congratulations!')).toBeInTheDocument();
+  it('renders success message', () => {
+    renderSuccessScreen(<SuccessScreen publicKey={testPublicKey} onComplete={vi.fn()} />);
+
+    expect(screen.getByText('Wallet ready')).toBeInTheDocument();
     expect(
       screen.getByText('Your Ancore wallet has been created successfully')
     ).toBeInTheDocument();
   });
 
   it('displays truncated public key', () => {
-    render(<SuccessScreen publicKey={testPublicKey} onComplete={vi.fn()} />);
+    renderSuccessScreen(<SuccessScreen publicKey={testPublicKey} onComplete={vi.fn()} />);
 
     // Should show truncated address
     expect(screen.getByText(/GABC12.*YZ/)).toBeInTheDocument();
@@ -383,7 +421,7 @@ describe('SuccessScreen', () => {
 
   it('displays contract ID if provided', () => {
     const contractId = 'CAS123DEF456GHI789JKL012MNO345PQR678STU901VWX2345';
-    render(
+    renderSuccessScreen(
       <SuccessScreen publicKey={testPublicKey} contractId={contractId} onComplete={vi.fn()} />
     );
 
@@ -391,7 +429,7 @@ describe('SuccessScreen', () => {
   });
 
   it('copies public key to clipboard', async () => {
-    render(<SuccessScreen publicKey={testPublicKey} onComplete={vi.fn()} />);
+    renderSuccessScreen(<SuccessScreen publicKey={testPublicKey} onComplete={vi.fn()} />);
 
     const copyButtons = screen.getAllByRole('button');
     const copyButton = copyButtons.find((btn) => {
@@ -409,20 +447,20 @@ describe('SuccessScreen', () => {
 
   it('calls onComplete when open wallet is clicked', () => {
     const onComplete = vi.fn();
-    render(<SuccessScreen publicKey={testPublicKey} onComplete={onComplete} />);
+    renderSuccessScreen(<SuccessScreen publicKey={testPublicKey} onComplete={onComplete} />);
 
     fireEvent.click(screen.getByText('Open Wallet'));
     expect(onComplete).toHaveBeenCalledTimes(1);
   });
 
   it('shows security reminder', () => {
-    render(<SuccessScreen publicKey={testPublicKey} onComplete={vi.fn()} />);
+    renderSuccessScreen(<SuccessScreen publicKey={testPublicKey} onComplete={vi.fn()} />);
 
     expect(screen.getByText(/recovery phrase/)).toBeInTheDocument();
   });
 
   it('has view on explorer button', () => {
-    render(<SuccessScreen publicKey={testPublicKey} onComplete={vi.fn()} />);
+    renderSuccessScreen(<SuccessScreen publicKey={testPublicKey} onComplete={vi.fn()} />);
 
     expect(screen.getByText('View on Stellar Expert')).toBeInTheDocument();
   });

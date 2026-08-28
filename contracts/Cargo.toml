@@ -3,6 +3,8 @@ resolver = "2"
 
 members = [
     "account",
+    "invoice",
+    "upgrade",
     "validation-modules",
 ]
 

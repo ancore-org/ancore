@@ -3,6 +3,7 @@ import { render, screen, fireEvent } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { renderHook, act } from '@testing-library/react';
 import { NotificationProvider } from '@ancore/ui-kit';
+import i18n from '../../../i18n';
 
 import { useSettings } from '../../../hooks/useSettings';
 import {
@@ -11,10 +12,13 @@ import {
   useDashboardSettingsStore,
 } from '../../../state/dashboard-settings';
 import { DEFAULTS, useSettingsStore } from '../../../stores/settings';
+import { useAccountStore } from '../../../stores/account';
+import { useAllowlistStore } from '../../../stores/allowlist';
 import { SettingsScreen } from '../SettingsScreen';
 import { NetworkSettings } from '../NetworkSettings';
 import { SecuritySettings } from '../SecuritySettings';
 import { AboutScreen } from '../AboutScreen';
+import { ConnectedSitesScreen } from '../ConnectedSitesScreen';
 import { revealVaultSecret, VaultExportError } from '../../../security/vault-export';
 import { SettingsGroup, SettingItem } from '../../../components/SettingsGroup';
 
@@ -121,6 +125,32 @@ describe('SettingItem', () => {
     render(<SettingItem label="Export Key" danger onClick={vi.fn()} />);
     const btn = screen.getByRole('button', { name: /export key/i });
     expect(btn.className).toContain('text-destructive');
+  });
+});
+
+describe('ConnectedSitesScreen', () => {
+  beforeEach(() => {
+    useAllowlistStore.setState({ approvedSites: {} });
+    useAccountStore.setState({ accounts: [], activeAccountId: null });
+  });
+
+  it('shows connected sites and allows disconnecting all', async () => {
+    useAccountStore.setState({
+      accounts: [{ id: 'acct-1', address: 'CABC...', label: 'Primary' }],
+      activeAccountId: 'acct-1',
+    });
+    useSettingsStore.setState({ ...DEFAULTS, network: 'testnet' });
+    useAllowlistStore.getState().approve('https://example.com', 'acct-1', 'testnet');
+    useAllowlistStore.getState().approve('https://demo.app', 'acct-1', 'testnet');
+
+    render(<ConnectedSitesScreen onBack={vi.fn()} />);
+
+    expect(screen.getByText('example.com')).toBeInTheDocument();
+    expect(screen.getByText('demo.app')).toBeInTheDocument();
+
+    await userEvent.click(screen.getByRole('button', { name: /disconnect all/i }));
+
+    expect(screen.getByText(/no connected sites/i)).toBeInTheDocument();
   });
 });
 
@@ -323,6 +353,7 @@ describe('SettingsScreen', () => {
   beforeEach(() => {
     localStorage.clear();
     useDashboardSettingsStore.setState(DEFAULT_DASHBOARD_SETTINGS);
+    useSettingsStore.setState(DEFAULTS);
   });
 
   it('renders all top-level groups', () => {
@@ -330,7 +361,17 @@ describe('SettingsScreen', () => {
     expect(screen.getByText('Settings')).toBeInTheDocument();
     expect(screen.getAllByText('Network').length).toBeGreaterThanOrEqual(1);
     expect(screen.getByText('Security')).toBeInTheDocument();
+    expect(screen.getByText('Privacy')).toBeInTheDocument();
     expect(screen.getByText('About Ancore')).toBeInTheDocument();
+  });
+
+  it('toggles telemetry opt-in from privacy settings', async () => {
+    renderSettingsScreen();
+    expect(screen.getByText('Disabled')).toBeInTheDocument();
+
+    await userEvent.click(screen.getByRole('button', { name: /usage analytics/i }));
+    expect(useSettingsStore.getState().telemetryOptIn).toBe(true);
+    expect(screen.getByText('Enabled')).toBeInTheDocument();
   });
 
   it('navigates to network settings', async () => {
@@ -376,5 +417,12 @@ describe('SettingsScreen', () => {
     });
     renderSettingsScreen();
     expect(screen.getAllByText('Mainnet').length).toBeGreaterThanOrEqual(1);
+  });
+
+  it('renders SettingsScreen copy from i18n keys', () => {
+    renderSettingsScreen();
+    expect(screen.getByText(i18n.t('settings.title'))).toBeInTheDocument();
+    expect(screen.getByText(i18n.t('settings.subtitle'))).toBeInTheDocument();
+    expect(screen.getByText(i18n.t('settings.groups.account'))).toBeInTheDocument();
   });
 });

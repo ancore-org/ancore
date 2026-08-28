@@ -5,7 +5,7 @@
  * Respects opt-in configuration and handles local storage of events.
  */
 
-import { AnyTelemetryEvent, TelemetryEventType } from './telemetry-schema';
+import { AnyTelemetryEvent, DistributiveOmit, TelemetryEventType } from './telemetry-schema';
 
 export interface TelemetryConfig {
   enabled: boolean;
@@ -28,7 +28,7 @@ class TelemetryEmitter {
     this.loadEvents();
   }
 
-  emit(event: Omit<AnyTelemetryEvent, 'timestamp' | 'sessionId'>): void {
+  emit(event: DistributiveOmit<AnyTelemetryEvent, 'timestamp' | 'sessionId'>): void {
     if (!this.config.enabled) {
       return;
     }
@@ -114,6 +114,12 @@ class TelemetryEmitter {
       operationType,
       success,
       duration,
+    });
+  }
+
+  emitAddressCopied(): void {
+    this.emit({
+      type: TelemetryEventType.ADDRESS_COPIED,
     });
   }
 

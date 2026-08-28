@@ -180,4 +180,49 @@ describe('fetchFeeStats', () => {
 
     expect(caughtError).toBeInstanceOf(NetworkError);
   });
+
+  // ── Malformed inputs ────────────────────────────────────────────────────
+
+  it('returns fallback when Horizon returns non-numeric fee values', async () => {
+    (global.fetch as jest.Mock).mockResolvedValue({
+      ok: true,
+      json: () =>
+        Promise.resolve({
+          fee_charged: { min: 'not-a-number', mode: '250', p90: '1000' },
+        }),
+    });
+
+    const result = await fetchFeeStats({ horizonUrl: HORIZON_URL });
+
+    expect(result.isFallback).toBe(true);
+    expect(result.minFee).toBe(FALLBACK_FEE_STATS.minFee);
+  });
+
+  it('returns fallback when Horizon returns negative fee values', async () => {
+    (global.fetch as jest.Mock).mockResolvedValue({
+      ok: true,
+      json: () =>
+        Promise.resolve({
+          fee_charged: { min: '-100', mode: '250', p90: '1000' },
+        }),
+    });
+
+    const result = await fetchFeeStats({ horizonUrl: HORIZON_URL });
+
+    expect(result.isFallback).toBe(true);
+  });
+
+  it('returns fallback when fee values are NaN strings', async () => {
+    (global.fetch as jest.Mock).mockResolvedValue({
+      ok: true,
+      json: () =>
+        Promise.resolve({
+          fee_charged: { min: 'NaN', mode: 'NaN', p90: 'NaN' },
+        }),
+    });
+
+    const result = await fetchFeeStats({ horizonUrl: HORIZON_URL });
+
+    expect(result.isFallback).toBe(true);
+  });
 });

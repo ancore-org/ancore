@@ -3,7 +3,7 @@
  */
 
 import type { Horizon, Transaction } from '@stellar/stellar-sdk';
-import { StellarClient } from '../client';
+import { StellarClient, createStellarClient } from '../client';
 import {
   AccountNotFoundError,
   NetworkError,
@@ -11,6 +11,7 @@ import {
   TransactionError,
 } from '../errors';
 import * as retryModule from '../retry';
+import type { RetryOptions } from '../retry';
 
 type MockRpcServer = {
   getHealth: jest.Mock<Promise<unknown>, []>;
@@ -36,6 +37,7 @@ const mockHorizonServerConstructor = jest.fn(() => ({
   loadAccount: jest.fn(),
   submitTransaction: jest.fn(),
 }));
+const mockTransactionFromXDR = jest.fn();
 
 jest.mock('@stellar/stellar-sdk', () => ({
   rpc: {
@@ -43,6 +45,11 @@ jest.mock('@stellar/stellar-sdk', () => ({
   },
   Horizon: {
     Server: jest.fn(() => mockHorizonServerConstructor()),
+  },
+  TransactionBuilder: {
+    fromXDR: jest.fn((xdr: string, networkPassphrase: string) =>
+      mockTransactionFromXDR(xdr, networkPassphrase)
+    ),
   },
 }));
 
@@ -111,6 +118,7 @@ describe('StellarClient', () => {
     mockRpcServers.clear();
     mockRpcServerConstructor.mockClear();
     mockHorizonServerConstructor.mockClear();
+    mockTransactionFromXDR.mockReset();
   });
 
   afterEach(() => {
@@ -180,6 +188,23 @@ describe('StellarClient', () => {
       expect(client.getNetworkPassphrase()).toBe(customPassphrase);
     });
 
+    it('should use the wallet retry preset by default', () => {
+      const client = new StellarClient({ network: 'testnet' });
+      const retryOptions = (client as unknown as { retryOptions: RetryOptions }).retryOptions;
+
+      expect(retryOptions).toEqual(retryModule.resolveRetryOptions('wallet'));
+    });
+
+    it('should allow selecting the indexer retry preset', () => {
+      const client = new StellarClient({
+        network: 'testnet',
+        retryPreset: 'indexer',
+      });
+      const retryOptions = (client as unknown as { retryOptions: RetryOptions }).retryOptions;
+
+      expect(retryOptions).toEqual(retryModule.resolveRetryOptions('indexer'));
+    });
+
     it('should allow custom retry options', () => {
       const client = new StellarClient({
         network: 'testnet',
@@ -188,8 +213,28 @@ describe('StellarClient', () => {
           baseDelayMs: 500,
         },
       });
+      const retryOptions = (client as unknown as { retryOptions: RetryOptions }).retryOptions;
 
-      expect(client.getNetwork()).toBe('testnet');
+      expect(retryOptions).toEqual({
+        maxRetries: 5,
+        baseDelayMs: 500,
+        exponential: true,
+      });
+    });
+
+    it('should merge custom retry options over the selected preset', () => {
+      const client = new StellarClient({
+        network: 'testnet',
+        retryPreset: 'indexer',
+        retryOptions: { baseDelayMs: 100 },
+      });
+      const retryOptions = (client as unknown as { retryOptions: RetryOptions }).retryOptions;
+
+      expect(retryOptions).toEqual({
+        maxRetries: 4,
+        baseDelayMs: 100,
+        exponential: true,
+      });
     });
 
     it('should allow custom asset metadata cache TTL', async () => {
@@ -216,6 +261,48 @@ describe('StellarClient', () => {
       expect(client.getNetwork()).toBe('local');
       expect(client.getNetworkPassphrase()).toBe('Standalone Network ; February 2017');
       expect(client.getRpcUrls()).toEqual(['http://localhost:8000/soroban/rpc']);
+    });
+
+    it('should create a client with futurenet network defaults', () => {
+      const client = new StellarClient({ network: 'futurenet' });
+
+      expect(client.getNetwork()).toBe('futurenet');
+      expect(client.getNetworkPassphrase()).toBe('Test SDF Future Network ; October 2022');
+      expect(client.getRpcUrls()).toEqual(['https://rpc-futurenet.stellar.org']);
+    });
+
+    it('should throw for unsupported network values', () => {
+      const invalidNetwork = 'invalid' as never;
+
+      expect(() => new StellarClient({ network: invalidNetwork })).toThrow(NetworkError);
+    });
+  });
+
+  describe('createStellarClient', () => {
+    it('should return a configured client for testnet', () => {
+      const client = createStellarClient('testnet');
+
+      expect(client.getNetwork()).toBe('testnet');
+      expect(client.getNetworkPassphrase()).toBe('Test SDF Network ; September 2015');
+    });
+
+    it('should return a configured client for mainnet', () => {
+      const client = createStellarClient('mainnet');
+
+      expect(client.getNetwork()).toBe('mainnet');
+    });
+
+    it('should return a configured client for futurenet', () => {
+      const client = createStellarClient('futurenet');
+
+      expect(client.getNetwork()).toBe('futurenet');
+      expect(client.getRpcUrls()).toEqual(['https://rpc-futurenet.stellar.org']);
+    });
+
+    it('should throw for invalid network', () => {
+      const invalidNetwork = 'invalid' as never;
+
+      expect(() => createStellarClient(invalidNetwork)).toThrow(NetworkError);
     });
   });
 
@@ -388,6 +475,53 @@ describe('StellarClient', () => {
       expect(horizon.loadAccount).toHaveBeenCalledTimes(2);
     });
 
+    it('should retry Horizon 429 responses and eventually succeed', async () => {
+      const client = new StellarClient({
+        network: 'testnet',
+        retryOptions: { maxRetries: 1, baseDelayMs: 0 },
+      });
+      const horizon = getHorizonMock(client);
+      const rateLimitError = Object.assign(new Error('Rate limited'), {
+        response: { status: 429 },
+      });
+      horizon.loadAccount
+        .mockRejectedValueOnce(rateLimitError)
+        .mockResolvedValueOnce(mockAccountResponse);
+
+      await expect(client.getAccount('GABC123')).resolves.toEqual(mockAccountResponse);
+      expect(horizon.loadAccount).toHaveBeenCalledTimes(2);
+    });
+
+    it('should not retry permanent Horizon 400 responses', async () => {
+      const client = new StellarClient({
+        network: 'testnet',
+        retryOptions: { maxRetries: 2, baseDelayMs: 0 },
+      });
+      const horizon = getHorizonMock(client);
+      const badRequestError = Object.assign(new Error('Bad request'), {
+        response: { status: 400 },
+      });
+      horizon.loadAccount.mockRejectedValue(badRequestError);
+
+      await expect(client.getAccount('GABC123')).rejects.toThrow(NetworkError);
+      expect(horizon.loadAccount).toHaveBeenCalledTimes(1);
+    });
+
+    it('should surface RetryExhaustedError after persistent Horizon 429 responses', async () => {
+      const client = new StellarClient({
+        network: 'testnet',
+        retryOptions: { maxRetries: 1, baseDelayMs: 0 },
+      });
+      const horizon = getHorizonMock(client);
+      const rateLimitError = Object.assign(new Error('Rate limited'), {
+        response: { status: 429 },
+      });
+      horizon.loadAccount.mockRejectedValue(rateLimitError);
+
+      await expect(client.getAccount('GABC123')).rejects.toThrow(RetryExhaustedError);
+      expect(horizon.loadAccount).toHaveBeenCalledTimes(2);
+    });
+
     it('should unwrap RetryExhaustedError to the last NetworkError', async () => {
       const client = new StellarClient({
         network: 'testnet',
@@ -406,6 +540,29 @@ describe('StellarClient', () => {
       jest.spyOn(retryModule, 'withRetry').mockRejectedValueOnce(exhausted);
 
       await expect(client.getAccount('GABC123')).rejects.toBe(exhausted);
+    });
+
+    it('should retry Horizon 429 responses and preserve retry exhaustion context', async () => {
+      const client = new StellarClient({
+        network: 'testnet',
+        retryOptions: { maxRetries: 2, baseDelayMs: 0 },
+      });
+      const horizon = getHorizonMock(client);
+      horizon.loadAccount.mockRejectedValue(
+        Object.assign(new Error('rate limited'), {
+          response: { status: 429 },
+        })
+      );
+
+      await expect(client.getAccount('GABC123')).rejects.toMatchObject({
+        name: 'RetryExhaustedError',
+        attempts: 3,
+        lastError: expect.objectContaining({
+          name: 'NetworkError',
+          statusCode: 429,
+        }),
+      });
+      expect(horizon.loadAccount).toHaveBeenCalledTimes(3);
     });
   });
 
@@ -427,6 +584,38 @@ describe('StellarClient', () => {
       expect(horizon.submitTransaction).toHaveBeenCalledWith(mockTransaction);
     });
 
+    it('should decode signed transaction XDR before submission', async () => {
+      const client = new StellarClient({ network: 'testnet', retryOptions: fastRetryOptions });
+      const horizon = getHorizonMock(client);
+      mockTransactionFromXDR.mockReturnValue(mockTransaction);
+      horizon.submitTransaction.mockResolvedValue(mockSubmitResponse);
+
+      await expect(
+        client.submitTransaction('signed-xdr' as unknown as Transaction)
+      ).resolves.toEqual(mockSubmitResponse);
+      expect(mockTransactionFromXDR).toHaveBeenCalledWith(
+        'signed-xdr',
+        'Test SDF Network ; September 2015'
+      );
+      expect(horizon.submitTransaction).toHaveBeenCalledWith(mockTransaction);
+    });
+
+    it('should normalize XDR decode errors before submission', async () => {
+      const client = new StellarClient({ network: 'testnet', retryOptions: fastRetryOptions });
+      const horizon = getHorizonMock(client);
+      const malformed = new Error('malformed XDR');
+      mockTransactionFromXDR.mockImplementationOnce(() => {
+        throw malformed;
+      });
+
+      await expect(client.submitTransaction('bad-xdr')).rejects.toMatchObject({
+        name: 'NetworkError',
+        message: 'Invalid signed transaction XDR',
+        cause: malformed,
+      });
+      expect(horizon.submitTransaction).not.toHaveBeenCalled();
+    });
+
     it('should throw TransactionError when Horizon returns result codes', async () => {
       const client = new StellarClient({ network: 'testnet', retryOptions: fastRetryOptions });
       const horizon = getHorizonMock(client);
@@ -445,6 +634,55 @@ describe('StellarClient', () => {
       await expect(client.submitTransaction(mockTransaction)).rejects.toThrow(TransactionError);
     });
 
+    it('should not retry permanent Horizon transaction errors', async () => {
+      const client = new StellarClient({
+        network: 'testnet',
+        retryOptions: { maxRetries: 2, baseDelayMs: 0 },
+      });
+      const horizon = getHorizonMock(client);
+      horizon.submitTransaction.mockRejectedValue({
+        response: {
+          data: {
+            extras: {
+              result_codes: {
+                transaction: 'tx_bad_seq',
+              },
+            },
+          },
+        },
+      });
+
+      await expect(client.submitTransaction(mockTransaction)).rejects.toThrow(TransactionError);
+      expect(horizon.submitTransaction).toHaveBeenCalledTimes(1);
+    });
+
+    it('should preserve Horizon transaction result details on TransactionError', async () => {
+      const client = new StellarClient({ network: 'testnet', retryOptions: fastRetryOptions });
+      const horizon = getHorizonMock(client);
+      horizon.submitTransaction.mockRejectedValue({
+        response: {
+          status: 400,
+          data: {
+            extras: {
+              result_codes: {
+                transaction: 'tx_failed',
+                operations: ['op_underfunded', 'op_no_destination'],
+              },
+              result_xdr: 'result-xdr',
+            },
+          },
+        },
+      });
+
+      await expect(client.submitTransaction(mockTransaction)).rejects.toMatchObject({
+        name: 'TransactionError',
+        resultCode: 'tx_failed',
+        operationResultCodes: ['op_underfunded', 'op_no_destination'],
+        resultXdr: 'result-xdr',
+        statusCode: 400,
+      });
+    });
+
     it('should wrap unexpected submission failures as NetworkError', async () => {
       const client = new StellarClient({ network: 'testnet', retryOptions: fastRetryOptions });
       const horizon = getHorizonMock(client);
@@ -461,6 +699,26 @@ describe('StellarClient', () => {
       const horizon = getHorizonMock(client);
       horizon.submitTransaction
         .mockRejectedValueOnce(new Error('timeout'))
+        .mockResolvedValueOnce(mockSubmitResponse);
+
+      await expect(client.submitTransaction(mockTransaction)).resolves.toEqual(mockSubmitResponse);
+      expect(horizon.submitTransaction).toHaveBeenCalledTimes(2);
+    });
+
+    it('should retry Horizon 429 submission responses and eventually succeed', async () => {
+      const client = new StellarClient({
+        network: 'testnet',
+        retryOptions: { maxRetries: 1, baseDelayMs: 0 },
+      });
+      const horizon = getHorizonMock(client);
+      const rateLimitError = Object.assign(new Error('Rate limited'), {
+        response: {
+          status: 429,
+          data: { title: 'Rate Limit Exceeded' },
+        },
+      });
+      horizon.submitTransaction
+        .mockRejectedValueOnce(rateLimitError)
         .mockResolvedValueOnce(mockSubmitResponse);
 
       await expect(client.submitTransaction(mockTransaction)).resolves.toEqual(mockSubmitResponse);
@@ -944,6 +1202,66 @@ describe('StellarClient', () => {
 
       expect(seen).toEqual([]);
       expect(getAccountActivityPage).toHaveBeenCalledTimes(1);
+    });
+  });
+  describe('simulateTransaction', () => {
+    const RPC_URL = 'https://sim-rpc.example.com';
+
+    const makeClient = () => new StellarClient({ network: 'testnet', rpcUrls: [RPC_URL] });
+
+    it('simulates a Transaction object through RPC failover', async () => {
+      const client = makeClient();
+      const server = getMockRpcServer(RPC_URL) as MockRpcServer & {
+        simulateTransaction: jest.Mock;
+      };
+      const response = { transactionData: {}, minResourceFee: '100' };
+      server.simulateTransaction = jest.fn().mockResolvedValue(response);
+
+      const tx = { fake: 'transaction' } as unknown as Transaction;
+      await expect(client.simulateTransaction(tx)).resolves.toBe(response);
+      expect(server.simulateTransaction).toHaveBeenCalledWith(tx);
+    });
+
+    it('rethrows the underlying NetworkError when retries are exhausted', async () => {
+      const client = makeClient();
+      const server = getMockRpcServer(RPC_URL) as MockRpcServer & {
+        simulateTransaction: jest.Mock;
+      };
+      const networkError = new NetworkError('rpc unreachable');
+      server.simulateTransaction = jest.fn().mockRejectedValue(networkError);
+
+      await expect(
+        client.simulateTransaction({ fake: 'transaction' } as unknown as Transaction)
+      ).rejects.toBe(networkError);
+    });
+
+    it('resolves an unparseable XDR string to an error result instead of throwing', async () => {
+      const client = makeClient();
+      mockTransactionFromXDR.mockImplementation(() => {
+        throw new Error('bad xdr');
+      });
+
+      await expect(client.simulateTransaction('not-xdr')).resolves.toMatchObject({
+        fee: '0.0000000',
+        error: expect.any(String),
+      });
+    });
+
+    it('never rejects for the XDR overload even when RPC fails', async () => {
+      const client = makeClient();
+      const server = getMockRpcServer(RPC_URL) as MockRpcServer & {
+        simulateTransaction: jest.Mock;
+      };
+      server.simulateTransaction = jest.fn().mockRejectedValue(new Error('boom'));
+      // A Soroban op is what routes the XDR overload to the RPC simulate call.
+      mockTransactionFromXDR.mockImplementation(() => ({
+        operations: [{ type: 'invokeHostFunction' }],
+        toXDR: () => 'xdr',
+      }));
+
+      const result = await client.simulateTransaction('AAAA');
+      expect(result).toMatchObject({ fee: '0.0000000', authEntries: [], footprint: '' });
+      expect(typeof (result as { error?: string }).error).toBe('string');
     });
   });
 });

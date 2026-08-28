@@ -20,16 +20,11 @@
 import { Request, Response, NextFunction, RequestHandler } from 'express';
 import { createRequestLogger, redactAccountId, type Logger } from '../logging';
 
-// Augment Express Request to carry a typed logger
-declare global {
-  namespace Express {
-    interface Request {
-      log: Logger;
-      /** ISO timestamp when the request was received */
-      startTime: number;
-    }
-  }
-}
+export type LoggedRequest = Request & {
+  log: Logger;
+  /** Epoch milliseconds when the request was received */
+  startTime: number;
+};
 
 /**
  * Creates the request logger middleware.
@@ -42,35 +37,34 @@ declare global {
  */
 export function createRequestLoggerMiddleware(): RequestHandler {
   return (req: Request, res: Response, next: NextFunction): void => {
+    const loggedReq = req as LoggedRequest;
     const requestId =
+      (req as Request & { requestId?: string }).requestId ??
       (req.headers['x-request-id'] as string | undefined) ??
       generateRequestId();
 
-    req.startTime = Date.now();
+    loggedReq.startTime = Date.now();
 
     const route = `${req.method} ${req.path}`;
 
     // Attach logger — accountId not yet available (set by auth middleware later)
-    req.log = createRequestLogger({ requestId, route });
+    loggedReq.log = createRequestLogger({ requestId, route });
 
-    req.log.info({ requestId }, 'request_start');
+    loggedReq.log.info({ requestId }, 'request_start');
 
     // Emit completion log when the response finishes
     res.on('finish', () => {
-      const durationMs = Date.now() - req.startTime;
+      const durationMs = Date.now() - loggedReq.startTime;
       const statusCode = res.statusCode;
       const outcome = statusCode < 400 ? 'success' : 'error';
 
       // Re-create logger with callerId if auth middleware populated it
       const callerId = res.locals['callerId'] as string | undefined;
       const completionLog = callerId
-        ? req.log.child({ accountId: redactAccountId(callerId) })
-        : req.log;
+        ? loggedReq.log.child({ accountId: redactAccountId(callerId) })
+        : loggedReq.log;
 
-      completionLog.info(
-        { durationMs, statusCode, outcome },
-        'request_complete'
-      );
+      completionLog.info({ durationMs, statusCode, outcome }, 'request_complete');
     });
 
     next();

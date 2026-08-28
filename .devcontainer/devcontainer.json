@@ -1,0 +1,28 @@
+{
+  "name": "Ancore Dev Container",
+  "image": "mcr.microsoft.com/devcontainers/typescript-node:0-20",
+  "features": {
+    "ghcr.io/devcontainers/features/rust:1": {
+      "version": "1.81.0"
+    },
+    "ghcr.io/devcontainers/features/pnpm:1": {
+      "version": "9"
+    }
+  },
+  "customizations": {
+    "vscode": {
+      "extensions": [
+        "rust-lang.rust-analyzer",
+        "dbaeumer.vscode-eslint",
+        "esbenp.prettier-vscode",
+        "eamodio.gitlens"
+      ],
+      "settings": {
+        "editor.formatOnSave": true,
+        "editor.defaultFormatter": "esbenp.prettier-vscode"
+      }
+    }
+  },
+  "postCreateCommand": "corepack enable && pnpm install",
+  "remoteUser": "vscode"
+}

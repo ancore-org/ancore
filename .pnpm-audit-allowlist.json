@@ -1,0 +1,76 @@
+{
+  "advisories": [
+    {
+      "id": "1123525",
+      "issue": "https://github.com/ancore-org/ancore/issues/977",
+      "justification": "vite: server.fs.deny bypass on Windows alternate paths. Dev-server-only issue, not present in production builds; the fix requires a Vite 5->6 major upgrade across every app in the monorepo (no 5.x backport exists). Tracked for that migration.",
+      "expires": "2026-10-15T00:00:00.000Z"
+    },
+    {
+      "id": "1123896",
+      "issue": "https://github.com/ancore-org/ancore/issues/1085",
+      "justification": "brace-expansion advisory affecting transitive dependency chains; remediation requires coordinated dependency upgrades across multiple workspaces.",
+      "expires": "2026-10-26T00:00:00.000Z"
+    },
+    {
+      "id": "1123897",
+      "issue": "https://github.com/ancore-org/ancore/issues/1085",
+      "justification": "brace-expansion advisory affecting transitive dependency chains; remediation requires coordinated dependency upgrades across multiple workspaces.",
+      "expires": "2026-10-26T00:00:00.000Z"
+    },
+    {
+      "id": "1123898",
+      "issue": "https://github.com/ancore-org/ancore/issues/1085",
+      "justification": "brace-expansion advisory affecting transitive dependency chains; remediation requires coordinated dependency upgrades across multiple workspaces.",
+      "expires": "2026-10-26T00:00:00.000Z"
+    },
+    {
+      "id": "1123911",
+      "issue": "https://github.com/ancore-org/ancore/issues/1085",
+      "justification": "js-yaml advisory is currently transitive; fixing requires dependency updates in upstream toolchain packages.",
+      "expires": "2026-10-26T00:00:00.000Z"
+    },
+    {
+      "id": "1123967",
+      "issue": "https://github.com/ancore-org/ancore/issues/1085",
+      "justification": "axios advisory is currently transitive; coordinated package updates are needed to move all dependents to patched versions.",
+      "expires": "2026-10-26T00:00:00.000Z"
+    },
+    {
+      "id": "1124011",
+      "issue": "https://github.com/ancore-org/ancore/issues/1085",
+      "justification": "@opentelemetry/propagator-jaeger advisory is transitive and requires dependency graph updates across services.",
+      "expires": "2026-10-26T00:00:00.000Z"
+    },
+    {
+      "id": "1124288",
+      "issue": "https://github.com/ancore-org/ancore/issues/1085",
+      "justification": "postcss advisory is transitive in build tooling dependencies; remediation requires broader package upgrades.",
+      "expires": "2026-10-26T00:00:00.000Z"
+    },
+    {
+      "id": "1124334",
+      "issue": "https://github.com/ancore-org/ancore/issues/1085",
+      "justification": "brace-expansion GHSA-mh99-v99m-4gvg uses vulnerable_versions <=5.0.7, which falsely matches 1.x/2.x. v5 is overridden to 5.0.8; 1.x/2.x are on patched 1.1.16/2.1.2 for the related DoS advisories.",
+      "expires": "2026-10-27T00:00:00.000Z"
+    },
+    {
+      "id": "1138808",
+      "issue": "https://github.com/ancore-org/ancore/issues/1206",
+      "justification": "image-size ICNS parser DoS (GHSA-w3rx-r6r6-pgpr); no patched version exists upstream. Transitive dev/build dependency of metro (React Native bundler), not present in shipped runtime bundles and never fed attacker-controlled input.",
+      "expires": "2026-10-31T00:00:00.000Z"
+    },
+    {
+      "id": "1138809",
+      "issue": "https://github.com/ancore-org/ancore/issues/1206",
+      "justification": "image-size JXL/HEIF parser DoS (GHSA-5p2g-fcmc-qvqq); no patched version exists upstream. Transitive dev/build dependency of metro (React Native bundler), not present in shipped runtime bundles and never fed attacker-controlled input.",
+      "expires": "2026-10-31T00:00:00.000Z"
+    },
+    {
+      "id": "1139346",
+      "issue": "https://github.com/ancore-org/ancore/issues/1206",
+      "justification": "extract-zip unvalidated symlink path traversal (GHSA-jmr9-qjv8-65gv); no patched version exists upstream. Transitive dev-only dependency of puppeteer-core; only extracts trusted Puppeteer/Chromium download artifacts, never user-supplied zips.",
+      "expires": "2026-10-31T00:00:00.000Z"
+    }
+  ]
+}

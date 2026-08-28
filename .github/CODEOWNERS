@@ -69,7 +69,7 @@
 /.github/SECURITY.md @ancore/security-team @ancore/core-team
 
 # Governance documents - Core team
-/MAINTAINERS.md @ancore/core-team
+/CONTRIBUTORS.md @ancore/core-team
 /RFC.md @ancore/core-team
 /CONTRIBUTING.md @ancore/core-team
 

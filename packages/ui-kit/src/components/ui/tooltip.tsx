@@ -9,7 +9,7 @@ export const Tooltip: React.FC<TooltipProps> = ({ content, children }) => {
   return (
     <div className="relative group">
       {children}
-      <div className="absolute bottom-full mb-2 hidden w-max bg-gray-800 text-white text-sm rounded p-2 group-hover:block group-focus-within:block z-50">
+      <div className="absolute bottom-full z-50 mb-2 hidden w-max rounded border border-border bg-popover p-2 text-sm text-popover-foreground shadow-md group-hover:block group-focus-within:block">
         {content}
       </div>
     </div>

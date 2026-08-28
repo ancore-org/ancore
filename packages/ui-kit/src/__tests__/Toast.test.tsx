@@ -39,25 +39,25 @@ describe('Toast', () => {
   it('renders success variant', () => {
     setup('success');
     fireEvent.click(screen.getByText('Show Toast'));
-    expect(screen.getByRole('alert')).toHaveClass('bg-green-50');
+    expect(screen.getByRole('alert')).toHaveClass('bg-success/10');
   });
 
   it('renders error variant', () => {
     setup('error');
     fireEvent.click(screen.getByText('Show Toast'));
-    expect(screen.getByRole('alert')).toHaveClass('bg-red-50');
+    expect(screen.getByRole('alert')).toHaveClass('bg-destructive/10');
   });
 
   it('renders warning variant', () => {
     setup('warning');
     fireEvent.click(screen.getByText('Show Toast'));
-    expect(screen.getByRole('alert')).toHaveClass('bg-yellow-50');
+    expect(screen.getByRole('alert')).toHaveClass('bg-warning/10');
   });
 
   it('renders info variant', () => {
     setup('info');
     fireEvent.click(screen.getByText('Show Toast'));
-    expect(screen.getByRole('alert')).toHaveClass('bg-blue-50');
+    expect(screen.getByRole('alert')).toHaveClass('bg-info/10');
   });
 
   it('auto-dismisses after duration', () => {

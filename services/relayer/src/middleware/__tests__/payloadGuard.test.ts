@@ -5,6 +5,7 @@ import {
   DEFAULT_MAX_PAYLOAD_BYTES,
   PAYLOAD_TOO_LARGE_REASON,
 } from '../payloadGuard';
+import { EnvValidationError, resetEnvCache } from '../../config/env';
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -37,12 +38,19 @@ function makeRes() {
 describe('resolveMaxBytes', () => {
   const originalEnv = process.env['RELAY_MAX_PAYLOAD_BYTES'];
 
+  beforeEach(() => {
+    // resolveMaxBytes reads the cached, validated env — clear it so each case
+    // re-parses the process.env mutations below.
+    resetEnvCache();
+  });
+
   afterEach(() => {
     if (originalEnv === undefined) {
       delete process.env['RELAY_MAX_PAYLOAD_BYTES'];
     } else {
       process.env['RELAY_MAX_PAYLOAD_BYTES'] = originalEnv;
     }
+    resetEnvCache();
   });
 
   it('returns the default when no option or env var is set', () => {
@@ -60,16 +68,25 @@ describe('resolveMaxBytes', () => {
     expect(resolveMaxBytes()).toBe(2048);
   });
 
-  it('falls back to default when env var is not a valid number', () => {
-    process.env['RELAY_MAX_PAYLOAD_BYTES'] = 'not-a-number';
+  it('treats an empty env var as unset', () => {
+    process.env['RELAY_MAX_PAYLOAD_BYTES'] = '';
     expect(resolveMaxBytes()).toBe(DEFAULT_MAX_PAYLOAD_BYTES);
   });
 
-  it('falls back to default when env var is zero or negative', () => {
+  // Previously these silently fell back to the default. They now fail fast so
+  // misconfiguration surfaces at boot rather than as an unexpected limit.
+  it('throws when env var is not a valid number', () => {
+    process.env['RELAY_MAX_PAYLOAD_BYTES'] = 'not-a-number';
+    expect(() => resolveMaxBytes()).toThrow(EnvValidationError);
+  });
+
+  it('throws when env var is zero or negative', () => {
     process.env['RELAY_MAX_PAYLOAD_BYTES'] = '0';
-    expect(resolveMaxBytes()).toBe(DEFAULT_MAX_PAYLOAD_BYTES);
+    expect(() => resolveMaxBytes()).toThrow(/RELAY_MAX_PAYLOAD_BYTES: must be at least 1/);
+
+    resetEnvCache();
     process.env['RELAY_MAX_PAYLOAD_BYTES'] = '-100';
-    expect(resolveMaxBytes()).toBe(DEFAULT_MAX_PAYLOAD_BYTES);
+    expect(() => resolveMaxBytes()).toThrow(/RELAY_MAX_PAYLOAD_BYTES: must be at least 1/);
   });
 });
 

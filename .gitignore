@@ -7,6 +7,7 @@ node_modules/
 # Build outputs
 dist/
 build/
+**/stats.html
 .next/
 out/
 *.tsbuildinfo
@@ -21,7 +22,7 @@ Cargo.lock
 # Testing
 coverage/
 .nyc_output/
-
+...
 # Environment
 .env
 .env*.local
@@ -52,12 +53,16 @@ temp/
 __pycache__/
 *.py[cod]
 
+# Generated security-audit evidence (see tools/security-audit.js)
+.audit-evidence/
+
 # Secrets
 *.key
 *.pem
 secrets/
 
-# issues
+# issues (local contributor backlog — not published to GitHub)
+/issues/
 docs/issues
 
 # Admin-only tooling (local project management)
@@ -67,6 +72,8 @@ docs/ROADMAP_TEMPLATES.md
 
 # extension-wallet generated artifacts (tsc/vitest outputs)
 apps/extension-wallet/src/**/*.d.ts
+# ...but globals.d.ts is hand-written source, not a tsc output
+!apps/extension-wallet/src/globals.d.ts
 apps/extension-wallet/src/**/*.d.ts.map
 apps/extension-wallet/src/**/*.js
 apps/extension-wallet/src/**/*.js.map

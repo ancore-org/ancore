@@ -31,6 +31,25 @@ We are committed to providing a welcoming and inclusive environment. Please:
 - wasm32-unknown-unknown target (`rustup target add wasm32-unknown-unknown`)
 - Soroban CLI (`cargo install --locked soroban-cli`)
 
+#### Installing pnpm (Windows)
+
+Node.js ships with Corepack, which manages pnpm for this repo (`packageManager: pnpm@9.0.0`).
+
+```powershell
+# Run PowerShell as Administrator if corepack enable reports EPERM
+corepack enable
+corepack prepare pnpm@9.0.0 --activate
+pnpm --version
+```
+
+If `pnpm` is still not found in new terminals, install it globally:
+
+```powershell
+npm install -g pnpm
+```
+
+Use `corepack pnpm` as a fallback anywhere `pnpm` is unavailable (for example, before Corepack activation completes).
+
 ### Setup
 
 1. Fork the repository
@@ -60,7 +79,20 @@ We are committed to providing a welcoming and inclusive environment. Please:
    pnpm test
    ```
 
+## VS Code Workspace Recommendations
+
+If you use Visual Studio Code, the repository includes a workspace recommendations file and an optional devcontainer for one-click setup.
+
+- Recommended extensions are defined in `.vscode/extensions.json`
+- Devcontainer points to Node 20, pnpm, and Rust support in `.devcontainer/devcontainer.json`
+- VS Code will also enable `editor.formatOnSave` by default for contributors using the devcontainer
+- Optional Soroban/Rust target setup can be completed after container creation with `rustup target add wasm32-unknown-unknown`
+
+To use it, open the repository in VS Code and choose **Reopen in Container** from the Command Palette.
+
 ## Development Workflow
+
+Wallet contributors: see [docs/wallets/FREIGHTER_COMPARISON.md](docs/wallets/FREIGHTER_COMPARISON.md) for the Freighter-informed adoption roadmap and open GitHub issues for scoped work.
 
 ### Branch Naming
 
@@ -85,6 +117,29 @@ We are committed to providing a welcoming and inclusive environment. Please:
    ```bash
    pnpm test
    ```
+
+   To run tests for a single package only, use `pnpm --filter`:
+
+   ```bash
+   # Run tests for a specific package (use the package name from its package.json)
+   pnpm --filter @ancore/core-sdk test
+   pnpm --filter @ancore/wallet-shared test
+   pnpm --filter @ancore/ui-kit test
+   ```
+
+   To filter down to a single test file or pattern within a package:
+
+   ```bash
+   # Jest-based packages — pass --testPathPattern after a double dash
+   pnpm --filter @ancore/core-sdk test -- --testPathPattern=secure-storage
+
+   # Vitest-based packages (e.g. ui-kit) — pass the file glob directly
+   pnpm --filter @ancore/ui-kit test -- src/components/Button
+   ```
+
+   Running full `turbo test` on every save is slow in a large monorepo. Use the
+   package-scoped commands above during development and save the full suite for
+   pre-push verification.
 
 4. Run linting:
 
@@ -134,9 +189,22 @@ make validate-env
 
 ### App-Specific Guides
 
-- **Extension Wallet**: [apps/extension-wallet/README.md](apps/extension-wallet/README.md)
-- **Mobile Wallet**: [apps/mobile-wallet/README.md](apps/mobile-wallet/README.md)
+- **Extension Wallet**: [apps/extension-wallet/README.md](apps/extension-wallet/README.md) — [AGENTS.md](apps/extension-wallet/AGENTS.md)
+- **Mobile Wallet**: [apps/mobile-wallet/README.md](apps/mobile-wallet/README.md) — [AGENTS.md](apps/mobile-wallet/AGENTS.md)
 - **Web Dashboard**: [apps/web-dashboard/README.md](apps/web-dashboard/README.md)
+
+### Developer Shortcuts
+
+We expose a small set of repo-root `pnpm` scripts that map to package-local commands
+using `pnpm --filter`. These make common tasks easier for contributors:
+
+```bash
+pnpm dev:extension   # start @ancore/extension-wallet dev server
+pnpm dev:dashboard   # start @ancore/web-dashboard dev server
+pnpm dev:mobile      # start @ancore/mobile-wallet dev/watch
+pnpm test:extension  # run @ancore/extension-wallet tests
+pnpm test:ui         # run @ancore/ui-kit tests
+```
 
 ### Common Commands
 
@@ -159,6 +227,25 @@ make build
 # See all available targets
 make help
 ```
+
+### Before opening a PR
+
+Run the exact checks CI runs, in the exact directories CI runs them in — see
+[AGENTS.md § Before you push](AGENTS.md#before-you-push--run-what-ci-runs). This matters more than it
+sounds: `contracts/` and `services/indexer/` are separate Rust workspaces with their own
+`cargo fmt`/`cargo clippy` gates, and TypeScript/JS formatting, linting, and building are three
+separate CI jobs that each fail independently. AGENTS.md also documents the specific failure patterns
+(dependency declarations for stub files, Vite/Vitest config conflicts, duplicate Rust module trees)
+that have caused repeat CI breaks in this repo — read it before your first PR, whether you're a human
+or an AI agent.
+
+If your PR touches `.github/workflows/*.yml`, the CI job **Actionlint — Workflow YAML** runs
+[`actionlint`](https://github.com/rhysd/actionlint) against every workflow file and fails the build on
+invalid `if:` context references, non-existent step outputs, and bad action versions — the same class of
+schema problem that once broke `release.yml` silently for months (GitHub's UI just shows "This run likely
+failed because of a workflow file issue" with no job logs). Install it locally and run
+`actionlint .github/workflows/*.yml` (`brew install actionlint`) before pushing so you catch these before
+CI does.
 
 ## Security Boundaries
 

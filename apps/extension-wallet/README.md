@@ -2,6 +2,8 @@
 
 Browser extension wallet for the Ancore account abstraction layer on Stellar.
 
+**Agent / contributor guide:** [AGENTS.md](./AGENTS.md) (modeled on [Freighter AGENTS.md](https://github.com/stellar/freighter/blob/master/AGENTS.md)).
+
 ## Architecture
 
 ```
@@ -61,6 +63,23 @@ Zustand stores with persistence to `chrome.storage.local` / `browser.storage.loc
 
 The `useLockManager` hook wires `LockManager` + `InactivityDetector` to the session store.
 Configure timeout via `useSettingsStore().setAutoLockMinutes(n)` (0 = never lock).
+
+## QR Export
+
+Settings → Address QR renders a downloadable PNG QR of the active account's public
+receive address, for support tickets and desktop use outside the receive flow.
+
+**All QR downloads must go through `utils/public-address-qr.ts`, never
+`utils/export-qr.ts` directly.** A downloaded QR is a file that leaves the extension —
+a secret encoded in one is catastrophic and invisible, since the PNG looks identical
+either way. `assertPublicAddressOnly` whitelists the Stellar public formats
+(`G…` account, `C…` contract, `M…` muxed) and throws `SecretExportBlockedError` on
+anything else, so a secret shape nobody anticipated still cannot slip through. Secret
+seeds, raw hex private keys, and recovery phrases get a specific message; everything
+else gets the generic rejection.
+
+`AccountQrScreen` applies the same check at the render boundary, so a non-public value
+never reaches the QR renderer even if a caller passes one.
 
 ## Permissions
 

@@ -37,11 +37,11 @@ scrape_configs:
         regex: '([^:]+)(?::\d+)?'
         replacement: '$1'
 
-  - job_name: indexer
+  - job_name: ancore-indexer
     metrics_path: /metrics
     scrape_interval: 15s
     static_configs:
-      - targets: ['indexer:8081']
+      - targets: ['indexer:9090']
     relabel_configs:
       - source_labels: [__address__]
         target_label: instance

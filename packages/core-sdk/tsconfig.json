@@ -6,12 +6,6 @@
     "composite": true,
     "tsBuildInfoFile": "./dist/.tsbuildinfo"
   },
-  "references": [
-    { "path": "../types" },
-    { "path": "../crypto" },
-    { "path": "../account-abstraction" },
-    { "path": "../stellar" }
-  ],
   "include": ["src/**/*"],
   "exclude": ["node_modules", "dist", "**/*.test.ts"]
 }

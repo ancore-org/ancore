@@ -1,0 +1,6 @@
+extends: spectral:oas
+rules:
+  info-contact: warn
+  operation-tag-defined: error
+  operation-operationId: error
+  oas3-unused-component: error

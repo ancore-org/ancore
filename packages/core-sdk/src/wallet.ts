@@ -6,6 +6,7 @@ import {
   validateMnemonic,
   type EncryptedSecretKeyPayload,
 } from '@ancore/crypto';
+import { StrKey } from '@stellar/stellar-sdk';
 
 export interface WalletMaterial {
   mnemonic: string;
@@ -54,7 +55,12 @@ function normalizeMnemonic(mnemonic: string): string {
 }
 
 export function deriveContractId(publicKey: string): string {
-  return `CAS${publicKey.slice(1, 56)}`;
+  try {
+    const bytes = StrKey.decodeEd25519PublicKey(publicKey);
+    return StrKey.encodeContract(bytes);
+  } catch {
+    return 'C' + publicKey.slice(1);
+  }
 }
 
 async function buildWalletMaterial(

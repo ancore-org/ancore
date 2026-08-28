@@ -7,7 +7,6 @@ import {
   updateContact as storageUpdateContact,
   removeContact as storageRemoveContact,
   toggleFavorite as storageToggleFavorite,
-  DuplicateAliasError,
 } from '../services/contactsStorage';
 
 export { DuplicateAliasError } from '../services/contactsStorage';

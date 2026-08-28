@@ -26,8 +26,19 @@ export interface Messages {
     response: { txId: string };
   };
   SIGN_TRANSACTION: {
-    request: { xdr: string };
-    response: { signedXdr: string };
+    request: { xdr: string; networkPassphrase: string };
+    response:
+      | { signedXdr: string }
+      | { error: string }
+      | { requiresHardware: true; xdr: string; networkPassphrase: string };
+  };
+  SIGN_MESSAGE: {
+    request: { message: string; networkPassphrase?: string };
+    response: { signature: string } | { error: string };
+  };
+  SIGN_RELAY_PAYLOAD: {
+    request: { operation: string; nonce: number };
+    response: { sessionKey: string; signature: string } | { error: string };
   };
   GET_WALLET_STATE: {
     request: Record<string, never>;
@@ -35,7 +46,7 @@ export interface Messages {
   };
   UNLOCK_WALLET: {
     request: { password: string };
-    response: { success: boolean };
+    response: { success: boolean; retryAfterMs?: number; message?: string };
   };
   LOCK_WALLET: {
     request: Record<string, never>;
@@ -47,6 +58,58 @@ export interface Messages {
       relayer: ServiceHealthResult;
       indexer: ServiceHealthResult;
     };
+  };
+
+  // ── External dApp messages (content script → background) ──────────────────
+
+  /** dApp requests wallet access; background checks/updates the allowlist. */
+  EXTERNAL_REQUEST_ACCESS: {
+    request: { origin: string; params?: Record<string, unknown> };
+    response: { smartAccountId: string; network: string };
+  };
+  /** dApp asks the background to sign an XDR transaction envelope. */
+  EXTERNAL_SIGN_TRANSACTION: {
+    request: { xdr: string; origin: string; networkPassphrase?: string };
+    response: { signedXdr: string };
+  };
+  /** dApp requests the wallet's public key / smart-account address. */
+  EXTERNAL_GET_PUBLIC_KEY: {
+    request: { origin: string };
+    response: { publicKey: string };
+  };
+  /** dApp queries which Stellar network the wallet is currently on. */
+  EXTERNAL_GET_NETWORK: {
+    request: { origin: string };
+    response: { network: string; networkPassphrase: string };
+  };
+  /** dApp checks whether the current origin is allowlisted. */
+  EXTERNAL_IS_CONNECTED: {
+    request: { origin: string };
+    response: { connected: boolean };
+  };
+  /** dApp queries the smart account's on-chain deployment status. */
+  EXTERNAL_GET_SMART_ACCOUNT: {
+    request: { origin: string; network?: string; smartAccountId?: string };
+    response: {
+      contractId: string;
+      deploymentStatus: 'deployed' | 'pending' | 'not_deployed' | 'unknown';
+      network: string;
+    };
+  };
+  /** dApp requests the wallet to sign an auth entry. */
+  EXTERNAL_SIGN_AUTH_ENTRY: {
+    request: { authEntry: string; origin: string; networkPassphrase?: string };
+    response: { signedAuthEntry: string };
+  };
+  /** dApp requests the wallet to sign an arbitrary message. */
+  EXTERNAL_SIGN_MESSAGE: {
+    request: { message: string; origin: string };
+    response: { signature: string };
+  };
+  /** dApp requests a time-limited session key. */
+  EXTERNAL_REQUEST_SESSION_KEY: {
+    request: { origin: string; expiresAt: number; permissions: number };
+    response: { publicKey: string; expiresAt: number };
   };
 }
 

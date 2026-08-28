@@ -26,11 +26,14 @@ export const WidgetErrorFallback: React.FC<FallbackProps> = ({ error, resetError
   );
 };
 
-export const WidgetErrorBoundary: React.FC<{ children: React.ReactNode }> = ({ children }) => {
+export const WidgetErrorBoundary: React.FC<{
+  children: React.ReactNode;
+  onReset?: () => void;
+}> = ({ children, onReset }) => {
   const logError = useWidgetErrorLogger();
 
   return (
-    <ErrorBoundary FallbackComponent={WidgetErrorFallback} onError={logError}>
+    <ErrorBoundary FallbackComponent={WidgetErrorFallback} onError={logError} onReset={onReset}>
       {children}
     </ErrorBoundary>
   );

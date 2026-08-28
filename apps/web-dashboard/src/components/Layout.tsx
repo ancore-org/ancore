@@ -20,7 +20,7 @@ const DensityToggle: React.FC = () => {
   return (
     <button
       onClick={toggleDensity}
-      className="flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground transition-colors px-2 py-1 rounded-md hover:bg-accent"
+      className="flex h-10 items-center gap-2 rounded-full px-3 text-sm text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
       title={`Switch to ${density === 'comfortable' ? 'compact' : 'comfortable'} density`}
     >
       <Rows className="w-4 h-4" />
@@ -33,12 +33,12 @@ export const Layout: React.FC = () => {
   const { accounts, currentAccount, setCurrentAccount, loading } = useAccountState();
 
   return (
-    <div className="min-h-screen bg-background text-foreground">
-      <header className="border-b px-6 py-3 flex items-center gap-6">
+    <div className="dashboard-shell">
+      <header className="flex items-center gap-5 border-b border-border px-6 py-4">
         <div className="lg:hidden">
           <MobileNav links={NAV_LINKS} />
         </div>
-        <span className="font-semibold text-lg">Ancore</span>
+        <span className="text-lg font-semibold tracking-tight">Ancore</span>
         <nav className="hidden lg:flex gap-4">
           {NAV_LINKS.map(({ to, label, end }) => (
             <NavLink
@@ -56,7 +56,7 @@ export const Layout: React.FC = () => {
             </NavLink>
           ))}
         </nav>
-        <div className="flex-1 flex justify-center">
+        <div className="flex flex-1 justify-center">
           <QuickActionBar />
         </div>
         <div className="flex items-center gap-2">
@@ -67,11 +67,15 @@ export const Layout: React.FC = () => {
               onAccountChange={setCurrentAccount}
             />
           )}
+          <span className="flex items-center gap-1.5 text-xs text-muted-foreground">
+            <span className="h-1.5 w-1.5 rounded-full bg-success" />
+            Testnet
+          </span>
           <DensityToggle />
-          <Settings className="w-4 h-4 text-muted-foreground" />
+          <Settings className="h-4 w-4 text-muted-foreground" />
         </div>
       </header>
-      <main className="container mx-auto px-6 py-8">
+      <main className="container mx-auto px-6 py-10">
         <Outlet />
       </main>
     </div>

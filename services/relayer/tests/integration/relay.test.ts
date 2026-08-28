@@ -2,6 +2,7 @@ import request from 'supertest';
 import { NetworkError } from '@ancore/stellar';
 import { createApp } from '../../src/server';
 import { IdempotencyStore } from '../../src/store/idempotency';
+import { resetEnvCache } from '../../src/config/env';
 import type {
   AuthServiceContract,
   SignatureServiceContract,
@@ -25,6 +26,10 @@ function makeMockSubmitter(
   overrides: Partial<TransactionSubmitterContract> = {}
 ): TransactionSubmitterContract {
   return {
+    simulateAndAssembleTransaction: jest.fn().mockResolvedValue({
+      assembledXdr: 'AAAA-assembled-xdr',
+      gasUsed: 150,
+    }),
     submitSignedTransaction: jest.fn().mockResolvedValue({
       transactionHash: NETWORK_HASH,
       gasUsed: 150,
@@ -65,7 +70,31 @@ describe('POST /relay/execute', () => {
     expect(res.status).toBe(200);
     expect(res.body.success).toBe(true);
     expect(res.body.transactionId).toMatch(/^[0-9A-F]{64}$/);
-    expect(res.body.gasUsed).toBe(21_000);
+    expect(res.body.gasUsed).toBe(0);
+  });
+
+  it('422 with NONCE_REPLAY error when submitting the same nonce twice', async () => {
+    // We pass makeApp which instantiates a MemoryNonceStore internally inside createApp
+    const app = makeApp(true, undefined, undefined, { useMockSubmission: true });
+
+    // First request should succeed
+    const res1 = await request(app)
+      .post('/relay/execute')
+      .set('Authorization', 'Bearer token')
+      .send(validBody);
+
+    expect(res1.status).toBe(200);
+    expect(res1.body.success).toBe(true);
+
+    // Second request with same sessionKey and nonce should fail
+    const res2 = await request(app)
+      .post('/relay/execute')
+      .set('Authorization', 'Bearer token')
+      .send(validBody);
+
+    expect(res2.status).toBe(422);
+    expect(res2.body.success).toBe(false);
+    expect(res2.body.error.code).toBe('NONCE_REPLAY');
   });
 
   it('200 with network transaction hash when submitter is wired', async () => {
@@ -82,7 +111,8 @@ describe('POST /relay/execute', () => {
     expect(res.body.success).toBe(true);
     expect(res.body.transactionId).toBe(NETWORK_HASH);
     expect(res.body.gasUsed).toBe(150);
-    expect(submitter.submitSignedTransaction).toHaveBeenCalledWith('AAAA-signed-xdr');
+    expect(submitter.simulateAndAssembleTransaction).toHaveBeenCalledWith('AAAA-signed-xdr');
+    expect(submitter.submitSignedTransaction).toHaveBeenCalledWith('AAAA-assembled-xdr');
   });
 
   it('422 with typed error when network submission fails', async () => {
@@ -99,7 +129,7 @@ describe('POST /relay/execute', () => {
 
     expect(res.status).toBe(422);
     expect(res.body.success).toBe(false);
-    expect(res.body.error.code).toBe('INTERNAL_ERROR');
+    expect(res.body.error.code).toBe('RPC_DOWN');
     expect(res.body.error.message).toBe('Horizon unavailable');
   });
 
@@ -164,6 +194,13 @@ describe('POST /relay/validate', () => {
     expect(res.status).toBe(400);
     expect(res.body.error).toBe('VALIDATION_ERROR');
   });
+
+  it('401 when Authorization header is missing', async () => {
+    await request(makeApp(true, undefined, undefined, { useMockSubmission: true }))
+      .post('/relay/validate')
+      .send(validBody)
+      .expect(401);
+  });
 });
 
 describe('GET /relay/status', () => {
@@ -218,7 +255,7 @@ describe('POST /relay/execute — idempotency-key header', () => {
       .post('/relay/execute')
       .set('Authorization', 'Bearer token')
       .set('idempotency-key', 'key-b')
-      .send(validBody);
+      .send({ ...validBody, nonce: 2 });
 
     expect(r1.status).toBe(200);
     expect(r2.status).toBe(200);
@@ -255,5 +292,114 @@ describe('POST /relay/execute — idempotency-key header', () => {
     await request(app).post('/relay/execute').set('Authorization', 'Bearer token').send(validBody);
 
     expect(store.size()).toBe(0);
+  });
+
+  it('rejects duplicate nonces with NONCE_REPLAY error code', async () => {
+    const app = makeApp(true, undefined, undefined, { useMockSubmission: true });
+
+    // First request
+    const r1 = await request(app)
+      .post('/relay/execute')
+      .set('Authorization', 'Bearer token')
+      .send(validBody);
+    expect(r1.status).toBe(200);
+
+    // Replay request with same nonce
+    const r2 = await request(app)
+      .post('/relay/execute')
+      .set('Authorization', 'Bearer token')
+      .send(validBody);
+    expect(r2.status).toBe(422);
+    expect(r2.body.success).toBe(false);
+    expect(r2.body.error.code).toBe('NONCE_REPLAY');
+  });
+
+  it('does not consume nonce on /relay/validate but rejects it after execution', async () => {
+    const app = makeApp(true, undefined, undefined, { useMockSubmission: true });
+
+    // Validate request first (should be valid)
+    const v1 = await request(app)
+      .post('/relay/validate')
+      .set('Authorization', 'Bearer token')
+      .send(validBody);
+    expect(v1.status).toBe(200);
+    expect(v1.body.valid).toBe(true);
+
+    // Validate request again (should still be valid because validate doesn't consume)
+    const v2 = await request(app)
+      .post('/relay/validate')
+      .set('Authorization', 'Bearer token')
+      .send(validBody);
+    expect(v2.status).toBe(200);
+    expect(v2.body.valid).toBe(true);
+
+    // Execute the request
+    const e1 = await request(app)
+      .post('/relay/execute')
+      .set('Authorization', 'Bearer token')
+      .send(validBody);
+    expect(e1.status).toBe(200);
+
+    // Now validate should fail because nonce is consumed
+    const v3 = await request(app)
+      .post('/relay/validate')
+      .set('Authorization', 'Bearer token')
+      .send(validBody);
+    expect(v3.status).toBe(422);
+    expect(v3.body.valid).toBe(false);
+    expect(v3.body.error.code).toBe('NONCE_REPLAY');
+  });
+
+  describe('BearerAuthService integration via RELAYER_AUTH_SECRET', () => {
+    let originalSecret: string | undefined;
+
+    beforeAll(() => {
+      originalSecret = process.env.RELAYER_AUTH_SECRET;
+      process.env.RELAYER_AUTH_SECRET = 'integration-secret';
+      // createApp() reads the cached, Zod-validated env; invalidate it so the
+      // secret set above is picked up.
+      resetEnvCache();
+    });
+
+    afterAll(() => {
+      if (originalSecret === undefined) {
+        delete process.env.RELAYER_AUTH_SECRET;
+      } else {
+        process.env.RELAYER_AUTH_SECRET = originalSecret;
+      }
+      resetEnvCache();
+    });
+
+    it('denies access with 401 when invalid token is supplied', async () => {
+      const mockSigService: SignatureServiceContract = {
+        verify: jest.fn().mockReturnValue(true),
+      };
+      const app = createApp(undefined, mockSigService, undefined, undefined, {
+        useMockSubmission: true,
+      });
+      const res = await request(app)
+        .post('/relay/execute')
+        .set('Authorization', 'Bearer wrong-secret')
+        .send(validBody);
+
+      expect(res.status).toBe(401);
+      expect(res.body.error).toBe('UNAUTHORIZED');
+    });
+
+    it('grants access with 200 when correct token is supplied', async () => {
+      const mockSigService: SignatureServiceContract = {
+        verify: jest.fn().mockReturnValue(true),
+      };
+      const app = createApp(undefined, mockSigService, undefined, undefined, {
+        useMockSubmission: true,
+      });
+      const res = await request(app)
+        .post('/relay/execute')
+        .set('Authorization', 'Bearer integration-secret')
+        .send({ ...validBody, nonce: 3 }); // Use a unique nonce to avoid replay rejection
+
+      expect(res.status).toBe(200);
+      expect(res.body.success).toBe(true);
+    });
   });
 });

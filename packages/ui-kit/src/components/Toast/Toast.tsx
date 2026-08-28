@@ -7,10 +7,10 @@ const toastVariants = cva(
   {
     variants: {
       variant: {
-        success: 'bg-green-50 border-green-200 text-green-900',
-        error: 'bg-red-50 border-red-200 text-red-900',
-        warning: 'bg-yellow-50 border-yellow-200 text-yellow-900',
-        info: 'bg-blue-50 border-blue-200 text-blue-900',
+        success: 'border-success/25 bg-success/10 text-foreground',
+        error: 'border-destructive/25 bg-destructive/10 text-foreground',
+        warning: 'border-warning/25 bg-warning/10 text-foreground',
+        info: 'border-info/25 bg-info/10 text-foreground',
       },
     },
     defaultVariants: { variant: 'info' },
@@ -18,10 +18,10 @@ const toastVariants = cva(
 );
 
 const icons = {
-  success: <CheckCircle className="h-4 w-4 mt-0.5 shrink-0 text-green-600" />,
-  error: <XCircle className="h-4 w-4 mt-0.5 shrink-0 text-red-600" />,
-  warning: <AlertTriangle className="h-4 w-4 mt-0.5 shrink-0 text-yellow-600" />,
-  info: <Info className="h-4 w-4 mt-0.5 shrink-0 text-blue-600" />,
+  success: <CheckCircle className="h-4 w-4 mt-0.5 shrink-0 text-success" />,
+  error: <XCircle className="h-4 w-4 mt-0.5 shrink-0 text-destructive" />,
+  warning: <AlertTriangle className="h-4 w-4 mt-0.5 shrink-0 text-warning" />,
+  info: <Info className="h-4 w-4 mt-0.5 shrink-0 text-info" />,
 };
 
 export interface ToastProps extends VariantProps<typeof toastVariants> {

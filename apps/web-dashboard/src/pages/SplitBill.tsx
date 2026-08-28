@@ -4,6 +4,15 @@ import { useNavigate } from 'react-router-dom';
 import { Plus, Trash2, Users, CheckCircle, Clock, XCircle, AlertCircle } from 'lucide-react';
 import { useSplitBill } from '../hooks/useSplitBill';
 import type { SplitBill, SplitBillStatus } from '../types/split-bill';
+import {
+  validateShares,
+  errorsByKey,
+  formError,
+  formatAmount,
+  parseDecimal,
+  type SplitMode,
+} from '../lib/split-bill-validation';
+import { stellarAddressError } from '../lib/address-validation';
 
 // ── Create form ───────────────────────────────────────────────────────────────
 
@@ -11,6 +20,7 @@ interface ParticipantDraft {
   key: string;
   address: string;
   alias: string;
+  /** Amount owed, or percentage share — depending on the selected split mode. */
   amount: string;
   assetCode: string;
 }
@@ -19,13 +29,55 @@ function newParticipant(): ParticipantDraft {
   return { key: crypto.randomUUID(), address: '', alias: '', amount: '', assetCode: 'XLM' };
 }
 
+/** Live summary of what the entered shares currently add up to. */
+function ShareSummary({
+  mode,
+  sum,
+  total,
+}: {
+  mode: SplitMode;
+  sum: number;
+  total: number | null;
+}) {
+  const target = mode === 'percentage' ? 100 : total;
+  if (target === null) return null;
+
+  const balanced = Math.abs(sum - target) < 0.5e-7;
+  const suffix = mode === 'percentage' ? '%' : '';
+
+  return (
+    <p
+      className={`text-xs mt-2 ${balanced ? 'text-green-600' : 'text-amber-600'}`}
+      data-testid="share-summary"
+    >
+      {formatAmount(sum)}
+      {suffix} of {formatAmount(target)}
+      {suffix} allocated
+    </p>
+  );
+}
+
 function CreateBillForm({ onCreated }: { onCreated: (id: string) => void }) {
   const { createBill } = useSplitBill();
   const [title, setTitle] = useState('');
   const [note, setNote] = useState('');
   const [creatorAddress, setCreatorAddress] = useState('');
+  const [mode, setMode] = useState<SplitMode>('amount');
+  const [totalAmount, setTotalAmount] = useState('');
   const [participants, setParticipants] = useState<ParticipantDraft[]>([newParticipant()]);
   const [error, setError] = useState('');
+  const [shareErrors, setShareErrors] = useState<Record<string, string>>({});
+  const [addressErrors, setAddressErrors] = useState<Record<string, string>>({});
+  const [creatorAddressError, setCreatorAddressError] = useState('');
+
+  // Recomputed on every render so the running total updates as the user types.
+  // Errors are only *surfaced* on submit; this just drives the live summary.
+  const preview = validateShares({
+    mode,
+    participants: participants.map((p) => ({ key: p.key, share: p.amount })),
+    totalAmount,
+  });
+  const parsedTotal = parseDecimal(totalAmount);
 
   function updateParticipant(key: string, patch: Partial<ParticipantDraft>) {
     setParticipants((prev) => prev.map((p) => (p.key === key ? { ...p, ...patch } : p)));
@@ -35,18 +87,60 @@ function CreateBillForm({ onCreated }: { onCreated: (id: string) => void }) {
     setParticipants((prev) => prev.filter((p) => p.key !== key));
   }
 
+  function handleModeChange(next: SplitMode) {
+    setMode(next);
+    setError('');
+    setShareErrors({});
+  }
+
   function handleSubmit(e: FormEvent) {
     e.preventDefault();
     setError('');
+    setShareErrors({});
+    setAddressErrors({});
+    setCreatorAddressError('');
 
     if (!title.trim()) return setError('Title is required.');
     if (!creatorAddress.trim()) return setError('Your address is required.');
+
+    const creatorError = stellarAddressError(creatorAddress);
+    if (creatorError) {
+      setCreatorAddressError(creatorError);
+      return setError(creatorError);
+    }
+
     if (participants.length === 0) return setError('Add at least one participant.');
 
     for (const p of participants) {
       if (!p.address.trim()) return setError('All participants need an address.');
-      if (!p.amount.trim() || isNaN(Number(p.amount)) || Number(p.amount) <= 0)
-        return setError('All participants need a valid amount.');
+    }
+
+    // Every participant is paid on-chain, so a malformed address is caught here
+    // rather than at settlement time. All rows are checked so the user fixes
+    // them in one pass instead of one per submit.
+    const badAddresses: Record<string, string> = {};
+    for (const p of participants) {
+      const addressError = stellarAddressError(p.address);
+      if (addressError) badAddresses[p.key] = addressError;
+    }
+
+    if (Object.keys(badAddresses).length > 0) {
+      setAddressErrors(badAddresses);
+      return setError('Fix the highlighted participant addresses.');
+    }
+
+    // Shares must add up: to 100% in percentage mode, or to the bill total in
+    // amount mode when one was given.
+    const result = validateShares({
+      mode,
+      participants: participants.map((p) => ({ key: p.key, share: p.amount })),
+      totalAmount,
+    });
+
+    if (!result.valid) {
+      setShareErrors(errorsByKey(result.errors));
+      setError(formError(result.errors) ?? 'Fix the highlighted participant shares.');
+      return;
     }
 
     const bill = createBill({
@@ -56,7 +150,9 @@ function CreateBillForm({ onCreated }: { onCreated: (id: string) => void }) {
       participants: participants.map((p) => ({
         address: p.address.trim(),
         alias: p.alias.trim() || undefined,
-        amount: p.amount.trim(),
+        // In percentage mode the stored amount is the share converted against
+        // the bill total, so a bill always persists concrete amounts.
+        amount: result.amounts[p.key],
         assetCode: p.assetCode,
       })),
     });
@@ -84,8 +180,19 @@ function CreateBillForm({ onCreated }: { onCreated: (id: string) => void }) {
             value={creatorAddress}
             onChange={(e) => setCreatorAddress(e.target.value)}
             placeholder="G..."
-            className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2 text-sm font-mono focus:outline-none focus:ring-2 focus:ring-slate-400"
+            aria-invalid={creatorAddressError ? true : undefined}
+            aria-describedby={creatorAddressError ? 'creator-address-error' : undefined}
+            className={`mt-1 w-full rounded-lg border px-3 py-2 text-sm font-mono focus:outline-none focus:ring-2 ${
+              creatorAddressError
+                ? 'border-red-400 focus:ring-red-400'
+                : 'border-slate-300 focus:ring-slate-400'
+            }`}
           />
+          {creatorAddressError && (
+            <span id="creator-address-error" className="mt-1 block text-xs text-red-600">
+              {creatorAddressError}
+            </span>
+          )}
         </label>
       </div>
 
@@ -98,6 +205,48 @@ function CreateBillForm({ onCreated }: { onCreated: (id: string) => void }) {
           className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-slate-400"
         />
       </label>
+
+      {/* Split mode + bill total */}
+      <div className="grid gap-4 sm:grid-cols-2">
+        <fieldset>
+          <legend className="text-sm font-medium text-slate-700">Split by</legend>
+          <div className="mt-1 inline-flex rounded-lg border border-slate-300 p-0.5">
+            {(['amount', 'percentage'] as const).map((option) => (
+              <button
+                key={option}
+                type="button"
+                onClick={() => handleModeChange(option)}
+                aria-pressed={mode === option}
+                className={`rounded-md px-3 py-1.5 text-xs capitalize transition-colors ${
+                  mode === option
+                    ? 'bg-slate-950 text-white'
+                    : 'text-slate-600 hover:text-slate-900'
+                }`}
+              >
+                {option}
+              </button>
+            ))}
+          </div>
+        </fieldset>
+
+        <label className="block">
+          <span className="text-sm font-medium text-slate-700">
+            Bill total {mode === 'percentage' ? '*' : '(optional)'}
+          </span>
+          <input
+            value={totalAmount}
+            onChange={(e) => setTotalAmount(e.target.value)}
+            placeholder="100"
+            inputMode="decimal"
+            className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-slate-400"
+          />
+          <span className="mt-1 block text-xs text-slate-500">
+            {mode === 'percentage'
+              ? 'Percentage shares are converted against this total.'
+              : 'When set, participant amounts must add up to it.'}
+          </span>
+        </label>
+      </div>
 
       {/* Participants */}
       <div>
@@ -113,62 +262,103 @@ function CreateBillForm({ onCreated }: { onCreated: (id: string) => void }) {
         </div>
 
         <ul className="space-y-3">
-          {participants.map((p) => (
-            <li key={p.key} className="grid grid-cols-[1fr_1fr_auto_auto_auto] gap-2 items-end">
-              <label className="block">
-                <span className="text-xs text-slate-500">Address *</span>
-                <input
-                  value={p.address}
-                  onChange={(e) => updateParticipant(p.key, { address: e.target.value })}
-                  placeholder="G..."
-                  className="mt-1 w-full rounded border border-slate-300 px-2 py-1.5 text-xs font-mono focus:outline-none focus:ring-1 focus:ring-slate-400"
-                />
-              </label>
-              <label className="block">
-                <span className="text-xs text-slate-500">Alias</span>
-                <input
-                  value={p.alias}
-                  onChange={(e) => updateParticipant(p.key, { alias: e.target.value })}
-                  placeholder="Alice"
-                  className="mt-1 w-full rounded border border-slate-300 px-2 py-1.5 text-xs focus:outline-none focus:ring-1 focus:ring-slate-400"
-                />
-              </label>
-              <label className="block">
-                <span className="text-xs text-slate-500">Amount *</span>
-                <input
-                  value={p.amount}
-                  onChange={(e) => updateParticipant(p.key, { amount: e.target.value })}
-                  placeholder="10"
-                  type="number"
-                  min="0"
-                  step="any"
-                  className="mt-1 w-24 rounded border border-slate-300 px-2 py-1.5 text-xs focus:outline-none focus:ring-1 focus:ring-slate-400"
-                />
-              </label>
-              <label className="block">
-                <span className="text-xs text-slate-500">Asset</span>
-                <input
-                  value={p.assetCode}
-                  onChange={(e) => updateParticipant(p.key, { assetCode: e.target.value })}
-                  placeholder="XLM"
-                  className="mt-1 w-16 rounded border border-slate-300 px-2 py-1.5 text-xs uppercase focus:outline-none focus:ring-1 focus:ring-slate-400"
-                />
-              </label>
-              <button
-                type="button"
-                onClick={() => removeParticipant(p.key)}
-                disabled={participants.length === 1}
-                className="mb-0.5 p-1.5 rounded text-slate-400 hover:text-red-500 disabled:opacity-30"
-                aria-label="Remove participant"
-              >
-                <Trash2 className="w-4 h-4" />
-              </button>
-            </li>
-          ))}
+          {participants.map((p) => {
+            const shareError = shareErrors[p.key];
+            const shareErrorId = `share-error-${p.key}`;
+            const addressError = addressErrors[p.key];
+            const addressErrorId = `address-error-${p.key}`;
+
+            return (
+              <li key={p.key}>
+                <div className="grid grid-cols-[1fr_1fr_auto_auto_auto] gap-2 items-end">
+                  <label className="block">
+                    <span className="text-xs text-slate-500">Address *</span>
+                    <input
+                      value={p.address}
+                      onChange={(e) => updateParticipant(p.key, { address: e.target.value })}
+                      placeholder="G..."
+                      aria-invalid={addressError ? true : undefined}
+                      aria-describedby={addressError ? addressErrorId : undefined}
+                      className={`mt-1 w-full rounded border px-2 py-1.5 text-xs font-mono focus:outline-none focus:ring-1 ${
+                        addressError
+                          ? 'border-red-400 focus:ring-red-400'
+                          : 'border-slate-300 focus:ring-slate-400'
+                      }`}
+                    />
+                  </label>
+                  <label className="block">
+                    <span className="text-xs text-slate-500">Alias</span>
+                    <input
+                      value={p.alias}
+                      onChange={(e) => updateParticipant(p.key, { alias: e.target.value })}
+                      placeholder="Alice"
+                      className="mt-1 w-full rounded border border-slate-300 px-2 py-1.5 text-xs focus:outline-none focus:ring-1 focus:ring-slate-400"
+                    />
+                  </label>
+                  <label className="block">
+                    <span className="text-xs text-slate-500">
+                      {mode === 'percentage' ? 'Share % *' : 'Amount *'}
+                    </span>
+                    <input
+                      value={p.amount}
+                      onChange={(e) => updateParticipant(p.key, { amount: e.target.value })}
+                      placeholder={mode === 'percentage' ? '50' : '10'}
+                      type="number"
+                      min="0"
+                      step="any"
+                      aria-invalid={shareError ? true : undefined}
+                      aria-describedby={shareError ? shareErrorId : undefined}
+                      className={`mt-1 w-24 rounded border px-2 py-1.5 text-xs focus:outline-none focus:ring-1 ${
+                        shareError
+                          ? 'border-red-400 focus:ring-red-400'
+                          : 'border-slate-300 focus:ring-slate-400'
+                      }`}
+                    />
+                  </label>
+                  <label className="block">
+                    <span className="text-xs text-slate-500">Asset</span>
+                    <input
+                      value={p.assetCode}
+                      onChange={(e) => updateParticipant(p.key, { assetCode: e.target.value })}
+                      placeholder="XLM"
+                      className="mt-1 w-16 rounded border border-slate-300 px-2 py-1.5 text-xs uppercase focus:outline-none focus:ring-1 focus:ring-slate-400"
+                    />
+                  </label>
+                  <button
+                    type="button"
+                    onClick={() => removeParticipant(p.key)}
+                    disabled={participants.length === 1}
+                    className="mb-0.5 p-1.5 rounded text-slate-400 hover:text-red-500 disabled:opacity-30"
+                    aria-label="Remove participant"
+                  >
+                    <Trash2 className="w-4 h-4" />
+                  </button>
+                </div>
+
+                {addressError && (
+                  <p id={addressErrorId} className="mt-1 text-xs text-red-600">
+                    {addressError}
+                  </p>
+                )}
+
+                {shareError && (
+                  <p id={shareErrorId} className="mt-1 text-xs text-red-600">
+                    {shareError}
+                  </p>
+                )}
+              </li>
+            );
+          })}
         </ul>
+
+        <ShareSummary mode={mode} sum={preview.sum} total={parsedTotal} />
       </div>
 
-      {error && <p className="text-sm text-red-600">{error}</p>}
+      {error && (
+        <p role="alert" className="text-sm text-red-600">
+          {error}
+        </p>
+      )}
 
       <button
         type="submit"
@@ -182,13 +372,16 @@ function CreateBillForm({ onCreated }: { onCreated: (id: string) => void }) {
 
 // ── Bill list ─────────────────────────────────────────────────────────────────
 
-const BILL_STATUS_CONFIG: Record<
-  SplitBillStatus,
-  { icon: ReactNode; className: string }
-> = {
+const BILL_STATUS_CONFIG: Record<SplitBillStatus, { icon: ReactNode; className: string }> = {
   open: { icon: <Clock className="w-3.5 h-3.5" />, className: 'text-blue-600 bg-blue-50' },
-  completed: { icon: <CheckCircle className="w-3.5 h-3.5" />, className: 'text-green-600 bg-green-50' },
-  expired: { icon: <AlertCircle className="w-3.5 h-3.5" />, className: 'text-slate-500 bg-slate-100' },
+  completed: {
+    icon: <CheckCircle className="w-3.5 h-3.5" />,
+    className: 'text-green-600 bg-green-50',
+  },
+  expired: {
+    icon: <AlertCircle className="w-3.5 h-3.5" />,
+    className: 'text-slate-500 bg-slate-100',
+  },
   cancelled: { icon: <XCircle className="w-3.5 h-3.5" />, className: 'text-red-600 bg-red-50' },
 };
 
@@ -224,9 +417,7 @@ function BillCard({ bill, onClick }: { bill: SplitBill; onClick: () => void }) {
         <span>
           {paidCount}/{total} paid
         </span>
-        <span className="ml-auto">
-          Expires {new Date(bill.expiresAt).toLocaleDateString()}
-        </span>
+        <span className="ml-auto">Expires {new Date(bill.expiresAt).toLocaleDateString()}</span>
       </div>
 
       {/* Mini progress bar */}

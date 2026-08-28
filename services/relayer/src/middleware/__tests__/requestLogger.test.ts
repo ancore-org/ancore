@@ -6,7 +6,7 @@
  */
 
 import { Request, Response, NextFunction } from 'express';
-import { createRequestLoggerMiddleware } from '../requestLogger';
+import { createRequestLoggerMiddleware, type LoggedRequest } from '../requestLogger';
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -80,9 +80,10 @@ describe('createRequestLoggerMiddleware', () => {
 
     middleware(req, res as unknown as Response, next);
 
-    expect(req.log).toBeDefined();
-    expect(typeof req.log.info).toBe('function');
-    expect(typeof req.log.child).toBe('function');
+    const loggedReq = req as LoggedRequest;
+    expect(loggedReq.log).toBeDefined();
+    expect(typeof loggedReq.log.info).toBe('function');
+    expect(typeof loggedReq.log.child).toBe('function');
   });
 
   it('emits request_start log on entry', () => {

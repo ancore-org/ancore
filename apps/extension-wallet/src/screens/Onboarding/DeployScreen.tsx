@@ -1,5 +1,15 @@
 import * as React from 'react';
-import { Loader2, CheckCircle2, AlertCircle, Rocket, Key, Globe, Wallet } from 'lucide-react';
+import {
+  Loader2,
+  CheckCircle2,
+  AlertCircle,
+  Rocket,
+  Key,
+  Globe,
+  Wallet,
+  ExternalLink,
+} from 'lucide-react';
+import { getTransactionExplorerLink } from '@/utils/explorer-links';
 
 /**
  * DeployScreen props
@@ -11,6 +21,10 @@ export interface DeployScreenProps {
   isLoading?: boolean;
   error?: string | null;
   status?: 'idle' | 'deploying' | 'funding' | 'initializing' | 'success' | 'error' | 'ready';
+  /** Deployment transaction hash, surfaced once the contract is deployed. */
+  txHash?: string;
+  /** True when the contract already existed on-chain (reimport path). */
+  alreadyDeployed?: boolean;
 }
 
 /**
@@ -45,11 +59,11 @@ function getStatusIcon(status: DeployScreenProps['status']) {
     case 'deploying':
     case 'funding':
     case 'initializing':
-      return <Loader2 className="w-5 h-5 animate-spin text-primary" />;
+      return <Loader2 className="h-5 w-5 animate-spin text-primary" />;
     case 'success':
-      return <CheckCircle2 className="w-5 h-5 text-green-600" />;
+      return <CheckCircle2 className="h-5 w-5 text-success" />;
     case 'error':
-      return <AlertCircle className="w-5 h-5 text-red-600" />;
+      return <AlertCircle className="h-5 w-5 text-destructive" />;
     default:
       return null;
   }
@@ -68,10 +82,13 @@ export function DeployScreen({
   isLoading = false,
   error = null,
   status = 'idle',
+  txHash,
+  alreadyDeployed = false,
 }: DeployScreenProps) {
   const isDeploying = status === 'deploying' || status === 'funding' || status === 'initializing';
   const isSuccess = status === 'success';
   const hasError = status === 'error' || error;
+  const explorerLink = txHash ? getTransactionExplorerLink(txHash, 'testnet') : null;
 
   // Determine which steps are complete
   const completedSteps = React.useMemo(() => {
@@ -87,7 +104,7 @@ export function DeployScreen({
   }, [status, isSuccess]);
 
   return (
-    <div className="flex flex-col min-h-screen bg-background">
+    <div className="wallet-sheet">
       {/* Header */}
       <div className="px-6 pt-6 pb-4">
         {!isDeploying && !isSuccess && !hasError && (
@@ -103,13 +120,13 @@ export function DeployScreen({
       {/* Content */}
       <div className="flex-1 px-6 flex flex-col justify-center">
         {/* Status Icon */}
-        <div className="flex justify-center mb-8">
+        <div className="mb-6 flex justify-center">
           <div
-            className={`w-20 h-20 rounded-full flex items-center justify-center ${
-              isSuccess ? 'bg-green-100' : hasError ? 'bg-red-100' : 'bg-primary/10'
+            className={`flex h-12 w-12 items-center justify-center rounded-full ${
+              isSuccess ? 'bg-success/10' : hasError ? 'bg-destructive/10' : 'bg-accent'
             }`}
           >
-            {getStatusIcon(status) || <Rocket className="w-10 h-10 text-primary" />}
+            {getStatusIcon(status) || <Rocket className="h-5 w-5 text-foreground" />}
           </div>
         </div>
 
@@ -148,7 +165,7 @@ export function DeployScreen({
                   key={step.id}
                   className={`flex items-center gap-3 p-3 rounded-xl transition-all ${
                     isComplete
-                      ? 'bg-green-50 border border-green-200'
+                      ? 'border border-success/20 bg-success/10'
                       : isCurrent
                         ? 'bg-primary/5 border border-primary/20'
                         : 'bg-muted/30'
@@ -156,11 +173,11 @@ export function DeployScreen({
                 >
                   <div
                     className={`w-10 h-10 rounded-lg flex items-center justify-center ${
-                      isComplete ? 'bg-green-100' : isCurrent ? 'bg-primary/10' : 'bg-muted/50'
+                      isComplete ? 'bg-success/10' : isCurrent ? 'bg-accent' : 'bg-muted/50'
                     }`}
                   >
                     {isComplete ? (
-                      <CheckCircle2 className="w-5 h-5 text-green-600" />
+                      <CheckCircle2 className="h-5 w-5 text-success" />
                     ) : isCurrent ? (
                       <Loader2 className="w-5 h-5 text-primary animate-spin" />
                     ) : (
@@ -171,7 +188,7 @@ export function DeployScreen({
                     <p
                       className={`text-sm font-medium ${
                         isComplete
-                          ? 'text-green-700'
+                          ? 'text-foreground'
                           : isCurrent
                             ? 'text-foreground'
                             : 'text-muted-foreground'
@@ -189,17 +206,37 @@ export function DeployScreen({
 
         {/* Error Details */}
         {hasError && error && (
-          <div className="mt-6 p-4 bg-red-50 border border-red-200 rounded-xl max-w-sm mx-auto">
-            <p className="text-sm text-red-700 text-center">{error}</p>
+          <div className="wallet-status-error mx-auto mt-6 max-w-sm rounded-xl border p-4">
+            <p className="text-center text-sm">{error}</p>
           </div>
         )}
 
         {/* Success Details */}
         {isSuccess && (
-          <div className="mt-6 p-4 bg-green-50 border border-green-200 rounded-xl max-w-sm mx-auto">
-            <p className="text-sm text-green-700 text-center">
-              Your smart wallet is now ready to use on Stellar testnet!
+          <div className="wallet-status-success mx-auto mt-6 max-w-sm space-y-3 rounded-xl border p-4">
+            <p className="text-center text-sm">
+              {alreadyDeployed
+                ? 'We found your existing smart account on Stellar testnet — no redeploy needed.'
+                : 'Your smart wallet is now ready to use on Stellar testnet!'}
             </p>
+            {explorerLink && (
+              <div className="space-y-1">
+                <p className="text-xs font-medium uppercase tracking-wide text-success">
+                  Transaction
+                </p>
+                <a
+                  href={explorerLink}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="flex items-center justify-center gap-1.5 text-sm font-medium text-success underline underline-offset-2"
+                >
+                  <span className="font-mono">
+                    {txHash!.slice(0, 8)}…{txHash!.slice(-8)}
+                  </span>
+                  <ExternalLink className="w-3.5 h-3.5" />
+                </a>
+              </div>
+            )}
           </div>
         )}
       </div>
@@ -209,18 +246,12 @@ export function DeployScreen({
         {!isDeploying && (
           <div className="space-y-3">
             {isSuccess ? (
-              <button
-                onClick={onComplete}
-                className="w-full py-4 px-6 bg-primary hover:bg-primary/90 text-primary-foreground font-semibold rounded-xl transition-all duration-200 flex items-center justify-center gap-2 shadow-lg shadow-primary/25 active:scale-[0.98]"
-              >
+              <button onClick={onComplete} className="wallet-pill-btn">
                 Open Your Wallet
               </button>
             ) : hasError ? (
               <>
-                <button
-                  onClick={onRetry}
-                  className="w-full py-4 px-6 bg-primary hover:bg-primary/90 text-primary-foreground font-semibold rounded-xl transition-all duration-200 flex items-center justify-center gap-2 shadow-lg shadow-primary/25 active:scale-[0.98]"
-                >
+                <button onClick={onRetry} className="wallet-pill-btn">
                   Try Again
                 </button>
                 <button
@@ -231,11 +262,7 @@ export function DeployScreen({
                 </button>
               </>
             ) : (
-              <button
-                onClick={onComplete}
-                disabled={isLoading}
-                className="w-full py-4 px-6 bg-primary hover:bg-primary/90 disabled:bg-muted disabled:text-muted-foreground text-primary-foreground font-semibold rounded-xl transition-all duration-200 flex items-center justify-center gap-2 shadow-lg shadow-primary/25 disabled:shadow-none active:scale-[0.98]"
-              >
+              <button onClick={onComplete} disabled={isLoading} className="wallet-pill-btn">
                 {isLoading ? (
                   <>
                     <Loader2 className="w-5 h-5 animate-spin" />

@@ -12,248 +12,334 @@ concurrency:
 
 permissions:
   contents: read
-  issues: write
-  pull-requests: write
 
 jobs:
-  quarantine-registry:
-    name: Flaky Test Quarantine Registry
+  changes:
+    name: Detect Changed Paths
     runs-on: ubuntu-latest
     outputs:
-      active_count: ${{ steps.validate.outputs.active_count }}
+      contracts: ${{ steps.filter.outputs.contracts }}
+      apps: ${{ steps.filter.outputs.apps }}
+      services: ${{ steps.filter.outputs.services }}
+      packages: ${{ steps.filter.outputs.packages }}
+      indexer: ${{ steps.filter.outputs.indexer }}
     steps:
       - uses: actions/checkout@v4
-
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
+      - uses: dorny/paths-filter@v3
+        id: filter
         with:
-          node-version: '20'
+          filters: |
+            contracts:
+              - 'contracts/**'
+              - 'scripts/check-wasm-size.js'
+              - '.github/workflows/ci.yml'
+            apps:
+              - 'apps/**'
+              - 'packages/**'
+              - 'package.json'
+              - 'pnpm-lock.yaml'
+              - 'turbo.json'
+              - '.github/workflows/ci.yml'
+            services:
+              - 'services/**'
+              - 'packages/**'
+              - 'package.json'
+              - 'pnpm-lock.yaml'
+              - '.github/workflows/ci.yml'
+            packages:
+              - 'packages/**'
+              - 'package.json'
+              - 'pnpm-lock.yaml'
+              - 'turbo.json'
+              - '.github/workflows/ci.yml'
+            indexer:
+              - 'services/indexer/**'
+              - '.github/workflows/ci.yml'
 
-      - name: Validate quarantine registry
-        id: validate
-        run: node scripts/ci/flaky-quarantine.js validate
-
-      - name: Publish quarantine report
-        run: node scripts/ci/flaky-quarantine.js report
-
-      - name: Auto-tag PR with active quarantine labels
-        if: github.event_name == 'pull_request' && steps.validate.outputs.active_count != '0'
-        uses: actions/github-script@v7
-        continue-on-error: true
-        with:
-          script: |
-            const fs = require('fs');
-            const registry = JSON.parse(fs.readFileSync('.github/flaky-test-quarantine.json', 'utf8'));
-            await github.rest.issues.addLabels({
-              owner: context.repo.owner,
-              repo: context.repo.repo,
-              issue_number: context.issue.number,
-              labels: registry.labels
-            });
-
-  lint:
-    name: Lint
+  actionlint:
+    name: Actionlint — Workflow YAML
     runs-on: ubuntu-latest
-    needs: quarantine-registry
     steps:
       - uses: actions/checkout@v4
 
-      - name: Setup pnpm
-        uses: pnpm/action-setup@v2
+      - name: Download actionlint
+        id: get_actionlint
+        run: bash <(curl -fsSL https://raw.githubusercontent.com/rhysd/actionlint/main/scripts/download-actionlint.bash)
+        shell: bash
+
+      - name: Check workflow files
+        run: ${{ steps.get_actionlint.outputs.executable }} -color
+        shell: bash
+
+  audit:
+    name: Dependency Audit
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v2
         with:
           version: 9
 
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
+      - uses: actions/setup-node@v4
         with:
           node-version: '20'
           cache: 'pnpm'
+          cache-dependency-path: pnpm-lock.yaml
 
-      - name: Install dependencies
-        run: pnpm install --frozen-lockfile
+      - run: pnpm install --frozen-lockfile
 
-      - name: Run linter
-        run: pnpm lint
-
-      - name: Check formatting
-        run: pnpm format:check
-
-      - name: Lint indexer migrations
-        run: pnpm indexer:lint-migrations
-
-  test:
-    name: Test
-    runs-on: ubuntu-latest
-    needs: quarantine-registry
-    steps:
-      - uses: actions/checkout@v4
-
-      - name: Setup pnpm
-        uses: pnpm/action-setup@v2
-        with:
-          version: 9
-
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: '20'
-          cache: 'pnpm'
-
-      - name: Install dependencies
-        run: pnpm install --frozen-lockfile
-
-      - name: Build packages
-        run: pnpm build
-
-      - name: Run tests
-        run: pnpm test
-
-      - name: Check coverage gates
-        run: node scripts/coverage-gate.js
-        continue-on-error: false
-
-      - name: Upload coverage reports
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: coverage-reports
-          path: packages/*/coverage/
-          retention-days: 30
-
-  coverage-report:
-    name: Coverage Report
-    runs-on: ubuntu-latest
-    needs: test
-    if: always()
-    steps:
-      - uses: actions/checkout@v4
-
-      - name: Setup pnpm
-        uses: pnpm/action-setup@v2
-        with:
-          version: 9
-
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: '20'
-          cache: 'pnpm'
-
-      - name: Install dependencies
-        run: pnpm install --frozen-lockfile
-
-      - name: Build packages
-        run: pnpm build
-
-      - name: Run tests with coverage
-        run: pnpm test
-        continue-on-error: true
-
-      - name: Generate coverage summary
-        run: |
-          echo "## 📊 Coverage Report" >> $GITHUB_STEP_SUMMARY
-          echo "" >> $GITHUB_STEP_SUMMARY
-
-          for package in core-sdk account-abstraction crypto stellar; do
-            if [ -f "packages/$package/coverage/coverage-summary.json" ]; then
-              echo "### $package" >> $GITHUB_STEP_SUMMARY
-              echo '```' >> $GITHUB_STEP_SUMMARY
-              node -e "
-                const data = require('./packages/$package/coverage/coverage-summary.json');
-                const total = data.total;
-                console.log('Branch:    ' + total.branches.pct + '%');
-                console.log('Functions: ' + total.functions.pct + '%');
-                console.log('Lines:     ' + total.lines.pct + '%');
-                console.log('Statements: ' + total.statements.pct + '%');
-              " >> $GITHUB_STEP_SUMMARY
-              echo '```' >> $GITHUB_STEP_SUMMARY
-            fi
-          done
-
-  extension-e2e-smoke:
-    name: Extension E2E Smoke
-    runs-on: ubuntu-latest
-    needs: quarantine-registry
-    strategy:
-      fail-fast: false
-      matrix:
-        browser: [chromium, firefox]
-    steps:
-      - uses: actions/checkout@v4
-
-      - name: Setup pnpm
-        uses: pnpm/action-setup@v2
-        with:
-          version: 9
-
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: '20'
-          cache: 'pnpm'
-
-      - name: Install dependencies
-        run: pnpm install --frozen-lockfile
-
-      - name: Install Playwright browser dependencies
-        run: pnpm --filter @ancore/extension-wallet exec playwright install --with-deps ${{ matrix.browser }}
-
-      - name: Run extension smoke suite
-        id: smoke
-        run: node scripts/ci/flaky-quarantine.js run --area extension-wallet -- pnpm --filter @ancore/extension-wallet exec playwright test --config=tests/playwright.config.ts --grep @smoke --project=${{ matrix.browser }}
-
-      - name: Auto-tag PR when quarantine absorbs a smoke failure
-        if: github.event_name == 'pull_request' && steps.smoke.outputs.quarantined == 'true'
-        uses: actions/github-script@v7
-        continue-on-error: true
-        with:
-          script: |
-            const fs = require('fs');
-            const registry = JSON.parse(fs.readFileSync('.github/flaky-test-quarantine.json', 'utf8'));
-            await github.rest.issues.addLabels({
-              owner: context.repo.owner,
-              repo: context.repo.repo,
-              issue_number: context.issue.number,
-              labels: registry.labels
-            });
-
-      - name: Upload flaky quarantine report
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: flaky-quarantine-report-${{ matrix.browser }}
-          path: .ci/flaky-quarantine-report.md
-          if-no-files-found: ignore
-          retention-days: 30
-
-      - name: Upload extension E2E failure artifacts
-        if: failure()
-        uses: actions/upload-artifact@v4
-        with:
-          name: extension-e2e-failure-artifacts-${{ matrix.browser }}
-          path: apps/extension-wallet/test-results/
-          retention-days: 7
-
-  contracts:
-    name: Build & Test Contracts
-    runs-on: ubuntu-latest
-    needs: quarantine-registry
-    steps:
-      - uses: actions/checkout@v4
+      - name: Validate pnpm audit allowlist
+        run: node scripts/check-audit-allowlist.js
 
       - name: Setup Rust
         uses: dtolnay/rust-toolchain@1.81.0
 
+      - name: Cache cargo-audit
+        uses: actions/cache@v4
+        with:
+          path: ~/.cargo/bin/cargo-audit
+          key: ${{ runner.os }}-cargo-audit-v0.21
+
+      - name: Install cargo-audit
+        run: which cargo-audit || cargo install --locked cargo-audit
+
+      - name: Cargo audit contracts
+        working-directory: ./contracts
+        run: cargo audit
+
+      - name: Cargo audit indexer
+        # Cargo.lock for the indexer lives at the `services/` workspace root and is
+        # gitignored, so generate it there before auditing.
+        working-directory: ./services
+        run: |
+          cargo generate-lockfile
+          cargo audit
+
+  install-scripts:
+    name: Install Script Policy
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v2
+        with:
+          version: 9
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'pnpm'
+
+      - run: pnpm install --frozen-lockfile --ignore-scripts
+
+      - name: Validate install script allowlist
+        run: node scripts/check-install-scripts.js
+
+  format:
+    name: Format Check
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v2
+        with:
+          version: 9
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'pnpm'
+          cache-dependency-path: pnpm-lock.yaml
+
+      - run: pnpm install --frozen-lockfile
+
+      - name: Check formatting
+        run: pnpm format:check
+
+  typecheck:
+    name: Type Check
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v2
+        with:
+          version: 9
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'pnpm'
+
+      - run: pnpm install --frozen-lockfile
+
+      - name: Run typecheck
+        run: pnpm typecheck
+
+  lint-translations:
+    name: Extension Translation Lint
+    runs-on: ubuntu-latest
+    needs: changes
+    if: github.event_name == 'push' || needs.changes.outputs.apps == 'true'
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v2
+        with:
+          version: 9
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'pnpm'
+          cache-dependency-path: pnpm-lock.yaml
+
+      - run: pnpm install --frozen-lockfile
+
+      - name: Lint extension translation keys
+        run: pnpm --filter @ancore/extension-wallet lint:translations
+
+  package:
+    name: Package — ${{ matrix.name }}
+    runs-on: ubuntu-latest
+    needs: changes
+    if: github.event_name == 'push' || needs.changes.outputs.packages == 'true'
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: types
+            filter: '@ancore/types'
+          - name: crypto
+            filter: '@ancore/crypto'
+          - name: stellar
+            filter: '@ancore/stellar'
+          - name: core-sdk
+            filter: '@ancore/core-sdk'
+          - name: ui-kit
+            filter: '@ancore/ui-kit'
+          - name: account-abstraction
+            filter: '@ancore/account-abstraction'
+          - name: wallet-shared
+            filter: '@ancore/wallet-shared'
+          - name: wallet-api
+            filter: '@ancore/wallet-api'
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v2
+        with:
+          version: 9
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'pnpm'
+          cache-dependency-path: pnpm-lock.yaml
+
+      - run: pnpm install --frozen-lockfile
+
+      - name: Lint
+        run: pnpm turbo run lint --filter=${{ matrix.filter }}
+
+      - name: Test
+        run: pnpm turbo run test --filter=${{ matrix.filter }}
+
+      - name: Coverage gate (security-critical packages)
+        if: contains(fromJSON('["core-sdk", "account-abstraction", "crypto", "stellar"]'), matrix.name)
+        run: node scripts/coverage-gate.js
+
+  app:
+    name: App — ${{ matrix.name }}
+    runs-on: ubuntu-latest
+    needs: changes
+    if: github.event_name == 'push' || needs.changes.outputs.apps == 'true'
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: extension-wallet
+            filter: '@ancore/extension-wallet'
+          - name: web-dashboard
+            filter: '@ancore/web-dashboard'
+          - name: mobile-wallet
+            filter: '@ancore/mobile-wallet'
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v2
+        with:
+          version: 9
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'pnpm'
+          cache-dependency-path: pnpm-lock.yaml
+
+      - run: pnpm install --frozen-lockfile
+
+      - name: Lint
+        run: pnpm turbo run lint --filter=${{ matrix.filter }}
+
+      - name: Test
+        run: pnpm turbo run test --filter=${{ matrix.filter }}
+
+  services:
+    name: Services — Lint & Test
+    runs-on: ubuntu-latest
+    needs: changes
+    if: github.event_name == 'push' || needs.changes.outputs.services == 'true'
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v2
+        with:
+          version: 9
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'pnpm'
+          cache-dependency-path: pnpm-lock.yaml
+
+      - run: pnpm install --frozen-lockfile
+
+      - name: Lint services
+        run: pnpm turbo run lint --filter='@ancore/relayer' --filter='@ancore/ai-agent'
+
+      - name: Test services
+        run: pnpm turbo run test --filter='@ancore/relayer' --filter='@ancore/ai-agent' --concurrency=1
+
+      - name: Check documented repository structure
+        run: pnpm docs:check-structure
+
+      - name: Validate documentation links
+        run: pnpm docs:validate-links
+
+      - name: Lint OpenAPI specs
+        run: pnpm docs:lint-openapi
+
+  contracts:
+    name: Contracts — Build & Test
+    runs-on: ubuntu-latest
+    needs: changes
+    if: github.event_name == 'push' || needs.changes.outputs.contracts == 'true'
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: dtolnay/rust-toolchain@1.81.0
+
       - name: Ensure Cargo cache directories exist
         run: |
-          mkdir -p $HOME/.cargo/bin
-          mkdir -p $HOME/.cargo/registry/index
-          mkdir -p $HOME/.cargo/registry/cache
-          mkdir -p $HOME/.cargo/git/db
+          mkdir -p "$HOME/.cargo/bin"
+          mkdir -p "$HOME/.cargo/registry/index"
+          mkdir -p "$HOME/.cargo/registry/cache"
+          mkdir -p "$HOME/.cargo/git/db"
           mkdir -p ${{ github.workspace }}/contracts/target
 
-      - name: Cache Cargo
-        uses: actions/cache@v3
+      - uses: actions/cache@v4
         with:
           path: |
             ~/.cargo/bin
@@ -263,14 +349,13 @@ jobs:
             ${{ github.workspace }}/contracts/target
           key: ${{ runner.os }}-cargo-${{ hashFiles('contracts/Cargo.lock') }}
 
-      - name: Add wasm32 target
-        run: rustup target add wasm32-unknown-unknown
+      - run: rustup target add wasm32-unknown-unknown
 
       - name: Install Stellar CLI
         run: |
           mkdir -p ~/.local/bin
           curl -L https://github.com/stellar/stellar-cli/releases/download/v22.0.1/stellar-cli-22.0.1-x86_64-unknown-linux-gnu.tar.gz | tar xz -C ~/.local/bin
-          echo "$HOME/.local/bin" >> $GITHUB_PATH
+          echo "$HOME/.local/bin" >> "$GITHUB_PATH"
           stellar version
 
       - name: Build contracts
@@ -289,47 +374,64 @@ jobs:
         working-directory: ./contracts
         run: cargo test
 
-      - name: Check WASM Size Regression
+      - name: Check WASM size regression
         run: node scripts/check-wasm-size.js
 
-      - name: Upload WASM size reports
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: wasm-size-reports
-          path: |
-            wasm-size-report.json
-            wasm-size-report.md
-          retention-days: 30
-
-      - name: Upload contract build logs on failure
-        if: failure()
-        uses: actions/upload-artifact@v4
-        with:
-          name: contract-failure-logs
-          path: contracts/target/wasm32-unknown-unknown/release/*.wasm
-          retention-days: 7
-
-  indexer:
-    name: Indexer
+  indexer-migrations:
+    name: Indexer — Migration Check
     runs-on: ubuntu-latest
-    needs: quarantine-registry
-    if: |
-      github.event_name == 'push' ||
-      contains(github.event.pull_request.title, 'indexer') ||
-      startsWith(github.head_ref, 'feat/') ||
-      startsWith(github.head_ref, 'fix/') ||
-      true
+    needs: changes
+    if: github.event_name == 'push' || needs.changes.outputs.indexer == 'true'
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: ancore
+          POSTGRES_PASSWORD: ancore
+          POSTGRES_DB: ancore_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U ancore"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
     steps:
       - uses: actions/checkout@v4
 
-      - name: Setup Rust
-        uses: dtolnay/rust-toolchain@stable
+      - name: Apply migrations (up smoke)
+        env:
+          DATABASE_URL: postgres://ancore:ancore@localhost:5432/ancore_test
+        run: bash services/indexer/scripts/check-migrations.sh
+
+  indexer:
+    name: Indexer — Build & Test
+    runs-on: ubuntu-latest
+    needs: changes
+    if: github.event_name == 'push' || needs.changes.outputs.indexer == 'true'
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v2
+        with:
+          version: 9
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'pnpm'
+          cache-dependency-path: pnpm-lock.yaml
+
+      - run: pnpm install --frozen-lockfile
+
+      - name: Lint indexer migrations
+        run: pnpm indexer:lint-migrations
+
+      - uses: dtolnay/rust-toolchain@1.81.0
         with:
           components: rustfmt, clippy
 
-      - name: Cache Cargo
-        uses: actions/cache@v3
+      - uses: actions/cache@v4
         with:
           path: |
             ~/.cargo/bin
@@ -353,145 +455,29 @@ jobs:
         working-directory: ./services/indexer
         run: cargo test
 
-  security:
-    name: Security Audit
+  ci-status:
+    name: CI Required Checks Status
     runs-on: ubuntu-latest
-    needs: quarantine-registry
+    needs:
+      [
+        audit,
+        format,
+        lint-translations,
+        package,
+        app,
+        services,
+        contracts,
+        indexer-migrations,
+        indexer,
+      ]
+    if: always()
     steps:
-      - uses: actions/checkout@v4
-
-      - name: Setup pnpm
-        uses: pnpm/action-setup@v2
-        with:
-          version: 9
-
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: '20'
-          cache: 'pnpm'
-
-      - name: Install dependencies
-        run: pnpm install --frozen-lockfile
-
-      - name: Run security audit
-        run: pnpm audit --audit-level=moderate
-        continue-on-error: true
-
-  # ── Issue #660: Relayer log-redaction CI guard ────────────────────────────
-  relayer-security:
-    name: Relayer — Log Redaction Check
-    runs-on: ubuntu-latest
-    needs: quarantine-registry
-    if: |
-      github.event_name == 'push' ||
-      contains(github.event.pull_request.changed_files, 'services/relayer') ||
-      true
-    steps:
-      - uses: actions/checkout@v4
-
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: '20'
-
-      - name: Setup pnpm
-        uses: pnpm/action-setup@v2
-        with:
-          version: 9
-
-      - name: Install relayer dependencies
-        run: pnpm install --frozen-lockfile
-        working-directory: services/relayer
-
-      - name: Run log-redaction grep check
-        # Fails CI (exit 1) if any log call site passes a raw sensitive field
-        # without going through a redact*() helper. See:
-        # services/relayer/scripts/check-log-redaction.js
-        run: node scripts/check-log-redaction.js
-        working-directory: services/relayer
-
-      - name: Run relayer tests (includes redaction unit tests)
-        run: pnpm test
-        working-directory: services/relayer
-
-  # ── Issue #650: ai-agent Docker image build + smoke test ─────────────────
-  ai-agent-docker:
-    name: AI Agent — Docker Build & Smoke Test
-    runs-on: ubuntu-latest
-    needs: quarantine-registry
-    if: |
-      github.event_name == 'push' ||
-      contains(github.event.pull_request.changed_files, 'services/ai-agent') ||
-      true
-    steps:
-      - uses: actions/checkout@v4
-
-      - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v3
-
-      - name: Build ai-agent Docker image
-        uses: docker/build-push-action@v5
-        with:
-          context: services/ai-agent
-          file: services/ai-agent/Dockerfile
-          push: false
-          load: true
-          tags: ancore/ai-agent:ci
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
-
-      - name: Run container smoke test
+      - name: Verify all executed jobs passed
         run: |
-          # Start the container in detached mode
-          docker run -d \
-            --name ai-agent-smoke \
-            -p 3001:3001 \
-            -e NODE_ENV=production \
-            ancore/ai-agent:ci
-
-          # Wait for the healthcheck to pass (up to 30 s)
-          echo "Waiting for container to become healthy..."
-          for i in $(seq 1 15); do
-            STATUS=$(docker inspect --format='{{.State.Health.Status}}' ai-agent-smoke 2>/dev/null || echo "starting")
-            echo "  attempt $i: $STATUS"
-            if [ "$STATUS" = "healthy" ]; then
-              echo "Container is healthy."
-              break
-            fi
-            sleep 2
-          done
-
-          # Verify /health returns HTTP 200
-          HTTP_CODE=$(curl -s -o /dev/null -w "%{http_code}" http://localhost:3001/health)
-          echo "HTTP status from /health: $HTTP_CODE"
-          if [ "$HTTP_CODE" != "200" ]; then
-            echo "Smoke test FAILED: expected 200, got $HTTP_CODE"
-            docker logs ai-agent-smoke
+          results="${{ join(needs.*.result, ' ') }}"
+          echo "Job results: $results"
+          if echo "$results" | grep -qE "failure|cancelled"; then
+            echo "Error: One or more CI jobs failed or were cancelled."
             exit 1
           fi
-
-          # Verify the response body contains status: ok
-          BODY=$(curl -s http://localhost:3001/health)
-          echo "Response body: $BODY"
-          echo "$BODY" | grep -q '"status":"ok"' || (echo "Smoke test FAILED: missing status:ok in response" && exit 1)
-
-          echo "Smoke test PASSED."
-
-      - name: Dump container logs on failure
-        if: failure()
-        run: docker logs ai-agent-smoke || true
-
-      - name: Stop and remove smoke container
-        if: always()
-        run: docker rm -f ai-agent-smoke || true
-
-      - name: Verify container runs as non-root
-        run: |
-          USER_ID=$(docker run --rm --entrypoint id ancore/ai-agent:ci -u)
-          echo "Container user ID: $USER_ID"
-          if [ "$USER_ID" = "0" ]; then
-            echo "FAIL: container is running as root (uid 0)"
-            exit 1
-          fi
-          echo "PASS: container runs as non-root user (uid $USER_ID)"
+          echo "All CI jobs passed or were skipped."

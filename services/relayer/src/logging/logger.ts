@@ -11,10 +11,10 @@
  *  service     — always "relayer"
  *  requestId   — UUID propagated from X-Request-Id header (#572)
  *  route       — "METHOD /path" string
- *  accountId   — caller identity, redacted to first 8 chars + "…"
+ *  accountId   — caller identity, redacted to first 8 chars + "\u2026"
  *  durationMs  — elapsed time from request start to log emission
  *  outcome     — "success" | "error" | "validation_failed"
- *  sessionKey  — first 8 chars of the hex session key + "…" (never full)
+ *  sessionKey  — first 8 chars of the hex session key + "\u2026" (never full)
  *  operation   — relay operation type
  *  statusCode  — HTTP response status
  *
@@ -69,6 +69,7 @@ const SENSITIVE_KEYS = new Set([
   'signedXdr',
   'signed_xdr',
 ]);
+const TRUNCATION_MARKER = '\u2026';
 
 /**
  * Redacts known sensitive keys from a log fields object.
@@ -87,23 +88,23 @@ function redactFields(fields: LogFields): LogFields {
 }
 
 /**
- * Redacts an accountId to the first 8 characters followed by "…".
+ * Redacts an accountId to the first 8 characters followed by "\u2026".
  * Returns undefined if the input is falsy.
  */
 export function redactAccountId(accountId: string | undefined): string | undefined {
   if (!accountId) return undefined;
   if (accountId.length <= 8) return accountId;
-  return `${accountId.slice(0, 8)}…`;
+  return `${accountId.slice(0, 8)}${TRUNCATION_MARKER}`;
 }
 
 /**
- * Redacts a session key to the first 8 hex chars followed by "…".
+ * Redacts a session key to the first 8 hex chars followed by "\u2026".
  * Returns undefined if the input is falsy.
  */
 export function redactSessionKey(sessionKey: string | undefined): string | undefined {
   if (!sessionKey) return undefined;
   if (sessionKey.length <= 8) return sessionKey;
-  return `${sessionKey.slice(0, 8)}…`;
+  return `${sessionKey.slice(0, 8)}${TRUNCATION_MARKER}`;
 }
 
 // ---------------------------------------------------------------------------

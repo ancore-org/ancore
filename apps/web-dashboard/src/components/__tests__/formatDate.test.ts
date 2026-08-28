@@ -72,11 +72,11 @@ describe('formatRelative', () => {
     expect(result).toBeTruthy();
   });
 
-  it('uses Intl.RelativeTimeFormat — result contains recognisable relative words', () => {
+  it('uses Intl.RelativeTimeFormat for day-sized offsets', () => {
     const yesterday = new Date(Date.now() - 25 * 60 * 60 * 1000).toISOString();
     const result = formatRelative(yesterday);
-    // Should contain "yesterday", "day", "ago", or a number depending on locale.
-    expect(result).toMatch(/yesterday|day|ago|\d+/i);
+    const expected = new Intl.RelativeTimeFormat(undefined, { numeric: 'auto' }).format(-1, 'day');
+    expect(result).toBe(expected);
   });
 
   it('throws RangeError for an invalid date string', () => {

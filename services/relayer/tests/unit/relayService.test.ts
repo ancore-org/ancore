@@ -2,6 +2,7 @@ import { NetworkError } from '@ancore/stellar';
 import { RelayService } from '../../src/services/relayService';
 import { JobQueue } from '../../src/queue/JobQueue';
 import { IdempotencyStore } from '../../src/store/idempotency';
+import { NonceStore, MemoryNonceStore } from '../../src/store/nonceStore';
 import type {
   SignatureServiceContract,
   RelayExecuteRequest,
@@ -31,6 +32,10 @@ function makeSubmitter(
   overrides: Partial<TransactionSubmitterContract> = {}
 ): TransactionSubmitterContract {
   return {
+    simulateAndAssembleTransaction: jest.fn().mockResolvedValue({
+      assembledXdr: 'AAAA-assembled-xdr',
+      gasUsed: 150,
+    }),
     submitSignedTransaction: jest.fn().mockResolvedValue({
       transactionHash: NETWORK_HASH,
       gasUsed: 150,
@@ -69,6 +74,23 @@ describe('RelayService', () => {
       expect(result.valid).toBe(false);
       expect(result.error?.code).toBe('NONCE_REPLAY');
     });
+
+    it('returns NONCE_REPLAY if nonce is already seen in nonceStore', async () => {
+      const nonceStore = new MemoryNonceStore();
+      nonceStore.track(VALID_KEY, 1);
+      const svc = new RelayService(
+        makeSignatureService(true),
+        undefined,
+        undefined,
+        undefined,
+        { useMockSubmission: true },
+        nonceStore
+      );
+      const result = await svc.validateRelay(makeRequest({ nonce: 1 }));
+      expect(result.valid).toBe(false);
+      expect(result.error?.code).toBe('NONCE_REPLAY');
+      expect(result.error?.message).toBe('Nonce already used');
+    });
   });
 
   describe('executeRelay', () => {
@@ -79,7 +101,30 @@ describe('RelayService', () => {
       const result = await svc.executeRelay(makeRequest());
       expect(result.success).toBe(true);
       expect(result.transactionId).toMatch(/^[0-9A-F]{64}$/);
-      expect(result.gasUsed).toBe(21_000);
+      expect(result.gasUsed).toBe(0);
+    });
+
+    it('tracks nonce in nonceStore upon successful execution', async () => {
+      const nonceStore = new MemoryNonceStore();
+      const svc = new RelayService(
+        makeSignatureService(true),
+        undefined,
+        undefined,
+        undefined,
+        { useMockSubmission: true },
+        nonceStore
+      );
+      const req = makeRequest({ nonce: 42 });
+      const r1 = await svc.executeRelay(req);
+      expect(r1.success).toBe(true);
+
+      // Now it should be in the store
+      expect(() => nonceStore.assertFresh(VALID_KEY, 42)).toThrow('Nonce already used');
+
+      // Subsequent execution with same request (nonce 42) should fail
+      const r2 = await svc.executeRelay(req);
+      expect(r2.success).toBe(false);
+      expect(r2.error?.code).toBe('NONCE_REPLAY');
     });
 
     it('returns network transaction hash from submitter on valid request', async () => {
@@ -92,7 +137,8 @@ describe('RelayService', () => {
       expect(result.success).toBe(true);
       expect(result.transactionId).toBe(NETWORK_HASH);
       expect(result.gasUsed).toBe(150);
-      expect(submitter.submitSignedTransaction).toHaveBeenCalledWith('AAAA-signed-xdr');
+      expect(submitter.simulateAndAssembleTransaction).toHaveBeenCalledWith('AAAA-signed-xdr');
+      expect(submitter.submitSignedTransaction).toHaveBeenCalledWith('AAAA-assembled-xdr');
     });
 
     it('returns INTERNAL_ERROR when signedTransactionXdr is missing', async () => {
@@ -118,8 +164,26 @@ describe('RelayService', () => {
       );
 
       expect(result.success).toBe(false);
-      expect(result.error?.code).toBe('INTERNAL_ERROR');
+      expect(result.error?.code).toBe('RPC_DOWN');
       expect(result.error?.message).toBe('Horizon down');
+    });
+
+    it('returns SIMULATION_FAILED when simulation rejects the transaction', async () => {
+      const { SimulationFailedError } = await import('@ancore/stellar');
+      const submitter = makeSubmitter({
+        simulateAndAssembleTransaction: jest
+          .fn()
+          .mockRejectedValue(new SimulationFailedError('contract revert')),
+      });
+      const svc = new RelayService(makeSignatureService(true), undefined, undefined, submitter);
+      const result = await svc.executeRelay(
+        makeRequest({ parameters: { signedTransactionXdr: 'AAAA-signed-xdr' } })
+      );
+
+      expect(result.success).toBe(false);
+      expect(result.error?.code).toBe('SIMULATION_FAILED');
+      expect(result.error?.message).toBe('contract revert');
+      expect(submitter.submitSignedTransaction).not.toHaveBeenCalled();
     });
 
     it('returns success=false and propagates error on invalid request', async () => {

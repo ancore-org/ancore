@@ -13,14 +13,14 @@ fn validate(env: Env, context: ValidationContext) -> Result<(), ValidationModule
 
 `ValidationContext` is the account-to-module boundary:
 
-| Field | Meaning |
-| --- | --- |
-| `account` | Account contract requesting validation |
+| Field        | Meaning                                                  |
+| ------------ | -------------------------------------------------------- |
+| `account`    | Account contract requesting validation                   |
 | `authorizer` | Owner or session-key authority represented as an address |
-| `target` | Contract address the account wants to invoke |
-| `function` | Function symbol the account wants to invoke |
-| `args_hash` | Fixed-size digest of the execution arguments |
-| `nonce` | Account nonce bound to the execution |
+| `target`     | Contract address the account wants to invoke             |
+| `function`   | Function symbol the account wants to invoke              |
+| `args_hash`  | Fixed-size digest of the execution arguments             |
+| `nonce`      | Account nonce bound to the execution                     |
 
 The interface keeps validation bounded by passing a fixed-size context instead
 of an unbounded argument vector. Modules that need argument-aware rules should
@@ -53,13 +53,13 @@ Policy semantics:
 
 Let `n` be the number of allowlisted targets.
 
-| Operation | Time | Space |
-| --- | --- | --- |
-| `initialize` | O(1) | O(1) |
-| `set_enabled` | O(1) | O(1) |
+| Operation            | Time | Space           |
+| -------------------- | ---- | --------------- |
+| `initialize`         | O(1) | O(1)            |
+| `set_enabled`        | O(1) | O(1)            |
 | `set_allowed_target` | O(1) | O(1) per target |
-| `is_allowed_target` | O(1) | O(1) |
-| `validate` | O(1) | O(1) |
+| `is_allowed_target`  | O(1) | O(1)            |
+| `validate`           | O(1) | O(1)            |
 
 Total module storage is O(n).
 

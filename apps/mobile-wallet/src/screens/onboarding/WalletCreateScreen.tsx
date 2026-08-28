@@ -19,7 +19,7 @@ export function WalletCreateScreen({ onBack = noop, onCancel = noop, onContinue 
         <p className="text-sm uppercase tracking-wide text-slate-500">Create</p>
         <h1 className="text-2xl font-semibold text-slate-950">Create a new wallet</h1>
         <p className="text-sm text-slate-600">
-          This screen is wired for navigation only and keeps handler behavior safe by default.
+          Enter a name for your wallet. You will be guided through creating a recovery phrase.
         </p>
       </header>
 

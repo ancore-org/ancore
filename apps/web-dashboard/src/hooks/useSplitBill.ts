@@ -13,7 +13,12 @@ export interface UseSplitBillReturn {
   bills: SplitBill[];
   isLoading: boolean;
   createBill: (input: CreateSplitBillInput) => SplitBill;
-  updateParticipant: (billId: string, participantId: string, status: ParticipantStatus, extra?: { failedReason?: string }) => void;
+  updateParticipant: (
+    billId: string,
+    participantId: string,
+    status: ParticipantStatus,
+    extra?: { failedReason?: string }
+  ) => void;
   cancelBill: (billId: string) => void;
   getBill: (billId: string) => SplitBill | undefined;
 }
@@ -37,8 +42,19 @@ export function useSplitBill(): UseSplitBillReturn {
   }, []);
 
   const updateParticipant = useCallback(
-    (billId: string, participantId: string, status: ParticipantStatus, extra?: { failedReason?: string }) => {
-      const updated = storageUpdateParticipant(loadSplitBills(), billId, participantId, status, extra);
+    (
+      billId: string,
+      participantId: string,
+      status: ParticipantStatus,
+      extra?: { failedReason?: string }
+    ) => {
+      const updated = storageUpdateParticipant(
+        loadSplitBills(),
+        billId,
+        participantId,
+        status,
+        extra
+      );
       saveSplitBills(updated);
       setBills(updated);
     },
@@ -51,10 +67,7 @@ export function useSplitBill(): UseSplitBillReturn {
     setBills(updated);
   }, []);
 
-  const getBill = useCallback(
-    (billId: string) => bills.find((b) => b.id === billId),
-    [bills]
-  );
+  const getBill = useCallback((billId: string) => bills.find((b) => b.id === billId), [bills]);
 
   return { bills, isLoading, createBill, updateParticipant, cancelBill, getBill };
 }

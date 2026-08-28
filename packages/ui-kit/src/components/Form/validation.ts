@@ -102,18 +102,18 @@ const STRENGTH_LABELS: PasswordStrength['label'][] = [
 
 const STRENGTH_COLOR_CLASSES: string[] = [
   'text-destructive',
-  'text-orange-500',
-  'text-yellow-500',
-  'text-blue-500',
-  'text-green-500',
+  'text-warning',
+  'text-info',
+  'text-primary',
+  'text-success',
 ];
 
 const STRENGTH_BG_CLASSES: string[] = [
   'bg-destructive',
-  'bg-orange-500',
-  'bg-yellow-500',
-  'bg-blue-500',
-  'bg-green-500',
+  'bg-warning',
+  'bg-info',
+  'bg-primary',
+  'bg-success',
 ];
 
 /**

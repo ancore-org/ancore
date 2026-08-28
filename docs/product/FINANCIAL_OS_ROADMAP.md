@@ -16,28 +16,6 @@ Use traditional software where it improves usability, speed of product iteration
 - Statement export (CSV/PDF)
 - Device/session security controls
 
-## Delivery cadence (2-3 features at a time)
-
-To avoid scattered delivery, each wave ships 2-3 focused features end-to-end.
-
-### Stellar Wave A (active)
-
-1. Handle payments (`@username`) - issue #409
-2. Contacts and favorites - issue #410
-3. Payment request links + QR - issue #411
-
-### Stellar Wave B (next)
-
-1. Scheduled transfers - issue #412
-2. Recurring transfers - issue #412
-3. Transfer limits + step-up verification - issue #413
-
-### Stellar Wave C (business kickoff)
-
-1. Invoice MVP - issue #415
-2. Statement exports - issue #417
-3. Bulk payouts CSV flow - issue #416
-
 ## Phase 2 - Fintech UX
 
 - Scheduled and recurring transfers
@@ -72,9 +50,3 @@ The following module paths are preserved intentionally as scaffolds:
 - `services/ai-agent/`
 
 They represent roadmap commitments, not production-complete implementations.
-
-## Labeling standard for roadmap issues
-
-- Always include: `Stellar Wave`
-- Complexity: `easy` or `medium`
-- Domain tags as applicable: `extension`, `transaction`, `security`, `contract`, `ui`

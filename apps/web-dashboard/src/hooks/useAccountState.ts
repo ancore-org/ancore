@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import type { AccountData } from '../types/dashboard';
 
 const STORAGE_KEY = 'ancore-dashboard-selected-account';
@@ -44,6 +44,7 @@ export function useAccountState(): UseAccountStateReturn {
   const [currentAccount, setCurrentAccountState] = useState<AccountData | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<Error | null>(null);
+  const mountedRef = useRef(true);
 
   const getStoredAccount = useCallback((): AccountData | null => {
     try {
@@ -82,11 +83,19 @@ export function useAccountState(): UseAccountStateReturn {
   }, []);
 
   const fetchAccounts = useCallback(async () => {
+    if (!mountedRef.current) {
+      return;
+    }
+
     setLoading(true);
     setError(null);
     try {
       // Simulate API call
       await new Promise((resolve) => setTimeout(resolve, 300));
+      if (!mountedRef.current) {
+        return;
+      }
+
       setAccounts(MOCK_ACCOUNTS);
 
       // Set current account from storage or default to first account
@@ -102,9 +111,13 @@ export function useAccountState(): UseAccountStateReturn {
         setCurrentAccountState(MOCK_ACCOUNTS[0]);
       }
     } catch (err) {
-      setError(err instanceof Error ? err : new Error('Failed to fetch accounts'));
+      if (mountedRef.current) {
+        setError(err instanceof Error ? err : new Error('Failed to fetch accounts'));
+      }
     } finally {
-      setLoading(false);
+      if (mountedRef.current) {
+        setLoading(false);
+      }
     }
   }, [getStoredAccount]);
 
@@ -121,7 +134,12 @@ export function useAccountState(): UseAccountStateReturn {
   }, [fetchAccounts]);
 
   useEffect(() => {
+    mountedRef.current = true;
     fetchAccounts();
+
+    return () => {
+      mountedRef.current = false;
+    };
   }, [fetchAccounts]);
 
   return {

@@ -10,6 +10,7 @@ import {
   type RetryPresetName,
   getRetryPreset,
 } from '../retry-presets';
+import { AncoreSdkError, InvalidRetryPresetError } from '../errors';
 import type { RetryOptions } from '@ancore/stellar';
 
 describe('retry-presets', () => {
@@ -109,10 +110,20 @@ describe('retry-presets', () => {
       expect(LOW_LATENCY.maxRetries).toBe(2); // Original should be unchanged
     });
 
-    it('should throw error for unknown preset name', () => {
+    it('should throw InvalidRetryPresetError for unknown preset name (issue #1259)', () => {
       expect(() => {
         getRetryPreset('UNKNOWN' as RetryPresetName);
       }).toThrow('Unknown retry preset: UNKNOWN');
+
+      try {
+        getRetryPreset('UNKNOWN' as RetryPresetName);
+        throw new Error('should have thrown');
+      } catch (error) {
+        expect(error).toBeInstanceOf(InvalidRetryPresetError);
+        expect(error).toBeInstanceOf(AncoreSdkError);
+        expect((error as InvalidRetryPresetError).code).toBe('INVALID_RETRY_PRESET');
+        expect((error as InvalidRetryPresetError).presetName).toBe('UNKNOWN');
+      }
     });
   });
 

@@ -1,129 +1,152 @@
 import * as React from 'react';
-import {
-  Button,
-  Card,
-  CardContent,
-  CardHeader,
-  CardTitle,
-  Badge,
-  AddressDisplay,
-  cn,
-} from '@ancore/ui-kit';
-import { ArrowLeft, Printer } from 'lucide-react';
+import { cn } from '@ancore/ui-kit';
+import { X, Link2, Share2 } from 'lucide-react';
 import { PaymentQRCode } from '@/components/PaymentQRCode';
-import type { StellarNetwork } from '@/utils/explorer-links';
-
-export interface ReceiveScreenAccount {
-  /** Stellar public key / address */
-  publicKey: string;
-  /** Human-readable account name or label (optional) */
-  name?: string;
-}
+import downloadQrPng from '@/utils/export-qr';
+import { useCopyWithFeedback } from '@/hooks/useCopyWithFeedback';
+import { truncateAddress } from '@/utils/address';
+import type { Network } from '@ancore/types';
 
 export interface ReceiveScreenProps {
-  /** The account whose address should be displayed and encoded into the QR code */
-  account: ReceiveScreenAccount;
-  /** Active network – shown as a badge in the UI */
-  network?: StellarNetwork;
-  /** Called when the user taps/clicks the back arrow */
+  smartAccountId?: string | null;
+  ownerPublicKey?: string | null;
+  /** Display name shown above the QR (wallet name). */
+  walletName?: string | null;
+  network?: Network;
   onBack?: () => void;
   className?: string;
 }
 
-const NETWORK_LABEL: Record<StellarNetwork, string> = {
-  mainnet: 'Mainnet',
-  testnet: 'Testnet',
-  futurenet: 'Futurenet',
-};
-
-const NETWORK_BADGE_CLASS: Record<StellarNetwork, string> = {
-  mainnet:
-    'border-emerald-200 bg-emerald-50 text-emerald-700 dark:border-emerald-800 dark:bg-emerald-950 dark:text-emerald-300',
-  testnet:
-    'border-amber-200 bg-amber-50 text-amber-700 dark:border-amber-800 dark:bg-amber-950 dark:text-amber-300',
-  futurenet:
-    'border-violet-200 bg-violet-50 text-violet-700 dark:border-violet-800 dark:bg-violet-950 dark:text-violet-300',
-};
+function buildPaymentUri(destination: string, network: Network): string {
+  return `web+stellar:pay?destination=${encodeURIComponent(destination)}&network=${encodeURIComponent(network)}`;
+}
 
 /**
- * ReceiveScreen – wallet receive screen showing a QR code and copyable address.
- *
- * Usage:
- * ```tsx
- * <ReceiveScreen
- *   account={{ publicKey: 'GABC...123', name: 'My Wallet' }}
- *   network="testnet"
- *   onBack={() => navigate(-1)}
- * />
- * ```
+ * Receive — QR-first layout (ref: clean receive sheet).
+ * Dark canvas, centered identity + QR, soft share CTA, asset warning.
  */
 export function ReceiveScreen({
-  account,
-  network = 'mainnet',
+  smartAccountId,
+  ownerPublicKey,
+  walletName,
+  network = 'testnet',
   onBack,
   className,
 }: ReceiveScreenProps) {
-  const handlePrint = React.useCallback(() => {
-    window.print();
-  }, []);
+  const { copy, copied } = useCopyWithFeedback();
+  const qrRef = React.useRef<SVGSVGElement>(null);
+  const paymentUri = smartAccountId ? buildPaymentUri(smartAccountId, network) : '';
+  const displayName = walletName?.trim() || 'Ancore Wallet';
+
+  const handleShare = React.useCallback(async () => {
+    if (!smartAccountId) return;
+    try {
+      if (navigator.share) {
+        await navigator.share({
+          title: 'Ancore receive address',
+          text: smartAccountId,
+        });
+        return;
+      }
+    } catch {
+      /* user cancelled or share unavailable */
+    }
+    await copy(smartAccountId);
+  }, [smartAccountId, copy]);
+
+  const handleCopyAddress = React.useCallback(() => {
+    if (smartAccountId) void copy(smartAccountId);
+  }, [smartAccountId, copy]);
+
+  if (!smartAccountId) {
+    return (
+      <div className={cn('wallet-sheet', className)}>
+        <header className="wallet-header">
+          <h1 className="wallet-title">Receive</h1>
+          {onBack && (
+            <button type="button" className="wallet-icon-btn" aria-label="Close" onClick={onBack}>
+              <X className="h-5 w-5" />
+            </button>
+          )}
+        </header>
+        <div className="flex flex-1 flex-col items-center justify-center px-8 text-center">
+          <p className="text-[15px] text-muted-foreground">
+            Complete onboarding to get your receive address
+          </p>
+        </div>
+      </div>
+    );
+  }
 
   return (
-    <Card className={cn('mx-auto w-full max-w-md border-slate-200', className)}>
-      {/* ── Header ─────────────────────────────────────────────────── */}
-      <CardHeader className="space-y-0 pb-4">
-        <div className="flex items-center gap-3">
-          <Button type="button" variant="ghost" size="icon" aria-label="Go back" onClick={onBack}>
-            <ArrowLeft className="h-4 w-4" aria-hidden="true" />
-          </Button>
-          <CardTitle className="text-lg">Receive</CardTitle>
+    <div className={cn('wallet-sheet', className)}>
+      <header className="wallet-header">
+        <h1 className="wallet-title">Receive</h1>
+        {onBack && (
+          <button type="button" className="wallet-icon-btn" aria-label="Close" onClick={onBack}>
+            <X className="h-5 w-5" />
+          </button>
+        )}
+      </header>
 
-          <div className="ml-auto">
-            <Badge
-              variant="outline"
-              className={cn(
-                'rounded-full px-3 py-0.5 text-xs font-medium',
-                NETWORK_BADGE_CLASS[network]
-              )}
-              aria-label={`Network: ${NETWORK_LABEL[network]}`}
-            >
-              {NETWORK_LABEL[network]}
-            </Badge>
-          </div>
-        </div>
-      </CardHeader>
-
-      {/* ── Body ──────────────────────────────────────────────────── */}
-      <CardContent className="flex flex-col items-center gap-6 pb-8">
-        {/* QR Code */}
-        <PaymentQRCode
-          value={account.publicKey}
-          size={220}
-          aria-label={`QR code for ${account.name ?? 'your address'}`}
-        />
-
-        {/* Address + copy */}
-        <div className="w-full space-y-2">
-          {account.name && (
-            <p className="text-center text-sm font-medium text-slate-600 dark:text-slate-400">
-              {account.name}
-            </p>
-          )}
-          <AddressDisplay address={account.publicKey} copyable truncate={8} label="Your address" />
+      <div className="flex flex-1 flex-col items-center px-6 pb-8 pt-6">
+        <div className="mb-6 text-center">
+          <p className="text-[20px] font-semibold tracking-tight text-foreground">{displayName}</p>
+          <button
+            type="button"
+            onClick={handleCopyAddress}
+            className="mt-1 inline-flex items-center gap-1.5 text-[14px] text-muted-foreground transition-colors hover:text-foreground"
+            aria-label="Copy address"
+          >
+            <span className="font-mono">{truncateAddress(smartAccountId, 8, 6)}</span>
+            <Link2 className="h-3.5 w-3.5 opacity-70" aria-hidden />
+            {copied && <span className="text-[12px] text-emerald-400">Copied</span>}
+          </button>
         </div>
 
-        {/* Print button */}
-        <Button
-          type="button"
-          variant="outline"
-          size="sm"
-          className="w-full"
-          onClick={handlePrint}
-          aria-label="Print QR code"
-        >
-          <Printer className="mr-2 h-4 w-4" aria-hidden="true" />
-          Print QR Code
-        </Button>
-      </CardContent>
-    </Card>
+        <div className="mb-8 rounded-[28px] bg-white p-4 shadow-[0_20px_50px_rgba(0,0,0,0.45)]">
+          <PaymentQRCode
+            value={paymentUri}
+            size={220}
+            qrRef={qrRef}
+            aria-label={`QR code for smart account ${smartAccountId}`}
+          />
+        </div>
+
+        <p className="mb-8 max-w-[300px] text-center text-[13px] leading-relaxed text-muted-foreground">
+          Use this address to receive XLM and Stellar assets such as USDC. Sending other network
+          assets may result in permanent loss.
+        </p>
+
+        {ownerPublicKey && (
+          <p className="mb-6 max-w-[300px] text-center text-[11px] text-muted-foreground/70">
+            Owner key: <span className="font-mono">{truncateAddress(ownerPublicKey, 6, 6)}</span>
+          </p>
+        )}
+
+        <div className="mt-auto w-full space-y-3">
+          <button type="button" className="wallet-pill-btn-secondary" onClick={handleShare}>
+            <Share2 className="mr-2 h-4 w-4" aria-hidden />
+            Share Address
+          </button>
+          <button
+            type="button"
+            className="w-full py-2 text-[13px] text-muted-foreground hover:text-foreground"
+            onClick={async () => {
+              try {
+                await downloadQrPng(paymentUri, {
+                  filename: `ancore-receive-${smartAccountId.slice(0, 8)}.png`,
+                  scale: 3,
+                });
+              } catch {
+                /* non-blocking */
+              }
+            }}
+          >
+            Download QR
+          </button>
+        </div>
+      </div>
+    </div>
   );
 }

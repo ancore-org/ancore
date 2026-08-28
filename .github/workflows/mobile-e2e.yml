@@ -1,0 +1,17 @@
+name: Mobile e2e
+
+on:
+  workflow_dispatch:
+
+jobs:
+  maestro-placeholder:
+    name: Maestro placeholder
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Report pending mobile Maestro setup
+        run: |
+          echo "Maestro mobile e2e flows are scaffolded in apps/mobile-wallet/e2e/flows."
+          echo "The onboarding and send flows remain gated behind the corresponding mobile issues and are not executed in CI yet."

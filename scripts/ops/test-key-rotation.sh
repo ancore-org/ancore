@@ -326,7 +326,7 @@ test_validation_script() {
 test_runbook_completeness() {
   section "Testing Runbook Completeness"
   
-  RUNBOOK="${SCRIPT_DIR}/../../docs/ops/runbooks/key-rotation.md"
+  RUNBOOK="${SCRIPT_DIR}/../../docs/security/INCIDENT_RESPONSE.md"
   
   # Test 1: Verify runbook exists
   log "Test 1: Verify runbook exists"

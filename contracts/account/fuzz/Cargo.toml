@@ -1,0 +1,55 @@
+[package]
+name = "ancore-account-fuzz"
+version = "0.0.0"
+publish = false
+edition = "2021"
+
+[package.metadata]
+cargo-fuzz = true
+
+[dependencies]
+libfuzzer-sys = "0.4"
+arbitrary = { version = "1", features = ["derive"] }
+ancore-account = { path = "..", features = ["fuzzing"] }
+
+[[bin]]
+name = "fuzz_spend_policy"
+path = "fuzz_targets/fuzz_spend_policy.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "fuzz_permissions"
+path = "fuzz_targets/fuzz_permissions.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "fuzz_spend_limits"
+path = "fuzz_targets/fuzz_spend_limits.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "fuzz_execute_args"
+path = "fuzz_targets/fuzz_execute_args.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "fuzz_allowlist"
+path = "fuzz_targets/fuzz_allowlist.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "fuzz_add_session_key"
+path = "fuzz_targets/fuzz_add_session_key.rs"
+test = false
+doc = false
+bench = false

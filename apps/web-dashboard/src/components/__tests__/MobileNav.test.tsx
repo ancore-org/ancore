@@ -1,7 +1,7 @@
 import React from 'react';
 import { render, screen, fireEvent } from '@testing-library/react';
 import { BrowserRouter } from 'react-router-dom';
-import { describe, it, expect, vi } from 'vitest';
+import { describe, it, expect } from 'vitest';
 import { MobileNav } from '../MobileNav';
 
 const NAV_LINKS = [
@@ -55,9 +55,9 @@ describe('MobileNav', () => {
     renderWithRouter(<MobileNav links={NAV_LINKS} />);
 
     fireEvent.click(screen.getByLabelText('Toggle navigation menu'));
-    const drawer = screen.getByRole('dialog');
+    screen.getByRole('dialog');
     const closeBtn = screen.getByLabelText('Close navigation menu');
-    const firstLink = screen.getByText('Dashboard');
+    screen.getByText('Dashboard');
     const lastLink = screen.getByText('Transactions');
 
     // Focus last link

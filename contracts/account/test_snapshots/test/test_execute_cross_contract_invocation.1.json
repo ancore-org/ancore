@@ -4,7 +4,25 @@
     "nonce": 0
   },
   "auth": [
-    [],
+    [
+      [
+        "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAFCT4",
+        {
+          "function": {
+            "contract_fn": {
+              "contract_address": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAD2KM",
+              "function_name": "initialize",
+              "args": [
+                {
+                  "address": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAFCT4"
+                }
+              ]
+            }
+          },
+          "sub_invocations": []
+        }
+      ]
+    ],
     [
       [
         "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAFCT4",
@@ -15,7 +33,7 @@
               "function_name": "add_session_key",
               "args": [
                 {
-                  "bytes": "bb09a6740ff39a6db7aa1d475b092f39b72f45fdd1427aefa82ec7c42dcef9c0"
+                  "bytes": "a6cabbe9ec2454fe9a8e261a8e48e9e491d85013ea177289d3e7338d14bcfdf4"
                 },
                 {
                   "u64": 10000
@@ -26,6 +44,12 @@
                       "u32": 1
                     }
                   ]
+                },
+                "void",
+                "void",
+                "void",
+                {
+                  "u64": 0
                 }
               ]
             }
@@ -56,7 +80,7 @@
                   "symbol": "SessionKey"
                 },
                 {
-                  "bytes": "bb09a6740ff39a6db7aa1d475b092f39b72f45fdd1427aefa82ec7c42dcef9c0"
+                  "bytes": "a6cabbe9ec2454fe9a8e261a8e48e9e491d85013ea177289d3e7338d14bcfdf4"
                 }
               ]
             },
@@ -76,7 +100,7 @@
                       "symbol": "SessionKey"
                     },
                     {
-                      "bytes": "bb09a6740ff39a6db7aa1d475b092f39b72f45fdd1427aefa82ec7c42dcef9c0"
+                      "bytes": "a6cabbe9ec2454fe9a8e261a8e48e9e491d85013ea177289d3e7338d14bcfdf4"
                     }
                   ]
                 },
@@ -85,11 +109,29 @@
                   "map": [
                     {
                       "key": {
+                        "symbol": "allowed_contracts"
+                      },
+                      "val": "void"
+                    },
+                    {
+                      "key": {
+                        "symbol": "cumulative_limit"
+                      },
+                      "val": "void"
+                    },
+                    {
+                      "key": {
                         "symbol": "expires_at"
                       },
                       "val": {
                         "u64": 10000
                       }
+                    },
+                    {
+                      "key": {
+                        "symbol": "max_amount_per_call"
+                      },
+                      "val": "void"
                     },
                     {
                       "key": {
@@ -108,7 +150,34 @@
                         "symbol": "public_key"
                       },
                       "val": {
-                        "bytes": "bb09a6740ff39a6db7aa1d475b092f39b72f45fdd1427aefa82ec7c42dcef9c0"
+                        "bytes": "a6cabbe9ec2454fe9a8e261a8e48e9e491d85013ea177289d3e7338d14bcfdf4"
+                      }
+                    },
+                    {
+                      "key": {
+                        "symbol": "spend_window_seconds"
+                      },
+                      "val": {
+                        "u64": 0
+                      }
+                    },
+                    {
+                      "key": {
+                        "symbol": "spend_window_start"
+                      },
+                      "val": {
+                        "u64": 0
+                      }
+                    },
+                    {
+                      "key": {
+                        "symbol": "spent_in_window"
+                      },
+                      "val": {
+                        "i128": {
+                          "hi": 0,
+                          "lo": 0
+                        }
                       }
                     }
                   ]
@@ -211,6 +280,39 @@
                 "key": {
                   "ledger_key_nonce": {
                     "nonce": 801925984706572462
+                  }
+                },
+                "durability": "temporary",
+                "val": "void"
+              }
+            },
+            "ext": "v0"
+          },
+          6311999
+        ]
+      ],
+      [
+        {
+          "contract_data": {
+            "contract": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAFCT4",
+            "key": {
+              "ledger_key_nonce": {
+                "nonce": 5541220902715666415
+              }
+            },
+            "durability": "temporary"
+          }
+        },
+        [
+          {
+            "last_modified_ledger_seq": 0,
+            "data": {
+              "contract_data": {
+                "ext": "v0",
+                "contract": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAFCT4",
+                "key": {
+                  "ledger_key_nonce": {
+                    "nonce": 5541220902715666415
                   }
                 },
                 "durability": "temporary",
@@ -366,7 +468,7 @@
             "data": {
               "vec": [
                 {
-                  "bytes": "bb09a6740ff39a6db7aa1d475b092f39b72f45fdd1427aefa82ec7c42dcef9c0"
+                  "bytes": "a6cabbe9ec2454fe9a8e261a8e48e9e491d85013ea177289d3e7338d14bcfdf4"
                 },
                 {
                   "u64": 10000
@@ -377,6 +479,12 @@
                       "u32": 1
                     }
                   ]
+                },
+                "void",
+                "void",
+                "void",
+                {
+                  "u64": 0
                 }
               ]
             }
@@ -400,7 +508,7 @@
             "data": {
               "vec": [
                 {
-                  "bytes": "bb09a6740ff39a6db7aa1d475b092f39b72f45fdd1427aefa82ec7c42dcef9c0"
+                  "bytes": "a6cabbe9ec2454fe9a8e261a8e48e9e491d85013ea177289d3e7338d14bcfdf4"
                 },
                 {
                   "u64": 10000
@@ -459,7 +567,7 @@
                       "symbol": "SessionKey"
                     },
                     {
-                      "bytes": "bb09a6740ff39a6db7aa1d475b092f39b72f45fdd1427aefa82ec7c42dcef9c0"
+                      "bytes": "a6cabbe9ec2454fe9a8e261a8e48e9e491d85013ea177289d3e7338d14bcfdf4"
                     }
                   ]
                 },
@@ -476,10 +584,10 @@
                   "u64": 0
                 },
                 {
-                  "bytes": "bb09a6740ff39a6db7aa1d475b092f39b72f45fdd1427aefa82ec7c42dcef9c0"
+                  "bytes": "a6cabbe9ec2454fe9a8e261a8e48e9e491d85013ea177289d3e7338d14bcfdf4"
                 },
                 {
-                  "bytes": "fea819d9f6c42248e4c1a067d5c33170784cc5e5cf084aaedd88b9174b0296619f53fa30b777b0175271bffe62cd217c23dd73e3839ac8eb852d52d7e7201001"
+                  "bytes": "3358445972427db18fa10e2a5eb4a0e7854a96c64593b7f6147598f1374912586eaf05097c47b1f575e18cc2b22fb61c4755b8a1725a40485b22b95ae4cad50c"
                 },
                 {
                   "bytes": "000000120000000100000000000000000000000000000000000000000000000000000000000000030000000f000000096765745f6e6f6e6365000000000000100000000100000000000000050000000000000000"

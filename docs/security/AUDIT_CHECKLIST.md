@@ -2,8 +2,6 @@
 
 _Last updated: 2026-04-26_
 
-> **Cross-reference:** See [Compliance Matrix](../release/compliance-matrix.md) for mapping to MVP gate and release checklist items.
-
 This checklist is the working artifact for internal pre-audit review of the extension wallet and shared SDK/contract stack.
 
 ## Scope
@@ -32,12 +30,14 @@ This checklist is the working artifact for internal pre-audit review of the exte
 - [x] ✅ No private keys in logs/errors.
 - [x] ✅ Decryption failure messages are generic.
 - [x] ✅ Encrypted payloads are versioned and validated.
+- [x] ✅ Secret byte comparisons use constant-time helper (`timingSafeEqual`).
 
 ### Evidence
 
 - AES-GCM + 256-bit key usage in `encryptSecretKey` and `decryptSecretKey`. (`packages/crypto/src/encryption.ts`)
 - PBKDF2 iteration floor/ceiling (`100000`/`600000`) enforced in payload validation. (`packages/crypto/src/encryption.ts`)
 - `getRandomValues` used for salt/IV generation in crypto and secure storage manager. (`packages/crypto/src/encryption.ts`, `packages/core-sdk/src/storage/secure-storage-manager.ts`)
+- `timingSafeEqual` for constant-time `Uint8Array` comparison. (`packages/crypto/src/timing-safe.ts`, `packages/crypto/src/__tests__/timing-safe.test.ts`)
 
 ---
 

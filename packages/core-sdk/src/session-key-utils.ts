@@ -28,6 +28,10 @@ export type SessionKeyInactiveReason = 'EXPIRED' | 'REVOKED' | 'UNKNOWN_KEY';
  *  - Its `expiresAt` timestamp (Unix seconds) is in the future relative to `nowMs`.
  *  - It has not been explicitly revoked (indicated by `expiresAt === 0`).
  *
+ * Use this check before calling `refreshSessionKeyTtl` — the on-chain TTL refresh
+ * extends Soroban storage lifetime but does not change logical `expires_at`; expired
+ * or revoked keys are rejected both locally and by the contract.
+ *
  * @param key - The session key object (must have `expiresAt: number` in Unix seconds).
  * @param options - Optional overrides (e.g. `nowMs` for testing).
  * @returns `true` when the key is active, `false` otherwise.

@@ -6,7 +6,7 @@ export default defineConfig({
   test: {
     globals: true,
     environment: 'jsdom',
-    setupFiles: ['./src/test/setup.ts'],
+    setupFiles: ['../../packages/ensure-webcrypto.ts', './src/test/setup.ts'],
     testTimeout: 30000,
   },
 });

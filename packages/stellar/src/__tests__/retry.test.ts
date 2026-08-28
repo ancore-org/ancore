@@ -2,7 +2,13 @@
  * Tests for retry logic
  */
 
-import { withRetry, calculateDelay } from '../retry';
+import {
+  withRetry,
+  calculateDelay,
+  RETRY_PRESETS,
+  resolveRetryOptions,
+  retryOptionsFromPreset,
+} from '../retry';
 import {
   RetryExhaustedError,
   NetworkError,
@@ -29,6 +35,21 @@ describe('retry', () => {
       expect(calculateDelay(1, 500, true)).toBe(500);
       expect(calculateDelay(2, 500, true)).toBe(1000);
       expect(calculateDelay(3, 500, true)).toBe(2000);
+    });
+
+    it('should clamp delay to maxDelayMs', () => {
+      expect(calculateDelay(10, 1000, true, 5000)).toBe(5000);
+      expect(calculateDelay(20, 1000, true, 5000)).toBe(5000);
+    });
+
+    it('should never exceed default 30s ceiling', () => {
+      for (let attempt = 1; attempt <= 20; attempt++) {
+        expect(calculateDelay(attempt, 1000, true)).toBeLessThanOrEqual(30_000);
+      }
+    });
+
+    it('should clamp linear delay to maxDelayMs', () => {
+      expect(calculateDelay(1, 50000, false, 30000)).toBe(30000);
     });
   });
 
@@ -531,6 +552,250 @@ describe('retry', () => {
           expect(exhaustedError.lastError).toBeInstanceOf(NetworkError);
           expect((exhaustedError.lastError as NetworkError).statusCode).toBe(502);
         }
+      });
+    });
+  });
+
+  describe('RETRY_PRESETS', () => {
+    it('should expose wallet and indexer presets', () => {
+      expect(RETRY_PRESETS.wallet).toEqual({ maxAttempts: 3, baseDelayMs: 200 });
+      expect(RETRY_PRESETS.indexer).toEqual({ maxAttempts: 5, baseDelayMs: 500 });
+    });
+
+    it('should convert presets into retry options', () => {
+      expect(retryOptionsFromPreset(RETRY_PRESETS.wallet)).toEqual({
+        maxRetries: 2,
+        baseDelayMs: 200,
+        exponential: true,
+      });
+      expect(retryOptionsFromPreset(RETRY_PRESETS.indexer)).toEqual({
+        maxRetries: 4,
+        baseDelayMs: 500,
+        exponential: true,
+      });
+    });
+
+    it('should merge preset defaults with overrides', () => {
+      expect(resolveRetryOptions('wallet', { maxRetries: 1 })).toEqual({
+        maxRetries: 1,
+        baseDelayMs: 200,
+        exponential: true,
+      });
+    });
+
+    describe('429 handling with mocked fetch', () => {
+      const originalFetch = global.fetch;
+
+      beforeEach(() => {
+        global.fetch = jest.fn();
+      });
+
+      afterEach(() => {
+        global.fetch = originalFetch;
+      });
+
+      const fetchHorizonAccount = async () => {
+        const response = await fetch('https://horizon-testnet.stellar.org/accounts/GABC123');
+        if (!response.ok) {
+          throw new NetworkError('Horizon request failed', { statusCode: response.status });
+        }
+        return response.json();
+      };
+
+      it('should retry on 429 and succeed using the wallet preset', async () => {
+        (global.fetch as jest.Mock)
+          .mockResolvedValueOnce({ ok: false, status: 429 })
+          .mockResolvedValueOnce({
+            ok: true,
+            json: () => Promise.resolve({ id: 'GABC123' }),
+          });
+
+        const result = await withRetry(fetchHorizonAccount, {
+          ...retryOptionsFromPreset(RETRY_PRESETS.wallet),
+          baseDelayMs: 0,
+        });
+
+        expect(result).toEqual({ id: 'GABC123' });
+        expect(global.fetch).toHaveBeenCalledTimes(2);
+      });
+
+      it('should throw RetryExhaustedError when 429 persists through wallet preset', async () => {
+        (global.fetch as jest.Mock).mockResolvedValue({ ok: false, status: 429 });
+
+        await expect(
+          withRetry(fetchHorizonAccount, {
+            ...retryOptionsFromPreset(RETRY_PRESETS.wallet),
+            baseDelayMs: 0,
+          })
+        ).rejects.toBeInstanceOf(RetryExhaustedError);
+
+        expect(global.fetch).toHaveBeenCalledTimes(RETRY_PRESETS.wallet.maxAttempts);
+      });
+    });
+  });
+
+  // ─────────────────────────────────────────────────────────────────────────
+  // Issue #1038 — Horizon 504 retry: maxAttempts and backoff matrix
+  // ─────────────────────────────────────────────────────────────────────────
+
+  describe('Horizon 504 retry — maxAttempts and backoff (issue #1038)', () => {
+    const originalSetTimeout = global.setTimeout;
+
+    afterEach(() => {
+      global.setTimeout = originalSetTimeout;
+    });
+
+    describe('maxAttempts enforcement', () => {
+      it('wallet preset stops after exactly 3 attempts on persistent 504', async () => {
+        const fn = jest
+          .fn()
+          .mockRejectedValue(new NetworkError('Gateway timeout', { statusCode: 504 }));
+
+        await expect(
+          withRetry(fn, {
+            ...retryOptionsFromPreset(RETRY_PRESETS.wallet),
+            baseDelayMs: 0,
+            isRetryable: (err) => err instanceof NetworkError,
+          })
+        ).rejects.toBeInstanceOf(RetryExhaustedError);
+
+        expect(fn).toHaveBeenCalledTimes(RETRY_PRESETS.wallet.maxAttempts); // 3
+      });
+
+      it('indexer preset stops after exactly 5 attempts on persistent 504', async () => {
+        const fn = jest
+          .fn()
+          .mockRejectedValue(new NetworkError('Gateway timeout', { statusCode: 504 }));
+
+        await expect(
+          withRetry(fn, {
+            ...retryOptionsFromPreset(RETRY_PRESETS.indexer),
+            baseDelayMs: 0,
+            isRetryable: (err) => err instanceof NetworkError,
+          })
+        ).rejects.toBeInstanceOf(RetryExhaustedError);
+
+        expect(fn).toHaveBeenCalledTimes(RETRY_PRESETS.indexer.maxAttempts); // 5
+      });
+
+      it('succeeds within maxAttempts when 504 clears on last allowed attempt (wallet)', async () => {
+        // Fail twice then succeed on attempt 3 (wallet maxAttempts = 3)
+        const fn = jest
+          .fn()
+          .mockRejectedValueOnce(new NetworkError('Gateway timeout', { statusCode: 504 }))
+          .mockRejectedValueOnce(new NetworkError('Gateway timeout', { statusCode: 504 }))
+          .mockResolvedValueOnce({ hash: 'abc123' });
+
+        const result = await withRetry(fn, {
+          ...retryOptionsFromPreset(RETRY_PRESETS.wallet),
+          baseDelayMs: 0,
+          isRetryable: (err) => err instanceof NetworkError,
+        });
+
+        expect(result).toEqual({ hash: 'abc123' });
+        expect(fn).toHaveBeenCalledTimes(RETRY_PRESETS.wallet.maxAttempts);
+      });
+
+      it('RetryExhaustedError carries the 504 NetworkError as lastError', async () => {
+        const cause = new NetworkError('Gateway timeout', { statusCode: 504 });
+        const fn = jest.fn().mockRejectedValue(cause);
+
+        try {
+          await withRetry(fn, {
+            ...retryOptionsFromPreset(RETRY_PRESETS.wallet),
+            baseDelayMs: 0,
+            isRetryable: (err) => err instanceof NetworkError,
+          });
+        } catch (err) {
+          expect(err).toBeInstanceOf(RetryExhaustedError);
+          expect((err as RetryExhaustedError).lastError).toBe(cause);
+          expect(((err as RetryExhaustedError).lastError as NetworkError).statusCode).toBe(504);
+        }
+      });
+    });
+
+    describe('exponential backoff flag matrix', () => {
+      it('exponential=true produces doubling delays: 100 → 200 → 400ms', async () => {
+        const delays: number[] = [];
+        const mockSetTimeout = jest.fn((cb: () => void, ms: number) => {
+          delays.push(ms);
+          return originalSetTimeout(cb, 0);
+        });
+        global.setTimeout = mockSetTimeout as unknown as typeof global.setTimeout;
+
+        const fn = jest
+          .fn()
+          .mockRejectedValueOnce(new NetworkError('504', { statusCode: 504 }))
+          .mockRejectedValueOnce(new NetworkError('504', { statusCode: 504 }))
+          .mockRejectedValueOnce(new NetworkError('504', { statusCode: 504 }))
+          .mockResolvedValueOnce('ok');
+
+        await withRetry(fn, { maxRetries: 3, baseDelayMs: 100, exponential: true });
+
+        expect(delays).toEqual([100, 200, 400]);
+      });
+
+      it('exponential=false produces flat delays: 100 → 100 → 100ms', async () => {
+        const delays: number[] = [];
+        const mockSetTimeout = jest.fn((cb: () => void, ms: number) => {
+          delays.push(ms);
+          return originalSetTimeout(cb, 0);
+        });
+        global.setTimeout = mockSetTimeout as unknown as typeof global.setTimeout;
+
+        const fn = jest
+          .fn()
+          .mockRejectedValueOnce(new NetworkError('504', { statusCode: 504 }))
+          .mockRejectedValueOnce(new NetworkError('504', { statusCode: 504 }))
+          .mockRejectedValueOnce(new NetworkError('504', { statusCode: 504 }))
+          .mockResolvedValueOnce('ok');
+
+        await withRetry(fn, { maxRetries: 3, baseDelayMs: 100, exponential: false });
+
+        expect(delays).toEqual([100, 100, 100]);
+      });
+
+      it('wallet preset defaults to exponential=true backoff', async () => {
+        const delays: number[] = [];
+        const mockSetTimeout = jest.fn((cb: () => void, ms: number) => {
+          delays.push(ms);
+          return originalSetTimeout(cb, 0);
+        });
+        global.setTimeout = mockSetTimeout as unknown as typeof global.setTimeout;
+
+        const fn = jest
+          .fn()
+          .mockRejectedValueOnce(new NetworkError('504', { statusCode: 504 }))
+          .mockRejectedValueOnce(new NetworkError('504', { statusCode: 504 }))
+          .mockResolvedValueOnce('ok');
+
+        const opts = retryOptionsFromPreset(RETRY_PRESETS.wallet);
+        await withRetry(fn, { ...opts, baseDelayMs: 100 });
+
+        // Two retries with exponential doubling from base 100ms
+        expect(delays).toEqual([100, 200]);
+      });
+
+      it('indexer preset defaults to exponential=true backoff across 4 retries', async () => {
+        const delays: number[] = [];
+        const mockSetTimeout = jest.fn((cb: () => void, ms: number) => {
+          delays.push(ms);
+          return originalSetTimeout(cb, 0);
+        });
+        global.setTimeout = mockSetTimeout as unknown as typeof global.setTimeout;
+
+        const fn = jest
+          .fn()
+          .mockRejectedValueOnce(new NetworkError('504', { statusCode: 504 }))
+          .mockRejectedValueOnce(new NetworkError('504', { statusCode: 504 }))
+          .mockRejectedValueOnce(new NetworkError('504', { statusCode: 504 }))
+          .mockRejectedValueOnce(new NetworkError('504', { statusCode: 504 }))
+          .mockResolvedValueOnce('ok');
+
+        const opts = retryOptionsFromPreset(RETRY_PRESETS.indexer);
+        await withRetry(fn, { ...opts, baseDelayMs: 100 });
+
+        expect(delays).toEqual([100, 200, 400, 800]);
       });
     });
   });

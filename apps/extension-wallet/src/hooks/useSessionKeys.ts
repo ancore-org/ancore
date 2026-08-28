@@ -110,11 +110,15 @@ export function useSessionKeys(): UseSessionKeysReturn {
       updateKey(publicKey, { expiresAt: newExpiresAt });
 
       try {
-        // Contract refresh semantics are not yet implemented in AccountContract.
-        // Persist local expiry updates optimistically and roll back on failure.
         if (!snapshot) {
           throw new Error('Session key not found');
         }
+
+        const client = createAccountClient(authState.accountAddress);
+        client.refreshSessionKeyTtl({
+          publicKey,
+          expiresAt: snapshot.expiresAt,
+        });
       } catch (err) {
         if (snapshot) updateKey(publicKey, { expiresAt: snapshot.expiresAt });
         const msg = err instanceof Error ? err.message : 'Failed to refresh session key';
@@ -124,7 +128,7 @@ export function useSessionKeys(): UseSessionKeysReturn {
         setIsLoading(false);
       }
     },
-    [keys, updateKey]
+    [keys, updateKey, authState.accountAddress]
   );
 
   return {

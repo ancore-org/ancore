@@ -6,11 +6,12 @@
   "module": "./dist/index.mjs",
   "types": "./dist/index.d.ts",
   "scripts": {
-    "build": "tsup src/index.ts --format cjs,esm --dts --tsconfig tsconfig.json",
+    "build": "tsup src/index.ts --format cjs,esm --dts --tsconfig tsconfig.build.json",
     "dev": "tsup src/index.ts --format cjs,esm --dts --watch",
     "test": "jest",
     "lint": "eslint src/",
-    "clean": "rm -rf dist"
+    "clean": "rm -rf dist",
+    "typecheck": "tsc --noEmit"
   },
   "keywords": [
     "ancore",
@@ -23,6 +24,7 @@
     "@ancore/types": "workspace:*",
     "@ancore/crypto": "workspace:*",
     "@ancore/stellar": "workspace:*",
+    "@ancore/test-fixtures": "workspace:*",
     "@stellar/stellar-sdk": "^13.3.0"
   },
   "devDependencies": {

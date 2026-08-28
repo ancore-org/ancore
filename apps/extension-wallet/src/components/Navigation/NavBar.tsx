@@ -13,7 +13,7 @@ export function NavBar() {
   return (
     <nav
       aria-label="Primary navigation"
-      className="sticky bottom-0 z-10 border-t border-border bg-background/95 px-2 py-2 backdrop-blur"
+      className="sticky bottom-0 z-10 border-t border-border bg-background/95 px-3 py-3 backdrop-blur-xl"
       data-testid="nav-bar"
     >
       <div className="grid grid-cols-5 gap-1">
@@ -24,14 +24,14 @@ export function NavBar() {
             to={to}
             className={({ isActive }) =>
               [
-                'flex flex-col items-center justify-center gap-1 rounded-xl px-2 py-2 text-[11px] font-medium transition-colors',
+                'flex min-h-12 flex-col items-center justify-center gap-1 rounded-xl px-1.5 py-1.5 text-[11px] font-medium transition-[background-color,color,transform] duration-150 [transition-timing-function:cubic-bezier(0.23,1,0.32,1)] active:scale-[0.98]',
                 isActive
-                  ? 'bg-primary text-primary-foreground shadow-sm'
+                  ? 'bg-accent text-foreground'
                   : 'text-muted-foreground hover:bg-accent hover:text-foreground',
               ].join(' ')
             }
           >
-            <Icon className="h-4 w-4" />
+            <Icon className="h-5 w-5" strokeWidth={2} />
             <span>{label}</span>
           </NavLink>
         ))}

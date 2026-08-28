@@ -7,6 +7,12 @@ export interface EncryptedPayload {
   data: string;
 }
 
+export interface PlatformStorageAdapter {
+  get(key: string): Promise<string | null>;
+  set(key: string, value: string): Promise<void>;
+  delete(key: string): Promise<void>;
+}
+
 export interface StorageAdapter {
   get<T = unknown>(key: string): Promise<T | null>;
   set(key: string, value: unknown): Promise<void>;

@@ -14,6 +14,10 @@ export interface PaymentQRCodeProps {
    * Additional className applied to the outer wrapper div.
    */
   className?: string;
+  /**
+   * Ref to the inner SVG element, for e.g. PNG download.
+   */
+  qrRef?: React.RefObject<SVGSVGElement | null>;
 }
 
 /**
@@ -21,7 +25,7 @@ export interface PaymentQRCodeProps {
  * Uses qrcode.react under the hood with a styled card border so it fits
  * the extension-wallet design system.
  */
-export function PaymentQRCode({ value, size = 220, className }: PaymentQRCodeProps) {
+export function PaymentQRCode({ value, size = 220, className, qrRef }: PaymentQRCodeProps) {
   return (
     <div
       className={cn(
@@ -31,6 +35,7 @@ export function PaymentQRCode({ value, size = 220, className }: PaymentQRCodePro
       data-testid="payment-qr-code"
     >
       <QRCodeSVG
+        ref={qrRef}
         value={value}
         size={size}
         level="M"

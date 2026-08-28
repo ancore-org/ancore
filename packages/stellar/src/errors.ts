@@ -19,12 +19,17 @@ export class StellarError extends Error {
 export class NetworkError extends StellarError {
   public readonly cause?: Error;
   public readonly statusCode?: number;
+  public readonly retryable?: boolean;
 
-  constructor(message: string, options?: { cause?: Error; statusCode?: number }) {
+  constructor(
+    message: string,
+    options?: { cause?: Error; statusCode?: number; retryable?: boolean }
+  ) {
     super(message);
     this.name = 'NetworkError';
     this.cause = options?.cause;
     this.statusCode = options?.statusCode;
+    this.retryable = options?.retryable;
   }
 }
 
@@ -42,17 +47,82 @@ export class AccountNotFoundError extends StellarError {
 }
 
 /**
+ * Error thrown when Soroban transaction simulation fails
+ */
+export class SimulationFailedError extends StellarError {
+  constructor(message: string) {
+    super(message);
+    this.name = 'SimulationFailedError';
+  }
+}
+
+/**
  * Error thrown when a transaction submission fails
  */
+type HorizonErrorPayload = {
+  response?: {
+    status?: number;
+    data?: {
+      message?: string;
+      extras?: {
+        result_codes?: {
+          transaction?: string;
+          operations?: unknown;
+        };
+        result_xdr?: string;
+      };
+      result_xdr?: string;
+    };
+  };
+};
+
+export interface TransactionErrorOptions {
+  resultCode?: string;
+  resultXdr?: string;
+  operationResultCodes?: string[];
+  statusCode?: number;
+}
+
 export class TransactionError extends StellarError {
   public readonly resultCode?: string;
   public readonly resultXdr?: string;
+  public readonly operationResultCodes?: string[];
+  public readonly statusCode?: number;
 
-  constructor(message: string, options?: { resultCode?: string; resultXdr?: string }) {
+  constructor(message: string, options?: TransactionErrorOptions) {
     super(message);
     this.name = 'TransactionError';
     this.resultCode = options?.resultCode;
     this.resultXdr = options?.resultXdr;
+    this.operationResultCodes = options?.operationResultCodes;
+    this.statusCode = options?.statusCode;
+  }
+
+  static fromHorizonError(error: unknown): TransactionError | null {
+    if (!error || typeof error !== 'object') {
+      return null;
+    }
+
+    const payload = error as HorizonErrorPayload;
+    const data = payload.response?.data;
+    const extras = data?.extras;
+    const resultCodes = extras?.result_codes;
+    const resultCode = resultCodes?.transaction;
+    const operationResultCodes = Array.isArray(resultCodes?.operations)
+      ? resultCodes.operations.filter((code): code is string => typeof code === 'string')
+      : undefined;
+    const resultXdr = extras?.result_xdr ?? data?.result_xdr;
+
+    if (!resultCode && !operationResultCodes?.length && !resultXdr) {
+      return null;
+    }
+
+    return new TransactionError(data?.message ?? 'Transaction submission failed', {
+      resultCode,
+      operationResultCodes,
+      resultXdr,
+      statusCode: payload.response?.status,
+    });
   }
 }
 

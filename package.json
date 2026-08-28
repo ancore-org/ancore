@@ -15,9 +15,14 @@
   "scripts": {
     "build": "turbo run build",
     "dev": "turbo run dev",
+    "dev:extension": "pnpm --filter @ancore/extension-wallet run dev",
+    "dev:dashboard": "pnpm --filter @ancore/web-dashboard run dev",
+    "dev:mobile": "pnpm --filter @ancore/mobile-wallet run dev",
+    "test:extension": "pnpm --filter @ancore/extension-wallet run test",
+    "test:ui": "pnpm --filter @ancore/ui-kit run test",
     "test": "turbo run test",
     "lint": "turbo run lint",
-    "typecheck": "turbo run build",
+    "typecheck": "turbo run typecheck",
     "format": "prettier --write \"**/*.{ts,tsx,js,jsx,json,md}\"",
     "format:check": "prettier --check \"**/*.{ts,tsx,js,jsx,json,md}\"",
     "clean": "turbo run clean && rm -rf node_modules",
@@ -28,10 +33,14 @@
     "indexer:check": "cd services/indexer && cargo check",
     "indexer:lint-migrations": "node services/indexer/scripts/lint-migrations.mjs",
     "audit:security": "node tools/security-audit.js",
+    "check:install-scripts": "node scripts/check-install-scripts.js",
+    "coverage:gate": "node scripts/coverage-gate.js",
     "docs:validate-links": "node scripts/validate-doc-links.js",
-    "verify": "pnpm lint && pnpm typecheck && pnpm test",
+    "docs:lint-openapi": "npx --yes @stoplight/spectral-cli lint --fail-severity=warn services/indexer/openapi.yaml",
+    "verify": "pnpm check:install-scripts && pnpm lint && pnpm typecheck && pnpm test",
     "prepare": "husky",
-    "docs:check-structure": "node scripts/check-docs-repo-structure.mjs"
+    "docs:check-structure": "node scripts/check-docs-repo-structure.mjs",
+    "verify:theme-tokens": "node scripts/verify-theme-tokens.ts"
   },
   "devDependencies": {
     "@testing-library/jest-dom": "^6.9.1",
@@ -45,7 +54,8 @@
     "lint-staged": "^15.0.0",
     "prettier": "^3.2.5",
     "turbo": "^2.3.0",
-    "typescript": "^5.6.0"
+    "typescript": "^5.6.0",
+    "vitest": "^3.2.6"
   },
   "lint-staged": {
     "*.{ts,tsx,js,jsx,json,md}": [
@@ -69,6 +79,12 @@
     "packages/account-abstraction/src/**/*.{ts,tsx,js,jsx}": [
       "pnpm --dir packages/account-abstraction exec eslint --fix"
     ],
+    "packages/wallet-shared/src/**/*.{ts,tsx,js,jsx}": [
+      "pnpm --dir packages/wallet-shared exec eslint --fix"
+    ],
+    "packages/wallet-api/src/**/*.{ts,tsx,js,jsx}": [
+      "pnpm --dir packages/wallet-api exec eslint --fix"
+    ],
     "apps/extension-wallet/src/**/*.{ts,tsx,js,jsx}": [
       "pnpm --dir apps/extension-wallet exec eslint --fix"
     ],
@@ -78,16 +94,35 @@
     "apps/mobile-wallet/src/**/*.{ts,tsx,js,jsx}": [
       "pnpm --dir apps/mobile-wallet exec eslint --fix"
     ],
+    "apps/mobile-app/src/**/*.{ts,tsx,js,jsx}": [
+      "pnpm --dir apps/mobile-app exec eslint --fix"
+    ],
     "services/relayer/src/**/*.{ts,tsx,js,jsx}": [
       "pnpm --dir services/relayer exec eslint --fix"
     ]
   },
   "pnpm": {
+    "onlyBuiltDependencies": [
+      "esbuild",
+      "protobufjs"
+    ],
     "overrides": {
-      "js-yaml": ">=4.1.1",
+      "js-yaml": ">=4.3.0",
       "tmp": ">=0.2.4",
       "esbuild": "0.21.5",
-      "@stellar/stellar-sdk": "^13.3.0"
+      "@stellar/stellar-sdk": "^13.3.0",
+      "tar": "7.5.22",
+      "vitest": ">=3.2.6 <4.0.0",
+      "form-data": ">=4.0.6",
+      "axios": ">=1.18.0",
+      "postcss": ">=8.5.18",
+      "@opentelemetry/propagator-jaeger": ">=2.9.0",
+      "brace-expansion@1": "1.1.18",
+      "brace-expansion@2": "2.1.4",
+      "brace-expansion@5": "5.0.9",
+      "brace-expansion@5.0.6": "5.0.9",
+      "protobufjs": ">=8.6.6",
+      "nanoid": ">=3.3.18"
     }
   },
   "packageManager": "pnpm@9.0.0",

@@ -1,7 +1,16 @@
 import { Request, Response } from 'express';
 import type { RelayServiceContract } from '../types';
 import type { RelayValidateRequest } from '../types';
-import { redactSessionKey } from '../logging';
+import { redactSessionKey, type Logger } from '../logging';
+import type { LoggedRequest } from '../middleware/requestLogger';
+
+const noopLogger: Logger = {
+  debug: () => undefined,
+  info: () => undefined,
+  warn: () => undefined,
+  error: () => undefined,
+  child: () => noopLogger,
+};
 
 /**
  * Factory that returns the POST /relay/validate handler bound to a service instance.
@@ -11,15 +20,17 @@ import { redactSessionKey } from '../logging';
  */
 export function createValidateRelayHandler(relayService: RelayServiceContract) {
   return async (req: Request, res: Response): Promise<void> => {
+    const loggedReq = req as Partial<LoggedRequest>;
     const request = req.body as RelayValidateRequest;
 
-    const log = req.log?.child({
-      route: 'POST /relay/validate',
-      sessionKey: redactSessionKey(request.sessionKey),
-      operation: request.operation,
-    }) ?? { info: () => {}, warn: () => {}, error: () => {}, debug: () => {}, child: () => ({} as any) };
+    const log =
+      loggedReq.log?.child({
+        route: 'POST /relay/validate',
+        sessionKey: redactSessionKey(request.sessionKey),
+        operation: request.operation,
+      }) ?? noopLogger;
 
-    const start = req.startTime ?? Date.now();
+    const start = loggedReq.startTime ?? Date.now();
 
     const result = await relayService.validateRelay(request);
     const durationMs = Date.now() - start;

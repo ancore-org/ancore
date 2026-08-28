@@ -218,7 +218,14 @@ export function useBiometricUnlock({
       isLoading: false,
       feedbackMessage: buildFeedbackMessage(reason, newLockout, 0),
     }));
-  }, [biometricService, lockoutManager, onSuccess, onPermanentLockout, promptMessage]);
+  }, [
+    biometricService,
+    lockoutManager,
+    onPermanentLockout,
+    onSuccess,
+    promptMessage,
+    startCountdown,
+  ]);
 
   // Password fallback
   const switchToPasswordFallback = useCallback(() => {
@@ -263,7 +270,7 @@ export function useBiometricUnlock({
         }));
       }
     },
-    [lockoutManager, onSuccess, passwordService]
+    [lockoutManager, onSuccess, passwordService, stopCountdown]
   );
 
   const backToBiometric = useCallback(() => {

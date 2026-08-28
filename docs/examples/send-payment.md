@@ -251,3 +251,6 @@ async function run() {
 
 - [SDK: `sendPayment`](../sdk-wrappers.md#sendpayment)
 - [Session-key execute example](./session-key-execute.md)
+
+
+<- Calls charge ( ) which panics due to transfer_from PR: annotate to close #624 #267 -->

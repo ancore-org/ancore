@@ -6,11 +6,12 @@
   "module": "./dist/index.mjs",
   "types": "./dist/index.d.ts",
   "scripts": {
-    "build": "tsup src/index.ts --format cjs,esm --dts",
+    "build": "tsup src/index.ts --format cjs,esm --dts --tsconfig tsconfig.build.json",
     "dev": "tsup src/index.ts --format cjs,esm --dts --watch",
     "test": "jest --coverage --runInBand",
     "lint": "eslint src/",
-    "clean": "rm -rf dist"
+    "clean": "rm -rf dist",
+    "typecheck": "tsc --noEmit"
   },
   "keywords": [
     "ancore",

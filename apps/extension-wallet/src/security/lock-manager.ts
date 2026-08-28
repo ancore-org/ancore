@@ -6,7 +6,7 @@
  */
 
 import { SecureStorageManager } from '@ancore/core-sdk';
-import { InactivityDetector } from './inactivity-detector';
+import { InactivityDetector, minutesToInactivityMs } from './inactivity-detector';
 
 type StorageManagerInstance = InstanceType<typeof SecureStorageManager>;
 
@@ -32,7 +32,10 @@ export class LockManager {
     this.onLock = options.onLock;
     this.onUnlock = options.onUnlock;
 
-    this.detector = new InactivityDetector(() => this.lock(), options.autoLockMinutes * 60 * 1000);
+    this.detector = new InactivityDetector(
+      () => this.lock(),
+      minutesToInactivityMs(options.autoLockMinutes)
+    );
   }
 
   get isLocked(): boolean {
@@ -71,7 +74,7 @@ export class LockManager {
    * Update the auto-lock timeout (e.g. when user changes settings).
    */
   setAutoLockMinutes(minutes: number): void {
-    this.detector.setTimeoutMs(minutes * 60 * 1000);
+    this.detector.setTimeoutMs(minutesToInactivityMs(minutes));
   }
 
   /**

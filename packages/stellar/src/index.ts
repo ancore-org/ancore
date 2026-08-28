@@ -6,13 +6,14 @@
 export const STELLAR_VERSION = '0.1.0';
 
 // Client
-export { StellarClient } from './client';
+export { StellarClient, createStellarClient } from './client';
 export type {
   AccountActivityPage,
   AccountActivityPageRequest,
   AssetMetadata,
   AssetMetadataCacheMetrics,
   Balance,
+  NetworkId,
   StellarClientConfig,
 } from './client';
 
@@ -21,15 +22,34 @@ export {
   StellarError,
   NetworkError,
   AccountNotFoundError,
+  SimulationFailedError,
   TransactionError,
   RetryExhaustedError,
 } from './errors';
 export { toCanonicalError as toCanonicalStellarError } from './errors';
 
 // Retry utilities
-export { withRetry, calculateDelay } from './retry';
-export type { RetryOptions } from './retry';
+export {
+  withRetry,
+  calculateDelay,
+  RETRY_PRESETS,
+  retryOptionsFromPreset,
+  resolveRetryOptions,
+} from './retry';
+export type { RetryOptions, RetryPresetConfig, RetryPresetName } from './retry';
 
 // Fee stats
 export { fetchFeeStats, FALLBACK_FEE_STATS } from './fee-stats';
 export type { FeeStats, FeeStatsOptions } from './fee-stats';
+
+// Simulation
+export { parseSimulationResponse, simulateUnsignedTransaction } from './simulation';
+export type { ParsedSimulationResult, SorobanResourceLimits } from './simulation';
+
+// Horizon URL validation
+export { validateHorizonUrl, isValidHorizonUrl } from './horizon-url';
+export { HorizonUrlValidationError } from './horizon-url';
+
+// Account sequence fetch helper
+export { fetchAccountSequence, clearSequenceCache } from './account-sequence';
+export type { AccountSequenceResult, FetchAccountSequenceOptions } from './account-sequence';

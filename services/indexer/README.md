@@ -2,6 +2,13 @@
 
 Blockchain indexer service for the Ancore ecosystem. Provides paginated, filterable query endpoints for account activity data.
 
+## Contract Event Catalog
+
+For a full list of contract events that this service ingests — including field types,
+sample payloads, and recommended indexer actions — see:
+
+**[`docs/indexer/contract-events.md`](../../docs/indexer/contract-events.md)**
+
 ## Features
 
 - **Cursor-based pagination**: Stable pagination that handles concurrent inserts
@@ -11,6 +18,33 @@ Blockchain indexer service for the Ancore ecosystem. Provides paginated, filtera
 
 ## API Endpoints
 
+### Prometheus Metrics
+
+```
+GET /metrics (Prometheus text format)
+```
+
+Exposes operational metrics in Prometheus text format for scraping. The metrics are served on a dedicated port (default: 9090, configurable via `PROMETHEUS_PORT` environment variable).
+
+**Available metrics:**
+- `indexer_lag_blocks`: Number of ledgers the indexer is behind the chain head
+- `indexer_lag_seconds`: Estimated seconds the indexer is behind the chain head (calculated as `lag_blocks × 5`)
+
+These metrics are automatically updated on each health check and can be used for alerting and monitoring dashboards.
+
+**Prometheus configuration:**
+
+Add the following scrape job to your `prometheus.yml`:
+
+```yaml
+scrape_configs:
+  - job_name: ancore-indexer
+    metrics_path: /metrics
+    scrape_interval: 15s
+    static_configs:
+      - targets: ['indexer:9090']
+```
+
 ### List Account Activity
 
 ```
@@ -18,6 +52,7 @@ GET /api/v1/accounts/{account_id}/activity
 ```
 
 Query parameters:
+
 - `cursor_after`: Opaque cursor for forward pagination
 - `cursor_before`: Opaque cursor for backward pagination
 - `limit`: Page size (default: 20, max: 100, min: 1)
@@ -30,6 +65,7 @@ Query parameters:
 - `to_date`: ISO 8601 datetime for upper bound (inclusive)
 
 Response:
+
 ```json
 {
   "data": [
@@ -98,6 +134,20 @@ CREATE TABLE account_activity (
 - `(account_id, ledger_seq DESC)` - Ledger-range queries
 - `(tx_hash)` - Transaction hash lookups
 
+### ingest_checkpoints table
+
+Stores the last successfully processed ledger sequence per ingestion stream so the worker can resume after restarts without duplicating events.
+
+```sql
+CREATE TABLE ingest_checkpoints (
+    stream          VARCHAR(64)  PRIMARY KEY,
+    last_ledger_seq BIGINT       NOT NULL,
+    updated_at      TIMESTAMPTZ  NOT NULL DEFAULT NOW()
+);
+```
+
+The indexer loads this cursor on startup and the ingest worker advances it only after a batch is durably persisted.
+
 ## Offline Build (no DATABASE\_URL required)
 
 `services/indexer` supports `cargo check` / `cargo build` without a live database connection. This is achieved via **SQLx offline mode**.
@@ -142,6 +192,180 @@ git commit -m "chore(indexer): regenerate sqlx offline cache"
 | Tests fail with DB connection error | Integration tests require a live DB | Use `--lib` flag to run unit tests only, or set `TEST_DATABASE_URL` |
 | `cargo sqlx` not found | `sqlx-cli` not installed | `cargo install sqlx-cli --no-default-features --features postgres` |
 
+## API Examples
+
+The following examples assume a local docker-compose stack is running. Run the smoke-test script to verify all endpoints in one shot:
+
+```bash
+bash scripts/curl-smoke-indexer.sh
+```
+
+### Health check
+
+```bash
+curl -s localhost:3000/health | jq
+```
+
+Sample response:
+
+```json
+{
+  "timestamp": "2024-01-15T10:30:00Z",
+  "status": "ok",
+  "latest_indexed_ledger": 50123456,
+  "chain_head": 50123456,
+  "lag_blocks": 0,
+  "lag_seconds": 0,
+  "schema_version": 5,
+  "expected_schema_version": 5,
+  "migration_status": "up_to_date",
+  "latest_migration": "create_schema_migrations_table",
+  "migration_applied_at": "2024-01-15T09:00:00Z",
+  "applied_migrations": 5
+}
+```
+
+### Health and migration status
+
+`/health` reports the live database schema alongside ledger lag so a deploy can
+verify the indexer is not serving mid-migrate.
+
+| Field | Meaning |
+| --- | --- |
+| `schema_version` | Highest version in the `schema_migrations` ledger. `null` when the ledger is missing or empty. |
+| `expected_schema_version` | Version this binary was compiled against (`EXPECTED_SCHEMA_VERSION`). |
+| `migration_status` | `up_to_date`, `pending`, `ahead`, or `unknown`. |
+| `latest_migration` | Name of the highest applied migration. |
+| `migration_applied_at` | When that migration ran. |
+| `applied_migrations` | Number of rows in the ledger. |
+
+`migration_status` values:
+
+- **`up_to_date`** — applied version matches the binary. Safe to serve.
+- **`pending`** — database is behind; migrations have not finished. Deploy is mid-migrate.
+- **`ahead`** — a newer indexer already migrated the database; this instance is stale and should be rolled forward.
+- **`unknown`** — the `schema_migrations` table is missing or empty. Either migrations have never run, or the database predates migration `005`.
+
+Anything other than `up_to_date` sets the top-level `status` to `degraded`, even
+when ledger lag is zero — gate rollouts on `status`, and read `migration_status`
+to tell a migration problem from a lag problem:
+
+```bash
+curl -sf localhost:3000/health | jq -e '.migration_status == "up_to_date"'
+```
+
+### Prometheus metrics
+
+```bash
+curl -s localhost:9090/metrics
+```
+
+Sample response (Prometheus text format):
+
+```
+# HELP indexer_lag_blocks Number of ledgers behind chain head
+# TYPE indexer_lag_blocks gauge
+indexer_lag_blocks 0
+
+# HELP indexer_lag_seconds Estimated seconds behind chain head
+# TYPE indexer_lag_seconds gauge
+indexer_lag_seconds 0
+```
+
+### List account activity
+
+```bash
+ACCOUNT="GABC123XYZ456DEF789GHI012JKL345MNO678PQR901STU234VWX567YZA"
+
+curl -s "localhost:3000/api/v1/accounts/$ACCOUNT/activity?limit=5" | jq
+```
+
+Sample response (`fixtures/api/account-activity-response.json`):
+
+```json
+{
+  "data": [
+    {
+      "id": "018e1f2a-3b4c-7d8e-9f0a-1b2c3d4e5f6a",
+      "account_id": "GABC123...",
+      "activity_type": "payment",
+      "amount": "100.0000000",
+      "asset": "USDC:GBBD47IF6...",
+      "counterparty": "GXYZ987...",
+      "tx_hash": "a1b2c3d4...",
+      "ledger_seq": 50123456,
+      "created_at": "2024-01-15T10:30:00Z",
+      "metadata": { "memo": "Invoice #1042" }
+    }
+  ],
+  "pagination": {
+    "has_next_page": true,
+    "has_previous_page": false,
+    "next_cursor": "eyJ0IjoiMjAyNC...",
+    "prev_cursor": null,
+    "count": 1
+  }
+}
+```
+
+### Filter by activity type
+
+```bash
+curl -s "localhost:3000/api/v1/accounts/$ACCOUNT/activity?activity_type=payment&limit=5" | jq
+```
+
+### Cursor pagination
+
+Use the `next_cursor` value from a previous response:
+
+```bash
+curl -s "localhost:3000/api/v1/accounts/$ACCOUNT/activity?cursor_after=eyJ0IjoiMjAyNC...&limit=5" | jq
+```
+
+### Filter by ledger range
+
+```bash
+curl -s "localhost:3000/api/v1/accounts/$ACCOUNT/activity?ledger_min=50000000&ledger_max=50200000" | jq
+```
+
+### Error envelope
+
+Invalid parameters return a structured error. Example — `limit` exceeds maximum:
+
+```bash
+curl -s "localhost:3000/api/v1/accounts/$ACCOUNT/activity?limit=500" | jq
+```
+
+Sample error response (`fixtures/api/error-response.json`):
+
+```json
+{
+  "error": {
+    "code": "VALIDATION_ERROR",
+    "message": "Invalid query parameters",
+    "details": [
+      { "field": "limit", "message": "limit must be between 1 and 100, got 500" }
+    ]
+  }
+}
+```
+
+### docker-compose walkthrough
+
+```bash
+# 1. Start the full stack
+docker-compose up -d
+
+# 2. Wait for services to be healthy
+bash scripts/dev/smoke-stack.sh
+
+# 3. Run the indexer API smoke test
+bash scripts/curl-smoke-indexer.sh
+
+# 4. Inspect logs if a check fails
+docker-compose logs indexer
+```
+
 ## Setup
 
 ### Prerequisites
@@ -155,15 +379,25 @@ git commit -m "chore(indexer): regenerate sqlx offline cache"
 DATABASE_URL=postgresql://user:password@localhost:5432/ancore
 TEST_DATABASE_URL=postgresql://user:password@localhost:5432/ancore_test
 DB_QUERY_TIMEOUT_SEC=30 # Optional, defaults to 30
+PROMETHEUS_PORT=9090 # Optional, defaults to 9090
 # SQLX_OFFLINE is set automatically via .cargo/config.toml — no manual export needed
 ```
 
 ### Running Migrations
 
 ```bash
-# Apply migrations
-psql $DATABASE_URL -f migrations/001_create_account_activity_table.sql
+# Apply every migration in filename order
+for f in migrations/*.sql; do psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f "$f"; done
 ```
+
+Applied migrations are recorded in the `schema_migrations` ledger created by
+`005_create_schema_migrations_table.sql`. **Every new migration file must end
+with an `INSERT INTO schema_migrations (version, name) VALUES (…) ON CONFLICT
+(version) DO NOTHING;`** for its own version, and
+`EXPECTED_SCHEMA_VERSION` in `src/repositories/migrations.rs` must be bumped in
+the same commit. `GET /health` compares the two so a deploy can tell whether the
+indexer is serving a schema it was not built for — see
+[Health and migration status](#health-and-migration-status).
 
 ### Linting Migrations
 
@@ -211,6 +445,7 @@ cargo test test_encode_decode_cursor_roundtrip
 ### Cursor Pagination
 
 Cursors are opaque base64url-encoded JSON objects containing:
+
 - `t`: ISO 8601 timestamp
 - `i`: Record UUID
 
@@ -241,6 +476,7 @@ Integration tests require a test database:
 # Set up test database
 createdb ancore_test
 psql ancore_test -f migrations/001_create_account_activity_table.sql
+psql ancore_test -f migrations/002_create_ingest_checkpoints_table.sql
 
 # Run integration tests
 cargo test --test account_activity_api_test
@@ -250,9 +486,20 @@ Tests are marked with `#[ignore]` to prevent accidental execution without a test
 
 ## CI Quality Gates
 
-The following checks run automatically on every PR via the `indexer` CI job:
+The following checks run automatically on every PR:
+
+**`indexer-migrations` job** — spins an ephemeral Postgres 16 container and:
+1. Applies every file in `migrations/` in filename order (up smoke)
+2. Drops all application tables, then re-applies migrations (down/up idempotency check)
+
+The job fails if any migration file errors or the schema cannot be rebuilt from scratch.
+
+**`indexer` job:**
 
 ```bash
+# Lint migration filenames and sequence numbers
+pnpm indexer:lint-migrations
+
 # Check formatting (must pass before merge)
 cargo fmt --check
 
@@ -263,7 +510,71 @@ cargo clippy -- -D warnings
 cargo test
 ```
 
-Run these locally from `services/indexer/` before pushing to avoid CI failures.
+Run locally from `services/indexer/` before pushing to avoid CI failures.
+
+### Running the migration check locally
+
+```bash
+# Start a local Postgres instance (docker example)
+docker run -d --name ancore-pg \
+  -e POSTGRES_USER=ancore -e POSTGRES_PASSWORD=ancore -e POSTGRES_DB=ancore_test \
+  -p 5432:5432 postgres:16
+
+# Run the check script
+DATABASE_URL=postgres://ancore:ancore@localhost:5432/ancore_test \
+  bash services/indexer/scripts/check-migrations.sh
+```
+
+## Rollback Procedure
+
+Migrations are **forward-only** (no auto-generated down scripts). To roll back a
+broken migration in production, follow these steps:
+
+### 1. Identify the bad migration
+
+Check which migration was last applied and which introduced the regression:
+
+```bash
+# List tables / columns to see current schema state
+psql "$DATABASE_URL" -c "\dt"
+psql "$DATABASE_URL" -c "\d account_activity"
+```
+
+### 2. Write a compensating migration
+
+Create a new migration file with the next sequence number that undoes the change:
+
+```bash
+# Example: undo migration 004 that added a NOT NULL column without a default
+touch services/indexer/migrations/005_rollback_bad_column.sql
+```
+
+```sql
+-- 005_rollback_bad_column.sql
+ALTER TABLE account_activity DROP COLUMN IF EXISTS bad_column;
+```
+
+Never edit or delete an already-applied migration file — that creates drift
+between environments.
+
+### 3. Apply the compensating migration
+
+```bash
+psql "$DATABASE_URL" -v ON_ERROR_STOP=1 \
+  -f services/indexer/migrations/005_rollback_bad_column.sql
+```
+
+### 4. Verify the schema
+
+```bash
+DATABASE_URL="$DATABASE_URL" \
+  bash services/indexer/scripts/check-migrations.sh
+```
+
+### 5. Deploy and monitor
+
+Deploy the service revision that includes the compensating migration and monitor
+`indexer_lag_blocks` / `indexer_lag_seconds` in Prometheus to confirm recovery.
 
 ## License
 

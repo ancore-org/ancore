@@ -3,12 +3,7 @@
  * Follows the same pattern as contactsStorage.ts.
  */
 
-import type {
-  SplitBill,
-  SplitBillParticipant,
-  CreateSplitBillInput,
-  ParticipantStatus,
-} from '../types/split-bill';
+import type { SplitBill, CreateSplitBillInput, ParticipantStatus } from '../types/split-bill';
 
 export const SPLIT_BILL_STORAGE_KEY = 'ancore-dashboard-split-bills';
 

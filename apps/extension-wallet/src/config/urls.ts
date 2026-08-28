@@ -43,9 +43,10 @@ export interface ConfigError {
 // ---------------------------------------------------------------------------
 
 const RELAYER_URLS: Record<string, string> = {
-  production: typeof import.meta !== 'undefined' && import.meta.env?.VITE_RELAYER_URL
-    ? import.meta.env.VITE_RELAYER_URL
-    : 'https://relayer.ancore.io',
+  production:
+    typeof import.meta !== 'undefined' && import.meta.env?.VITE_RELAYER_URL
+      ? import.meta.env.VITE_RELAYER_URL
+      : 'https://relayer.ancore.io',
   staging: 'https://relayer-staging.ancore.io',
   local: 'http://localhost:3000',
 };

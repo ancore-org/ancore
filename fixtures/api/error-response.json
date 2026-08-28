@@ -1,0 +1,12 @@
+{
+  "error": {
+    "code": "VALIDATION_ERROR",
+    "message": "Invalid query parameters",
+    "details": [
+      {
+        "field": "limit",
+        "message": "limit must be between 1 and 100, got 500"
+      }
+    ]
+  }
+}

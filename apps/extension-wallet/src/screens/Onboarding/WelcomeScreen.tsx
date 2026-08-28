@@ -1,114 +1,119 @@
-import { Shield, Zap, Key, Users, ChevronRight, Wallet } from 'lucide-react';
+import { ChevronRight, Download, Plus, HelpCircle, WalletCards, X } from 'lucide-react';
 
 /**
  * Welcome screen props
  */
 export interface WelcomeScreenProps {
-  onNext: () => void;
+  onNext: () => void | Promise<void>;
+  onImport?: () => void;
   onBack?: () => void;
+  /** Shown when create-wallet fails (e.g. crypto error). */
+  error?: string | null;
+  /** True while mnemonic generation is in flight. */
+  isLoading?: boolean;
 }
 
 /**
- * WelcomeScreen - Introduction screen for first-time users
- *
- * Explains Ancore wallet and its key features before starting onboarding.
+ * WelcomeScreen — first-run chooser.
+ * Visual language: clean option list (ref: “Add an Existing Wallet”).
+ * Stellar product copy; no ETH/iCloud-specific paths.
  */
-export function WelcomeScreen({ onNext, onBack }: WelcomeScreenProps) {
-  const features = [
+export function WelcomeScreen({
+  onNext,
+  onImport,
+  onBack,
+  error,
+  isLoading = false,
+}: WelcomeScreenProps) {
+  const options = [
     {
-      icon: Shield,
-      title: 'Secure',
-      description: 'Your keys never leave this device',
+      key: 'create',
+      icon: Plus,
+      title: 'Create new wallet',
+      description: 'Generate a new recovery phrase and smart account on Stellar.',
+      onClick: onNext,
     },
     {
-      icon: Key,
-      title: 'Smart Accounts',
-      description: 'Account abstraction on Stellar network',
+      key: 'import',
+      icon: Download,
+      title: 'Import',
+      description: 'Add an existing wallet with a 12 or 24-word recovery phrase.',
+      onClick: onImport,
+      disabled: !onImport,
     },
-    {
-      icon: Zap,
-      title: 'Fast',
-      description: 'Quick transactions with low fees',
-    },
-    {
-      icon: Users,
-      title: 'Simple',
-      description: 'Easy to use, hard to lose access',
-    },
-  ];
+  ] as const;
 
   return (
-    <div className="flex flex-col min-h-screen bg-gradient-to-b from-primary/5 via-background to-background">
-      {/* Header */}
-      <div className="px-6 pt-12 pb-8">
-        {/* Logo */}
-        <div className="flex justify-center mb-6">
-          <div className="relative">
-            <div className="w-20 h-20 rounded-2xl bg-gradient-to-br from-primary to-purple-700 flex items-center justify-center shadow-lg shadow-primary/25">
-              <Wallet className="w-10 h-10 text-white" />
-            </div>
-            <div className="absolute -bottom-1 -right-1 w-6 h-6 rounded-full bg-green-400 border-2 border-background flex items-center justify-center">
-              <span className="text-[10px] font-bold text-green-900">A</span>
-            </div>
+    <div className="wallet-sheet">
+      <header className="wallet-header">
+        <button
+          type="button"
+          className="wallet-icon-btn"
+          aria-label="Close"
+          onClick={onBack}
+          disabled={!onBack}
+        >
+          <X className="h-5 w-5" />
+        </button>
+        <button type="button" className="wallet-icon-btn" aria-label="Help">
+          <HelpCircle className="h-5 w-5 text-muted-foreground" />
+        </button>
+      </header>
+
+      <div className="flex flex-1 flex-col px-6 pb-8 pt-4">
+        <div className="mb-8 flex justify-center" aria-hidden="true">
+          <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-foreground text-background">
+            <WalletCards className="h-5 w-5" strokeWidth={2} />
           </div>
         </div>
 
-        {/* Title */}
-        <h1 className="text-2xl font-bold text-center text-foreground mb-2">Welcome to Ancore</h1>
-        <p className="text-sm text-muted-foreground text-center max-w-xs mx-auto">
-          The smart wallet for the Stellar network. Create your account to get started.
-        </p>
-      </div>
+        <div className="mb-8 text-center">
+          <h1 className="mb-2 text-[26px] font-semibold tracking-tight text-foreground">
+            Set up your wallet
+          </h1>
+          <p className="mx-auto max-w-[280px] text-[15px] leading-relaxed text-muted-foreground">
+            Create a new smart account or continue with one you already own.
+          </p>
+        </div>
 
-      {/* Features */}
-      <div className="flex-1 px-6">
-        <div className="grid grid-cols-2 gap-3">
-          {features.map((feature, index) => (
-            <div key={index} className="bg-card rounded-xl p-4 border border-border/50">
-              <div className="w-10 h-10 rounded-lg bg-primary/10 flex items-center justify-center mb-3">
-                <feature.icon className="w-5 h-5 text-primary" />
-              </div>
-              <h3 className="font-semibold text-sm text-foreground mb-1">{feature.title}</h3>
-              <p className="text-xs text-muted-foreground">{feature.description}</p>
-            </div>
+        {error && (
+          <div
+            role="alert"
+            className="wallet-status-error mb-4 rounded-2xl border px-4 py-3 text-[13px]"
+          >
+            {error}
+          </div>
+        )}
+
+        {isLoading && (
+          <div className="mb-4 flex items-center justify-center gap-2 text-[13px] text-muted-foreground">
+            <span className="inline-block h-4 w-4 animate-spin rounded-full border-2 border-muted-foreground border-t-transparent" />
+            Generating recovery phrase…
+          </div>
+        )}
+
+        <div className="flex flex-col gap-3">
+          {options.map((opt) => (
+            <button
+              key={opt.key}
+              type="button"
+              disabled={isLoading || ('disabled' in opt && opt.disabled)}
+              onClick={() => void opt.onClick?.()}
+              className="wallet-option-row disabled:opacity-40"
+            >
+              <span className="wallet-option-icon">
+                <opt.icon className="h-5 w-5" strokeWidth={2} />
+              </span>
+              <span className="min-w-0 flex-1">
+                <span className="block text-[16px] font-semibold text-foreground">{opt.title}</span>
+                <span className="mt-0.5 block text-[13px] leading-snug text-muted-foreground">
+                  {opt.description}
+                </span>
+              </span>
+              <ChevronRight className="h-5 w-5 shrink-0 text-muted-foreground/70" />
+            </button>
           ))}
         </div>
-
-        {/* Info box */}
-        <div className="mt-6 p-4 bg-primary/5 border border-primary/20 rounded-xl">
-          <div className="flex gap-3">
-            <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center flex-shrink-0">
-              <span className="text-sm">💡</span>
-            </div>
-            <div>
-              <h4 className="text-sm font-medium text-foreground mb-1">Before you start</h4>
-              <p className="text-xs text-muted-foreground leading-relaxed">
-                You'll receive a 12-word recovery phrase. This is the ONLY way to recover your
-                account. Write it down and keep it safe.
-              </p>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      {/* Footer */}
-      <div className="px-6 py-6 pb-8">
-        <button
-          onClick={onNext}
-          className="w-full py-4 px-6 bg-primary hover:bg-primary/90 text-primary-foreground font-semibold rounded-xl transition-all duration-200 flex items-center justify-center gap-2 shadow-lg shadow-primary/25 active:scale-[0.98]"
-        >
-          Create New Wallet
-          <ChevronRight className="w-5 h-5" />
-        </button>
-
-        {onBack && (
-          <button
-            onClick={onBack}
-            className="w-full mt-3 py-3 px-6 text-muted-foreground hover:text-foreground text-sm font-medium transition-colors"
-          >
-            Back
-          </button>
-        )}
       </div>
     </div>
   );

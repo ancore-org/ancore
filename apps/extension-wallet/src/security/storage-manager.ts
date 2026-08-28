@@ -1,4 +1,4 @@
-import { SecureStorageManager, createStorageAdapter } from '@ancore/core-sdk';
+import { createStorageAdapter, SecureStorageManager, type StorageAdapter } from '@ancore/core-sdk';
 
 type StorageManagerInstance = InstanceType<typeof SecureStorageManager>;
 
@@ -12,6 +12,8 @@ export function getSharedStorageManager(): StorageManagerInstance {
   return _storageManager;
 }
 
-export function resetSharedStorageManagerForTests(): void {
-  _storageManager = null;
+/** Reset singleton; optionally seed with a test adapter before the next getSharedStorageManager(). */
+export function resetSharedStorageManagerForTests(adapter?: StorageAdapter): void {
+  _storageManager = adapter ? new SecureStorageManager(adapter) : null;
+  globalThis.localStorage?.clear?.();
 }

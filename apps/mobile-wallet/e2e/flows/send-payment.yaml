@@ -1,0 +1,16 @@
+appId: org.ancore.wallet.dev
+---
+# TODO: requires #785 (mobile-sign-send) — enable in CI after that ships
+- launchApp
+- tapOn: "Unlock Wallet"
+- tapOn: "Use Password Instead"
+- tapOn: "Password"
+- inputText: ${E2E_TEST_PASSWORD}
+- tapOn: "Continue"
+- assertVisible: "Send"
+- tapOn: "Send"
+- tapOn: "Recipient"
+- inputText: ${E2E_RECIPIENT_ADDRESS}
+- tapOn: "Continue"
+- assertVisible: "Transaction Submitted"
+- assertVisible: "Transaction hash"

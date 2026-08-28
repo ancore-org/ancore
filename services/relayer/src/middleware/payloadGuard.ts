@@ -1,4 +1,5 @@
 import { Request, Response, NextFunction, RequestHandler } from 'express';
+import { getEnv, DEFAULT_RELAY_MAX_PAYLOAD_BYTES } from '../config/env';
 import { rootLogger as logger } from '../logging';
 
 /**
@@ -10,7 +11,7 @@ export const PAYLOAD_TOO_LARGE_REASON = 'PAYLOAD_TOO_LARGE' as const;
  * Default maximum request body size in bytes (512 KiB).
  * Override via the `RELAY_MAX_PAYLOAD_BYTES` environment variable.
  */
-export const DEFAULT_MAX_PAYLOAD_BYTES = 512 * 1024; // 512 KiB
+export const DEFAULT_MAX_PAYLOAD_BYTES = DEFAULT_RELAY_MAX_PAYLOAD_BYTES; // 512 KiB
 
 /**
  * Options accepted by `createPayloadGuardMiddleware`.
@@ -27,21 +28,18 @@ export interface PayloadGuardOptions {
 }
 
 /**
- * Resolve the effective max-payload limit from options → env → default.
+ * Resolve the effective max-payload limit from options → validated env.
  * Exported for unit testing.
+ *
+ * The env value is parsed and bounds-checked by the Zod schema in
+ * `src/config/env.ts`, so an invalid `RELAY_MAX_PAYLOAD_BYTES` is a boot-time
+ * failure rather than a silent fallback to the default.
  */
 export function resolveMaxBytes(options?: PayloadGuardOptions): number {
   if (options?.maxBytes !== undefined) {
     return options.maxBytes;
   }
-  const fromEnv = process.env['RELAY_MAX_PAYLOAD_BYTES'];
-  if (fromEnv) {
-    const parsed = parseInt(fromEnv, 10);
-    if (!isNaN(parsed) && parsed > 0) {
-      return parsed;
-    }
-  }
-  return DEFAULT_MAX_PAYLOAD_BYTES;
+  return getEnv().RELAY_MAX_PAYLOAD_BYTES;
 }
 
 /**

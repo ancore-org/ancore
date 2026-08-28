@@ -1,0 +1,5 @@
+# Cargo Audit configuration for contracts workspace
+# Add triaged advisory IDs to `ignore` to allowlist known false positives.
+
+[advisories]
+ignore = []

@@ -300,4 +300,4 @@ Our RFC process is inspired by:
 
 ---
 
-**See also**: [CONTRIBUTING.md](CONTRIBUTING.md), [MAINTAINERS.md](MAINTAINERS.md)
+**See also**: [CONTRIBUTING.md](CONTRIBUTING.md), [CONTRIBUTORS.md](CONTRIBUTORS.md)

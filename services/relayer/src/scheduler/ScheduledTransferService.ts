@@ -3,7 +3,10 @@ import type { RelayServiceContract } from '../types';
 import type { RelayExecuteRequest } from '../types';
 import { nextRetryAfter } from '../queue/backoff';
 import { ScheduledTransferStore } from './ScheduledTransferStore';
+import type { PgScheduledTransferStore } from './PgScheduledTransferStore';
 import { computeNextRunAt, isDue } from './schedule-utils';
+import { schedulerMaxFailuresReached } from '../metrics';
+import { rootLogger } from '../logging/logger';
 import type {
   CreateScheduledTransferInput,
   ScheduledTransfer,
@@ -12,42 +15,59 @@ import type {
 
 const MAX_CONSECUTIVE_FAILURES = 5;
 
+export type AnyScheduledTransferStore = ScheduledTransferStore | PgScheduledTransferStore;
+
+/**
+ * FailureNotifier is called when a recurring transfer reaches a notable failure
+ * threshold.  Implementations may send push notifications, emails, webhooks, etc.
+ */
+export interface FailureNotifier {
+  onConsecutiveFailure(transfer: ScheduledTransfer, failureCount: number): Promise<void>;
+  onMaxFailuresReached(transfer: ScheduledTransfer): Promise<void>;
+}
+
 export class ScheduledTransferService {
   constructor(
-    private readonly store: ScheduledTransferStore,
-    private readonly relayService: RelayServiceContract
+    private readonly store: AnyScheduledTransferStore,
+    private readonly relayService: RelayServiceContract,
+    private readonly notifier?: FailureNotifier
   ) {}
 
-  create(input: CreateScheduledTransferInput, callerId: string): ScheduledTransfer {
+  async create(input: CreateScheduledTransferInput, callerId: string): Promise<ScheduledTransfer> {
     return this.store.create(input, callerId);
   }
 
-  list(accountAddress: string, callerId: string): ScheduledTransfer[] {
+  async list(accountAddress: string, callerId: string): Promise<ScheduledTransfer[]> {
     return this.store.listByAccount(accountAddress, callerId);
   }
 
-  get(id: string, callerId: string): ScheduledTransfer | undefined {
+  async get(id: string, callerId: string): Promise<ScheduledTransfer | undefined> {
     return this.store.getByIdForCaller(id, callerId);
   }
 
-  pause(id: string, callerId: string): ScheduledTransfer | undefined {
-    const transfer = this.store.getByIdForCaller(id, callerId);
+  async pause(id: string, callerId: string): Promise<ScheduledTransfer | undefined> {
+    const transfer = await this.store.getByIdForCaller(id, callerId);
     if (!transfer || transfer.status !== 'active') {
       return undefined;
     }
     return this.store.updateStatus(id, 'paused');
   }
 
-  cancel(id: string, callerId: string): ScheduledTransfer | undefined {
-    const transfer = this.store.getByIdForCaller(id, callerId);
-    if (!transfer || transfer.status === 'cancelled' || transfer.status === 'completed') {
+  async cancel(id: string, callerId: string): Promise<ScheduledTransfer | undefined> {
+    const transfer = await this.store.getByIdForCaller(id, callerId);
+    if (
+      !transfer ||
+      transfer.status === 'cancelled' ||
+      transfer.status === 'completed' ||
+      transfer.status === 'failed'
+    ) {
       return undefined;
     }
     return this.store.updateStatus(id, 'cancelled');
   }
 
-  listExecutions(id: string, callerId: string): ScheduledTransferExecutionLog[] {
-    const transfer = this.store.getByIdForCaller(id, callerId);
+  async listExecutions(id: string, callerId: string): Promise<ScheduledTransferExecutionLog[]> {
+    const transfer = await this.store.getByIdForCaller(id, callerId);
     if (!transfer) {
       return [];
     }
@@ -56,9 +76,11 @@ export class ScheduledTransferService {
 
   /**
    * Execute all due scheduled transfers via the relayer pipeline.
+   * Acquires a distributed lease per transfer to prevent double-execution
+   * across concurrent worker instances.
    */
   async processDueTransfers(now: Date = new Date()): Promise<number> {
-    const due = this.store.listDue(now);
+    const due = await this.store.listDue(now);
     let processed = 0;
 
     for (const transfer of due) {
@@ -66,15 +88,27 @@ export class ScheduledTransferService {
         continue;
       }
 
-      if (!this.store.tryAcquireProcessing(transfer.id)) {
+      const acquired = await this.store.tryAcquireProcessing(transfer.id);
+      if (!acquired) {
         continue;
       }
 
       try {
         await this.executeTransfer(transfer, now);
         processed++;
+      } catch (err) {
+        // A single transfer must not abort the whole scheduler pass; otherwise
+        // one persistently failing transfer blocks every later due transfer.
+        rootLogger.error(
+          {
+            scheduledTransferId: transfer.id,
+            outcome: 'error',
+            error: err instanceof Error ? err.message : String(err),
+          },
+          'scheduled transfer execution threw'
+        );
       } finally {
-        this.store.releaseProcessing(transfer.id);
+        await this.store.releaseProcessing(transfer.id);
       }
     }
 
@@ -102,13 +136,13 @@ export class ScheduledTransferService {
       error: response.error?.message,
     };
 
-    this.store.appendExecution(log);
+    await this.store.appendExecution(log);
 
     if (!response.success) {
       const consecutiveFailures = transfer.consecutiveFailures + 1;
 
       if (transfer.frequency === 'once') {
-        this.store.updateAfterExecution(transfer.id, {
+        await this.store.updateAfterExecution(transfer.id, {
           status: 'completed',
           nextRunAt: transfer.nextRunAt,
           lastExecutionAt: executedAt,
@@ -118,21 +152,49 @@ export class ScheduledTransferService {
       }
 
       if (consecutiveFailures >= MAX_CONSECUTIVE_FAILURES) {
-        this.store.updateAfterExecution(transfer.id, {
-          status: 'completed',
+        await this.store.updateAfterExecution(transfer.id, {
+          status: 'failed',
           nextRunAt: transfer.nextRunAt,
           lastExecutionAt: executedAt,
           consecutiveFailures,
         });
+
+        schedulerMaxFailuresReached.inc();
+
+        // Notify: max failures reached, transfer terminated
+        if (this.notifier) {
+          await this.notifier.onMaxFailuresReached(transfer).catch(() => {});
+        }
+        if ('recordFailureNotification' in this.store) {
+          await (this.store as PgScheduledTransferStore)
+            .recordFailureNotification(transfer.id, 'max_failures_reached', {
+              consecutiveFailures,
+              error: response.error?.message,
+            })
+            .catch(() => {});
+        }
         return;
       }
 
-      this.store.updateAfterExecution(transfer.id, {
+      await this.store.updateAfterExecution(transfer.id, {
         status: 'active',
         nextRunAt: nextRetryAfter(consecutiveFailures - 1, now),
         lastExecutionAt: executedAt,
         consecutiveFailures,
       });
+
+      // Notify on every consecutive failure (above threshold 1 to avoid noise)
+      if (consecutiveFailures > 1 && this.notifier) {
+        await this.notifier.onConsecutiveFailure(transfer, consecutiveFailures).catch(() => {});
+      }
+      if (consecutiveFailures > 1 && 'recordFailureNotification' in this.store) {
+        await (this.store as PgScheduledTransferStore)
+          .recordFailureNotification(transfer.id, 'consecutive_failure', {
+            consecutiveFailures,
+            error: response.error?.message,
+          })
+          .catch(() => {});
+      }
       return;
     }
 
@@ -143,14 +205,14 @@ export class ScheduledTransferService {
     );
 
     if (nextRunAt) {
-      this.store.updateAfterExecution(transfer.id, {
+      await this.store.updateAfterExecution(transfer.id, {
         status: 'active',
         nextRunAt: nextRunAt.toISOString(),
         lastExecutionAt: executedAt,
         consecutiveFailures: 0,
       });
     } else {
-      this.store.updateAfterExecution(transfer.id, {
+      await this.store.updateAfterExecution(transfer.id, {
         status: 'completed',
         nextRunAt: transfer.nextRunAt,
         lastExecutionAt: executedAt,

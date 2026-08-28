@@ -1,4 +1,5 @@
 export {
+  rootLogger as logger,
   rootLogger,
   createRequestLogger,
   redactAccountId,

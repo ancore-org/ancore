@@ -7,10 +7,11 @@ type Props = {
   adapter: TransactionHistoryAdapter;
   pageSize?: number;
   isConfigured?: boolean;
+  isOnline?: boolean;
 };
 
-export const HistoryScreen = ({ adapter, pageSize, isConfigured = true }: Props) => {
-  const history = usePaginatedTransactionHistory({ adapter, pageSize });
+export const HistoryScreen = ({ adapter, pageSize, isConfigured = true, isOnline }: Props) => {
+  const history = usePaginatedTransactionHistory({ adapter, pageSize, isOnline });
 
   // Show configuration error if adapter not configured
   if (!isConfigured && history.isLoadingInitial) {
@@ -30,6 +31,7 @@ export const HistoryScreen = ({ adapter, pageSize, isConfigured = true }: Props)
       isLoadingInitial={history.isLoadingInitial}
       isLoadingMore={history.isLoadingMore}
       isRefreshing={history.isRefreshing}
+      isOffline={history.isOffline}
       hasMore={history.hasMore}
       error={history.error}
       onRetry={history.retry}

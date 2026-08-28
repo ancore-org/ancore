@@ -11,6 +11,7 @@ import { LockManager } from '../security/lock-manager';
 import { getSharedStorageManager } from '../security/storage-manager';
 import { getSettingsState, useSettingsStore } from '../stores/settings';
 import { setSessionState } from '../stores/session';
+import { useHotkey } from './useHotkey';
 
 // Singleton storage manager shared across hook instances
 type StorageManagerInstance = InstanceType<typeof SecureStorageManager>;
@@ -67,6 +68,12 @@ export function useLockManager(): UseLockManagerResult {
   const lock = useCallback(() => {
     managerRef.current?.lock();
   }, []);
+
+  const enableLockShortcut = useSettingsStore((state) => state.enableLockShortcut);
+
+  // Register cross-platform keyboard shortcut: ⌘+Shift+L (Mac) / Ctrl+Shift+L (Win/Linux)
+  useHotkey('Meta+Shift+L', lock, { enabled: enableLockShortcut && !isLocked, ignoreInputs: true });
+  useHotkey('Ctrl+Shift+L', lock, { enabled: enableLockShortcut && !isLocked, ignoreInputs: true });
 
   return { isLocked, unlock, lock };
 }

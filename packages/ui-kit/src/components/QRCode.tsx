@@ -24,7 +24,7 @@ export function QRCode({
   return (
     <div
       className={cn(
-        'inline-flex items-center justify-center rounded-xl border border-slate-200 bg-white p-4 shadow-sm',
+        'inline-flex items-center justify-center rounded-xl border border-border bg-card p-4 shadow-sm',
         className
       )}
       {...props}

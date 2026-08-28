@@ -1,7 +1,6 @@
 import { render, screen, fireEvent } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { OnboardingHints } from '../OnboardingHints';
-import React from 'react';
 
 const mockNavigate = vi.fn();
 
