@@ -10,6 +10,18 @@ import {
 
 export const DASHBOARD_SESSION_STORAGE_KEY = 'ancore_dashboard_session';
 
+/**
+ * Thrown when a request needs an auth token but no dashboard session is
+ * present. Call sites must surface this instead of falling back to a
+ * hardcoded placeholder token.
+ */
+export class AuthRequiredError extends Error {
+  constructor(message = 'No active session; sign in to continue.') {
+    super(message);
+    this.name = 'AuthRequiredError';
+  }
+}
+
 export interface DashboardSession {
   userId: string;
   displayName: string;

@@ -12,7 +12,7 @@ import {
   type SchedulerClient,
 } from '../services/scheduler-client';
 import { createWalletApiRelaySigner } from '../services/relay-signer';
-import { useDashboardAuth } from '../auth';
+import { AuthRequiredError, useDashboardAuth } from '../auth';
 
 const REFRESH_INTERVAL_MS = 15_000;
 
@@ -40,7 +40,12 @@ export function useScheduledTransfers(options: UseScheduledTransfersOptions = {}
       options.client ??
       createSchedulerClient({
         baseUrl: import.meta.env.VITE_RELAYER_URL ?? 'http://localhost:3000',
-        getAuthToken: () => session?.accessToken ?? 'ancore-client-token',
+        getAuthToken: () => {
+          if (!session?.accessToken) {
+            throw new AuthRequiredError();
+          }
+          return session.accessToken;
+        },
       }),
     [options.client, session?.accessToken]
   );
