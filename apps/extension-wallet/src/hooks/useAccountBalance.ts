@@ -115,25 +115,4 @@ export function formatBalance(
   return currency ? `${formatted} ${currency}` : formatted;
 }
 
-/**
- * Utility function to convert XLM to USD (placeholder)
- * In production, this would fetch from a price API
- */
-export function convertToUSD(xlmAmount: number, rate: number = 0.12): number {
-  return xlmAmount * rate;
-}
-
-/**
- * Utility function to format USD value
- * @deprecated Use `formatFiatAmount` from `@ancore/core-sdk` instead.
- */
-export function formatUSD(amount: number): string {
-  return new Intl.NumberFormat('en-US', {
-    style: 'currency',
-    currency: 'USD',
-    minimumFractionDigits: 2,
-    maximumFractionDigits: 2,
-  }).format(amount);
-}
-
 export default useAccountBalance;
