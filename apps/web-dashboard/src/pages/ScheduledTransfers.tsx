@@ -5,6 +5,8 @@ import {
   useScheduledTransfers,
   type CreateScheduledTransferForm,
 } from '../hooks/useScheduledTransfers';
+import { useAccountState } from '../hooks/useAccountState';
+import { useWalletConnection } from '../hooks/useWalletConnection';
 import { SCHEDULE_FREQUENCY_OPTIONS } from '../services/scheduler-client';
 import { ExecutionLogPanel } from '../components/ExecutionLogPanel';
 
@@ -15,6 +17,10 @@ function defaultStartAt(): string {
 }
 
 export function ScheduledTransfersPage() {
+  const { currentAccount } = useAccountState();
+  const wallet = useWalletConnection();
+  const accountAddress = wallet.address || currentAccount?.address;
+
   const {
     transfers,
     executions,
@@ -24,7 +30,7 @@ export function ScheduledTransfersPage() {
     createTransfer,
     pauseTransfer,
     cancelTransfer,
-  } = useScheduledTransfers();
+  } = useScheduledTransfers(accountAddress ? { accountAddress } : {});
 
   const [form, setForm] = useState<CreateScheduledTransferForm>({
     to: '',

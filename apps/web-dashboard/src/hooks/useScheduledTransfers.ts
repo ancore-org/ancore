@@ -33,7 +33,7 @@ export interface UseScheduledTransfersOptions {
 
 export function useScheduledTransfers(options: UseScheduledTransfersOptions = {}) {
   const { session } = useDashboardAuth();
-  const accountAddress = options.accountAddress ?? DEMO_ACCOUNT_ADDRESS;
+  const accountAddress = options.accountAddress ?? session?.userId ?? DEMO_ACCOUNT_ADDRESS;
   const refreshIntervalMs = options.refreshIntervalMs ?? REFRESH_INTERVAL_MS;
   const client = useMemo(
     () =>
