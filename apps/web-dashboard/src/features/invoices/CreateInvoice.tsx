@@ -1,3 +1,4 @@
+import { useMemo } from 'react';
 import { useFormContext } from 'react-hook-form';
 import { Form, Field, AddressInput, FormAmountInput, FormSubmit } from '@ancore/ui-kit';
 import { Card, CardContent, CardHeader, CardTitle } from '@ancore/ui-kit';
@@ -27,6 +28,17 @@ function InvoiceFields({ onCancel }: { onCancel?: () => void }) {
   const recipientAddressError =
     stellarAddressError(recipientAddress, { kinds: ['account'] }) ?? undefined;
 
+  // `createInvoiceSchema` rejects a past dueDate on submit; hint that at the
+  // input level too so the picker doesn't let users pick an already-invalid time.
+  const minDueDate = useMemo(() => {
+    const now = new Date();
+    now.setSeconds(0, 0);
+    const pad = (value: number) => String(value).padStart(2, '0');
+    return `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}T${pad(
+      now.getHours()
+    )}:${pad(now.getMinutes())}`;
+  }, []);
+
   return (
     <div className="space-y-4">
       <AddressInput
@@ -48,7 +60,7 @@ function InvoiceFields({ onCancel }: { onCancel?: () => void }) {
       </Field>
 
       <Field label="Due Date (optional)">
-        <Input type="datetime-local" {...register('dueDate')} />
+        <Input type="datetime-local" min={minDueDate} {...register('dueDate')} />
       </Field>
 
       <Field label="Reference (optional)">
