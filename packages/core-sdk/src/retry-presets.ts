@@ -8,6 +8,7 @@
  */
 
 import type { RetryOptions } from '@ancore/stellar';
+import { InvalidRetryPresetError } from './errors';
 
 /**
  * Low-latency preset for time-sensitive operations.
@@ -129,7 +130,7 @@ export type RetryPresetName = keyof typeof RETRY_PRESETS;
 export function getRetryPreset(name: RetryPresetName): RetryOptions {
   const preset = RETRY_PRESETS[name];
   if (!preset) {
-    throw new Error(`Unknown retry preset: ${name}`);
+    throw new InvalidRetryPresetError(name);
   }
   return { ...preset }; // Return a copy to prevent mutation
 }

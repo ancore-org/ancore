@@ -1,4 +1,4 @@
-appId: com.ancore.mobile
+appId: org.ancore.wallet.dev
 name: Ancore mobile app Maestro e2e suite
 flows:
   - e2e/flows

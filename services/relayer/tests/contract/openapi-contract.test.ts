@@ -17,11 +17,12 @@ import type { AuthServiceContract, SignatureServiceContract } from '../../src/ty
 
 const VALID_KEY = 'a'.repeat(64);
 const VALID_SIG = 'b'.repeat(128);
+const ACCOUNT_ADDRESS = 'GAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAWHF';
 
 const validBody = {
   sessionKey: VALID_KEY,
   operation: 'relay_execute' as const,
-  parameters: {},
+  parameters: { accountAddress: ACCOUNT_ADDRESS },
   signature: VALID_SIG,
   nonce: 1,
 };

@@ -1,8 +1,8 @@
 import { describe, it, expect, beforeEach } from 'vitest';
 import { useContactsStore, DuplicateAliasError } from '../contacts';
 
-const ADDR_A = 'GAAZI4TCR3TY5OJHCTJC2A4QSY6CJWJH5IAJTGKIN2ER7LBNVKOCCWNA';
-const ADDR_B = 'GBRPYHIL2CI3FNQ4BXLFMNDLFJUNPU2HY3ZMFSHONUCEOASW7QC7OX2H';
+const ADDR_A = 'GDP27GNQUPVJQ2JRZC5N5YYNLMKNVYF5AJOOKWQ2R4PKAKMMV77O5EIY';
+const ADDR_B = 'GDX7IBH35QYGRVFKSXXYINHDQSKV7SRZ7EFVYYI4USSK66BRSZWDVE5C';
 
 beforeEach(() => {
   useContactsStore.setState({ contacts: [] });

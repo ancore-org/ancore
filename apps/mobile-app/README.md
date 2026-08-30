@@ -31,15 +31,18 @@ corepack pnpm --filter @ancore/mobile-app android
 
 ## Scripts
 
-| Command              | Description                  |
-| -------------------- | ---------------------------- |
-| `pnpm start`         | Start Metro bundler          |
-| `pnpm ios`           | Run on iOS simulator         |
-| `pnpm android`       | Run on Android emulator      |
-| `pnpm build:ios`     | Build iOS release bundle     |
-| `pnpm build:android` | Build Android release bundle |
-| `pnpm lint`          | ESLint source                |
-| `pnpm test`          | Jest unit tests              |
+| Command              | Description                                               |
+| -------------------- | --------------------------------------------------------- |
+| `pnpm start`         | Start Metro bundler                                       |
+| `pnpm ios`           | Run dev scheme on iOS simulator (`org.ancore.wallet.dev`) |
+| `pnpm android`       | Run dev flavor on Android emulator                        |
+| `pnpm ios:prod`      | Run prod scheme on iOS simulator                          |
+| `pnpm android:prod`  | Run prod flavor on Android emulator                       |
+| `pnpm set-version`   | Sync version across package.json and native projects      |
+| `pnpm build:ios`     | Build iOS release bundle                                  |
+| `pnpm build:android` | Build Android release bundle                              |
+| `pnpm lint`          | ESLint source                                             |
+| `pnpm test`          | Jest unit tests                                           |
 
 ## Architecture
 
@@ -58,3 +61,17 @@ index.js → App.tsx → OnboardingNavigator (@ancore/mobile-wallet)
 | Prod    | org.ancore.wallet     | org.ancore.wallet     |
 
 Dual bundle IDs allow side-by-side dev and prod installs with isolated Keychain stores.
+
+## Store release
+
+Fastlane lanes upload to TestFlight (iOS) and Play internal (Android). See
+[RELEASE.md](./RELEASE.md) for the full runbook.
+
+```bash
+# Sync marketing version across native projects
+pnpm set-version 0.2.0
+
+# Tag to trigger CI (from repo root)
+git tag -a mobile-v0.2.0 -m "Mobile release v0.2.0"
+git push origin mobile-v0.2.0
+```

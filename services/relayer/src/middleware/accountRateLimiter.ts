@@ -10,7 +10,12 @@ import { getEnv } from '../config/env';
  * non-positive values fail startup instead of silently falling back.
  */
 function resolveRpm(rpm?: number): number {
-  if (rpm !== undefined && rpm > 0) return rpm;
+  if (rpm !== undefined && Number.isInteger(rpm) && rpm >= 1 && rpm <= 600) return rpm;
+  if (rpm !== undefined) {
+    console.warn(
+      `[accountRateLimiter] Invalid rpm ${rpm} — must be integer 1..600, falling back to env`
+    );
+  }
   return getEnv().RELAY_RATE_LIMIT_RPM;
 }
 

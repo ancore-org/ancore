@@ -33,6 +33,9 @@ use soroban_sdk::{
     Val, Vec,
 };
 
+/// Env-free validation helpers (also used by cargo-fuzz / property tests).
+pub mod validation;
+
 #[cfg(not(target_family = "wasm"))]
 use ed25519_dalek::{Signature as DalekSignature, VerifyingKey};
 
@@ -211,14 +214,13 @@ const INSTANCE_BUMP_THRESHOLD: u32 = 15 * DAY_IN_LEDGERS; // 15 days
 const MIN_MILLISECONDS_TIMESTAMP: u64 = 100_000_000_000;
 
 /// Permission bit for send payment operations
-pub const PERMISSION_SEND_PAYMENT: u32 = 0;
-/// Permission bit for execute operations
+pub const PERMISSION_SEND_PAYMENT: u32 = validation::PERMISSION_SEND_PAYMENT;
 /// Permission bit for session-key execute authorization.
 /// Issue #188: Session keys must have this permission to invoke transactions.
 /// Without this bit set, execute() returns InsufficientPermission error.
-pub const PERMISSION_EXECUTE: u32 = 1;
+pub const PERMISSION_EXECUTE: u32 = validation::PERMISSION_EXECUTE;
 /// Permission bit for invoke contract operations
-pub const PERMISSION_INVOKE_CONTRACT: u32 = 2;
+pub const PERMISSION_INVOKE_CONTRACT: u32 = validation::PERMISSION_INVOKE_CONTRACT;
 
 #[contract]
 pub struct AncoreAccount;
@@ -469,9 +471,9 @@ impl AncoreAccount {
             return Err(ContractError::InvalidExpiration);
         }
 
-        Self::validate_spend_policy(
-            &max_amount_per_call,
-            &cumulative_limit,
+        validation::validate_spend_policy(
+            max_amount_per_call,
+            cumulative_limit,
             spend_window_seconds,
         )?;
 
@@ -479,19 +481,16 @@ impl AncoreAccount {
         owner.require_auth();
 
         // Validate permission vector contains only valid/known permissions and no duplicates
-        let mut seen = Vec::new(&env);
+        let mut permission_buf = [0u32; 8];
+        let mut permission_len = 0usize;
         for permission in permissions.iter() {
-            if permission != PERMISSION_SEND_PAYMENT
-                && permission != PERMISSION_EXECUTE
-                && permission != PERMISSION_INVOKE_CONTRACT
-            {
+            if permission_len >= permission_buf.len() {
                 return Err(ContractError::InsufficientPermission);
             }
-            if seen.contains(permission) {
-                return Err(ContractError::InsufficientPermission);
-            }
-            seen.push_back(permission);
+            permission_buf[permission_len] = permission;
+            permission_len += 1;
         }
+        validation::validate_permissions(&permission_buf[..permission_len])?;
 
         if env
             .storage()
@@ -1082,30 +1081,6 @@ impl AncoreAccount {
         payload
     }
 
-    fn validate_spend_policy(
-        max_amount_per_call: &Option<i128>,
-        cumulative_limit: &Option<i128>,
-        spend_window_seconds: u64,
-    ) -> Result<(), ContractError> {
-        if let Some(limit) = max_amount_per_call {
-            if *limit <= 0 {
-                return Err(ContractError::InvalidSpendPolicy);
-            }
-        }
-
-        if let Some(limit) = cumulative_limit {
-            if *limit <= 0 || spend_window_seconds == 0 {
-                return Err(ContractError::InvalidSpendPolicy);
-            }
-        }
-
-        if spend_window_seconds > 0 && cumulative_limit.is_none() {
-            return Err(ContractError::InvalidSpendPolicy);
-        }
-
-        Ok(())
-    }
-
     fn extract_spend_amount(env: &Env, args: &Vec<Val>) -> Option<i128> {
         for index in 0..args.len() {
             let value = args.get(index).unwrap();
@@ -1123,36 +1098,15 @@ impl AncoreAccount {
         session: &SessionKey,
         args: &Vec<Val>,
     ) -> Result<(), ContractError> {
-        let amount = match Self::extract_spend_amount(env, args) {
-            Some(value) => value,
-            None => return Ok(()),
-        };
-
-        if let Some(limit) = session.max_amount_per_call {
-            if amount > limit {
-                return Err(ContractError::ExceededSpendLimit);
-            }
-        }
-
-        if let Some(cumulative_limit) = session.cumulative_limit {
-            let now = env.ledger().timestamp();
-            let mut spent = session.spent_in_window;
-            let window_start = session.spend_window_start;
-
-            if now > window_start.saturating_add(session.spend_window_seconds) {
-                spent = 0;
-            }
-
-            let next_spent = spent
-                .checked_add(amount)
-                .ok_or(ContractError::ArithmeticOverflow)?;
-
-            if next_spent > cumulative_limit {
-                return Err(ContractError::ExceededSpendLimit);
-            }
-        }
-
-        Ok(())
+        validation::check_spend_limits(&validation::SpendCheckInput {
+            amount: Self::extract_spend_amount(env, args),
+            max_amount_per_call: session.max_amount_per_call,
+            cumulative_limit: session.cumulative_limit,
+            spend_window_start: session.spend_window_start,
+            spend_window_seconds: session.spend_window_seconds,
+            spent_in_window: session.spent_in_window,
+            now: env.ledger().timestamp(),
+        })
     }
 
     fn apply_spend_usage(

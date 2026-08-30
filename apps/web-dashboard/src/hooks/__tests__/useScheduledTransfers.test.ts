@@ -2,11 +2,17 @@ import { renderHook, waitFor } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
 import type { ScheduledTransfer, ScheduledTransferExecutionLog } from '@ancore/types';
 
-vi.mock('../../auth', () => ({
-  useDashboardAuth: () => ({
-    session: { accessToken: 'test-token' },
-  }),
+const mockUseDashboardAuth = vi.fn(() => ({
+  session: { accessToken: 'test-token' } as { accessToken: string } | null,
 }));
+
+vi.mock('../../auth', async () => {
+  const actual = await vi.importActual<typeof import('../../auth')>('../../auth');
+  return {
+    ...actual,
+    useDashboardAuth: () => mockUseDashboardAuth(),
+  };
+});
 
 vi.mock('../../services/scheduler-client', () => ({
   createSchedulerClient: vi.fn(),
@@ -69,5 +75,19 @@ describe('useScheduledTransfers', () => {
     expect(result.current.executions[sampleTransfer.id]).toHaveLength(1);
     expect(client.listScheduledTransfers).toHaveBeenCalled();
     expect(client.listExecutions).toHaveBeenCalledWith(sampleTransfer.id);
+  });
+
+  it('throws AuthRequiredError instead of a hardcoded token when no session is present', async () => {
+    mockUseDashboardAuth.mockReturnValueOnce({ session: null });
+
+    const { createSchedulerClient } = await import('../../services/scheduler-client');
+    const { AuthRequiredError } = await import('../../auth');
+    const { useScheduledTransfers } = await import('../useScheduledTransfers');
+
+    renderHook(() => useScheduledTransfers({ refreshIntervalMs: 60_000 }));
+
+    expect(createSchedulerClient).toHaveBeenCalled();
+    const options = vi.mocked(createSchedulerClient).mock.calls[0][0];
+    expect(() => options?.getAuthToken?.()).toThrow(AuthRequiredError);
   });
 });

@@ -17,14 +17,14 @@ maestro test e2e/flows --env-file e2e/common/env.yaml
 
 ## Flows
 
-| Flow                      | Status             | AppID               | Purpose                                           |
-| ------------------------- | ------------------ | ------------------- | ------------------------------------------------- |
-| `create-wallet.yaml`      | ⏳ Blocked by #783 | `com.ancore.mobile` | Create new wallet from recovery phrase generation |
-| `import-wallet.yaml`      | ⏳ Blocked by #783 | `com.ancore.mobile` | Import wallet from existing recovery phrase       |
-| `lock-unlock.yaml`        | ✅ Ready           | `com.ancore.mobile` | Lock/unlock wallet with password                  |
-| `send-payment.yaml`       | ⏳ Blocked by #785 | `com.ancore.mobile` | Send NIGHT payment to recipient                   |
-| `walletconnect-pair.yaml` | ✅ Ready           | `com.ancore.mobile` | Pair with dApp via WalletConnect                  |
-| `sign-xdr.yaml`           | ✅ Ready           | `com.ancore.mobile` | Sign transaction after WalletConnect pair         |
+| Flow                      | Status     | AppID                   | Purpose                                           |
+| ------------------------- | ---------- | ----------------------- | ------------------------------------------------- |
+| `create-wallet.yaml`      | ✅ Ready   | `org.ancore.wallet.dev` | Create new wallet from recovery phrase generation |
+| `import-wallet.yaml`      | ✅ Ready   | `org.ancore.wallet.dev` | Import wallet from existing recovery phrase       |
+| `lock-unlock.yaml`        | ✅ Ready   | `org.ancore.wallet.dev` | Lock/unlock wallet with password                  |
+| `send-payment.yaml`       | ⏳ Blocked | `org.ancore.wallet.dev` | Send NIGHT payment to recipient (no Send UI yet)  |
+| `walletconnect-pair.yaml` | ✅ Ready   | `org.ancore.wallet.dev` | Pair with dApp via WalletConnect                  |
+| `sign-xdr.yaml`           | ✅ Ready   | `org.ancore.wallet.dev` | Sign transaction after WalletConnect pair         |
 
 ## CI Integration
 
@@ -84,9 +84,7 @@ maestro test e2e/flows/lock-unlock.yaml \
 
 ## Blocked Flows
 
-- **create-wallet.yaml** — Awaiting #783 (mobile-wire-onboarding). Scaffolded but depends on UI wiring.
-- **import-wallet.yaml** — Awaiting #783 (mobile-wire-onboarding). Scaffolded but depends on UI wiring.
-- **send-payment.yaml** — Awaiting #785 (mobile-sign-send). Scaffolded but depends on sign/submit integration.
+- **send-payment.yaml** — Vault-backed signing is implemented, but the mobile Send UI is not wired yet.
 
 ## Running in CI
 
@@ -101,7 +99,7 @@ See `.github/workflows/mobile-app-e2e.yml` for build matrix (iOS + Android, 2 ma
 
 ### Adding a New Flow
 
-1. Create `e2e/flows/<feature>.yaml` with appId `com.ancore.mobile`
+1. Create `e2e/flows/<feature>.yaml` with appId `org.ancore.wallet.dev`
 2. Test locally with `maestro test e2e/flows/<feature>.yaml --env-file e2e/common/env.yaml`
 3. Add to table above with status and blockers (if any)
 4. CI picks it up automatically

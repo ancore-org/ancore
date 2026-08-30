@@ -148,6 +148,16 @@ export function parsePaymentRequest(payload: unknown): PaymentRequest {
     throw new PaymentRequestValidationError('memoType must be one of: text, id, hash, return.');
   }
 
+  if (memo !== undefined) {
+    const effectiveMemoType = memoType || 'text';
+    if (effectiveMemoType === 'text') {
+      const byteLength = new TextEncoder().encode(memo).length;
+      if (byteLength > 28) {
+        throw new PaymentRequestValidationError('Text memo must be 28 bytes or less.');
+      }
+    }
+  }
+
   // 5. Build normalized object
   const request: PaymentRequest = {
     destination,

@@ -5,7 +5,8 @@ edition.workspace = true
 rust-version.workspace = true
 
 [lib]
-crate-type = ["cdylib"]
+# cdylib for Soroban WASM; rlib so cargo-fuzz / property tests can link helpers.
+crate-type = ["cdylib", "rlib"]
 doctest = false
 
 [dependencies]
@@ -18,8 +19,11 @@ ed25519-dalek = "2.1.1"
 soroban-sdk = { workspace = true, features = ["testutils"] }
 ed25519-dalek = { version = "2.1.0", features = ["rand_core"] }
 rand = "0.8.5"
+proptest = "1.5"
 
 [features]
 testutils = ["soroban-sdk/testutils"]
+# Enables re-exports aimed at the fuzz harness (no behavior change).
+fuzzing = []
 
 # Profile settings inherited from workspace (contracts/Cargo.toml)

@@ -20,7 +20,8 @@ Session keys are created by generating a temporary key pair on the client side a
 ### Code Sample (SDK)
 
 ```typescript
-import { AncoreClient, SessionPermission } from '@ancore/core-sdk';
+import { SessionPermission } from '@ancore/types';
+import { AncoreClient } from '@ancore/core-sdk';
 import { Keypair } from '@stellar/stellar-sdk';
 
 // Generate temporary session key
@@ -28,19 +29,50 @@ const sessionKeypair = Keypair.random();
 
 const tx = await ancoreClient.createSessionKey({
   publicKey: sessionKeypair.publicKey(),
-  permissions: SessionPermission.EXECUTE,
+  // `permissions` is an array of SessionPermission values, not a single value.
+  permissions: [SessionPermission.MANAGE_DATA],
   expiresAt: Math.floor(Date.now() / 1000) + 3600, // Expires in 1 hour
 });
 // Submit tx with master account signature to register the key on-chain
 ```
 
+> `SessionPermission.MANAGE_DATA` is the value the contract calls
+> `PERMISSION_EXECUTE` (index `1`) — the permission that gates `execute()`.
+> See the enum documentation in `@ancore/types` for the full name/value mapping.
+
 ---
 
-## Permission Bits Explained
+## Permissions Explained
 
-Permissions for session keys are represented on-chain as a bitmask (integers):
-- **`PERMISSION_EXECUTE = 1`**: Grants the session key permission to sign and execute general operations on behalf of the smart account within defined scope rules.
-- **`None / Unrestricted`**: Default fallback. If no custom scopes are defined, permissions apply generally according to the bitmask.
+On-chain, a session key's permissions are a `Vec<u32>` of **permission indices**
+— not a bitmask. The contract validates each entry against its known set and
+rejects unknown values or duplicates.
+
+| `SessionPermission` | Contract constant            | Value | Grants                                             |
+| ------------------- | ---------------------------- | ----- | -------------------------------------------------- |
+| `SEND_PAYMENT`      | `PERMISSION_SEND_PAYMENT`    | `0`   | Initiating payments.                                |
+| `MANAGE_DATA`       | `PERMISSION_EXECUTE`         | `1`   | Signing and executing general operations via `execute()`. |
+| `INVOKE_CONTRACT`   | `PERMISSION_INVOKE_CONTRACT` | `2`   | Calling contract functions.                         |
+
+A separate **bitmask** representation (`1 << index`) exists purely for UI state,
+where a set of checkboxes is more convenient than an array. Convert between the
+two with the helpers in `@ancore/account-abstraction` rather than hand-rolling
+bit math — the bitmask is never sent to the contract directly:
+
+```typescript
+import {
+  permissionsToBitmask,
+  bitmaskToPermissions,
+  permissionsToContractVec,
+} from '@ancore/account-abstraction';
+
+const bitmask = permissionsToBitmask([SessionPermission.SEND_PAYMENT]); // UI state
+const perms = bitmaskToPermissions(bitmask); // back to enum values
+const vec = permissionsToContractVec(perms); // what the contract receives
+```
+
+An empty permission array grants no scoped rights; the contract rejects an
+`execute()` call from a session key lacking `PERMISSION_EXECUTE`.
 
 ---
 

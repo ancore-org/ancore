@@ -26,7 +26,7 @@ Draft ──open()──► Open ──pay()──► Paid
 |--------|------|-------------|
 | `create(creator, recipient, amount, asset, description?, due_date?, reference?)` | creator | Creates invoice in Draft state |
 | `open(id)` | creator | Transitions Draft → Open |
-| `pay(id, payer, payment_tx)` | payer | Transfers tokens via SAC; transitions Open → Paid |
+| `pay(id, payer, payment_tx)` | recipient | Transfers tokens via SAC; only `invoice.recipient` may pay; transitions Open → Paid |
 | `cancel(id)` | creator | Cancels Draft or Open invoice |
 | `expire(id)` | anyone | Transitions Open → Expired when `due_date` has passed |
 | `get(id)` | — | Returns invoice by ID |

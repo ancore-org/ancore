@@ -3,3 +3,4 @@ pub mod contract_events;
 pub mod health;
 pub mod metrics;
 pub mod statements;
+pub mod validation;

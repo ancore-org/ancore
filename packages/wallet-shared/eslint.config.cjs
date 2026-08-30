@@ -9,6 +9,9 @@ module.exports = [
     languageOptions: {
       parser: tsParser,
       parserOptions: { ecmaVersion: 2022, sourceType: 'module' },
+      globals: {
+        URL: 'readonly',
+      },
     },
     plugins: { '@typescript-eslint': tsPlugin },
     rules: {

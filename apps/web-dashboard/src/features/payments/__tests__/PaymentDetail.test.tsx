@@ -28,4 +28,23 @@ describe('PaymentDetail', () => {
       screen.getByRole('status', { name: 'Acme Treasury merchant verification: Verified' })
     ).toBeInTheDocument();
   });
+
+  it('renders the amount with the transaction asset code and no currency symbol', () => {
+    render(<PaymentDetail transaction={{ ...payment, asset: 'USDC' }} />);
+
+    expect(screen.getByText('142.5 USDC')).toBeInTheDocument();
+    expect(screen.queryByText('$142.50')).not.toBeInTheDocument();
+  });
+
+  it('falls back to XLM when the transaction carries no asset code', () => {
+    render(<PaymentDetail transaction={payment} />);
+
+    expect(screen.getByText('142.5 XLM')).toBeInTheDocument();
+  });
+
+  it('preserves Stellar 7-decimal precision instead of rounding to cents', () => {
+    render(<PaymentDetail transaction={{ ...payment, amount: 0.0000123, asset: 'XLM' }} />);
+
+    expect(screen.getByText('0.0000123 XLM')).toBeInTheDocument();
+  });
 });

@@ -7,6 +7,10 @@ import {
   handleGetNetwork,
   handleRequestAccess,
   handleGetSmartAccount,
+  handleSignTransaction,
+  handleSignAuthEntry,
+  handleSignMessage,
+  handleRequestSessionKey,
 } from '../handlers';
 import type { ExternalHandlerContext } from '@ancore/types';
 
@@ -244,5 +248,191 @@ describe('handleGetSmartAccount', () => {
 
     const result = await handleGetSmartAccount(makeCtx());
     expect(result.deploymentStatus).toBe('not_deployed');
+  });
+});
+
+// ── Signing handlers (issue #1122, #1121) ─────────────────────────────────────
+
+describe('handleSignTransaction', () => {
+  it('validates xdr param and throws on missing xdr', async () => {
+    await expect(handleSignTransaction(makeCtx('https://dapp.example', {}))).rejects.toThrow(/xdr/);
+  });
+
+  it('throws when xdr is empty string', async () => {
+    await expect(
+      handleSignTransaction(makeCtx('https://dapp.example', { xdr: '   ' }))
+    ).rejects.toThrow(/xdr/);
+  });
+
+  it('throws when origin is not allowed', async () => {
+    const { isAllowed } = await import('../allowlist');
+    vi.mocked(isAllowed).mockResolvedValueOnce(false);
+    await expect(
+      handleSignTransaction(makeCtx('https://evil.example', { xdr: 'AAAA' }))
+    ).rejects.toThrow('Origin not allowed');
+  });
+
+  it('enqueues approval and returns signed result on approval', async () => {
+    const { enqueueApproval, registerResponseCallbacks } = await import('../response-queue');
+    const { openApprovalWindow } = await import('../../../approval-window');
+    vi.mocked(registerResponseCallbacks).mockImplementation((_id, resolve) =>
+      resolve({ signedXdr: 'SIGNED_XDR' })
+    );
+    const result = await handleSignTransaction(
+      makeCtx('https://dapp.example', { xdr: 'AAAA', network: 'testnet' })
+    );
+    expect(enqueueApproval).toHaveBeenCalled();
+    expect(openApprovalWindow).toHaveBeenCalled();
+    expect(result).toEqual({ signedXdr: 'SIGNED_XDR' });
+  });
+
+  it('rejects when approval is rejected', async () => {
+    const { registerResponseCallbacks } = await import('../response-queue');
+    vi.mocked(registerResponseCallbacks).mockImplementation((_id, _resolve, reject) =>
+      reject(new Error('User rejected'))
+    );
+    await expect(
+      handleSignTransaction(makeCtx('https://dapp.example', { xdr: 'AAAA' }))
+    ).rejects.toThrow('User rejected');
+  });
+});
+
+describe('handleSignAuthEntry', () => {
+  it('throws on missing authEntry', async () => {
+    await expect(handleSignAuthEntry(makeCtx('https://dapp.example', {}))).rejects.toThrow(
+      /authEntry/
+    );
+  });
+
+  it('throws on invalid base64 authEntry', async () => {
+    await expect(
+      handleSignAuthEntry(makeCtx('https://dapp.example', { authEntry: '   ' }))
+    ).rejects.toThrow(/authEntry/);
+  });
+
+  it('throws when origin not allowed', async () => {
+    const { isAllowed } = await import('../allowlist');
+    vi.mocked(isAllowed).mockResolvedValueOnce(false);
+    await expect(
+      handleSignAuthEntry(
+        makeCtx('https://evil.example', { authEntry: Buffer.from('valid').toString('base64') })
+      )
+    ).rejects.toThrow('Origin not allowed');
+  });
+
+  it('enqueues and returns signed auth entry on approval', async () => {
+    const { enqueueApproval, registerResponseCallbacks } = await import('../response-queue');
+    const { openApprovalWindow } = await import('../../../approval-window');
+    vi.mocked(registerResponseCallbacks).mockImplementation((_id, resolve) =>
+      resolve({ signedAuthEntry: 'SIGNED_ENTRY' })
+    );
+    const entry = Buffer.from('auth-entry-data').toString('base64');
+    const result = await handleSignAuthEntry(makeCtx('https://dapp.example', { authEntry: entry }));
+    expect(enqueueApproval).toHaveBeenCalled();
+    expect(openApprovalWindow).toHaveBeenCalledWith(expect.any(String), 'sign-auth-entry');
+    expect(result).toEqual({ signedAuthEntry: 'SIGNED_ENTRY' });
+  });
+
+  it('rejects when user rejects', async () => {
+    const { registerResponseCallbacks } = await import('../response-queue');
+    vi.mocked(registerResponseCallbacks).mockImplementation((_id, _resolve, reject) =>
+      reject(new Error('User rejected'))
+    );
+    const entry = Buffer.from('auth').toString('base64');
+    await expect(
+      handleSignAuthEntry(makeCtx('https://dapp.example', { authEntry: entry }))
+    ).rejects.toThrow('User rejected');
+  });
+});
+
+describe('handleSignMessage', () => {
+  it('throws on missing message', async () => {
+    await expect(handleSignMessage(makeCtx('https://dapp.example', {}))).rejects.toThrow(/message/);
+  });
+
+  it('throws on empty message', async () => {
+    await expect(
+      handleSignMessage(makeCtx('https://dapp.example', { message: '   ' }))
+    ).rejects.toThrow(/message/);
+  });
+
+  it('throws when origin not allowed', async () => {
+    const { isAllowed } = await import('../allowlist');
+    vi.mocked(isAllowed).mockResolvedValueOnce(false);
+    await expect(
+      handleSignMessage(makeCtx('https://evil.example', { message: 'hello' }))
+    ).rejects.toThrow('Origin not allowed');
+  });
+
+  it('enqueues and returns signature on approval', async () => {
+    const { enqueueApproval, registerResponseCallbacks } = await import('../response-queue');
+    const { openApprovalWindow } = await import('../../../approval-window');
+    vi.mocked(registerResponseCallbacks).mockImplementation((_id, resolve) =>
+      resolve({ signature: 'SIG123' })
+    );
+    const result = await handleSignMessage(
+      makeCtx('https://dapp.example', { message: 'hello world' })
+    );
+    expect(enqueueApproval).toHaveBeenCalled();
+    expect(openApprovalWindow).toHaveBeenCalled();
+    expect(result).toEqual({ signature: 'SIG123' });
+  });
+
+  it('rejects when approval rejected', async () => {
+    const { registerResponseCallbacks } = await import('../response-queue');
+    vi.mocked(registerResponseCallbacks).mockImplementation((_id, _resolve, reject) =>
+      reject(new Error('User rejected'))
+    );
+    await expect(
+      handleSignMessage(makeCtx('https://dapp.example', { message: 'hello' }))
+    ).rejects.toThrow('User rejected');
+  });
+});
+
+describe('handleRequestSessionKey', () => {
+  it('throws on missing expiresAt', async () => {
+    await expect(
+      handleRequestSessionKey(makeCtx('https://dapp.example', { permissions: 1 }))
+    ).rejects.toThrow(/expiresAt/);
+  });
+
+  it('throws when expiresAt is not in future', async () => {
+    await expect(
+      handleRequestSessionKey(
+        makeCtx('https://dapp.example', { expiresAt: Date.now() - 1000, permissions: 1 })
+      )
+    ).rejects.toThrow(/future/);
+  });
+
+  it('throws on missing permissions', async () => {
+    await expect(
+      handleRequestSessionKey(makeCtx('https://dapp.example', { expiresAt: Date.now() + 100000 }))
+    ).rejects.toThrow(/permissions/);
+  });
+
+  it('throws when origin not allowed', async () => {
+    const { isAllowed } = await import('../allowlist');
+    vi.mocked(isAllowed).mockResolvedValueOnce(false);
+    await expect(
+      handleRequestSessionKey(
+        makeCtx('https://evil.example', { expiresAt: Date.now() + 100000, permissions: 1 })
+      )
+    ).rejects.toThrow('Origin not allowed');
+  });
+
+  it('returns session key material on success', async () => {
+    const result = await handleRequestSessionKey(
+      makeCtx('https://dapp.example', { expiresAt: Date.now() + 100000, permissions: 0b11 })
+    );
+    expect(result.publicKey).toMatch(/^G[A-Z0-9]{55}$/);
+    expect(result.expiresAt).toBeGreaterThan(Date.now());
+  });
+
+  it('enqueues approval for session key request', async () => {
+    const { enqueueApproval } = await import('../response-queue');
+    await handleRequestSessionKey(
+      makeCtx('https://dapp.example', { expiresAt: Date.now() + 100000, permissions: 1 })
+    );
+    expect(enqueueApproval).toHaveBeenCalled();
   });
 });

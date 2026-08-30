@@ -26,13 +26,23 @@
     "@ancore/crypto": "workspace:*",
     "@ancore/stellar": "workspace:*",
     "@ancore/types": "workspace:*",
+    "@ancore/wallet-shared": "workspace:*",
     "@reown/walletkit": "^1.5.5",
+    "@stellar/stellar-sdk": "^13.3.0",
+    "@walletconnect/core": "^2.23.9",
     "@walletconnect/types": "^2.23.9",
     "@walletconnect/utils": "^2.23.9",
+    "buffer": "^6.0.3",
     "jail-monkey": "^3.0.0",
     "react": "^18.3.1",
     "react-native-biometrics": "^3.0.1",
     "react-native-keychain": "^10.0.0"
+  },
+  "peerDependencies": {
+    "@walletconnect/react-native-compat": "^2.23.9",
+    "@react-native-async-storage/async-storage": "^2.0.0",
+    "react": "^18.3.1",
+    "react-native": ">=0.76.0"
   },
   "devDependencies": {
     "@eslint/js": "^9.0.0",

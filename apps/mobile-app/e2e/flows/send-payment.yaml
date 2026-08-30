@@ -1,7 +1,7 @@
-appId: com.ancore.mobile
+appId: org.ancore.wallet.dev
 ---
 # Centralized from apps/mobile-wallet/e2e/flows/send-payment.yaml
-# TODO: requires #785 (mobile-sign-send) — enable in CI after that ships
+# Blocked: mobile Send UI not implemented yet
 - launchApp
 - tapOn: "Unlock Wallet"
 - tapOn: "Use Password Instead"

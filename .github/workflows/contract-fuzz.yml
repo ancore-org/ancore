@@ -1,0 +1,136 @@
+# Nightly contract fuzz harness (Phase 3.2 / #994)
+#
+# Runs cargo-fuzz targets against contracts/account validation helpers.
+# Crashes and artifacts are uploaded for triage into docs/security/INTERNAL_AUDIT_v0.md.
+
+name: Contract Fuzz
+
+on:
+  schedule:
+    # Nightly 03:00 UTC
+    - cron: '0 3 * * *'
+  workflow_dispatch:
+    inputs:
+      fuzz_seconds:
+        description: 'Seconds to run each fuzz target'
+        required: false
+        default: '300'
+        type: string
+      target:
+        description: 'Single target (empty = all)'
+        required: false
+        default: ''
+        type: string
+
+permissions:
+  contents: read
+
+concurrency:
+  group: contract-fuzz-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  CARGO_TERM_COLOR: always
+  FUZZ_SECONDS: ${{ github.event.inputs.fuzz_seconds || '300' }}
+
+jobs:
+  fuzz-account:
+    name: Fuzz account (${{ matrix.target }})
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        target:
+          - fuzz_spend_policy
+          - fuzz_permissions
+          - fuzz_spend_limits
+          - fuzz_execute_args
+          - fuzz_allowlist
+          - fuzz_add_session_key
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Rust nightly (cargo-fuzz)
+        if: ${{ github.event.inputs.target == '' || github.event.inputs.target == matrix.target }}
+        uses: dtolnay/rust-toolchain@nightly
+        with:
+          components: rust-src
+
+      - name: Cache cargo
+        if: ${{ github.event.inputs.target == '' || github.event.inputs.target == matrix.target }}
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/bin
+            ~/.cargo/registry/index
+            ~/.cargo/registry/cache
+            ~/.cargo/git/db
+            contracts/account/fuzz/target
+          key: ${{ runner.os }}-account-fuzz-${{ matrix.target }}-${{ hashFiles('contracts/account/**/Cargo.toml', 'contracts/Cargo.lock') }}
+
+      - name: Install cargo-fuzz
+        if: ${{ github.event.inputs.target == '' || github.event.inputs.target == matrix.target }}
+        run: cargo install cargo-fuzz --locked || cargo install cargo-fuzz
+
+      - name: Install clang (libFuzzer)
+        if: ${{ github.event.inputs.target == '' || github.event.inputs.target == matrix.target }}
+        run: sudo apt-get update && sudo apt-get install -y clang
+
+      - name: Run fuzz target
+        if: ${{ github.event.inputs.target == '' || github.event.inputs.target == matrix.target }}
+        working-directory: contracts/account
+        run: |
+          set -euo pipefail
+          mkdir -p fuzz/artifacts "fuzz/corpus/${{ matrix.target }}"
+          cargo +nightly fuzz run ${{ matrix.target }} -- \
+            -max_total_time="${FUZZ_SECONDS}" \
+            -artifact_prefix="fuzz/artifacts/${{ matrix.target }}-"
+
+      - name: Skip note
+        if: ${{ github.event.inputs.target != '' && github.event.inputs.target != matrix.target }}
+        run: echo "Skipping ${{ matrix.target }} (requested ${{ github.event.inputs.target }})"
+
+      - name: Upload corpus
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: fuzz-corpus-${{ matrix.target }}-${{ github.run_id }}
+          path: contracts/account/fuzz/corpus/${{ matrix.target }}
+          if-no-files-found: ignore
+          retention-days: 14
+
+      - name: Upload crash artifacts
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: fuzz-crashes-${{ matrix.target }}-${{ github.run_id }}
+          path: |
+            contracts/account/fuzz/artifacts
+            contracts/account/fuzz/corpus/${{ matrix.target }}
+          if-no-files-found: ignore
+          retention-days: 90
+
+  property-tests:
+    name: Account property tests (proptest)
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@1.81.0
+
+      - name: Cache cargo
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            contracts/target
+          key: ${{ runner.os }}-account-proptest-${{ hashFiles('contracts/Cargo.lock', 'contracts/account/Cargo.toml') }}
+
+      - name: Run property tests
+        working-directory: contracts
+        run: cargo test -p ancore-account --test properties -- --nocapture

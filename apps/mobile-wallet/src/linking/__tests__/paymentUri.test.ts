@@ -28,4 +28,10 @@ describe('parsePaymentUri', () => {
     ).toBeNull();
     expect(parsePaymentUri('not a uri')).toBeNull();
   });
+
+  it('rejects destination with invalid StrKey checksum even if regex shape matches', () => {
+    // GDQP2KPQGKIHYJGXNUIYOMHARUARCA7DJT5FO2FFOOKY3B2WSQHG4W36 has G... shape & length 56, but invalid CRC
+    const invalidChecksumDest = 'GDQP2KPQGKIHYJGXNUIYOMHARUARCA7DJT5FO2FFOOKY3B2WSQHG4W36';
+    expect(parsePaymentUri(`stellar:pay?destination=${invalidChecksumDest}`)).toBeNull();
+  });
 });

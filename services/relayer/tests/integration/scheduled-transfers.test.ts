@@ -23,7 +23,7 @@ function validScheduledTransferBody(startAt = futureIso()) {
     relayPayload: {
       sessionKey: VALID_KEY,
       operation: 'relay_execute' as const,
-      parameters: { to: RECIPIENT, amount: '10.5' },
+      parameters: { accountAddress: ACCOUNT, to: RECIPIENT, amount: '10.5' },
       signature: VALID_SIG,
       nonce: 1,
     },

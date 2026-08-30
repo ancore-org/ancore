@@ -1,4 +1,4 @@
-appId: com.ancore.mobile
+appId: org.ancore.wallet.dev
 ---
 # Centralized from apps/mobile-wallet/e2e/flows/lock-unlock.yaml
 - launchApp
@@ -6,7 +6,7 @@ appId: com.ancore.mobile
 - tapOn: "Use Password Instead"
 - tapOn: "Password"
 - inputText: ${E2E_TEST_PASSWORD}
-- tapOn: "Continue"
+- tapOn: "Unlock"
 - assertVisible: "Settings"
 - tapOn: "Settings"
 - tapOn: "Lock wallet"
@@ -14,5 +14,5 @@ appId: com.ancore.mobile
 - tapOn: "Use Password Instead"
 - tapOn: "Password"
 - inputText: ${E2E_TEST_PASSWORD}
-- tapOn: "Continue"
+- tapOn: "Unlock"
 - assertVisible: "Account"

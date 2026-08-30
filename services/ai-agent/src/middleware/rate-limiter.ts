@@ -27,8 +27,7 @@ export function draftIntentRateLimiter(
   res: Response,
   next: NextFunction
 ): void | Response {
-  const accountId = req.body?.accountId;
-  const key = accountId ? `account:${accountId}` : `ip:${req.ip || 'unknown'}`;
+  const key = `ip:${req.ip || 'unknown'}`;
   const now = Date.now();
 
   let record = hits.get(key);
@@ -47,4 +46,8 @@ export function draftIntentRateLimiter(
   }
 
   next();
+}
+
+export function _resetRateLimitStore(): void {
+  hits.clear();
 }

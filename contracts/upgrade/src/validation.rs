@@ -1,50 +1,61 @@
-#![allow(dead_code)]
-
 //! WASM contract validation logic for the UpgradeGovernor.
 //!
-//! Provides hooks for inspecting a proposed WASM blob before execution:
-//! - Size bounds
-//! - Required export names
-//! - Forbidden import patterns
-//!
-//! In production, the host environment can provide WASM metadata queries;
-//! this module documents the expected interface and defensive checks.
+//! Validates a proposer's WASM attestation — the caller's self-reported
+//! size, exports, and imports — against the stored `ContractValidation`
+//! policy. Because Soroban contracts cannot retrieve WASM bytes from a
+//! hash at execution time, this is an **attestation model**: the contract
+//! enforces the policy on the declared metadata; off-chain tooling must
+//! independently verify that the declaration matches the actual WASM at
+//! `new_wasm_hash` before signing or broadcasting the proposal.
 
 use soroban_sdk::{BytesN, Env};
+#[cfg(test)]
+use soroban_sdk::{String, Vec};
 
-use crate::{ContractValidation, UpgradeError};
+use crate::{ContractValidation, UpgradeError, WasmAttestation};
 
-/// Validate a proposed WASM hash against the current contract validation rules.
+/// Validate a proposed WASM hash and metadata attestation against policy.
 ///
-/// # Parameters
-/// - `env`: Soroban environment
-/// - `wasm_hash`: Hash of the proposed WASM blob
-/// - `validation`: Current validation configuration
-///
-/// # Returns
-/// `Ok(())` if validation passes, or an `UpgradeError` on failure.
+/// Checks performed (in order):
+/// 1. Hash must not be the all-zero sentinel.
+/// 2. `attestation.wasm_size >= validation.min_wasm_size` (when `min > 0`).
+/// 3. `attestation.wasm_size <= validation.max_wasm_size` (when `max > 0`).
+/// 4. Every name in `validation.required_exports` must appear in `attestation.exports`.
+/// 5. No name in `validation.forbidden_imports` may appear in `attestation.imports`.
 pub fn validate_wasm_metadata(
-    _env: &Env,
+    env: &Env,
     wasm_hash: &BytesN<32>,
     validation: &ContractValidation,
+    attestation: &WasmAttestation,
 ) -> Result<(), UpgradeError> {
-    // Defensive checks that do not require fetching the actual WASM bytes.
-    // In a full integration, the host would expose:
-    //   env.wasm_metadata(wasm_hash) -> { size: u32, exports: Vec<String>, imports: Vec<String> }
-    // For now, we enforce rules that can be checked without host support.
-
-    if wasm_hash == &BytesN::from_array(_env, &[0u8; 32]) {
+    if wasm_hash == &BytesN::from_array(env, &[0u8; 32]) {
         return Err(UpgradeError::InvalidWasmHash);
     }
 
-    // Placeholder: real WASM size/export/import checks would happen here.
-    // The contract currently enforces these rules at the policy level during
-    // `set_contract_validation` and re-checks at execution time.
+    if validation.min_wasm_size > 0 && attestation.wasm_size < validation.min_wasm_size {
+        return Err(UpgradeError::WasmTooSmall);
+    }
+    if validation.max_wasm_size > 0 && attestation.wasm_size > validation.max_wasm_size {
+        return Err(UpgradeError::WasmTooLarge);
+    }
+
+    for required in validation.required_exports.iter() {
+        if !attestation.exports.contains(required) {
+            return Err(UpgradeError::MissingRequiredExport);
+        }
+    }
+
+    for forbidden in validation.forbidden_imports.iter() {
+        if attestation.imports.contains(forbidden) {
+            return Err(UpgradeError::ForbiddenImportDetected);
+        }
+    }
 
     Ok(())
 }
 
-/// Build a validation rule that requires specific exported function names.
+/// Build a validation policy that requires specific exported function names.
+#[cfg(test)]
 pub fn require_exports(env: &Env, names: Vec<String>) -> ContractValidation {
     ContractValidation {
         min_wasm_size: 1024,
@@ -54,7 +65,8 @@ pub fn require_exports(env: &Env, names: Vec<String>) -> ContractValidation {
     }
 }
 
-/// Build a validation rule that forbids specific import patterns.
+/// Build a validation policy that forbids specific import patterns.
+#[cfg(test)]
 pub fn forbid_imports(env: &Env, patterns: Vec<String>) -> ContractValidation {
     ContractValidation {
         min_wasm_size: 1024,
@@ -65,6 +77,7 @@ pub fn forbid_imports(env: &Env, patterns: Vec<String>) -> ContractValidation {
 }
 
 /// Merge two validation configs (intersection of constraints).
+#[cfg(test)]
 pub fn merge_validation(
     env: &Env,
     a: &ContractValidation,
@@ -81,7 +94,7 @@ pub fn merge_validation(
 
     let mut required = Vec::new(env);
     for name in a.required_exports.iter() {
-        if b.required_exports.contains(name) {
+        if b.required_exports.contains(&name) {
             required.push_back(name.clone());
         }
     }
@@ -91,7 +104,7 @@ pub fn merge_validation(
         forbidden.push_back(name.clone());
     }
     for name in b.forbidden_imports.iter() {
-        if !forbidden.contains(name) {
+        if !forbidden.contains(&name) {
             forbidden.push_back(name.clone());
         }
     }
@@ -109,27 +122,231 @@ mod tests {
     use super::*;
     use soroban_sdk::{BytesN, Env};
 
+    fn permissive(env: &Env) -> ContractValidation {
+        ContractValidation {
+            min_wasm_size: 0,
+            max_wasm_size: 0,
+            required_exports: Vec::new(env),
+            forbidden_imports: Vec::new(env),
+        }
+    }
+
+    fn default_attestation(env: &Env) -> WasmAttestation {
+        WasmAttestation {
+            wasm_size: 4096,
+            exports: Vec::new(env),
+            imports: Vec::new(env),
+        }
+    }
+
     #[test]
     fn test_reject_zero_hash() {
         let env = Env::default();
+        let validation = permissive(&env);
+        let attestation = default_attestation(&env);
+        let zero = BytesN::from_array(&env, &[0u8; 32]);
+        let result = validate_wasm_metadata(&env, &zero, &validation, &attestation);
+        assert!(matches!(result, Err(UpgradeError::InvalidWasmHash)));
+    }
+
+    #[test]
+    fn test_wasm_too_small() {
+        let env = Env::default();
         let validation = ContractValidation {
-            min_wasm_size: 0,
+            min_wasm_size: 1024,
             max_wasm_size: 0,
             required_exports: Vec::new(&env),
             forbidden_imports: Vec::new(&env),
         };
-        let zero = BytesN::from_array(&env, &[0u8; 32]);
-        assert!(validate_wasm_metadata(&env, &zero, &validation).is_err());
+        let attestation = WasmAttestation {
+            wasm_size: 512,
+            exports: Vec::new(&env),
+            imports: Vec::new(&env),
+        };
+        let hash = BytesN::from_array(&env, &[1u8; 32]);
+        let result = validate_wasm_metadata(&env, &hash, &validation, &attestation);
+        assert!(matches!(result, Err(UpgradeError::WasmTooSmall)));
+    }
+
+    #[test]
+    fn test_wasm_too_large() {
+        let env = Env::default();
+        let validation = ContractValidation {
+            min_wasm_size: 0,
+            max_wasm_size: 1024,
+            required_exports: Vec::new(&env),
+            forbidden_imports: Vec::new(&env),
+        };
+        let attestation = WasmAttestation {
+            wasm_size: 2048,
+            exports: Vec::new(&env),
+            imports: Vec::new(&env),
+        };
+        let hash = BytesN::from_array(&env, &[1u8; 32]);
+        let result = validate_wasm_metadata(&env, &hash, &validation, &attestation);
+        assert!(matches!(result, Err(UpgradeError::WasmTooLarge)));
+    }
+
+    #[test]
+    fn test_missing_required_export() {
+        let env = Env::default();
+        let mut required = Vec::new(&env);
+        required.push_back(String::from_str(&env, "upgrade"));
+        let validation = ContractValidation {
+            min_wasm_size: 0,
+            max_wasm_size: 0,
+            required_exports: required,
+            forbidden_imports: Vec::new(&env),
+        };
+        let attestation = WasmAttestation {
+            wasm_size: 4096,
+            exports: Vec::new(&env),
+            imports: Vec::new(&env),
+        };
+        let hash = BytesN::from_array(&env, &[1u8; 32]);
+        let result = validate_wasm_metadata(&env, &hash, &validation, &attestation);
+        assert!(matches!(result, Err(UpgradeError::MissingRequiredExport)));
+    }
+
+    #[test]
+    fn test_forbidden_import_detected() {
+        let env = Env::default();
+        let mut forbidden = Vec::new(&env);
+        forbidden.push_back(String::from_str(&env, "dangerous_fn"));
+        let validation = ContractValidation {
+            min_wasm_size: 0,
+            max_wasm_size: 0,
+            required_exports: Vec::new(&env),
+            forbidden_imports: forbidden,
+        };
+        let mut imports = Vec::new(&env);
+        imports.push_back(String::from_str(&env, "dangerous_fn"));
+        let attestation = WasmAttestation {
+            wasm_size: 4096,
+            exports: Vec::new(&env),
+            imports,
+        };
+        let hash = BytesN::from_array(&env, &[1u8; 32]);
+        let result = validate_wasm_metadata(&env, &hash, &validation, &attestation);
+        assert!(matches!(result, Err(UpgradeError::ForbiddenImportDetected)));
+    }
+
+    #[test]
+    fn test_passes_with_all_constraints_met() {
+        let env = Env::default();
+        let mut required = Vec::new(&env);
+        required.push_back(String::from_str(&env, "upgrade"));
+        let mut forbidden = Vec::new(&env);
+        forbidden.push_back(String::from_str(&env, "dangerous_fn"));
+        let validation = ContractValidation {
+            min_wasm_size: 1024,
+            max_wasm_size: 1024 * 1024,
+            required_exports: required,
+            forbidden_imports: forbidden,
+        };
+        let mut exports = Vec::new(&env);
+        exports.push_back(String::from_str(&env, "upgrade"));
+        exports.push_back(String::from_str(&env, "get_version"));
+        let attestation = WasmAttestation {
+            wasm_size: 8192,
+            exports,
+            imports: Vec::new(&env),
+        };
+        let hash = BytesN::from_array(&env, &[1u8; 32]);
+        let result = validate_wasm_metadata(&env, &hash, &validation, &attestation);
+        assert!(result.is_ok());
+    }
+
+    #[test]
+    fn test_size_bounds_disabled_when_zero() {
+        let env = Env::default();
+        let validation = permissive(&env);
+        // wasm_size = 0 should pass when both bounds are 0 (disabled)
+        let attestation = WasmAttestation {
+            wasm_size: 0,
+            exports: Vec::new(&env),
+            imports: Vec::new(&env),
+        };
+        let hash = BytesN::from_array(&env, &[1u8; 32]);
+        let result = validate_wasm_metadata(&env, &hash, &validation, &attestation);
+        assert!(result.is_ok());
     }
 
     #[test]
     fn test_merge_validation_intersection() {
         let env = Env::default();
-        let a = require_exports(&env, vec!["upgrade".to_string(), "get_version".to_string()]);
-        let b = require_exports(&env, vec!["upgrade".to_string(), "migrate".to_string()]);
+        let a = require_exports(&env, {
+            let mut v = Vec::new(&env);
+            v.push_back(String::from_str(&env, "upgrade"));
+            v.push_back(String::from_str(&env, "get_version"));
+            v
+        });
+        let b = require_exports(&env, {
+            let mut v = Vec::new(&env);
+            v.push_back(String::from_str(&env, "upgrade"));
+            v.push_back(String::from_str(&env, "migrate"));
+            v
+        });
         let merged = merge_validation(&env, &a, &b);
-        assert!(merged.required_exports.contains(&"upgrade".to_string()));
-        assert!(!merged.required_exports.contains(&"get_version".to_string()));
-        assert!(!merged.required_exports.contains(&"migrate".to_string()));
+        assert!(merged
+            .required_exports
+            .contains(String::from_str(&env, "upgrade")));
+        assert!(!merged
+            .required_exports
+            .contains(String::from_str(&env, "get_version")));
+        assert!(!merged
+            .required_exports
+            .contains(String::from_str(&env, "migrate")));
+    }
+
+    /// `merge_validation`'s forbidden-imports side is a union (either policy's
+    /// forbidden name is forbidden in the merged result) — the opposite of the
+    /// required-exports intersection tested above. Previously untested.
+    #[test]
+    fn test_merge_validation_forbidden_imports_union() {
+        let env = Env::default();
+        let a = forbid_imports(&env, {
+            let mut v = Vec::new(&env);
+            v.push_back(String::from_str(&env, "dangerous_fn"));
+            v
+        });
+        let b = forbid_imports(&env, {
+            let mut v = Vec::new(&env);
+            v.push_back(String::from_str(&env, "dangerous_fn")); // duplicate, must not double up
+            v.push_back(String::from_str(&env, "other_dangerous_fn"));
+            v
+        });
+        let merged = merge_validation(&env, &a, &b);
+        assert_eq!(merged.forbidden_imports.len(), 2);
+        assert!(merged
+            .forbidden_imports
+            .contains(String::from_str(&env, "dangerous_fn")));
+        assert!(merged
+            .forbidden_imports
+            .contains(String::from_str(&env, "other_dangerous_fn")));
+    }
+
+    /// A policy built with `forbid_imports` alone (no required exports, a
+    /// default size range) correctly rejects an attestation carrying that
+    /// import — exercising the builder end-to-end through the real
+    /// enforcement function, not just its own struct construction.
+    #[test]
+    fn test_forbid_imports_policy_rejects_matching_import() {
+        let env = Env::default();
+        let policy = forbid_imports(&env, {
+            let mut v = Vec::new(&env);
+            v.push_back(String::from_str(&env, "dangerous_fn"));
+            v
+        });
+        let mut imports = Vec::new(&env);
+        imports.push_back(String::from_str(&env, "dangerous_fn"));
+        let attestation = WasmAttestation {
+            wasm_size: 4096,
+            exports: Vec::new(&env),
+            imports,
+        };
+        let hash = BytesN::from_array(&env, &[1u8; 32]);
+        let result = validate_wasm_metadata(&env, &hash, &policy, &attestation);
+        assert!(matches!(result, Err(UpgradeError::ForbiddenImportDetected)));
     }
 }

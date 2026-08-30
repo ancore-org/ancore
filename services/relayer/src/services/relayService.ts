@@ -97,7 +97,9 @@ export class RelayService implements RelayServiceContract {
           const targetContract = request.parameters.accountAddress as string;
           const { RPC_URL, NETWORK_PASSPHRASE } = getEnv();
           const onChainKey = await getSessionKey(targetContract, request.sessionKey, {
-            server: new rpc.Server(RPC_URL) as any,
+            server: new rpc.Server(RPC_URL) as unknown as Parameters<
+              typeof getSessionKey
+            >[2]['server'],
             sourceAccount: targetContract,
             networkPassphrase: NETWORK_PASSPHRASE,
           });
@@ -111,7 +113,15 @@ export class RelayService implements RelayServiceContract {
             return { valid: false, error };
           }
         } catch (e: unknown) {
-          // ignore or handle error if contract query fails
+          const message = e instanceof Error ? e.message : 'Unable to verify session key on chain';
+          const error: RelayError = {
+            code: RelayErrorCodes.INVALID_SIGNATURE,
+            message: `Session key verification unavailable: ${message}`,
+          };
+          span.recordException(e instanceof Error ? e : new Error(String(e)));
+          span.setStatus({ code: SpanStatusCode.ERROR, message: error.message });
+          span.setAttribute('error.code', error.code);
+          return { valid: false, error };
         }
 
         const ok = this.signatureService.verify(request.sessionKey, payload, request.signature);
@@ -126,8 +136,8 @@ export class RelayService implements RelayServiceContract {
         }
 
         if (request.transferPolicy) {
-          const { policy, amount, todayTotal } = request.transferPolicy;
-          const policyResult = validateTransferPolicy(amount, todayTotal, policy);
+          const { policy, amount, todayTotal, assetCode } = request.transferPolicy;
+          const policyResult = validateTransferPolicy(amount, todayTotal, policy, assetCode);
           if (policyResult.action === 'block') {
             const error: RelayError = {
               code: RelayErrorCodes.POLICY_DENIED,

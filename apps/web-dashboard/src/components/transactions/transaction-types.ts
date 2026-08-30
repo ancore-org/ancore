@@ -15,6 +15,8 @@ export interface Transaction {
   type: TransactionType;
   status: TransactionStatus;
   amount: number;
+  /** Asset code the amount is denominated in. Defaults to XLM when absent. */
+  asset?: string;
   counterparty: string;
   memo: string;
   merchant?: MerchantSummary | null;

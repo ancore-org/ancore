@@ -24,11 +24,21 @@ export interface TransferPolicyResult {
   message: string;
 }
 
+/**
+ * Asset code used in policy messages when the caller does not supply one.
+ * The policy itself is asset-agnostic — this only affects the unit shown to
+ * the user, so callers moving non-XLM value must pass their own code.
+ */
+export const DEFAULT_POLICY_ASSET_CODE = 'XLM';
+
 export function validateTransferPolicy(
   amount: number,
   todayTotal: number,
-  policy: TransferPolicy = DEFAULT_TRANSFER_POLICY
+  policy: TransferPolicy = DEFAULT_TRANSFER_POLICY,
+  assetCode: string = DEFAULT_POLICY_ASSET_CODE
 ): TransferPolicyResult {
+  const unit = assetCode.trim() || DEFAULT_POLICY_ASSET_CODE;
+
   const normalizedAmount = Number(amount);
   const normalizedTodayTotal = Number(todayTotal);
 
@@ -43,14 +53,14 @@ export function validateTransferPolicy(
   if (normalizedTodayTotal + normalizedAmount > policy.dailyLimit) {
     return {
       action: 'block',
-      message: `Transfer exceeds daily limit of ${policy.dailyLimit} XLM. Reduce the amount or wait until tomorrow.`,
+      message: `Transfer exceeds daily limit of ${policy.dailyLimit} ${unit}. Reduce the amount or wait until tomorrow.`,
     };
   }
 
   if (normalizedAmount > policy.stepUpThreshold) {
     return {
       action: 'step_up',
-      message: `This transfer exceeds your step-up threshold of ${policy.stepUpThreshold} XLM and requires additional confirmation.`,
+      message: `This transfer exceeds your step-up threshold of ${policy.stepUpThreshold} ${unit} and requires additional confirmation.`,
     };
   }
 

@@ -68,7 +68,14 @@ Check each item as it is verified. Commit the updated file before tagging.
 
 ---
 
-## Override Log
+## 9. Mobile App (TestFlight / Play internal)
+
+- [ ] `node apps/mobile-app/scripts/set-app-version.mjs X.Y.Z` run and committed
+- [ ] Maestro e2e flows pass on dev build (`mobile-app-e2e.yml`)
+- [ ] GitHub mobile release secrets configured (see `apps/mobile-app/RELEASE.md`)
+- [ ] TestFlight / Play internal build uploaded for QA
+
+---
 
 If a gate was bypassed via manual override, record it here:
 

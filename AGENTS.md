@@ -174,6 +174,42 @@ See `.pnpm-install-scripts-allowlist.json` for the current set of allowed packag
 justifications. Today only `esbuild` (platform binary download) and `protobufjs` (generated JS)
 are allowed.
 
+### Audit advisory allowlist
+
+`pnpm audit --audit-level=high` gates CI (the **Dependency Audit** job, and again in
+`release-gate.yml`). When an advisory has a patched version, **upgrade** — either directly or via a
+`pnpm.overrides` entry in the root `package.json`, which is how the `axios`, `postcss`, `nanoid`,
+and `brace-expansion` advisories are handled today.
+
+Allowlisting is only for advisories that **cannot** be fixed: `pnpm audit` reports
+`patched_versions: <0.0.0`, meaning no upstream release exists to move to. Add an entry to
+`.pnpm-audit-allowlist.json`:
+
+```json
+{
+  "id": "1138808",
+  "issue": "https://github.com/ancore-org/ancore/issues/1206",
+  "justification": "What the advisory is, why it is unfixable, and why it is not exploitable here.",
+  "expires": "2026-10-31T00:00:00.000Z"
+}
+```
+
+All four fields are mandatory and enforced by `scripts/check-audit-allowlist.js`:
+
+- `id` — the numeric advisory id. The checker also matches on `github_advisory_id`, so a `GHSA-…`
+  string works too.
+- `issue` — must be an `ancore-org/ancore` issue URL, so every suppression has a tracking issue.
+- `justification` — why it cannot be fixed _and_ why it is not exploitable in this repo.
+- `expires` — an **expiry date is not optional**. The check fails once it passes, forcing a
+  re-review rather than letting a suppression become permanent.
+
+An advisory that is merely inconvenient to fix does not qualify. Suppressing a _fixable_ advisory
+hides a real, patchable vulnerability behind a gate that still reports green.
+
+```bash
+node scripts/check-audit-allowlist.js   # validate allowlist + run the audit gate
+```
+
 ## Known pitfalls that have broken CI here
 
 - **Rust dead-code false positives from duplicate module trees.** If a binary crate (`main.rs`)

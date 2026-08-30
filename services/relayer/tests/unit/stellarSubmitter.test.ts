@@ -116,7 +116,7 @@ describe('StellarTransactionSubmitter', () => {
     ).rejects.toThrow(SimulationFailedError);
   });
 
-  it('submits a signed transaction and returns hash and fee', async () => {
+  it('submits a signed transaction and returns hash and fallback fee when response has no fee details', async () => {
     const submitTransaction = jest.fn().mockResolvedValue({
       hash: 'a'.repeat(64),
     });
@@ -132,6 +132,43 @@ describe('StellarTransactionSubmitter', () => {
     expect(submitTransaction).toHaveBeenCalledTimes(1);
     expect(result.transactionHash).toBe('a'.repeat(64));
     expect(result.gasUsed).toBe(100);
+  });
+
+  it('reports actual gasUsed from response.fee_charged instead of pre-set fee (issue #1264)', async () => {
+    const submitTransaction = jest.fn().mockResolvedValue({
+      hash: 'b'.repeat(64),
+      fee_charged: '320',
+    });
+    const isHealthy = jest.fn().mockResolvedValue(true);
+    MockStellarClient.mockImplementation(
+      () => ({ submitTransaction, isHealthy }) as unknown as StellarClient
+    );
+
+    const submitter = new StellarTransactionSubmitter({ network: 'testnet' });
+    const signedXdr = buildSignedTransactionXdr(); // pre-set fee is 100
+    const result = await submitter.submitSignedTransaction(signedXdr);
+
+    expect(result.transactionHash).toBe('b'.repeat(64));
+    expect(result.gasUsed).toBe(320);
+  });
+
+  it('reports actual gasUsed from response.result_xdr instead of pre-set fee (issue #1264)', async () => {
+    // AAAAAAAAMDkAAAAAAAAAAAAAAAA= decodes to TransactionResult with feeCharged = 12345
+    const submitTransaction = jest.fn().mockResolvedValue({
+      hash: 'c'.repeat(64),
+      result_xdr: 'AAAAAAAAMDkAAAAAAAAAAAAAAAA=',
+    });
+    const isHealthy = jest.fn().mockResolvedValue(true);
+    MockStellarClient.mockImplementation(
+      () => ({ submitTransaction, isHealthy }) as unknown as StellarClient
+    );
+
+    const submitter = new StellarTransactionSubmitter({ network: 'testnet' });
+    const signedXdr = buildSignedTransactionXdr(); // pre-set fee is 100
+    const result = await submitter.submitSignedTransaction(signedXdr);
+
+    expect(result.transactionHash).toBe('c'.repeat(64));
+    expect(result.gasUsed).toBe(12345);
   });
 
   it('propagates submission errors from StellarClient', async () => {

@@ -11,25 +11,29 @@ import type { AllowlistEntry } from '../allowlist';
 // Fixtures
 // ---------------------------------------------------------------------------
 
+/** Valid Soroban contract C-address: 'C' + 55 base32 chars. */
+const SMART_ACCOUNT_A = 'CABCDEFGHIJKLMNOPQRSTUVWXYZ234567ABCDEFGHIJKLMNOPQRSTUVW';
+const SMART_ACCOUNT_B = 'CBCDEFGHIJKLMNOPQRSTUVWXYZ234567ABCDEFGHIJKLMNOPQRSTUVWX';
+
 const ENTRY_TESTNET: AllowlistEntry = {
   origin: 'https://app.example.com',
   grantedAt: 1_700_000_000_000,
   network: 'testnet',
-  smartAccountId: 'CABC1234',
+  smartAccountId: SMART_ACCOUNT_A,
 };
 
 const ENTRY_MAINNET: AllowlistEntry = {
   origin: 'https://app.example.com',
   grantedAt: 1_700_000_001_000,
   network: 'mainnet',
-  smartAccountId: 'CABC1234',
+  smartAccountId: SMART_ACCOUNT_A,
 };
 
 const ENTRY_OTHER_ORIGIN: AllowlistEntry = {
   origin: 'https://other.example.com',
   grantedAt: 1_700_000_002_000,
   network: 'testnet',
-  smartAccountId: 'CABC1234',
+  smartAccountId: SMART_ACCOUNT_A,
 };
 
 // ---------------------------------------------------------------------------
@@ -55,6 +59,83 @@ describe('parseAllowlist', () => {
 
   it('returns empty array when JSON is not an array', () => {
     expect(parseAllowlist(JSON.stringify({ origin: 'https://x.com' }))).toEqual([]);
+  });
+
+  // --- hardened field validation (issue #1185) ---
+
+  it('rejects an entry with an empty origin', () => {
+    const raw = JSON.stringify([{ ...ENTRY_TESTNET, origin: '' }]);
+    expect(parseAllowlist(raw)).toEqual([]);
+  });
+
+  it('rejects an entry whose origin is not a URL', () => {
+    const raw = JSON.stringify([{ ...ENTRY_TESTNET, origin: 'not-a-url' }]);
+    expect(parseAllowlist(raw)).toEqual([]);
+  });
+
+  it('rejects a non-http(s) origin scheme', () => {
+    const raw = JSON.stringify([{ ...ENTRY_TESTNET, origin: 'javascript:alert(1)' }]);
+    expect(parseAllowlist(raw)).toEqual([]);
+  });
+
+  it('rejects a non-normalized origin carrying a path or trailing slash', () => {
+    const withPath = JSON.stringify([{ ...ENTRY_TESTNET, origin: 'https://app.example.com/x' }]);
+    const withSlash = JSON.stringify([{ ...ENTRY_TESTNET, origin: 'https://app.example.com/' }]);
+    expect(parseAllowlist(withPath)).toEqual([]);
+    expect(parseAllowlist(withSlash)).toEqual([]);
+  });
+
+  it('rejects a negative grantedAt', () => {
+    const raw = JSON.stringify([{ ...ENTRY_TESTNET, grantedAt: -1 }]);
+    expect(parseAllowlist(raw)).toEqual([]);
+  });
+
+  it('rejects a non-finite grantedAt', () => {
+    // NaN / Infinity do not survive JSON, so validate the parsed shape directly.
+    const raw =
+      '[{"origin":"https://app.example.com","grantedAt":null,"network":"testnet","smartAccountId":"' +
+      SMART_ACCOUNT_A +
+      '"}]';
+    expect(parseAllowlist(raw)).toEqual([]);
+  });
+
+  it('rejects a non-integer grantedAt', () => {
+    const raw = JSON.stringify([{ ...ENTRY_TESTNET, grantedAt: 1.5 }]);
+    expect(parseAllowlist(raw)).toEqual([]);
+  });
+
+  it('accepts grantedAt of 0 (epoch)', () => {
+    const raw = JSON.stringify([{ ...ENTRY_TESTNET, grantedAt: 0 }]);
+    expect(parseAllowlist(raw)).toHaveLength(1);
+  });
+
+  it('rejects a network outside the known enum', () => {
+    const raw = JSON.stringify([{ ...ENTRY_TESTNET, network: 'pretendnet' }]);
+    expect(parseAllowlist(raw)).toEqual([]);
+  });
+
+  it('accepts every known network', () => {
+    for (const network of ['testnet', 'mainnet', 'futurenet', 'local']) {
+      const raw = JSON.stringify([{ ...ENTRY_TESTNET, network }]);
+      expect(parseAllowlist(raw)).toHaveLength(1);
+    }
+  });
+
+  it('rejects a smartAccountId that is not a contract C-address', () => {
+    for (const smartAccountId of ['', 'CABC1234', 'G' + 'A'.repeat(55), 'C' + 'a'.repeat(55)]) {
+      const raw = JSON.stringify([{ ...ENTRY_TESTNET, smartAccountId }]);
+      expect(parseAllowlist(raw)).toEqual([]);
+    }
+  });
+
+  it('keeps entries for different smart accounts on the same origin', () => {
+    const raw = JSON.stringify([
+      ENTRY_TESTNET,
+      { ...ENTRY_TESTNET, smartAccountId: SMART_ACCOUNT_B },
+    ]);
+    const result = parseAllowlist(raw);
+    expect(result).toHaveLength(2);
+    expect(result.map((e) => e.smartAccountId)).toEqual([SMART_ACCOUNT_A, SMART_ACCOUNT_B]);
   });
 
   it('filters out malformed entries', () => {

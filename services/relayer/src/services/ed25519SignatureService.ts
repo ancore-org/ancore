@@ -31,6 +31,33 @@ export class Ed25519SignatureService implements SignatureServiceContract {
       return false;
     }
   }
+
+  /**
+   * Health check probe for the Ed25519 signature backend.
+   * Performs an end-to-end sign and verify round-trip with a test keypair
+   * to ensure cryptographic verification functions correctly.
+   */
+  async isHealthy(): Promise<{ healthy: boolean; latencyMs?: number }> {
+    const started = Date.now();
+    try {
+      const keypair = Keypair.random();
+      const testPayload = 'ancore-relayer-signature-health';
+      const sig = keypair.sign(Buffer.from(testPayload, 'utf8'));
+      const rawPubHex = Buffer.from(keypair.rawPublicKey()).toString('hex');
+      const sigHex = Buffer.from(sig).toString('hex');
+      const healthy = this.verify(rawPubHex, testPayload, sigHex);
+
+      return {
+        healthy,
+        latencyMs: Date.now() - started,
+      };
+    } catch {
+      return {
+        healthy: false,
+        latencyMs: Date.now() - started,
+      };
+    }
+  }
 }
 
 /**

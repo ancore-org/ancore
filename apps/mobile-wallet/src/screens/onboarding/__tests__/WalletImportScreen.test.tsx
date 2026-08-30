@@ -110,4 +110,11 @@ describe('WalletImportScreen', () => {
     fireEvent.click(screen.getByRole('button', { name: /^cancel$/i }));
     expect(onCancel).toHaveBeenCalledTimes(1);
   });
+
+  it('displays updated placeholder and supports 24-word phrases', () => {
+    render(<WalletImportScreen />);
+    expect(
+      screen.getByPlaceholderText(/enter your recovery phrase \(12-24 words\)/i),
+    ).toBeInTheDocument();
+  });
 });

@@ -92,7 +92,7 @@ export class InvoiceClient {
     return this.request<OpenInvoiceResult>('POST', `/invoices/${invoiceId}/open`);
   }
 
-  /** Records an on-chain payment against an Open invoice. */
+  /** Records an on-chain payment against an Open invoice. Only the recipient may pay. */
   async pay(params: PayInvoiceParams): Promise<PayInvoiceResult> {
     return this.request<PayInvoiceResult>('POST', `/invoices/${params.invoiceId}/pay`, {
       paymentTxHash: params.paymentTxHash,

@@ -1,5 +1,5 @@
-import { OnboardingNavigator } from '@ancore/mobile-wallet';
+import { MobileAppRoot } from '@ancore/mobile-wallet';
 
 export default function App() {
-  return <OnboardingNavigator />;
+  return <MobileAppRoot />;
 }

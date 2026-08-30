@@ -1,4 +1,7 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
+import { AccountNotFoundError, createStellarClient } from '@ancore/stellar';
+import { useAccountStore } from '@/stores/account';
+import { useDashboardSettingsStore } from '@/state/dashboard-settings';
 
 interface UseAccountBalanceReturn {
   balance: number;
@@ -7,41 +10,44 @@ interface UseAccountBalanceReturn {
   refreshBalance: () => Promise<void>;
 }
 
+const POLL_INTERVAL_MS = 30_000;
+const BALANCE_CHANGE_THRESHOLD = 0.001;
+
 /**
- * Hook for fetching and managing account balance
- * In a real application, this would connect to the Stellar network
- * via @ancore/core-sdk and @ancore/stellar packages
+ * Hook for fetching and managing the active account's native XLM balance
+ * via the configured Stellar network client.
  */
 export function useAccountBalance(): UseAccountBalanceReturn {
   const [balance, setBalance] = useState<number>(0);
   const [isLoading, setIsLoading] = useState<boolean>(false);
   const [error, setError] = useState<Error | null>(null);
 
-  /**
-   * Simulates fetching balance from the Stellar network
-   * In production, this would use:
-   * - @ancore/stellar for network connection
-   * - @ancore/core-sdk for account abstraction
-   * - Proper error handling and retry logic
-   */
-  const fetchBalance = useCallback(async (): Promise<number> => {
-    // Simulate network delay
-    await new Promise((resolve) => setTimeout(resolve, 800));
+  const activeAccountId = useAccountStore((state) => state.activeAccountId);
+  const accounts = useAccountStore((state) => state.accounts);
+  const publicKey = useMemo(() => {
+    const active = accounts.find((a) => a.id === activeAccountId) ?? accounts[0];
+    return active?.address ?? null;
+  }, [accounts, activeAccountId]);
 
-    // Simulate random network errors (10% chance for demo)
-    if (Math.random() < 0.1) {
-      throw new Error('Network timeout: Unable to reach Stellar network');
+  const network = useDashboardSettingsStore((state) => state.network);
+  const stellarClient = useMemo(() => createStellarClient(network), [network]);
+
+  const fetchBalance = useCallback(async (): Promise<number> => {
+    if (!publicKey) {
+      return 0;
     }
 
-    // In a real app, this would be:
-    // const client = new StellarClient({ network: 'testnet' });
-    // const account = await client.getAccount(publicKey);
-    // return account.balances.find(b => b.asset_type === 'native')?.balance || 0;
-
-    // For demo, return current balance with small random variation
-    const variation = (Math.random() - 0.5) * 0.1; // ±5% variation
-    return Math.max(0, balance * (1 + variation));
-  }, [balance]);
+    try {
+      const balances = await stellarClient.getBalances(publicKey);
+      const native = balances.find((entry) => entry.assetType === 'native');
+      return native ? Number(native.balance) : 0;
+    } catch (err) {
+      if (err instanceof AccountNotFoundError) {
+        return 0;
+      }
+      throw err;
+    }
+  }, [publicKey, stellarClient]);
 
   const refreshBalance = useCallback(async () => {
     setIsLoading(true);
@@ -58,34 +64,27 @@ export function useAccountBalance(): UseAccountBalanceReturn {
     }
   }, [fetchBalance]);
 
-  // Initial fetch on mount
   useEffect(() => {
-    refreshBalance();
-  }, []);
+    void refreshBalance();
+  }, [refreshBalance]);
 
-  // Simulate balance updates from network (polling)
   useEffect(() => {
-    if (isLoading) return;
+    if (isLoading || error) return;
 
     const interval = setInterval(() => {
-      // Only update if not currently loading and no error
-      if (!isLoading && !error) {
-        fetchBalance()
-          .then((newBalance) => {
-            // Only update if balance changed significantly (> 0.001 XLM)
-            if (Math.abs(newBalance - balance) > 0.001) {
-              setBalance(newBalance);
-            }
-          })
-          .catch((err) => {
-            // Don't set error for background updates, just log
-            console.debug('Background balance update failed:', err);
-          });
-      }
-    }, 30000); // Poll every 30 seconds
+      fetchBalance()
+        .then((newBalance) => {
+          setBalance((current) =>
+            Math.abs(newBalance - current) > BALANCE_CHANGE_THRESHOLD ? newBalance : current
+          );
+        })
+        .catch((err) => {
+          console.debug('Background balance update failed:', err);
+        });
+    }, POLL_INTERVAL_MS);
 
     return () => clearInterval(interval);
-  }, [balance, isLoading, error, fetchBalance]);
+  }, [fetchBalance, isLoading, error]);
 
   return {
     balance,
@@ -114,27 +113,6 @@ export function formatBalance(
   }).format(balance);
 
   return currency ? `${formatted} ${currency}` : formatted;
-}
-
-/**
- * Utility function to convert XLM to USD (placeholder)
- * In production, this would fetch from a price API
- */
-export function convertToUSD(xlmAmount: number, rate: number = 0.12): number {
-  return xlmAmount * rate;
-}
-
-/**
- * Utility function to format USD value
- * @deprecated Use `formatFiatAmount` from `@ancore/core-sdk` instead.
- */
-export function formatUSD(amount: number): string {
-  return new Intl.NumberFormat('en-US', {
-    style: 'currency',
-    currency: 'USD',
-    minimumFractionDigits: 2,
-    maximumFractionDigits: 2,
-  }).format(amount);
 }
 
 export default useAccountBalance;

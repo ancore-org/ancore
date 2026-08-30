@@ -46,7 +46,10 @@ soroban contract build
 
 ```bash
 cargo test
+cargo test --test properties   # proptest invariants
 ```
+
+Fuzzing (nightly CI + local): see [FUZZING.md](./FUZZING.md).
 
 ## Deployment
 

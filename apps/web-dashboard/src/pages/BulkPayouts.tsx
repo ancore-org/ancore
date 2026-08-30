@@ -12,7 +12,7 @@ import {
   type BulkPayoutRow,
   type PayoutSubmission,
 } from '../services/bulk-payouts';
-import { useDashboardAuth } from '../auth';
+import { AuthRequiredError, useDashboardAuth } from '../auth';
 
 const EMPTY_PARSE_RESULT: BulkPayoutParseResult = {
   rows: [],
@@ -37,7 +37,12 @@ export function BulkPayoutsPage() {
     () =>
       createRelayerPayoutSubmitter({
         baseUrl: resolveRelayerBaseUrl(import.meta.env.VITE_RELAYER_URL),
-        getAuthToken: () => session?.accessToken ?? 'ancore-client-token',
+        getAuthToken: () => {
+          if (!session?.accessToken) {
+            throw new AuthRequiredError();
+          }
+          return session.accessToken;
+        },
         buildRelayRequest: async (submission: PayoutSubmission) => {
           // The outer envelope always needs a real relay signature — even
           // when the CSV supplies a pre-signed transaction XDR, that's a

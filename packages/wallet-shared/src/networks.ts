@@ -17,7 +17,7 @@ export const DEFAULT_HORIZON_URLS: Record<StellarNetwork, string> = {
 };
 
 export const DEFAULT_SOROBAN_RPC_URLS: Record<StellarNetwork, string> = {
-  mainnet: 'https://soroban-rpc.mainnet.stellar.gateway.dev',
+  mainnet: 'https://soroban-mainnet.stellar.org',
   testnet: 'https://soroban-testnet.stellar.org',
   futurenet: 'https://rpc-futurenet.stellar.org',
   local: 'http://localhost:8000/soroban/rpc',

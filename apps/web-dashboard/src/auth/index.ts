@@ -1,4 +1,5 @@
 export {
+  AuthRequiredError,
   DASHBOARD_SESSION_STORAGE_KEY,
   DashboardAuthProvider,
   readDashboardSession,

@@ -4,6 +4,7 @@ import {
   SimulationFailedError,
   SimulationExpiredError,
   BuilderValidationError,
+  InvalidRetryPresetError,
   SessionKeyManagementError,
   SessionKeyExecutionError,
   SessionKeyExecutionValidationError,
@@ -44,6 +45,15 @@ describe('error classes', () => {
     const err = new BuilderValidationError('no operations added');
     expect(err.code).toBe('BUILDER_VALIDATION');
     expect(err.name).toBe('BuilderValidationError');
+  });
+
+  it('InvalidRetryPresetError has correct code, name, and properties', () => {
+    const err = new InvalidRetryPresetError('CUSTOM');
+    expect(err.code).toBe('INVALID_RETRY_PRESET');
+    expect(err.message).toBe('Unknown retry preset: CUSTOM');
+    expect(err.presetName).toBe('CUSTOM');
+    expect(err.name).toBe('InvalidRetryPresetError');
+    expect(err).toBeInstanceOf(AncoreSdkError);
   });
 
   it('SessionKeyManagementError accepts custom code and cause', () => {
@@ -195,5 +205,26 @@ describe('normalizeError — additional branches', () => {
     // so it hits the final String(error) fallback
     expect(n.code).toBe('UNKNOWN');
     expect(typeof n.message).toBe('string');
+  });
+
+  it('classifies exact 4xx/5xx status codes as NETWORK', () => {
+    expect(normalizeError({ code: '404', message: 'Not found' }).category).toBe('NETWORK');
+    expect(normalizeError({ code: '500', message: 'Server error' }).category).toBe('NETWORK');
+    expect(normalizeError({ code: '503', message: 'Service unavailable' }).category).toBe(
+      'NETWORK'
+    );
+  });
+
+  it('does not misclassify codes merely prefixed with 3 digits as NETWORK', () => {
+    // Should not match as NETWORK when code has suffix like _LEGACY_FIELD
+    const legacy = normalizeError({ code: '404_LEGACY_FIELD', message: 'legacy' });
+    expect(legacy.category).not.toBe('NETWORK');
+    expect(legacy.category).toBe('UNKNOWN');
+
+    const badReq = normalizeError({ code: '400_BAD_REQUEST', message: 'bad request' });
+    expect(badReq.category).toBe('VALIDATION');
+
+    const extendedNum = normalizeError({ code: '40400', message: 'extended code' });
+    expect(extendedNum.category).not.toBe('NETWORK');
   });
 });

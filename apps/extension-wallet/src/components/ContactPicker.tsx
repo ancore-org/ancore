@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { useContactsStore } from '../stores/contacts';
 import type { Contact } from '@ancore/types';
 
@@ -18,6 +18,7 @@ interface ContactPickerProps {
 export function ContactPicker({ onSelect, placeholder = 'Search contacts…' }: ContactPickerProps) {
   const contacts = useContactsStore((state) => state.contacts);
   const [query, setQuery] = useState('');
+  const [activeIndex, setActiveIndex] = useState(0);
 
   const filtered = contacts
     .filter(
@@ -31,6 +32,46 @@ export function ContactPicker({ onSelect, placeholder = 'Search contacts…' }: 
       return a.alias.localeCompare(b.alias);
     });
 
+  useEffect(() => {
+    setActiveIndex(filtered.length > 0 ? 0 : -1);
+  }, [query, filtered.length]);
+
+  const selectContact = (contact: Contact, index: number) => {
+    setActiveIndex(index);
+    onSelect(contact);
+  };
+
+  const handleListboxKeyDown = (event: React.KeyboardEvent<HTMLUListElement>) => {
+    if (filtered.length === 0) {
+      return;
+    }
+
+    switch (event.key) {
+      case 'ArrowDown':
+        event.preventDefault();
+        setActiveIndex((index) => Math.min(index + 1, filtered.length - 1));
+        break;
+      case 'ArrowUp':
+        event.preventDefault();
+        setActiveIndex((index) => Math.max(index - 1, 0));
+        break;
+      case 'Home':
+        event.preventDefault();
+        setActiveIndex(0);
+        break;
+      case 'End':
+        event.preventDefault();
+        setActiveIndex(filtered.length - 1);
+        break;
+      case 'Enter':
+        event.preventDefault();
+        if (activeIndex >= 0 && activeIndex < filtered.length) {
+          onSelect(filtered[activeIndex]);
+        }
+        break;
+    }
+  };
+
   if (contacts.length === 0) {
     return (
       <div
@@ -41,6 +82,11 @@ export function ContactPicker({ onSelect, placeholder = 'Search contacts…' }: 
       </div>
     );
   }
+
+  const activeOptionId =
+    activeIndex >= 0 && activeIndex < filtered.length
+      ? `contact-option-${filtered[activeIndex].id}`
+      : undefined;
 
   return (
     <div data-testid="contact-picker" className="flex flex-col gap-3">
@@ -63,13 +109,26 @@ export function ContactPicker({ onSelect, placeholder = 'Search contacts…' }: 
           No contacts match your search.
         </div>
       ) : (
-        <ul className="flex flex-col gap-1" role="listbox" aria-label="Contacts">
-          {filtered.map((contact) => (
-            <li key={contact.id} role="option" aria-selected={false}>
+        <ul
+          className="flex flex-col gap-1"
+          role="listbox"
+          aria-label="Contacts"
+          tabIndex={0}
+          aria-activedescendant={activeOptionId}
+          onKeyDown={handleListboxKeyDown}
+        >
+          {filtered.map((contact, index) => (
+            <li
+              key={contact.id}
+              id={`contact-option-${contact.id}`}
+              role="option"
+              aria-selected={index === activeIndex}
+            >
               <button
                 type="button"
                 data-testid={`contact-item-${contact.id}`}
-                onClick={() => onSelect(contact)}
+                onClick={() => selectContact(contact, index)}
+                onMouseEnter={() => setActiveIndex(index)}
                 className="w-full flex items-center justify-between gap-3 rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-left hover:border-cyan-400/40 hover:bg-cyan-400/5 transition-all"
               >
                 <div className="flex flex-col min-w-0">

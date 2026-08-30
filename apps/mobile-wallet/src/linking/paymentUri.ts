@@ -1,10 +1,11 @@
+import { StrKey } from '@stellar/stellar-sdk';
+
 export interface ParsedPaymentUri {
   dest: string;
   amount?: string;
 }
 
 const SUPPORTED_SCHEMES = new Set(['stellar', 'web+stellar']);
-const DESTINATION_RE = /^G[A-Z2-7]{55}$/;
 
 function isValidAmount(amount: string): boolean {
   if (!/^(?:0|[1-9]\d*)(?:\.\d{1,7})?$/.test(amount)) {
@@ -40,7 +41,7 @@ export function parsePaymentUri(uri: string): ParsedPaymentUri | null {
   const params = new URLSearchParams(payload.slice(querySeparator + 1));
   const dest = params.get('destination') ?? params.get('dest');
 
-  if (!dest || !DESTINATION_RE.test(dest)) {
+  if (!dest || !StrKey.isValidEd25519PublicKey(dest)) {
     return null;
   }
 

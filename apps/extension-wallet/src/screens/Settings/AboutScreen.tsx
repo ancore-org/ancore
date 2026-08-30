@@ -2,13 +2,27 @@ import * as React from 'react';
 import { ExternalLink, Github, MessageCircle, Bug, Heart } from 'lucide-react';
 import { ScreenHeader } from './NetworkSettings';
 
-const APP_VERSION = '0.1.0';
+export function getAppVersion(): string {
+  try {
+    if (typeof chrome !== 'undefined' && chrome?.runtime?.getManifest) {
+      const manifest = chrome.runtime.getManifest();
+      if (manifest?.version) {
+        return manifest.version;
+      }
+    }
+  } catch {
+    // Ignore runtime error
+  }
+  return '0.1.0';
+}
 
 interface AboutScreenProps {
   onBack: () => void;
 }
 
 export function AboutScreen({ onBack }: AboutScreenProps) {
+  const appVersion = getAppVersion();
+
   return (
     <div className="flex flex-col min-h-screen bg-background">
       <ScreenHeader title="About" onBack={onBack} />
@@ -24,7 +38,7 @@ export function AboutScreen({ onBack }: AboutScreenProps) {
             <p className="text-sm text-muted-foreground">Account abstraction for Stellar</p>
           </div>
           <span className="rounded-full bg-primary/10 px-3 py-1 text-xs font-semibold text-primary">
-            v{APP_VERSION}
+            v{appVersion}
           </span>
         </div>
 
