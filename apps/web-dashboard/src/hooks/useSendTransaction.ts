@@ -156,10 +156,12 @@ export const useSendTransaction = (options: UseSendTransactionOptions = {}) => {
 
   const [optimisticTransaction, setOptimisticTransaction] = useState<Transaction | null>(null);
   const pollRef = useRef<PollController | null>(null);
+  const isMountedRef = useRef(true);
 
   // Cleanup polling on unmount
   useEffect(() => {
     return () => {
+      isMountedRef.current = false;
       pollRef.current?.stop();
     };
   }, []);
@@ -241,6 +243,7 @@ export const useSendTransaction = (options: UseSendTransactionOptions = {}) => {
 
           // Wait for confirmation asynchronously (don't block UI)
           void controller.result.then((pollStatus) => {
+            if (!isMountedRef.current) return;
             setOptimisticTransaction((prev) => {
               if (!prev || prev.hash !== sendResult.hash) return prev;
               return {

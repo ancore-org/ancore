@@ -19,7 +19,7 @@ function defaultStartAt(): string {
 export function ScheduledTransfersPage() {
   const { currentAccount } = useAccountState();
   const wallet = useWalletConnection();
-  const accountAddress = wallet.address || currentAccount?.address;
+  const accountAddress = wallet.smartAccountId || currentAccount?.address;
 
   const {
     transfers,
