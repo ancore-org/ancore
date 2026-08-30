@@ -80,6 +80,8 @@ export async function migrateLegacyMobileVault(storageManager: {
 
     return true;
   } catch (error) {
-    throw new Error(`Failed to migrate legacy mobile vault: ${error instanceof Error ? error.message : String(error)}`);
+    throw new Error(
+      `Failed to migrate legacy mobile vault: ${error instanceof Error ? error.message : String(error)}`
+    );
   }
 }
