@@ -1,11 +1,11 @@
-import type { JobQueue } from '../queue/JobQueue';
+import type { JobQueueContract } from '../queue/types';
 import type { HandlerRegistry, WorkerOptions, WorkerStats } from './types';
 
 const DEFAULT_POLL_INTERVAL_MS = 500;
 const DEFAULT_CONCURRENCY = 1;
 
 /**
- * Polls a `JobQueue` and dispatches jobs to registered handlers.
+ * Polls a `JobQueue` (in-memory or Postgres-backed) and dispatches jobs to registered handlers.
  *
  * Usage:
  * ```ts
@@ -16,7 +16,7 @@ const DEFAULT_CONCURRENCY = 1;
  * ```
  */
 export class QueueWorker {
-  private readonly queue: JobQueue;
+  private readonly queue: JobQueueContract;
   private readonly handlers: HandlerRegistry;
   private readonly pollIntervalMs: number;
   private readonly concurrency: number;
@@ -32,7 +32,7 @@ export class QueueWorker {
     deadLettered: 0,
   };
 
-  constructor(queue: JobQueue, handlers: HandlerRegistry, options: WorkerOptions = {}) {
+  constructor(queue: JobQueueContract, handlers: HandlerRegistry, options: WorkerOptions = {}) {
     this.queue = queue;
     this.handlers = handlers;
     this.pollIntervalMs = options.pollIntervalMs ?? DEFAULT_POLL_INTERVAL_MS;
@@ -69,7 +69,7 @@ export class QueueWorker {
 
   private async poll(): Promise<void> {
     while (this.running && this.activeJobs < this.concurrency) {
-      const result = this.queue.dequeue();
+      const result = await this.queue.dequeue();
       if (!result) break;
 
       this.activeJobs++;
@@ -84,15 +84,15 @@ export class QueueWorker {
             throw new Error(`No handler registered for job type "${job.type}"`);
           }
           await handler(job);
-          ack();
+          await ack();
           this.stats.succeeded++;
         } catch (err) {
           const error = err instanceof Error ? err : new Error(String(err));
-          nack(error);
+          await nack(error);
           this.stats.failed++;
 
           // Check if the job was moved to dead-letter after nack
-          const updated = this.queue.getById(job.id);
+          const updated = await this.queue.getById(job.id);
           if (updated?.status === 'dead') {
             this.stats.deadLettered++;
           }

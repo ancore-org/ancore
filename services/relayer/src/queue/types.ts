@@ -41,7 +41,16 @@ export interface EnqueueOptions {
 export interface DequeueResult<T = unknown> {
   job: Job<T>;
   /** Call to mark the job completed */
-  ack: () => void;
+  ack: () => void | Promise<void>;
   /** Call to mark the job failed and schedule a retry (or move to dead-letter) */
-  nack: (error: Error) => void;
+  nack: (error: Error) => void | Promise<void>;
+}
+
+export interface JobQueueContract {
+  enqueue(options: EnqueueOptions): Job | Promise<Job>;
+  dequeue<T = unknown>(): DequeueResult<T> | null | Promise<DequeueResult<T> | null>;
+  getById(id: string): Job | undefined | Promise<Job | undefined>;
+  getByIdempotencyKey(key: string): Job | undefined | Promise<Job | undefined>;
+  getDeadLetterJobs(): Job[] | Promise<Job[]>;
+  size(): number | Promise<number>;
 }
