@@ -84,10 +84,7 @@ export class AccountPersistence {
   private readonly storageKey: string;
   private readonly now: () => number;
 
-  constructor(
-    storageManager: SecureStorageManager,
-    options: AccountPersistenceOptions = {}
-  ) {
+  constructor(storageManager: SecureStorageManager, options: AccountPersistenceOptions = {}) {
     this.storageManager = storageManager;
     this.storageKey = options.storageKey ?? DEFAULT_ACCOUNTS_STORAGE_KEY;
     this.now = options.now ?? (() => Date.now());

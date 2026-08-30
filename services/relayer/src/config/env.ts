@@ -143,10 +143,7 @@ export const relayerEnvSchema = z.object({
 
   // Database
   /** PostgreSQL database URL for persistent stores (JobQueue, IdempotencyStore, NonceStore, ScheduledTransfers). Required in production. */
-  DATABASE_URL: z.preprocess(
-    emptyToUndefined,
-    z.string().min(1, 'must not be empty').optional()
-  ),
+  DATABASE_URL: z.preprocess(emptyToUndefined, z.string().min(1, 'must not be empty').optional()),
 
   // Limits and timers
   /** Per-caller/IP requests per 15-minute window on `/relay/*`. */
