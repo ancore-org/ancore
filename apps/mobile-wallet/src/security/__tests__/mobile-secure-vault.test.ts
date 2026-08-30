@@ -3,9 +3,13 @@
  */
 
 import { webcrypto } from 'crypto';
-import { ChromeStorageAdapter, SecureStorageManager } from '@ancore/core-sdk';
+import {
+  ChromeStorageAdapter,
+  SecureStorageManager,
+  createAccountPersistence,
+} from '@ancore/core-sdk';
 import { MemorySecureStoreAdapter } from '../../storage';
-import { MobileSecureVault } from '../mobile-secure-vault';
+import { createMobileSecureStorageManager } from '../mobile-storage-manager';
 
 export const mockAppStateListeners = new Set<(state: string) => void>();
 
@@ -76,18 +80,22 @@ function createMockChromeStorage(): {
   };
 }
 
-describe('MobileSecureVault', () => {
+describe('Unified Vault (SecureStorageManager + AccountPersistence)', () => {
   const password = 'correct horse battery staple';
 
   it('persists account metadata and encrypted key material through SecureStorageManager', async () => {
     const storage = new MemorySecureStoreAdapter();
-    const vault = new MobileSecureVault(storage, {
+    const manager = new SecureStorageManager(storage, {
+      autoLockMs: undefined,
+    });
+
+    await expect(manager.unlock(password)).resolves.toBe(true);
+
+    const accounts = createAccountPersistence(manager, {
       now: () => Date.parse('2026-04-23T12:00:00.000Z'),
     });
 
-    await expect(vault.unlock(password)).resolves.toBe(true);
-
-    const metadata = await vault.persistAccount({
+    const metadata = await accounts.persistAccount({
       id: 'primary',
       address: 'GABC1234',
       label: 'Primary account',
@@ -106,13 +114,13 @@ describe('MobileSecureVault', () => {
       updatedAt: '2026-04-23T12:00:00.000Z',
     });
 
-    const persistedRecords = await storage.get('mobile_vault_accounts');
+    const persistedRecords = await storage.get('vault_accounts');
 
     expect(persistedRecords).not.toBeNull();
     expect(persistedRecords).not.toContain('SSECRET1234');
     expect(persistedRecords).not.toContain('memo-seed');
-    expect(await vault.listAccountMetadata()).toEqual([metadata]);
-    expect(await vault.loadAccount('primary')).toEqual({
+    expect(await accounts.listAccountMetadata()).toEqual([metadata]);
+    expect(await accounts.loadAccount('primary')).toEqual({
       metadata,
       secret: {
         keyMaterial: 'SSECRET1234',
@@ -126,22 +134,24 @@ describe('MobileSecureVault', () => {
 
   it('rejects wrong passwords after the vault has been initialized', async () => {
     const storage = new MemorySecureStoreAdapter();
-    const firstVault = new MobileSecureVault(storage);
+    const firstManager = new SecureStorageManager(storage);
 
-    await firstVault.unlock(password);
-    await firstVault.persistAccount({
+    await firstManager.unlock(password);
+    const firstAccounts = createAccountPersistence(firstManager);
+    await firstAccounts.persistAccount({
       id: 'primary',
       address: 'GABC1234',
       keyMaterial: 'SSECRET1234',
       accountPayload: { network: 'testnet' },
     });
-    firstVault.lock();
+    firstManager.lock();
 
-    const secondVault = new MobileSecureVault(storage);
+    const secondManager = new SecureStorageManager(storage);
 
-    await expect(secondVault.unlock('wrong password')).resolves.toBe(false);
-    expect(secondVault.isUnlocked).toBe(false);
-    await expect(secondVault.loadAccount('primary')).rejects.toThrow('Storage manager is locked');
+    await expect(secondManager.unlock('wrong password')).resolves.toBe(false);
+    expect(secondManager.isUnlocked).toBe(false);
+    const secondAccounts = createAccountPersistence(secondManager);
+    await expect(secondAccounts.loadAccount('primary')).rejects.toThrow('Storage manager is locked');
   });
 
   it('locks after the inactivity timeout elapses', async () => {
@@ -149,16 +159,17 @@ describe('MobileSecureVault', () => {
 
     try {
       const storage = new MemorySecureStoreAdapter();
-      const vault = new MobileSecureVault(storage, { lockTimeoutMs: 1_000 });
+      const manager = new SecureStorageManager(storage, { autoLockMs: 1_000 });
 
-      await vault.unlock(password);
-      expect(vault.isUnlocked).toBe(true);
+      await manager.unlock(password);
+      expect(manager.isUnlocked).toBe(true);
 
       jest.advanceTimersByTime(1_001);
 
-      expect(vault.isUnlocked).toBe(false);
+      expect(manager.isUnlocked).toBe(false);
+      const accounts = createAccountPersistence(manager);
       await expect(
-        vault.persistAccount({
+        accounts.persistAccount({
           id: 'primary',
           address: 'GABC1234',
           keyMaterial: 'SSECRET1234',
@@ -195,17 +206,17 @@ describe('MobileSecureVault', () => {
     await expect(mobileManager.getAccount()).resolves.toEqual(account);
   });
 
-  it('locks the secure vault when the app goes to the background', async () => {
+  it('locks the secure vault when the app goes to the background with app state handler', async () => {
     mockAppStateListeners.clear();
     const storage = new MemorySecureStoreAdapter();
-    const vault = new MobileSecureVault(storage);
+    const { manager, dispose } = createMobileSecureStorageManager(storage);
 
     // Initial state: locked
-    expect(vault.isUnlocked).toBe(false);
+    expect(manager.isUnlocked).toBe(false);
 
     // Unlock vault
-    await expect(vault.unlock(password)).resolves.toBe(true);
-    expect(vault.isUnlocked).toBe(true);
+    await expect(manager.unlock(password)).resolves.toBe(true);
+    expect(manager.isUnlocked).toBe(true);
 
     // Trigger app state change to inactive / background
     expect(mockAppStateListeners.size).toBe(1);
@@ -214,10 +225,11 @@ describe('MobileSecureVault', () => {
     listener('background');
 
     // Should be locked now
-    expect(vault.isUnlocked).toBe(false);
+    expect(manager.isUnlocked).toBe(false);
 
     // Clean up
-    vault.dispose();
+    dispose();
     expect(mockAppStateListeners.size).toBe(0);
   });
 });
+

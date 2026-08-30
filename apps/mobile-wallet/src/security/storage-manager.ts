@@ -1,25 +1,33 @@
 import { SecureStorageManager } from '@ancore/core-sdk';
 
 import { createSecureStoreAdapter } from '../storage/secure-store-factory';
+import { createMobileSecureStorageManager } from './mobile-storage-manager';
 
 import type { SecureStoreAdapter } from '../storage/types';
 
 type StorageManagerInstance = InstanceType<typeof SecureStorageManager>;
 
 let sharedStorageManager: StorageManagerInstance | null = null;
+let sharedDispose: (() => void) | null = null;
 
 /** Shared vault instance for onboarding, unlock, and signing flows. */
 export function getSharedStorageManager(): StorageManagerInstance {
   if (!sharedStorageManager) {
-    sharedStorageManager = new SecureStorageManager(createSecureStoreAdapter());
+    const { manager, dispose } = createMobileSecureStorageManager(createSecureStoreAdapter());
+    sharedStorageManager = manager;
+    sharedDispose = dispose;
   }
 
-  return sharedStorageManager;
+  return sharedStorageManager as StorageManagerInstance;
 }
 
 /** Reset singleton; optionally seed with a test adapter before the next get. */
 export function resetSharedStorageManagerForTests(adapter?: SecureStoreAdapter): void {
+  if (sharedDispose) {
+    sharedDispose();
+  }
   sharedStorageManager = adapter ? new SecureStorageManager(adapter) : null;
+  sharedDispose = null;
 }
 
 const MASTER_SALT_KEY = 'master_salt';
