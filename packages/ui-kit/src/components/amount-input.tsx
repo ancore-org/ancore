@@ -1,11 +1,9 @@
 import * as React from 'react';
-import { Input } from './ui/input';
-import { Badge } from './ui/badge';
-import { cn } from '@/lib/utils';
+import { AmountInputBase, type AmountInputBaseProps } from './Form/AmountInput';
 
 export interface AmountInputProps extends Omit<
-  React.InputHTMLAttributes<HTMLInputElement>,
-  'type'
+  AmountInputBaseProps,
+  'onMax' | 'maxDisabled' | 'name'
 > {
   /**
    * Current balance to display
@@ -27,31 +25,20 @@ export interface AmountInputProps extends Omit<
 
 /**
  * AmountInput - A specialized input component for cryptocurrency amounts
- * Displays balance, asset badge, and handles numeric input validation
+ * Displays balance, asset badge, and handles numeric input validation.
+ *
+ * @deprecated This is a thin wrapper kept for backwards compatibility. It now
+ * renders `AmountInputBase`, the same implementation behind `FormAmountInput`.
+ * Import `FormAmountInput` instead — it additionally integrates with `Form`
+ * via a `name` prop and supports a MAX shortcut.
+ *
+ * The previous implementation used a raw `type="number"` field with no input
+ * sanitisation and no `aria-invalid` / `aria-describedby` wiring, which made
+ * it the less accessible of two similarly named exports for money amounts.
  */
-const AmountInput = React.forwardRef<HTMLInputElement, AmountInputProps>(
-  ({ balance, asset = 'XLM', error, label = 'Amount', className, ...props }, ref) => {
-    return (
-      <div className={cn('space-y-2', className)}>
-        <div className="flex items-center justify-between">
-          <label className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70">
-            {label}
-          </label>
-          <Badge variant="outline">{asset}</Badge>
-        </div>
-        <Input type="number" step="any" placeholder="0.00" ref={ref} {...props} />
-        <div className="flex items-center justify-between">
-          {balance && (
-            <p className="text-sm text-muted-foreground">
-              Balance: {balance} {asset}
-            </p>
-          )}
-          {error && <p className="text-sm text-destructive">{error}</p>}
-        </div>
-      </div>
-    );
-  }
-);
+const AmountInput = React.forwardRef<HTMLInputElement, AmountInputProps>((props, ref) => (
+  <AmountInputBase ref={ref} {...props} />
+));
 AmountInput.displayName = 'AmountInput';
 
 export { AmountInput };

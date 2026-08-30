@@ -1,6 +1,7 @@
-import { useCallback, useContext, createContext, useMemo, useReducer } from 'react';
-import { importWallet } from '@ancore/core-sdk';
+import { useCallback, useContext, createContext, useMemo, useReducer, useState } from 'react';
 import { generateMnemonic } from '@ancore/crypto';
+
+import { persistOnboardedWallet } from '../onboarding/persist-wallet';
 
 import {
   DEFAULT_ONBOARDING_STATE,
@@ -26,6 +27,7 @@ type OnboardingAction =
   | { type: 'restart' }
   | { type: 'setMnemonic'; mnemonic: string }
   | { type: 'setPassword'; password: string }
+  | { type: 'setWalletLabel'; walletLabel: string }
   | { type: 'clearSensitiveData' };
 
 type OnboardingContextValue = {
@@ -40,6 +42,7 @@ type OnboardingContextValue = {
   goTo: (route: OnboardingRoute) => void;
   setMnemonic: (mnemonic: string) => void;
   setPassword: (password: string) => void;
+  setWalletLabel: (walletLabel: string) => void;
   clearSensitiveData: () => void;
 };
 
@@ -103,6 +106,7 @@ function onboardingReducer(state: OnboardingState, action: OnboardingAction): On
         history: ['entry', action.flow],
         mnemonic: null,
         password: null,
+        walletLabel: null,
       };
     case 'goTo':
       return {
@@ -146,6 +150,8 @@ function onboardingReducer(state: OnboardingState, action: OnboardingAction): On
       return { ...state, mnemonic: action.mnemonic };
     case 'setPassword':
       return { ...state, password: action.password };
+    case 'setWalletLabel':
+      return { ...state, walletLabel: action.walletLabel };
     case 'clearSensitiveData':
       return { ...state, mnemonic: null, password: null };
     default:
@@ -169,6 +175,7 @@ function useOnboardingNavigator(initialState?: Partial<OnboardingState>) {
       goTo: (route) => dispatch({ type: 'goTo', route }),
       setMnemonic: (mnemonic) => dispatch({ type: 'setMnemonic', mnemonic }),
       setPassword: (password) => dispatch({ type: 'setPassword', password }),
+      setWalletLabel: (walletLabel) => dispatch({ type: 'setWalletLabel', walletLabel }),
       clearSensitiveData: () => dispatch({ type: 'clearSensitiveData' }),
     }),
     [state]
@@ -185,7 +192,7 @@ function useOnboardingContext(): OnboardingContextValue {
   return context;
 }
 
-function OnboardingRouteView() {
+function OnboardingRouteView({ onComplete }: { onComplete?: () => void }) {
   const {
     state,
     startCreate,
@@ -197,14 +204,48 @@ function OnboardingRouteView() {
     restart,
     goTo,
     setMnemonic,
+    setWalletLabel,
     clearSensitiveData,
   } = useOnboardingContext();
 
-  const handleCreateContinue = useCallback(() => {
-    const mnemonic = generateMnemonic();
-    setMnemonic(mnemonic);
-    goTo('create-display');
-  }, [setMnemonic, goTo]);
+  const [error, setError] = useState<string | null>(null);
+
+  const persistWallet = useCallback(
+    async (password: string) => {
+      if (!state.mnemonic) {
+        throw new Error('Recovery phrase is missing');
+      }
+
+      setError(null);
+
+      try {
+        await persistOnboardedWallet({
+          mnemonic: state.mnemonic,
+          password,
+          label: state.walletLabel ?? 'Ancore Wallet',
+        });
+        clearSensitiveData();
+        complete();
+        onComplete?.();
+      } catch (persistError) {
+        const message =
+          persistError instanceof Error ? persistError.message : 'Failed to save wallet securely';
+        setError(message);
+        throw new Error(message);
+      }
+    },
+    [state.mnemonic, state.walletLabel, clearSensitiveData, complete, onComplete]
+  );
+
+  const handleCreateContinue = useCallback(
+    (walletLabel: string) => {
+      const mnemonic = generateMnemonic();
+      setWalletLabel(walletLabel);
+      setMnemonic(mnemonic);
+      goTo('create-display');
+    },
+    [setWalletLabel, setMnemonic, goTo]
+  );
 
   const handleImportContinue = useCallback(
     (mnemonic: string) => {
@@ -216,20 +257,28 @@ function OnboardingRouteView() {
 
   const handleCreatePasswordComplete = useCallback(
     async (password: string) => {
-      await importWallet({ mnemonic: state.mnemonic!, password });
-      clearSensitiveData();
-      complete();
+      await persistWallet(password);
     },
-    [state.mnemonic, clearSensitiveData, complete]
+    [persistWallet]
   );
 
   const handleImportPasswordComplete = useCallback(
     async (password: string) => {
-      await importWallet({ mnemonic: state.mnemonic!, password });
-      clearSensitiveData();
-      complete();
+      await persistWallet(password);
     },
-    [state.mnemonic, clearSensitiveData, complete]
+    [persistWallet]
+  );
+
+  const passwordScreen = (flow: 'create' | 'import') => (
+    <>
+      {error && <p role="alert">{error}</p>}
+      <PasswordScreen
+        flow={flow}
+        onBack={back}
+        onCancel={cancel}
+        onComplete={flow === 'create' ? handleCreatePasswordComplete : handleImportPasswordComplete}
+      />
+    </>
   );
 
   switch (state.route) {
@@ -264,27 +313,13 @@ function OnboardingRouteView() {
         />
       );
     case 'create-password':
-      return (
-        <PasswordScreen
-          flow="create"
-          onBack={back}
-          onCancel={cancel}
-          onComplete={handleCreatePasswordComplete}
-        />
-      );
+      return passwordScreen('create');
     case 'import':
       return (
         <WalletImportScreen onBack={back} onCancel={cancel} onContinue={handleImportContinue} />
       );
     case 'import-password':
-      return (
-        <PasswordScreen
-          flow="import"
-          onBack={back}
-          onCancel={cancel}
-          onComplete={handleImportPasswordComplete}
-        />
-      );
+      return passwordScreen('import');
     case 'recover':
       return <WalletRecoverScreen onBack={back} onCancel={cancel} onContinue={complete} />;
     case 'complete':
@@ -300,12 +335,18 @@ function OnboardingRouteView() {
   }
 }
 
-export function OnboardingNavigator({ initialState }: { initialState?: Partial<OnboardingState> }) {
+export function OnboardingNavigator({
+  initialState,
+  onComplete,
+}: {
+  initialState?: Partial<OnboardingState>;
+  onComplete?: () => void;
+}) {
   const contextValue = useOnboardingNavigator(initialState);
 
   return (
     <OnboardingContext.Provider value={contextValue}>
-      <OnboardingRouteView />
+      <OnboardingRouteView onComplete={onComplete} />
     </OnboardingContext.Provider>
   );
 }

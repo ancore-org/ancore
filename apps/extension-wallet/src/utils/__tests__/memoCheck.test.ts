@@ -58,6 +58,52 @@ describe('isMemoRequired', () => {
     expect(result).toBe(false);
   });
 
+  it('does not cache network errors and re-checks on the next call', async () => {
+    const addr = 'GCNOCACHEERR000000000000000000000000000000000000000000000';
+    fetchSpy.mockRejectedValueOnce(new Error('network')).mockResolvedValueOnce({
+      ok: true,
+      json: async () => ({ require_memo: true }),
+    } as Response);
+
+    const { isMemoRequired: check } = await import('../memoCheck');
+    expect(await check(addr)).toBe(false);
+    expect(await check(addr)).toBe(true);
+    expect(fetchSpy).toHaveBeenCalledTimes(2);
+  });
+
+  it('does not cache non-2xx responses and re-checks on the next call', async () => {
+    const addr = 'GCNOCACHEHTTP00000000000000000000000000000000000000000000';
+    fetchSpy.mockResolvedValueOnce({ ok: false, status: 503 } as Response).mockResolvedValueOnce({
+      ok: true,
+      json: async () => ({ require_memo: true }),
+    } as Response);
+
+    const { isMemoRequired: check } = await import('../memoCheck');
+    expect(await check(addr)).toBe(false);
+    expect(await check(addr)).toBe(true);
+    expect(fetchSpy).toHaveBeenCalledTimes(2);
+  });
+
+  it('does not cache JSON parse failures and re-checks on the next call', async () => {
+    const addr = 'GCNOCACHEJSON00000000000000000000000000000000000000000000';
+    fetchSpy
+      .mockResolvedValueOnce({
+        ok: true,
+        json: async () => {
+          throw new Error('invalid json');
+        },
+      } as Response)
+      .mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({ require_memo: true }),
+      } as Response);
+
+    const { isMemoRequired: check } = await import('../memoCheck');
+    expect(await check(addr)).toBe(false);
+    expect(await check(addr)).toBe(true);
+    expect(fetchSpy).toHaveBeenCalledTimes(2);
+  });
+
   it('caches results to avoid duplicate API calls', async () => {
     fetchSpy.mockResolvedValue({
       ok: true,

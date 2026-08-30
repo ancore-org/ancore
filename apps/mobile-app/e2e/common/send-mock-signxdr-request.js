@@ -1,8 +1,8 @@
 #!/usr/bin/env node
 /**
- * Mock WalletConnect sign-xdr request for e2e testing
- * Injects a mock WalletConnect session_request event via adb shell
- * Used by: e2e/flows/sign-xdr.yaml
+ * Mock WalletConnect sign-xdr request for e2e testing.
+ * Android: adb broadcast to MockWalletConnectReceiver.
+ * iOS: simctl openurl with ancoredev://mock-wc deep link.
  */
 
 const { execSync } = require('child_process');
@@ -15,13 +15,41 @@ const mockSignXdrRequest = {
   },
 };
 
-try {
-  const adbCmd = `adb shell "am broadcast -a com.ancore.mobile.MOCK_WC_REQUEST --es request '${JSON.stringify(
+const payload = encodeURIComponent(JSON.stringify(mockSignXdrRequest));
+
+function runAndroid() {
+  const adbCmd = `adb shell "am broadcast -a org.ancore.wallet.dev.MOCK_WC_REQUEST --es request '${JSON.stringify(
     mockSignXdrRequest
   ).replace(/'/g, "\\'")}'"`;
 
-  console.log('📢 Sending mock WalletConnect sign-xdr request...');
+  console.log('📢 Sending mock WalletConnect sign-xdr request (Android)...');
   execSync(adbCmd, { stdio: 'inherit' });
+}
+
+function runIos() {
+  const url = `ancoredev://mock-wc?request=${payload}`;
+  const iosCmd = `xcrun simctl openurl booted "${url}"`;
+
+  console.log('📢 Sending mock WalletConnect sign-xdr request (iOS)...');
+  execSync(iosCmd, { stdio: 'inherit' });
+}
+
+try {
+  const platform = process.env.E2E_PLATFORM?.toLowerCase();
+
+  if (platform === 'ios') {
+    runIos();
+  } else if (platform === 'android') {
+    runAndroid();
+  } else {
+    try {
+      execSync('adb get-state', { stdio: 'ignore' });
+      runAndroid();
+    } catch {
+      runIos();
+    }
+  }
+
   console.log('✅ Mock request sent');
 } catch (err) {
   console.error('❌ Failed to send mock request:', err.message);

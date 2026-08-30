@@ -117,8 +117,8 @@ describe('KeychainSecureStoreAdapter', () => {
     const store = installKeychainFake();
 
     const adapter = new KeychainSecureStoreAdapter({ bundleId: PROD_BUNDLE_ID });
-    await adapter.set('mobile_vault_state', { a: 1 });
-    await adapter.set('mobile_vault_accounts', { b: 2 });
+    await adapter.set('mobile_vault_state', JSON.stringify({ a: 1 }));
+    await adapter.set('mobile_vault_accounts', JSON.stringify({ b: 2 }));
 
     await adapter.clear();
 
@@ -132,6 +132,22 @@ describe('KeychainSecureStoreAdapter', () => {
       service: 'org.ancore.wallet.__keys__',
     });
     expect(store.size).toBe(0);
+    await expect(adapter.get('mobile_vault_state')).resolves.toBeNull();
+    await expect(adapter.get('mobile_vault_accounts')).resolves.toBeNull();
+  });
+
+  it('deletes an entry and removes it from keychain storage and index', async () => {
+    const store = installKeychainFake();
+
+    const adapter = new KeychainSecureStoreAdapter({ bundleId: PROD_BUNDLE_ID });
+    await adapter.set('secret_key', 'secret_val');
+    await adapter.delete('secret_key');
+
+    expect(mockKeychain.resetGenericPassword).toHaveBeenCalledWith({
+      service: 'org.ancore.wallet.secret_key',
+    });
+    expect(store.has('org.ancore.wallet.secret_key')).toBe(false);
+    await expect(adapter.get('secret_key')).resolves.toBeNull();
   });
 
   it('scopes the service name to the dev bundle ID when configured', async () => {

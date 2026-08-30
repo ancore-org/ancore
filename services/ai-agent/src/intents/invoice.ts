@@ -9,9 +9,14 @@ export const InvoiceIntentSchema = z.object({
   amount: amountStringSchema,
   asset: z.enum(['XLM', 'USDC']),
   recipient: z.string().min(1, 'Recipient is required'),
-  dueDate: z.string().refine((date) => !isNaN(Date.parse(date)), {
-    message: 'Invalid due date format',
-  }),
+  dueDate: z
+    .string()
+    .refine((date) => !isNaN(Date.parse(date)), {
+      message: 'Invalid due date format',
+    })
+    .refine((date) => Date.parse(date) >= Date.now(), {
+      message: 'Due date must not be in the past',
+    }),
 });
 
 export type InvoiceIntent = z.infer<typeof InvoiceIntentSchema>;

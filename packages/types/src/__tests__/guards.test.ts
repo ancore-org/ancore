@@ -8,6 +8,7 @@ import {
   isSessionKeyPolicy,
   isStatementRow,
 } from '../guards';
+import { STATEMENT_STATUSES } from '../statement';
 
 describe('guards', () => {
   test('isSmartAccount returns true for valid object', () => {
@@ -31,8 +32,14 @@ describe('guards', () => {
   });
 
   test('isValidPermission recognizes permissions', () => {
-    expect(isValidPermission(0)).toBe(true);
+    expect(isValidPermission(0)).toBe(false);
+    expect(isValidPermission(1)).toBe(true);
     expect(isValidPermission(2)).toBe(true);
+    expect(isValidPermission(4)).toBe(true);
+    expect(isValidPermission(8)).toBe(true);
+    expect(isValidPermission(3)).toBe(true);
+    expect(isValidPermission(15)).toBe(true);
+    expect(isValidPermission(16)).toBe(false);
     expect(isValidPermission(99)).toBe(false);
     expect(isValidPermission('x')).toBe(false);
   });
@@ -119,8 +126,36 @@ describe('guards', () => {
 
   // ── StatementRow ────────────────────────────────────────────────────────
 
-  test('isStatementRow returns true for valid row', () => {
-    const row = {
+  const validStatementRow = {
+    id: 'tx1',
+    timestamp: '2025-01-01T00:00:00.000Z',
+    counterparty: 'GABC',
+    amount: '100.0000000',
+    asset: 'XLM',
+    status: 'completed',
+    memoOrReference: 'invoice-42',
+  };
+
+  test('isStatementRow returns true for a real StatementRow', () => {
+    expect(isStatementRow(validStatementRow)).toBe(true);
+  });
+
+  test('isStatementRow accepts every StatementStatus', () => {
+    for (const status of STATEMENT_STATUSES) {
+      expect(isStatementRow({ ...validStatementRow, status })).toBe(true);
+    }
+  });
+
+  test('isStatementRow returns false when a required field is missing', () => {
+    for (const key of Object.keys(validStatementRow)) {
+      const row: Record<string, unknown> = { ...validStatementRow };
+      delete row[key];
+      expect(isStatementRow(row)).toBe(false);
+    }
+  });
+
+  test('isStatementRow rejects the legacy date/type shape', () => {
+    const legacyRow = {
       id: 'tx1',
       date: '2025-01-01',
       type: 'payment',
@@ -128,12 +163,14 @@ describe('guards', () => {
       asset: 'XLM',
       status: 'completed',
     };
-    expect(isStatementRow(row)).toBe(true);
+    expect(isStatementRow(legacyRow)).toBe(false);
   });
 
-  test('isStatementRow returns false for invalid row', () => {
+  test('isStatementRow returns false for invalid values', () => {
     expect(isStatementRow(null)).toBe(false);
+    expect(isStatementRow(undefined)).toBe(false);
     expect(isStatementRow({})).toBe(false);
-    expect(isStatementRow({ id: 'tx1', status: 'bogus' })).toBe(false);
+    expect(isStatementRow({ ...validStatementRow, status: 'bogus' })).toBe(false);
+    expect(isStatementRow({ ...validStatementRow, amount: 100 })).toBe(false);
   });
 });

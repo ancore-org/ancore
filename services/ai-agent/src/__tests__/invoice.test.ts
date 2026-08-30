@@ -58,6 +58,52 @@ describe('Invoice Intent Schema and Validation', () => {
       }
     });
 
+    // Issue #1271 — a well-formed but past dueDate previously passed schema
+    // validation (only Date.parse's NaN check ran, no >= now comparison).
+    it('rejects a well-formed dueDate that is in the past', () => {
+      const fixture = {
+        type: 'invoice',
+        amount: '150.00',
+        asset: 'XLM',
+        recipient: 'Bob',
+        dueDate: '2020-01-01T00:00:00Z',
+      };
+      const result = InvoiceIntentSchema.safeParse(fixture);
+      expect(result.success).toBe(false);
+      if (!result.success) {
+        expect(result.error.issues[0].message).toBe('Due date must not be in the past');
+      }
+    });
+
+    it('rejects a dueDate of yesterday', () => {
+      const yesterday = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
+      const fixture = {
+        type: 'invoice',
+        amount: '150.00',
+        asset: 'XLM',
+        recipient: 'Bob',
+        dueDate: yesterday,
+      };
+      const result = InvoiceIntentSchema.safeParse(fixture);
+      expect(result.success).toBe(false);
+      if (!result.success) {
+        expect(result.error.issues[0].message).toBe('Due date must not be in the past');
+      }
+    });
+
+    it('accepts a dueDate of tomorrow', () => {
+      const tomorrow = new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString();
+      const fixture = {
+        type: 'invoice',
+        amount: '150.00',
+        asset: 'XLM',
+        recipient: 'Bob',
+        dueDate: tomorrow,
+      };
+      const result = InvoiceIntentSchema.safeParse(fixture);
+      expect(result.success).toBe(true);
+    });
+
     it('validates multilingual recipient and typical data', () => {
       const fixture = {
         type: 'invoice',

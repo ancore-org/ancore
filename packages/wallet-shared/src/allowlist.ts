@@ -96,13 +96,53 @@ export function removeOriginFromAllowlist(
 // Internal helpers
 // ---------------------------------------------------------------------------
 
+/** Networks a grant may be scoped to. Mirrors StellarNetwork in networks.ts. */
+const KNOWN_NETWORKS: readonly StellarNetwork[] = ['testnet', 'mainnet', 'futurenet', 'local'];
+
+/** Soroban contract C-address: 'C' followed by 55 base32 characters. */
+const CONTRACT_ID_PATTERN = /^C[A-Z2-7]{55}$/;
+
+/**
+ * Validate that a value is a well-formed, normalized origin.
+ *
+ * Accepts only absolute http(s) URLs reduced to their origin — no trailing
+ * slash, no path, no credentials — which is the shape addOrigin stores.
+ */
+function isValidOrigin(value: string): boolean {
+  if (!value) return false;
+  let parsed: URL;
+  try {
+    parsed = new URL(value);
+  } catch {
+    return false;
+  }
+  if (parsed.protocol !== 'https:' && parsed.protocol !== 'http:') return false;
+  // URL.origin re-serializes canonically; a mismatch means the stored string
+  // carried a path, query, trailing slash, or credentials.
+  return parsed.origin === value;
+}
+
 function isValidEntry(value: unknown): value is AllowlistEntry {
   if (!value || typeof value !== 'object') return false;
   const e = value as Partial<AllowlistEntry>;
-  return (
-    typeof e.origin === 'string' &&
-    typeof e.grantedAt === 'number' &&
-    typeof e.network === 'string' &&
-    typeof e.smartAccountId === 'string'
-  );
+
+  if (typeof e.origin !== 'string' || !isValidOrigin(e.origin)) return false;
+
+  // Reject NaN, Infinity, negative, and non-integer timestamps.
+  if (
+    typeof e.grantedAt !== 'number' ||
+    !Number.isFinite(e.grantedAt) ||
+    !Number.isInteger(e.grantedAt) ||
+    e.grantedAt < 0
+  ) {
+    return false;
+  }
+
+  if (typeof e.network !== 'string') return false;
+  if (!KNOWN_NETWORKS.includes(e.network as StellarNetwork)) return false;
+
+  if (typeof e.smartAccountId !== 'string') return false;
+  if (!CONTRACT_ID_PATTERN.test(e.smartAccountId)) return false;
+
+  return true;
 }

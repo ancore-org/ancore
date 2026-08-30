@@ -1,4 +1,4 @@
-appId: com.ancore.mobile
+appId: org.ancore.wallet.dev
 ---
 # Centralized from apps/mobile-wallet/e2e/flows/walletconnect-pair.yaml
 - launchApp

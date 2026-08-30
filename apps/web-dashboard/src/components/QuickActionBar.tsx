@@ -1,16 +1,12 @@
 import React from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Send, ArrowDownLeft, QrCode } from 'lucide-react';
+import { Send } from 'lucide-react';
 import { cn } from '@ancore/ui-kit';
 
 export const QuickActionBar: React.FC = () => {
   const navigate = useNavigate();
 
-  const actions = [
-    { icon: Send, label: 'Send', path: '/send' },
-    { icon: ArrowDownLeft, label: 'Request', path: '/request' },
-    { icon: QrCode, label: 'Scan', path: '/scan' },
-  ];
+  const actions = [{ icon: Send, label: 'Send', path: '/dashboard/send' }];
 
   return (
     <div className="flex items-center gap-1 rounded-full border border-border bg-card p-1">

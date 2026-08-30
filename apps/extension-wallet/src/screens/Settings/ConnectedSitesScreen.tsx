@@ -124,7 +124,7 @@ export function ConnectedSitesScreen({ onBack }: { onBack: () => void }) {
             <div className="space-y-3">
               {approvedSites.map((site) => {
                 const hostname = getHostname(site.origin);
-                const faviconUrl = `https://www.google.com/s2/favicons?domain=${hostname}&sz=64`;
+                const siteInitial = hostname.charAt(0).toUpperCase() || '?';
                 return (
                   <div
                     key={`${site.origin}-${site.accountId}-${site.network}`}
@@ -133,7 +133,9 @@ export function ConnectedSitesScreen({ onBack }: { onBack: () => void }) {
                     <div className="flex items-start justify-between gap-3">
                       <div className="flex min-w-0 items-start gap-3">
                         <div className="mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-primary/10">
-                          <img alt="" className="h-5 w-5 rounded-sm" src={faviconUrl} />
+                          <span aria-hidden="true" className="text-sm font-semibold text-primary">
+                            {siteInitial}
+                          </span>
                         </div>
                         <div className="min-w-0">
                           <div className="flex items-center gap-2">

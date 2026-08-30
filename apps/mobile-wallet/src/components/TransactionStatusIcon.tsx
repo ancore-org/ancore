@@ -1,3 +1,5 @@
+import { useEffect, useRef } from 'react';
+
 import { type TransactionStatus } from '../screens/history/types';
 
 type StatusMeta = {
@@ -42,11 +44,21 @@ type Props = {
 export const TransactionStatusIcon = ({ status, onUnknownStatus }: Props) => {
   const normalizedStatus = status ?? 'unknown';
   const meta = STATUS_META[normalizedStatus] ?? STATUS_META.unknown;
+  const isUnrecognized = !STATUS_META[normalizedStatus];
 
-  // Log unknown statuses safely for Sentry
-  if (!STATUS_META[normalizedStatus] && onUnknownStatus) {
+  // Log unknown statuses safely for Sentry. Reporting happens in an effect, not
+  // during render, so the callback is never fired from an impure render pass.
+  // The ref keeps it to one report per distinct status: StrictMode remounts and
+  // concurrent re-renders would otherwise fire it repeatedly for one bad value.
+  const lastReportedStatus = useRef<unknown>(undefined);
+
+  useEffect(() => {
+    if (!isUnrecognized || !onUnknownStatus) return;
+    if (lastReportedStatus.current === status) return;
+
+    lastReportedStatus.current = status;
     onUnknownStatus(status);
-  }
+  }, [isUnrecognized, status, onUnknownStatus]);
 
   return (
     <span

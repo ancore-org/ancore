@@ -1,10 +1,10 @@
 use soroban_sdk::{
     contract, contractimpl,
     testutils::{Address as _, Ledger as _},
-    Address, BytesN, Env, Symbol,
+    Address, BytesN, Env, Symbol, Vec,
 };
 
-use upgrade::UpgradeGovernorClient;
+use upgrade::{UpgradeGovernorClient, WasmAttestation};
 
 /// Mock target contract that supports upgrade and get_version.
 #[contract]
@@ -40,9 +40,14 @@ fn test_full_upgrade_flow() {
     let owner = Address::generate(&env);
     governor.initialize(&owner, &target_id, &10u64);
 
-    // Propose a "WASM hash"
+    // Propose a "WASM hash" with a permissive attestation (no policy configured)
     let wasm_hash = BytesN::from_array(&env, &[7u8; 32]);
-    let proposal_id = governor.propose_upgrade(&wasm_hash);
+    let attestation = WasmAttestation {
+        wasm_size: 4096,
+        exports: Vec::new(&env),
+        imports: Vec::new(&env),
+    };
+    let proposal_id = governor.propose_upgrade(&wasm_hash, &attestation);
     assert_eq!(proposal_id, 1);
 
     // Fast-forward past timelock
@@ -70,7 +75,12 @@ fn test_storage_layout_compatibility() {
     governor.initialize(&owner, &target_id, &5u64);
 
     let wasm_hash = BytesN::from_array(&env, &[9u8; 32]);
-    let proposal_id = governor.propose_upgrade(&wasm_hash);
+    let attestation = WasmAttestation {
+        wasm_size: 4096,
+        exports: Vec::new(&env),
+        imports: Vec::new(&env),
+    };
+    let proposal_id = governor.propose_upgrade(&wasm_hash, &attestation);
 
     env.ledger().set_timestamp(env.ledger().timestamp() + 6);
     assert!(governor.try_execute_upgrade(&proposal_id).is_ok());

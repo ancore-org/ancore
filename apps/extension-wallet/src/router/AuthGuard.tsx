@@ -68,6 +68,11 @@ function hasExtensionStorage(): boolean {
   return false;
 }
 
+/** Playwright dev-server harness: unlock without extension storage APIs. */
+function readE2eInitiallyUnlocked(): boolean {
+  return typeof window !== 'undefined' && window.__E2E_INITIALLY_UNLOCKED__ === true;
+}
+
 export function ExtensionAuthProvider({
   children,
   unlockVerifier,
@@ -94,6 +99,9 @@ export function ExtensionAuthProvider({
   React.useEffect(() => {
     async function initVault() {
       if (!hasExtensionStorage()) {
+        if (readE2eInitiallyUnlocked()) {
+          setIsUnlocked(true);
+        }
         setIsInitializing(false);
         return;
       }

@@ -103,25 +103,33 @@ export function useSessionKeys(): UseSessionKeysReturn {
 
   const refreshSessionKey = useCallback(
     async (publicKey: string, newExpiresAt: number): Promise<void> => {
+      setIsLoading(true);
       setError(null);
 
       const snapshot = keys.find((k: SessionKey) => k.publicKey === publicKey);
+      if (!snapshot) {
+        setIsLoading(false);
+        throw new Error('Session key not found');
+      }
+
       updateKey(publicKey, { expiresAt: newExpiresAt });
 
       try {
-        // Contract refresh semantics are not yet implemented in AccountContract.
-        // Persist local expiry updates optimistically and roll back on failure.
-        if (!snapshot) {
-          throw new Error('Session key not found');
-        }
+        const client = createAccountClient(authState.accountAddress);
+        client.refreshSessionKeyTtl({
+          publicKey,
+          expiresAt: snapshot.expiresAt,
+        });
       } catch (err) {
-        if (snapshot) updateKey(publicKey, { expiresAt: snapshot.expiresAt });
+        updateKey(publicKey, { expiresAt: snapshot.expiresAt });
         const msg = err instanceof Error ? err.message : 'Failed to refresh session key';
         setError(msg);
         throw err;
+      } finally {
+        setIsLoading(false);
       }
     },
-    [keys, updateKey]
+    [keys, updateKey, authState.accountAddress]
   );
 
   return {

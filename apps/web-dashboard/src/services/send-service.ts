@@ -1,6 +1,7 @@
 import { StellarClient, createStellarClient } from '@ancore/stellar';
 import { buildSignedRelayPayload, resolveRelayerBaseUrl } from '@ancore/core-sdk';
 import { createWalletApiRelaySigner } from './relay-signer';
+import { AuthRequiredError } from '../auth';
 import { NETWORK_PASSPHRASES } from '@ancore/wallet-shared';
 import {
   Operation,
@@ -223,7 +224,10 @@ export class RelayerSendStrategy implements SendStrategy {
 
   async send(params: SendParams): Promise<SendResult> {
     const baseUrl = resolveRelayerBaseUrl();
-    const token = this.getAuthToken ? await this.getAuthToken() : 'ancore-dashboard-token';
+    if (!this.getAuthToken) {
+      throw new AuthRequiredError();
+    }
+    const token = await this.getAuthToken();
 
     const signer = await createWalletApiRelaySigner();
     const payload = await buildSignedRelayPayload(params.recipient, params.amount, signer);

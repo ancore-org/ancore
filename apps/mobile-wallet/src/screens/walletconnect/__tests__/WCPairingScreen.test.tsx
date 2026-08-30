@@ -1,5 +1,5 @@
 import React from 'react';
-import { render, screen, waitFor } from '@testing-library/react';
+import { act, render, screen, waitFor } from '@testing-library/react';
 import { SessionTypes } from '@walletconnect/types';
 
 import { WalletKitProvider } from '../../../providers/WalletKitProvider';
@@ -70,10 +70,12 @@ describe('WCPairingScreen', () => {
     );
 
     await waitFor(() => {
-      expect(mockWalletKit.pair).toHaveBeenCalled();
+      expect(screen.getByText('Waiting for session proposal…')).toBeInTheDocument();
     });
 
-    mockWalletKit.triggerEvent('session_proposal');
+    act(() => {
+      mockWalletKit.triggerEvent('session_proposal');
+    });
 
     await waitFor(() => {
       expect(screen.getByText('Session proposal received')).toBeInTheDocument();

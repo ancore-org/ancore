@@ -1,3 +1,8 @@
+jest.mock('@ancore/account-abstraction', () => ({
+  getSessionKey: jest.fn(),
+}));
+
+import { getSessionKey } from '@ancore/account-abstraction';
 import { NetworkError } from '@ancore/stellar';
 import { RelayService } from '../../src/services/relayService';
 import { JobQueue } from '../../src/queue/JobQueue';
@@ -9,15 +14,24 @@ import type {
   TransactionSubmitterContract,
 } from '../../src/types';
 
+const mockedGetSessionKey = jest.mocked(getSessionKey);
+
 const VALID_KEY = 'a'.repeat(64);
 const VALID_SIG = 'b'.repeat(128);
 const NETWORK_HASH = 'c'.repeat(64);
+const ACCOUNT_ADDRESS = 'GAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAWHF';
+
+const MOCK_SESSION_KEY = {
+  publicKey: VALID_KEY,
+  permissions: [1],
+  expiresAt: Date.now() + 60_000,
+};
 
 function makeRequest(overrides: Partial<RelayExecuteRequest> = {}): RelayExecuteRequest {
   return {
     sessionKey: VALID_KEY,
     operation: 'relay_execute',
-    parameters: {},
+    parameters: { accountAddress: ACCOUNT_ADDRESS },
     signature: VALID_SIG,
     nonce: 1,
     ...overrides,
@@ -46,6 +60,10 @@ function makeSubmitter(
 }
 
 describe('RelayService', () => {
+  beforeEach(() => {
+    mockedGetSessionKey.mockResolvedValue(MOCK_SESSION_KEY);
+  });
+
   describe('validateRelay', () => {
     it('returns valid=true when signature passes', async () => {
       const svc = new RelayService(makeSignatureService(true));

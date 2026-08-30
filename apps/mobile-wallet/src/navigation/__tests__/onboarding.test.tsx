@@ -2,22 +2,14 @@ import '@testing-library/jest-dom';
 
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 
-import { importWallet } from '@ancore/core-sdk';
+import { persistOnboardedWallet } from '../../onboarding/persist-wallet';
 import { validateMnemonic } from '@ancore/crypto';
 
-import { OnboardingNavigatorTestHarness } from '..';
+import { OnboardingNavigatorTestHarness } from '../onboarding';
 
-jest.mock('@ancore/core-sdk', () => ({
-  importWallet: jest.fn().mockResolvedValue({
-    mnemonic:
-      'abandon ability able about above absent absorb abstract absurd abuse access accident',
-    publicKey: 'GABCDEFGHIJKLMNOPQRSTUVWXYZ1234567890',
-    secretKey: 'SABCDEFGHIJKLMNOPQRSTUVWXYZ1234567890',
-    accountIndex: 0,
-    contractId: 'CABCDEFGHIJKLMNOPQRSTUVWXYZ1234567890',
-  }),
+jest.mock('../../onboarding/persist-wallet', () => ({
+  persistOnboardedWallet: jest.fn().mockResolvedValue(undefined),
 }));
-
 jest.mock('@ancore/crypto', () => ({
   generateMnemonic: jest
     .fn()
@@ -121,7 +113,7 @@ describe('OnboardingNavigator', () => {
   });
 
   it('completes a full create flow: display → verify → password → vault write → complete', async () => {
-    const mockImportWallet = jest.mocked(importWallet);
+    const mockPersistWallet = jest.mocked(persistOnboardedWallet);
 
     render(<OnboardingNavigatorTestHarness />);
 
@@ -132,14 +124,15 @@ describe('OnboardingNavigator', () => {
       expect(screen.getByRole('heading', { name: /wallet setup complete/i })).toBeInTheDocument();
     });
 
-    expect(mockImportWallet).toHaveBeenCalledWith({
+    expect(mockPersistWallet).toHaveBeenCalledWith({
       mnemonic: TEST_MNEMONIC,
       password: TEST_PASSWORD,
+      label: TEST_WALLET_NAME,
     });
   });
 
   it('completes a full import flow: validate mnemonic → password → vault write → complete', async () => {
-    const mockImportWallet = jest.mocked(importWallet);
+    const mockPersistWallet = jest.mocked(persistOnboardedWallet);
 
     render(<OnboardingNavigatorTestHarness />);
 
@@ -150,9 +143,10 @@ describe('OnboardingNavigator', () => {
       expect(screen.getByRole('heading', { name: /wallet setup complete/i })).toBeInTheDocument();
     });
 
-    expect(mockImportWallet).toHaveBeenCalledWith({
+    expect(mockPersistWallet).toHaveBeenCalledWith({
       mnemonic: TEST_MNEMONIC,
       password: TEST_PASSWORD,
+      label: 'Ancore Wallet',
     });
   });
 

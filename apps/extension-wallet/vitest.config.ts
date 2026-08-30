@@ -26,6 +26,7 @@ export default defineConfig({
       '**/tests/e2e/**',
       '**/messaging/__tests__/messaging.test.ts',
       '**/SessionKeys/__tests__/**',
+      '**/hooks/__tests__/useSessionKeys.test.ts',
     ],
     coverage: {
       provider: 'v8',

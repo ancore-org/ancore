@@ -101,6 +101,8 @@ export interface UseSendTransactionOptions {
   balance?: number;
   /** Maximum decimal places allowed for the asset being sent. Defaults to 7 (XLM). */
   assetDecimals?: number;
+  /** Asset code shown in transfer-policy messages. Defaults to XLM. */
+  assetCode?: string;
   service?: SendService;
   pollIntervalMs?: number;
   dailyTransferLimit?: number;
@@ -186,6 +188,7 @@ export { validateSchedule } from '@/utils/schedule-validation';
 export function useSendTransaction(options: UseSendTransactionOptions = {}) {
   const balance = options.balance ?? DEFAULT_BALANCE;
   const assetDecimals = options.assetDecimals ?? 7;
+  const assetCode = options.assetCode ?? 'XLM';
   const pollIntervalMs = options.pollIntervalMs ?? DEFAULT_POLL_MS;
   const dailyTransferLimit = options.dailyTransferLimit ?? DEFAULT_DAILY_LIMIT;
   const transferStepUpThreshold = options.transferStepUpThreshold ?? DEFAULT_STEP_UP_THRESHOLD;
@@ -253,10 +256,15 @@ export function useSendTransaction(options: UseSendTransactionOptions = {}) {
 
       const numeric = Number(values.amount);
       if (!nextErrors.amount && Number.isFinite(numeric) && numeric > 0) {
-        const policyResult = validateTransferPolicy(numeric, todayTransferTotal, {
-          dailyLimit: dailyTransferLimit,
-          stepUpThreshold: transferStepUpThreshold,
-        });
+        const policyResult = validateTransferPolicy(
+          numeric,
+          todayTransferTotal,
+          {
+            dailyLimit: dailyTransferLimit,
+            stepUpThreshold: transferStepUpThreshold,
+          },
+          assetCode
+        );
         if (policyResult.action === 'block') {
           nextErrors.policy = policyResult.message;
         }
@@ -280,7 +288,14 @@ export function useSendTransaction(options: UseSendTransactionOptions = {}) {
         !nextErrors.simulation
       );
     },
-    [balance, assetDecimals, dailyTransferLimit, transferStepUpThreshold, todayTransferTotal]
+    [
+      balance,
+      assetDecimals,
+      assetCode,
+      dailyTransferLimit,
+      transferStepUpThreshold,
+      todayTransferTotal,
+    ]
   );
 
   const goToReview = useCallback(
@@ -324,10 +339,15 @@ export function useSendTransaction(options: UseSendTransactionOptions = {}) {
 
         // Determine policy action
         const numeric = Number(values.amount);
-        const policyResult = validateTransferPolicy(numeric, todayTransferTotal, {
-          dailyLimit: dailyTransferLimit,
-          stepUpThreshold: transferStepUpThreshold,
-        });
+        const policyResult = validateTransferPolicy(
+          numeric,
+          todayTransferTotal,
+          {
+            dailyLimit: dailyTransferLimit,
+            stepUpThreshold: transferStepUpThreshold,
+          },
+          assetCode
+        );
 
         setFee(estimatedFee);
         setTx({

@@ -5,7 +5,9 @@ import React, {
   useState,
   ReactNode,
   useCallback,
+  useMemo,
 } from 'react';
+import type { IWalletKit } from '@reown/walletkit';
 import { SessionTypes } from '@walletconnect/types';
 import { SessionApprovalSheet, SessionProposal } from '../components/SessionApprovalSheet';
 import {
@@ -14,11 +16,36 @@ import {
   type SignAuthEntryRequest,
 } from '../components/SignAuthEntryApprovalSheet';
 import {
+  SignXdrApprovalSheet,
+  parseSignXdrRequest,
+  type SignXdrRequest,
+} from '../components/SignXdrApprovalSheet';
+import {
   createStellarRpcHandlers,
   handleStellarRpcRequest,
   type StellarRpcHandlers,
 } from './stellar-handlers';
 import type { ParsedAuthEntry } from '../walletconnect/auth-entry-parser';
+import { buildApprovedSessionNamespaces } from '../walletconnect/approve-session';
+import {
+  buildWalletKitMetadata,
+  type StellarRpcChain,
+  type WalletKitMetadataInput,
+} from '../walletconnect/constants';
+import { createWalletKit } from '../walletconnect/create-wallet-kit';
+import {
+  createDevMockSession,
+  createDevMockSessionProposal,
+  isDevMockPairingUri,
+  isDevMockSessionProposal,
+} from '../walletconnect/dev-mock';
+import {
+  isDevMockWalletConnectDeepLink,
+  parseDevMockWalletConnectDeepLink,
+} from '../walletconnect/dev-mock-deeplink';
+import { subscribeToWalletConnectDeepLinks } from '../linking/walletConnectLinking';
+
+export type { IWalletKit };
 
 interface SessionRequestEvent {
   id: number;
@@ -29,33 +56,6 @@ interface SessionRequestEvent {
       params: unknown;
     };
   };
-}
-
-// Abstract WalletKit interface - to be implemented with actual @reown/walletkit API
-export interface IWalletKit {
-  init(options: {
-    projectId: string;
-    metadata: { name: string; description: string; url: string; icons: string[] };
-  }): Promise<void>;
-  pair(params: { uri: string }): Promise<void>;
-  approveSession(params: { id: number; namespaces: Record<string, unknown> }): Promise<void>;
-  rejectSession(params: { id: number; reason: { code: number; message: string } }): Promise<void>;
-  disconnectSession(params: {
-    topic: string;
-    reason: { code: number; message: string };
-  }): Promise<void>;
-  respondSessionRequest(params: {
-    topic: string;
-    response: {
-      id: number;
-      jsonrpc: '2.0';
-      result?: unknown;
-      error?: { code: number; message: string };
-    };
-  }): Promise<void>;
-  getActiveSessions(): Record<string, SessionTypes.Struct>;
-  on(event: string, callback: (...args: unknown[]) => void): void;
-  off(event: string, callback: (...args: unknown[]) => void): void;
 }
 
 interface WalletConnectContextType {
@@ -81,6 +81,9 @@ interface WalletKitProviderProps {
   projectId: string;
   walletKitInstance?: IWalletKit;
   stellarHandlers?: StellarRpcHandlers;
+  metadata?: WalletKitMetadataInput;
+  activeChain?: StellarRpcChain;
+  activeAccount?: string;
 }
 
 export const WalletKitProvider: React.FC<WalletKitProviderProps> = ({
@@ -88,107 +91,183 @@ export const WalletKitProvider: React.FC<WalletKitProviderProps> = ({
   projectId,
   walletKitInstance,
   stellarHandlers,
+  metadata,
+  activeChain,
+  activeAccount,
 }) => {
-  const [walletKit] = useState<IWalletKit | null>(walletKitInstance || null);
+  const [walletKit, setWalletKit] = useState<IWalletKit | null>(walletKitInstance ?? null);
   const [sessions, setSessions] = useState<SessionTypes.Struct[]>([]);
-  const [isInitialized, setIsInitialized] = useState(false);
+  const [isInitialized, setIsInitialized] = useState(Boolean(walletKitInstance));
+  const resolvedMetadata = useMemo(
+    () => buildWalletKitMetadata(metadata ?? { name: 'Ancore Wallet' }),
+    [metadata]
+  );
   const [pendingProposal, setPendingProposal] = useState<SessionProposal | null>(null);
   const [pendingSignAuthEntry, setPendingSignAuthEntry] = useState<SignAuthEntryRequest | null>(
     null
   );
+  const [pendingSignXdr, setPendingSignXdr] = useState<SignXdrRequest | null>(null);
+  const [signXdrStatus, setSignXdrStatus] = useState<'pending' | 'success'>('pending');
   const [parsedAuthEntry, setParsedAuthEntry] = useState<ParsedAuthEntry | null>(null);
+  const [devMockSessions, setDevMockSessions] = useState<Record<string, SessionTypes.Struct>>({});
 
-  const handlers = stellarHandlers ?? createStellarRpcHandlers();
+  const handlers = useMemo(() => stellarHandlers ?? createStellarRpcHandlers(), [stellarHandlers]);
+
+  const getAllSessions = useCallback((): Record<string, SessionTypes.Struct> => {
+    return {
+      ...(walletKit?.getActiveSessions() ?? {}),
+      ...devMockSessions,
+    };
+  }, [walletKit, devMockSessions]);
+
+  const respondSessionRequest = useCallback(
+    async (params: {
+      topic: string;
+      response: {
+        id: number;
+        jsonrpc: '2.0';
+        result?: unknown;
+        error?: { code: number; message: string };
+      };
+    }) => {
+      if (!walletKit || devMockSessions[params.topic]) {
+        return;
+      }
+
+      await walletKit.respondSessionRequest(
+        params as Parameters<IWalletKit['respondSessionRequest']>[0]
+      );
+    },
+    [walletKit, devMockSessions]
+  );
+
+  const refreshSessions = useCallback(() => {
+    setSessions(Object.values(getAllSessions()));
+  }, [getAllSessions]);
+
+  const pair = useCallback(
+    async (uri: string): Promise<void> => {
+      if (!walletKit) {
+        throw new Error('WalletKit not initialized');
+      }
+
+      if (isDevMockPairingUri(uri)) {
+        setPendingProposal(createDevMockSessionProposal());
+        return;
+      }
+
+      await walletKit.pair({ uri });
+    },
+    [walletKit]
+  );
+
+  const approveSession = useCallback(
+    async (proposal: {
+      id: number;
+      params: { requiredNamespaces: Record<string, unknown> };
+    }): Promise<void> => {
+      if (!walletKit) {
+        throw new Error('WalletKit not initialized');
+      }
+
+      if (isDevMockSessionProposal(proposal)) {
+        const session = createDevMockSession(activeAccount);
+        setDevMockSessions((current) => {
+          const next = { ...current, [session.topic]: session };
+          setSessions(Object.values({ ...(walletKit?.getActiveSessions() ?? {}), ...next }));
+          return next;
+        });
+        return;
+      }
+
+      const approvedNamespaces = buildApprovedSessionNamespaces({
+        proposal: proposal as SessionProposal,
+        activeChain,
+        activeAccount,
+      });
+
+      await walletKit.approveSession({
+        id: proposal.id,
+        namespaces: approvedNamespaces as SessionTypes.Namespaces,
+      });
+      refreshSessions();
+    },
+    [walletKit, activeChain, activeAccount, refreshSessions]
+  );
+
+  const rejectSession = useCallback(
+    async (proposal: { id: number }): Promise<void> => {
+      if (!walletKit) {
+        throw new Error('WalletKit not initialized');
+      }
+
+      await walletKit.rejectSession({
+        id: proposal.id,
+        reason: { code: 4001, message: 'User rejected the session proposal' },
+      });
+    },
+    [walletKit]
+  );
+
+  const disconnectSession = useCallback(
+    async (topic: string): Promise<void> => {
+      if (!walletKit) {
+        throw new Error('WalletKit not initialized');
+      }
+
+      await walletKit.disconnectSession({
+        topic,
+        reason: { code: 6000, message: 'User disconnected the session' },
+      });
+
+      refreshSessions();
+    },
+    [walletKit, refreshSessions]
+  );
 
   useEffect(() => {
     if (walletKitInstance) {
+      setWalletKit(walletKitInstance);
       setIsInitialized(true);
+      setSessions(Object.values(walletKitInstance.getActiveSessions()));
       return;
     }
 
+    let cancelled = false;
+
     const initializeWalletKit = async () => {
       try {
+        const kit = await createWalletKit({
+          projectId,
+          metadata: resolvedMetadata,
+        });
+
+        if (cancelled) {
+          return;
+        }
+
+        setWalletKit(kit);
         setIsInitialized(true);
+        setSessions(Object.values(kit.getActiveSessions()));
       } catch (error) {
-        console.error('Failed to initialize WalletKit:', error);
+        if (!cancelled) {
+          console.error('Failed to initialize WalletKit:', error);
+        }
       }
     };
 
-    initializeWalletKit();
-  }, [projectId, walletKitInstance]);
+    void initializeWalletKit();
 
-  const pair = async (uri: string): Promise<void> => {
-    if (!walletKit) {
-      throw new Error('WalletKit not initialized');
-    }
-
-    await walletKit.pair({ uri });
-  };
-
-  const approveSession = async (proposal: {
-    id: number;
-    params: { requiredNamespaces: Record<string, unknown> };
-  }): Promise<void> => {
-    if (!walletKit) {
-      throw new Error('WalletKit not initialized');
-    }
-
-    const { id, params } = proposal;
-    const { requiredNamespaces } = params;
-
-    const accounts: string[] = [];
-    const approvedNamespaces: Record<
-      string,
-      { accounts: string[]; methods: string[]; events: string[]; chains: string[] }
-    > = {};
-
-    for (const [key, namespace] of Object.entries(requiredNamespaces)) {
-      const ns = namespace as
-        | { chains?: string[]; methods?: string[]; events?: string[] }
-        | undefined;
-      approvedNamespaces[key] = {
-        accounts: accounts.filter((acc) => acc.startsWith(key.split(':')[0])),
-        methods: ns?.methods || [],
-        events: ns?.events || [],
-        chains: ns?.chains || [],
-      };
-    }
-
-    await walletKit.approveSession({ id, namespaces: approvedNamespaces });
-    setSessions(Object.values(walletKit.getActiveSessions()));
-  };
-
-  const rejectSession = async (proposal: { id: number }): Promise<void> => {
-    if (!walletKit) {
-      throw new Error('WalletKit not initialized');
-    }
-
-    await walletKit.rejectSession({
-      id: proposal.id,
-      reason: { code: 4001, message: 'User rejected the session proposal' },
-    });
-  };
-
-  const disconnectSession = async (topic: string): Promise<void> => {
-    if (!walletKit) {
-      throw new Error('WalletKit not initialized');
-    }
-
-    await walletKit.disconnectSession({
-      topic,
-      reason: { code: 6000, message: 'User disconnected the session' },
-    });
-
-    setSessions(Object.values(walletKit.getActiveSessions()));
-  };
+    return () => {
+      cancelled = true;
+    };
+  }, [projectId, walletKitInstance, resolvedMetadata]);
 
   const clearPendingProposal = () => setPendingProposal(null);
 
   const respondAuthEntrySuccess = useCallback(
     async (request: SignAuthEntryRequest, result: { signedAuthEntry: string }) => {
-      if (!walletKit) return;
-
-      await walletKit.respondSessionRequest({
+      await respondSessionRequest({
         topic: request.topic,
         response: {
           id: request.id,
@@ -197,14 +276,12 @@ export const WalletKitProvider: React.FC<WalletKitProviderProps> = ({
         },
       });
     },
-    [walletKit]
+    [respondSessionRequest]
   );
 
   const respondAuthEntryReject = useCallback(
     async (request: SignAuthEntryRequest) => {
-      if (!walletKit) return;
-
-      await walletKit.respondSessionRequest({
+      await respondSessionRequest({
         topic: request.topic,
         response: {
           id: request.id,
@@ -213,13 +290,11 @@ export const WalletKitProvider: React.FC<WalletKitProviderProps> = ({
         },
       });
     },
-    [walletKit]
+    [respondSessionRequest]
   );
 
   const handleSessionRequest = useCallback(
     async (rawEvent: unknown) => {
-      if (!walletKit) return;
-
       const event = rawEvent as SessionRequestEvent & { session: SessionTypes.Struct };
       const method = event.params?.request?.method;
       const params = event.params?.request?.params;
@@ -248,9 +323,22 @@ export const WalletKitProvider: React.FC<WalletKitProviderProps> = ({
         return;
       }
 
-      const session = event.session ?? walletKit.getActiveSessions()[event.topic];
+      if (method === 'stellar_signXDR' || method === 'stellar_signAndSubmitXDR') {
+        const request = parseSignXdrRequest({
+          id: event.id,
+          topic: event.topic,
+          method,
+          params: params as SignXdrRequest['params'],
+          session: event.session ?? getAllSessions()[event.topic],
+        });
+        setSignXdrStatus('pending');
+        setPendingSignXdr(request);
+        return;
+      }
+
+      const session = event.session ?? getAllSessions()[event.topic];
       if (!session) {
-        await walletKit.respondSessionRequest({
+        await respondSessionRequest({
           topic: event.topic,
           response: {
             id: event.id,
@@ -263,13 +351,13 @@ export const WalletKitProvider: React.FC<WalletKitProviderProps> = ({
 
       try {
         const result = await handleStellarRpcRequest(method, params, session, handlers);
-        await walletKit.respondSessionRequest({
+        await respondSessionRequest({
           topic: event.topic,
           response: { id: event.id, jsonrpc: '2.0', result },
         });
       } catch (error) {
         const message = error instanceof Error ? error.message : 'Request failed';
-        await walletKit.respondSessionRequest({
+        await respondSessionRequest({
           topic: event.topic,
           response: {
             id: event.id,
@@ -279,7 +367,7 @@ export const WalletKitProvider: React.FC<WalletKitProviderProps> = ({
         });
       }
     },
-    [handlers, walletKit]
+    [handlers, getAllSessions, respondSessionRequest]
   );
 
   useEffect(() => {
@@ -291,12 +379,121 @@ export const WalletKitProvider: React.FC<WalletKitProviderProps> = ({
 
     walletKit.on('session_proposal', handleSessionProposal);
     walletKit.on('session_request', handleSessionRequest);
+    walletKit.on('session_delete', refreshSessions);
 
     return () => {
       walletKit.off('session_proposal', handleSessionProposal);
       walletKit.off('session_request', handleSessionRequest);
+      walletKit.off('session_delete', refreshSessions);
     };
-  }, [walletKit, isInitialized, handleSessionRequest]);
+  }, [walletKit, isInitialized, handleSessionRequest, refreshSessions, getAllSessions]);
+
+  useEffect(() => {
+    if (!isInitialized || typeof __DEV__ === 'undefined' || !__DEV__) {
+      return;
+    }
+
+    let subscription: { remove: () => void } | undefined;
+
+    void import('react-native')
+      .then(({ DeviceEventEmitter }) => {
+        subscription = DeviceEventEmitter.addListener(
+          'MockWalletConnectRequest',
+          (payload: string) => {
+            try {
+              const parsed = JSON.parse(payload) as {
+                method: string;
+                params: unknown;
+              };
+              const sessions = getAllSessions();
+              const topic = Object.keys(sessions)[0];
+              if (!topic) {
+                return;
+              }
+
+              void handleSessionRequest({
+                id: Date.now(),
+                topic,
+                session: sessions[topic],
+                params: {
+                  request: {
+                    method: parsed.method,
+                    params: parsed.params,
+                  },
+                },
+              });
+            } catch (error) {
+              console.error('Failed to handle mock WalletConnect request:', error);
+            }
+          }
+        );
+      })
+      .catch(() => undefined);
+
+    return () => {
+      subscription?.remove();
+    };
+  }, [isInitialized, handleSessionRequest, getAllSessions]);
+
+  useEffect(() => {
+    if (!isInitialized) {
+      return;
+    }
+
+    const subscription = subscribeToWalletConnectDeepLinks(({ uri }: { uri: string }) => {
+      void pair(uri);
+    });
+
+    return () => subscription.remove();
+  }, [isInitialized, pair]);
+
+  useEffect(() => {
+    if (!isInitialized || typeof __DEV__ === 'undefined' || !__DEV__) {
+      return;
+    }
+
+    let subscription: { remove: () => void } | undefined;
+
+    const dispatchMockRequest = (request: { method: string; params: unknown }) => {
+      const sessions = getAllSessions();
+      const topic = Object.keys(sessions)[0];
+      if (!topic) {
+        return;
+      }
+
+      void handleSessionRequest({
+        id: Date.now(),
+        topic,
+        session: sessions[topic],
+        params: {
+          request: {
+            method: request.method,
+            params: request.params,
+          },
+        },
+      });
+    };
+
+    void import('react-native')
+      .then(({ Linking }) => {
+        const handleUrl = (url: string | null) => {
+          if (!url || !isDevMockWalletConnectDeepLink(url)) {
+            return;
+          }
+
+          const request = parseDevMockWalletConnectDeepLink(url);
+          if (request) {
+            dispatchMockRequest(request);
+          }
+        };
+
+        void Linking.getInitialURL().then(handleUrl);
+        subscription = Linking.addEventListener('url', (event) => handleUrl(event.url));
+      })
+      .catch(() => undefined);
+
+    return () => subscription?.remove();
+  }, [getAllSessions, handleSessionRequest, isInitialized]);
 
   useEffect(() => {
     if (!pendingProposal) return;
@@ -329,7 +526,7 @@ export const WalletKitProvider: React.FC<WalletKitProviderProps> = ({
   const handleAuthEntryApprove = async () => {
     if (!pendingSignAuthEntry || !walletKit) return;
 
-    const session = walletKit.getActiveSessions()[pendingSignAuthEntry.topic];
+    const session = getAllSessions()[pendingSignAuthEntry.topic];
     if (!session) {
       await respondAuthEntryReject(pendingSignAuthEntry);
       setPendingSignAuthEntry(null);
@@ -345,7 +542,7 @@ export const WalletKitProvider: React.FC<WalletKitProviderProps> = ({
       await respondAuthEntrySuccess(pendingSignAuthEntry, result);
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Signing failed';
-      await walletKit.respondSessionRequest({
+      await respondSessionRequest({
         topic: pendingSignAuthEntry.topic,
         response: {
           id: pendingSignAuthEntry.id,
@@ -367,6 +564,74 @@ export const WalletKitProvider: React.FC<WalletKitProviderProps> = ({
       setPendingSignAuthEntry(null);
       setParsedAuthEntry(null);
     }
+  };
+
+  const handleSignXdrApprove = async () => {
+    if (!pendingSignXdr || !walletKit) return;
+
+    const session = getAllSessions()[pendingSignXdr.topic];
+    if (!session) {
+      await respondSessionRequest({
+        topic: pendingSignXdr.topic,
+        response: {
+          id: pendingSignXdr.id,
+          jsonrpc: '2.0',
+          error: { code: 4100, message: 'Session not found' },
+        },
+      });
+      setPendingSignXdr(null);
+      return;
+    }
+
+    try {
+      const result = await handleStellarRpcRequest(
+        pendingSignXdr.method,
+        pendingSignXdr.params,
+        session,
+        handlers
+      );
+
+      await respondSessionRequest({
+        topic: pendingSignXdr.topic,
+        response: {
+          id: pendingSignXdr.id,
+          jsonrpc: '2.0',
+          result,
+        },
+      });
+
+      setSignXdrStatus('success');
+      setTimeout(() => {
+        setPendingSignXdr(null);
+        setSignXdrStatus('pending');
+      }, 1500);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Signing failed';
+      await respondSessionRequest({
+        topic: pendingSignXdr.topic,
+        response: {
+          id: pendingSignXdr.id,
+          jsonrpc: '2.0',
+          error: { code: 4001, message },
+        },
+      });
+      setPendingSignXdr(null);
+    }
+  };
+
+  const handleSignXdrReject = async () => {
+    if (!pendingSignXdr || !walletKit) return;
+
+    await respondSessionRequest({
+      topic: pendingSignXdr.topic,
+      response: {
+        id: pendingSignXdr.id,
+        jsonrpc: '2.0',
+        error: { code: 4001, message: 'User rejected the request' },
+      },
+    });
+    setPendingSignXdr(null);
+    setSignXdrStatus('pending');
   };
 
   const value: WalletConnectContextType = {
@@ -398,6 +663,14 @@ export const WalletKitProvider: React.FC<WalletKitProviderProps> = ({
           parsed={parsedAuthEntry}
           onApprove={handleAuthEntryApprove}
           onReject={handleAuthEntryReject}
+        />
+      )}
+      {pendingSignXdr && (
+        <SignXdrApprovalSheet
+          request={pendingSignXdr}
+          status={signXdrStatus}
+          onApprove={handleSignXdrApprove}
+          onReject={handleSignXdrReject}
         />
       )}
     </WalletConnectContext.Provider>
