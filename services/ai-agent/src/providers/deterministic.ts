@@ -6,6 +6,12 @@ const INVOICE_KEYWORDS = ['invoice', 'bill me', 'request payment', 'request a pa
 const STELLAR_ADDRESS_RE = /\bG[A-Z2-7]{55}\b/;
 const STELLAR_ADDRESS_RE_G = /\bG[A-Z2-7]{55}\b/g;
 const AMOUNT_RE = /(\d+(?:\.\d+)?)/;
+const ASSET_KEYWORDS = '(?:xlm|lumens?|usdc)';
+// A number adjacent to an asset keyword ("25 XLM", "USDC 25") is far more
+// likely to be the payment amount than an unrelated number elsewhere in the
+// prompt ("wait 3 days then send 25 XLM to G..." should extract "25", not "3").
+const AMOUNT_BEFORE_ASSET_RE = new RegExp(`(\\d+(?:\\.\\d+)?)\\s*${ASSET_KEYWORDS}\\b`, 'i');
+const AMOUNT_AFTER_ASSET_RE = new RegExp(`${ASSET_KEYWORDS}\\s*(\\d+(?:\\.\\d+)?)`, 'i');
 
 function isInvoicePrompt(prompt: string): boolean {
   const lower = prompt.toLowerCase();
@@ -16,7 +22,10 @@ function extractAmount(prompt: string): string {
   // Stellar strkeys are base32 and contain the digits 2-7, so an address in the
   // prompt would otherwise be a candidate amount ("Pay GD..7.. 25 XLM" -> "7").
   // Strip addresses before scanning for a number.
-  const match = prompt.replace(STELLAR_ADDRESS_RE_G, ' ').match(AMOUNT_RE);
+  const stripped = prompt.replace(STELLAR_ADDRESS_RE_G, ' ');
+  const nearAsset = stripped.match(AMOUNT_BEFORE_ASSET_RE) ?? stripped.match(AMOUNT_AFTER_ASSET_RE);
+  if (nearAsset) return nearAsset[1];
+  const match = stripped.match(AMOUNT_RE);
   return match ? match[1] : '10';
 }
 
