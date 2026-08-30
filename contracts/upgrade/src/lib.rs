@@ -102,18 +102,6 @@ pub struct WasmAttestation {
     pub imports: Vec<String>,
 }
 
-/// Multisig governance configuration.
-///
-/// The `threshold` number of unique signers must approve a proposal (via
-/// `submit_multisig_signature`) before `execute_multisig_upgrade` will
-/// proceed. `threshold` must be ≥ 1 and ≤ `signers.len()`.
-#[contracttype]
-#[derive(Clone, Debug)]
-pub struct MultisigConfig {
-    pub threshold: u32,
-    pub signers: Vec<Address>,
-}
-
 pub mod factory;
 mod multisig;
 mod validation;
