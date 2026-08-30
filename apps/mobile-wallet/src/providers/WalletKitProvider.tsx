@@ -310,6 +310,7 @@ export const WalletKitProvider: React.FC<WalletKitProviderProps> = ({
           setParsedAuthEntry(parsed);
           setPendingSignAuthEntry(request);
         } catch (error) {
+          if (!walletKit) return;
           const message = error instanceof Error ? error.message : 'Unparseable auth entry XDR';
           await walletKit.respondSessionRequest({
             topic: event.topic,
