@@ -4,15 +4,15 @@ import { AccountSummary } from '../components/AccountSummary';
 import { TransactionList } from '../components/TransactionList';
 import { AccountOverviewGrid } from '../widgets/AccountOverviewGrid';
 import { useAccountData } from '../hooks/useAccountData';
+import { useAccountState } from '../hooks/useAccountState';
 import { useIndexerActivity } from '../hooks/useIndexerActivity';
+import { useWalletConnection } from '../hooks/useWalletConnection';
 import { DashboardPageSkeleton } from '../components/LoadingSkeletons';
 import {
   AccountNotFoundError,
   HorizonUnavailableError,
   useAccountOverview,
 } from '../hooks/useAccountOverview';
-
-const DEFAULT_ADDRESS = 'GABC...XYZ';
 
 const AccountFetchAlert: React.FC<{
   error: Error;
@@ -53,23 +53,75 @@ const AccountFetchAlert: React.FC<{
   );
 };
 
+const ConnectWalletPrompt: React.FC<{
+  wallet: ReturnType<typeof useWalletConnection>;
+}> = ({ wallet }) => (
+  <div className="space-y-6">
+    <h1 className="text-2xl font-semibold">Dashboard</h1>
+    <div className="rounded-2xl border border-border bg-card px-6 py-8 text-center">
+      <p className="text-lg font-medium">Connect a wallet to view your dashboard</p>
+      <p className="mt-2 text-sm text-muted-foreground">
+        {wallet.extensionInstalled
+          ? 'Your balance, activity and account overview all load from the connected account.'
+          : 'Install the Ancore browser extension to connect an account.'}
+      </p>
+      {wallet.error && (
+        <p role="alert" className="mt-3 text-sm text-destructive">
+          {wallet.error}
+        </p>
+      )}
+      {wallet.extensionInstalled && (
+        <button
+          type="button"
+          onClick={() => void wallet.connect()}
+          disabled={wallet.connecting}
+          className="mt-5 inline-flex h-11 items-center rounded-full bg-primary px-5 text-sm font-semibold text-primary-foreground transition-transform active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-60"
+        >
+          {wallet.connecting ? 'Connecting...' : 'Connect wallet'}
+        </button>
+      )}
+    </div>
+  </div>
+);
+
 export const Dashboard: React.FC = () => {
-  const { account, loading: accountLoading, error: accountError } = useAccountData(DEFAULT_ADDRESS);
+  // The address every data source on this page keys off. Sourced from the
+  // connected wallet, falling back to the account the user selected in the
+  // dashboard's own account switcher — the same resolution order
+  // ScheduledTransfersPage uses, so the two pages never show different
+  // accounts at the same time.
+  //
+  // This replaced a hardcoded 'GABC...XYZ' constant, which is not even a
+  // well-formed 56-character StrKey, so the dashboard's three data sources
+  // were all querying an address that cannot exist.
+  const wallet = useWalletConnection();
+  const { currentAccount } = useAccountState();
+  const address = wallet.smartAccountId ?? currentAccount?.address ?? '';
+
+  // All three hooks no-op on an empty address rather than issuing a request,
+  // so they are safe to call unconditionally — which they must be, since
+  // hooks cannot be called behind a branch.
+  const { account, loading: accountLoading, error: accountError } = useAccountData(address);
   const {
     error: overviewError,
     refetch: refetchOverview,
     isLoading: overviewLoading,
-  } = useAccountOverview(DEFAULT_ADDRESS);
+  } = useAccountOverview(address);
   const {
     items: transactions,
     loading: txLoading,
     error: txError,
     loadMore,
     hasMore,
-  } = useIndexerActivity(DEFAULT_ADDRESS);
+  } = useIndexerActivity(address);
 
   const loading = accountLoading || txLoading;
   const error = accountError || txError;
+
+  // Checked before `loading`: with no address the data hooks return early
+  // without clearing their initial loading flag, so the page would otherwise
+  // sit on the skeleton forever instead of telling the user to connect.
+  if (!address) return <ConnectWalletPrompt wallet={wallet} />;
 
   if (loading) return <DashboardPageSkeleton />;
   if (error) return <p className="text-destructive">Error: {error.message}</p>;
@@ -91,7 +143,7 @@ export const Dashboard: React.FC = () => {
         transactions={transactions}
         emptyAction={
           <Link
-            to="/send"
+            to="/dashboard/send"
             className="inline-flex h-11 items-center rounded-full bg-primary px-5 text-sm font-semibold text-primary-foreground transition-transform active:scale-[0.98]"
           >
             Send your first payment
