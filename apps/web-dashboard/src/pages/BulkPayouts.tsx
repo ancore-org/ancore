@@ -1,11 +1,13 @@
-import { useMemo, useState, type ChangeEvent } from 'react';
+import { useEffect, useMemo, useState, type ChangeEvent } from 'react';
 import { AlertCircle, CheckCircle2, Play, Upload } from 'lucide-react';
 import { Badge, Button, Card, CardContent, CardHeader, CardTitle } from '@ancore/ui-kit';
 import { buildSignedRelayPayload, resolveRelayerBaseUrl } from '../services/scheduler-client';
 import { createWalletApiRelaySigner } from '../services/relay-signer';
 import {
+  clearBulkPayoutCheckpoint,
   createRelayerPayoutSubmitter,
   executeBulkPayoutBatch,
+  loadBulkPayoutCheckpoint,
   parseBulkPayoutCsv,
   type BulkPayoutExecutionSummary,
   type BulkPayoutParseResult,
@@ -28,6 +30,7 @@ export function BulkPayoutsPage() {
   const [executionSummary, setExecutionSummary] = useState<BulkPayoutExecutionSummary | null>(null);
   const [isExecuting, setIsExecuting] = useState(false);
   const [fileError, setFileError] = useState<string | null>(null);
+  const [progress, setProgress] = useState<{ completed: number; total: number } | null>(null);
 
   const failedExecutions = useMemo(
     () => executionSummary?.results.filter((result) => result.status === 'failed') ?? [],
@@ -80,14 +83,45 @@ export function BulkPayoutsPage() {
     setParseResult(parseBulkPayoutCsv(text));
   };
 
+  /**
+   * Identifies the batch across reloads (#1349).
+   *
+   * Derived from the parsed rows rather than generated, so reloading the page
+   * and re-selecting the same CSV resolves to the same batch and its
+   * checkpoint still applies. Row ids already encode line, recipient and
+   * amount, so any edit to the file produces a different batch.
+   */
+  const batchId = useMemo(() => {
+    if (parseResult.validRows.length === 0) return undefined;
+    return `${parseResult.validRows.length}:${parseResult.validRows.map((row) => row.id).join('|')}`;
+  }, [parseResult.validRows]);
+
+  // Report what a previous, interrupted run already submitted rather than
+  // showing an empty summary while those payouts sit completed on-chain.
+  useEffect(() => {
+    if (!batchId) return;
+    const resumed = loadBulkPayoutCheckpoint(batchId, parseResult.validRows);
+    if (resumed) {
+      setExecutionSummary(resumed);
+    }
+  }, [batchId, parseResult.validRows]);
+
   const executeBatch = async () => {
     if (parseResult.validRows.length === 0 || parseResult.invalidRows.length > 0) {
       return;
     }
 
     setIsExecuting(true);
+    setProgress({ completed: 0, total: parseResult.validRows.length });
     try {
-      setExecutionSummary(await executeBulkPayoutBatch(parseResult.validRows, submitPayoutToQueue));
+      const summary = await executeBulkPayoutBatch(parseResult.validRows, submitPayoutToQueue, {
+        batchId,
+        onProgress: setProgress,
+      });
+      setExecutionSummary(summary);
+      // The summary is now on screen, so the checkpoint has done its job.
+      // Keeping it would make the next identical batch skip every row.
+      clearBulkPayoutCheckpoint();
     } finally {
       setIsExecuting(false);
     }
@@ -180,7 +214,11 @@ export function BulkPayoutsPage() {
           type="button"
         >
           <Play className="h-4 w-4" />
-          {isExecuting ? 'Executing...' : 'Execute payout batch'}
+          {isExecuting
+            ? progress
+              ? `Executing ${progress.completed}/${progress.total}...`
+              : 'Executing...'
+            : 'Execute payout batch'}
         </Button>
       </div>
 
