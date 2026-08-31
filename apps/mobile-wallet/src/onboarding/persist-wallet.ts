@@ -1,6 +1,6 @@
 import { createAccountPersistence, importWallet } from '@ancore/core-sdk';
 
-import { getSharedStorageManager } from '../security/storage-manager';
+import { getSharedStorageManager, unlockSharedStorageManager } from '../security/storage-manager';
 
 export interface PersistOnboardedWalletParams {
   mnemonic: string;
@@ -23,15 +23,16 @@ export async function persistOnboardedWallet({
   // Generate wallet material with encrypted mnemonic
   const wallet = await importWallet({ mnemonic, password });
 
-  // Unlock the vault with the password
-  const storageManager = getSharedStorageManager();
-  const unlocked = await storageManager.unlock(password);
+  // Unlock via the migration-safe wrapper so legacy vault data is migrated
+  // before account persistence reads from it (#1370).
+  const unlocked = await unlockSharedStorageManager(password);
 
   if (!unlocked) {
     throw new Error('Failed to unlock vault after onboarding');
   }
 
   // Persist account using the new unified API
+  const storageManager = getSharedStorageManager();
   const accountPersistence = createAccountPersistence(storageManager);
   if (!wallet.encryptedMnemonic) {
     throw new Error('Failed to encrypt mnemonic');
