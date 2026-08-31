@@ -33,15 +33,13 @@ export function parseEnv(
 
     const message = `[env] Invalid environment configuration:\n${issues}\n\nCopy apps/web-dashboard/.env.example to .env.local and fill in all values.`;
 
-    // Fail fast in development so misconfiguration is immediately visible.
-    if (import.meta.env.DEV) {
-      throw new Error(message);
-    }
-
-    console.error(message);
+    // Fail fast in every environment: running with unvalidated config produces
+    // confusing downstream failures (e.g. undefined used to build a URL) far
+    // from the real cause.
+    throw new Error(message);
   }
 
-  return result.success ? result.data : (raw as unknown as Env);
+  return result.data;
 }
 
 // Eagerly parse so main.tsx can `import './lib/env'` as a side-effect. Under
