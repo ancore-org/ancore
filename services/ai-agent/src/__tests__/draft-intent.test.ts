@@ -71,4 +71,21 @@ describe('generateDraftIntent', () => {
 
     expect(result.source).toBe('deterministic');
   });
+
+  it('throws instead of returning a deterministic draft that fails schema validation', async () => {
+    const provider = stubProvider({
+      isAvailable: () => true,
+      draftIntent: async () => {
+        throw new Error('LLM exploded');
+      },
+    });
+    const zeroAmountInput: DraftIntentInput = {
+      prompt: 'send 0 XLM to GDKRY7GNU3CJQX6FMT2BIPW5ELSZAHOV4DKRY7GNU3CJQX6FMT2BIPW5',
+      accountId: 'GACC',
+    };
+
+    await expect(generateDraftIntent(zeroAmountInput, provider)).rejects.toThrow(
+      /failed schema validation/
+    );
+  });
 });

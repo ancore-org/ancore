@@ -6,6 +6,7 @@ const INVOICE_KEYWORDS = ['invoice', 'bill me', 'request payment', 'request a pa
 const STELLAR_ADDRESS_RE = /\bG[A-Z2-7]{55}\b/;
 const STELLAR_ADDRESS_RE_G = /\bG[A-Z2-7]{55}\b/g;
 const AMOUNT_RE = /(\d+(?:\.\d+)?)/;
+const DEFAULT_INVOICE_DUE_DAYS = 7;
 
 function isInvoicePrompt(prompt: string): boolean {
   const lower = prompt.toLowerCase();
@@ -50,7 +51,7 @@ export function deterministicDraftIntent({
       amount,
       asset,
       recipient: accountId,
-      dueDate: new Date().toISOString(),
+      dueDate: new Date(Date.now() + DEFAULT_INVOICE_DUE_DAYS * 24 * 60 * 60 * 1000).toISOString(),
     };
     return { intent, summary: 'Drafted invoice intent' };
   }

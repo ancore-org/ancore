@@ -6,6 +6,7 @@ import type {
   LlmProvider,
   ProviderDraftResult,
 } from './providers/types';
+import { intentSchema } from './schemas/intent';
 import { log } from './logging/logger';
 
 export interface DraftIntentResult extends ProviderDraftResult {
@@ -25,6 +26,11 @@ const defaultProvider: LlmProvider = new AnthropicProvider();
  * schema validation — falls back to the deterministic parser so the endpoint
  * always succeeds, per issue #1005 item 3. The returned `source` field lets
  * callers and audit logs distinguish which path produced the draft.
+ *
+ * The deterministic parser's output is validated against the same
+ * intentSchema the LLM path enforces before it is ever returned, so a
+ * malformed draft (e.g. a zero or out-of-range amount) throws here instead
+ * of silently reaching the caller.
  */
 export async function generateDraftIntent(
   input: DraftIntentInput,
@@ -46,5 +52,13 @@ export async function generateDraftIntent(
     }
   }
 
-  return { ...deterministicDraftIntent(input), source: 'deterministic' };
+  const result = deterministicDraftIntent(input);
+  const parsed = intentSchema.safeParse(result.intent);
+  if (!parsed.success) {
+    throw new Error(
+      `Deterministic provider output failed schema validation: ${parsed.error.message}`
+    );
+  }
+
+  return { ...result, intent: parsed.data, source: 'deterministic' };
 }
