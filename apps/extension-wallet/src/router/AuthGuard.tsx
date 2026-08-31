@@ -1,6 +1,8 @@
 import * as React from 'react';
 import { Navigate, Outlet, useLocation } from 'react-router-dom';
 import { sendMessage } from '../messaging/sender';
+import { recordCurrentDevice } from '../security/device-session-recorder';
+import { useDeviceSessionsStore } from '../stores/deviceSessions';
 
 export const AUTH_STORAGE_KEY = 'ancore_extension_auth';
 
@@ -180,6 +182,7 @@ export function ExtensionAuthProvider({
           ...(smartAccountId ? { smartAccountId } : {}),
         });
         setIsUnlocked(true);
+        void recordCurrentDevice();
       },
       unlockWallet: async (password: string) => {
         try {
@@ -202,6 +205,9 @@ export function ExtensionAuthProvider({
 
           setUnlockError(null);
           setIsUnlocked(true);
+          // Fire-and-forget: device bookkeeping must never delay or fail an
+          // otherwise successful unlock.
+          void recordCurrentDevice();
           return true;
         } catch {
           setUnlockError(DEFAULT_UNLOCK_ERROR);
@@ -222,6 +228,9 @@ export function ExtensionAuthProvider({
         setUnlockError(null);
         setAuthState(DEFAULT_AUTH_STATE);
         setIsUnlocked(false);
+        // A reset discards the vault, so the trusted-device list that belonged
+        // to it must not survive into the next wallet.
+        useDeviceSessionsStore.getState().reset();
       },
       refreshUnlockStatus: refreshUnlockStatusInternal,
     }),
