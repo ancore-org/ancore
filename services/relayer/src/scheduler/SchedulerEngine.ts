@@ -35,6 +35,17 @@ export class SchedulerEngine {
    */
   private consecutiveFailures = 0;
 
+  /**
+   * The tick currently in flight, if any (#1346).
+   *
+   * `stop()` clears the timer, which prevents the *next* tick, but a tick
+   * already running is executing scheduled transfers — signing and submitting
+   * real transactions. Shutting down without waiting for it kills a transfer
+   * somewhere between "signed" and "confirmed", which for a money-moving
+   * service is the one state you cannot reconcile from the outside.
+   */
+  private inFlightTick: Promise<unknown> | null = null;
+
   constructor(service: ScheduledTransferService, options: SchedulerEngineOptions = {}) {
     this.service = service;
     this.pollIntervalMs = options.pollIntervalMs ?? DEFAULT_POLL_INTERVAL_MS;
@@ -55,6 +66,47 @@ export class SchedulerEngine {
     }
   }
 
+  /** Whether a tick is currently executing. */
+  get isTicking(): boolean {
+    return this.inFlightTick !== null;
+  }
+
+  /**
+   * Stop polling and wait for any tick already in flight to finish (#1346).
+   *
+   * Resolves `true` when the scheduler is fully idle, `false` when
+   * `timeoutMs` elapsed first — the caller decides whether to keep waiting or
+   * proceed with shutdown, rather than this hanging a deploy indefinitely.
+   *
+   * Safe to call when already stopped or never started: it resolves `true`
+   * immediately.
+   */
+  async drain(timeoutMs: number): Promise<boolean> {
+    this.stop();
+
+    const pending = this.inFlightTick;
+    if (!pending) return true;
+
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    const timedOut = new Promise<false>((resolve) => {
+      timer = setTimeout(() => resolve(false), timeoutMs);
+    });
+
+    try {
+      // The tick's own rejection is already recorded as a failure metric by
+      // `runTick`; here it only matters that it finished.
+      return await Promise.race([
+        pending.then(
+          () => true,
+          () => true
+        ),
+        timedOut,
+      ]);
+    } finally {
+      if (timer) clearTimeout(timer);
+    }
+  }
+
   /**
    * Process due transfers immediately (useful in tests).
    *
@@ -67,7 +119,22 @@ export class SchedulerEngine {
 
   private async runTick(): Promise<number> {
     const before = this.now();
+    const tick = this.executeTick(before);
 
+    // Tracked so `drain` can await it. Cleared in `finally` rather than on
+    // success, so a failing tick does not leave the scheduler looking busy
+    // forever.
+    this.inFlightTick = tick;
+    try {
+      return await tick;
+    } finally {
+      if (this.inFlightTick === tick) {
+        this.inFlightTick = null;
+      }
+    }
+  }
+
+  private async executeTick(before: Date): Promise<number> {
     try {
       const processed = await this.service.processDueTransfers(before);
       this.consecutiveFailures = 0;

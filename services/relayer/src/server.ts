@@ -9,6 +9,7 @@ import { z } from 'zod';
 import { Pool } from 'pg';
 import { TransferPolicySchema } from '@ancore/types';
 import { loadEnvOrExit } from './config/env';
+import { installShutdownHandlers } from './shutdown';
 import { RelayService } from './services/relayService';
 import { createStellarSubmitterFromEnv } from './services/stellarSubmitter';
 import { createAuthMiddleware } from './middleware/auth';
@@ -207,6 +208,12 @@ export function createApp(
     schedulerEngine.start();
   }
 
+  // Exposed so the shutdown handler can drain the scheduler it started
+  // (#1346). `app.locals` rather than a changed return type: `createApp()`
+  // returning an Express app is relied on by every test and by supertest, and
+  // a graceful-shutdown fix has no business rewriting those call sites.
+  app.locals.schedulerEngine = schedulerEngine;
+
   const validateScheduledTransfer = validateBody(createScheduledTransferSchema);
   const contentTypeGuard = createContentTypeGuardMiddleware();
 
@@ -269,7 +276,15 @@ if (require.main === module) {
   const { PORT } = loadEnvOrExit();
   const app = createApp();
 
-  app.listen(PORT, () => {
+  const server = app.listen(PORT, () => {
     console.log(`Relayer service listening on port ${PORT}`);
+  });
+
+  // Drain on SIGTERM/SIGINT instead of dying mid-flight (#1346). Installed
+  // only when this file is the entrypoint: importing `createApp` into a test
+  // or another process must not hijack that process's signal handling.
+  installShutdownHandlers({
+    server,
+    drainables: [app.locals.schedulerEngine as SchedulerEngine],
   });
 }

@@ -49,15 +49,27 @@ export class QueueWorker {
 
   /**
    * Gracefully stop the worker.
-   * Waits for in-flight jobs to finish before resolving.
+   *
+   * Waits for in-flight jobs to finish before resolving. `timeoutMs` bounds
+   * that wait (#1346): without one, a handler that never settles keeps the
+   * process alive until the orchestrator's SIGKILL, turning a clean drain into
+   * a hard kill of everything else that was still shutting down properly.
+   * Resolves either way — the caller cannot do anything useful with a
+   * rejection here, and losing the rest of the shutdown sequence to an
+   * exception would be worse than proceeding.
    */
-  stop(): Promise<void> {
+  stop(timeoutMs?: number): Promise<void> {
     this.running = false;
     if (this.pollTimer) {
       clearTimeout(this.pollTimer);
       this.pollTimer = null;
     }
-    return this.waitForIdle();
+    return this.waitForIdle(timeoutMs);
+  }
+
+  /** Number of jobs currently being handled. */
+  get inFlight(): number {
+    return this.activeJobs;
   }
 
   // ── Polling ────────────────────────────────────────────────────────────────
@@ -110,15 +122,22 @@ export class QueueWorker {
 
   // ── Helpers ────────────────────────────────────────────────────────────────
 
-  private waitForIdle(): Promise<void> {
+  private waitForIdle(timeoutMs?: number): Promise<void> {
     return new Promise((resolve) => {
+      const deadline = timeoutMs === undefined ? undefined : Date.now() + timeoutMs;
+
       const check = (): void => {
         if (this.activeJobs === 0) {
           resolve();
-        } else {
-          setTimeout(check, 10);
+          return;
         }
+        if (deadline !== undefined && Date.now() >= deadline) {
+          resolve();
+          return;
+        }
+        setTimeout(check, 10);
       };
+
       check();
     });
   }
