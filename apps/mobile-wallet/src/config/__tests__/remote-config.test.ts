@@ -1,4 +1,5 @@
 import {
+  REMOTE_CONFIG_TIMEOUT_MS,
   RemoteConfigError,
   checkAppGate,
   compareSemver,
@@ -131,7 +132,11 @@ describe('fetchRemoteAppConfig', () => {
     await expect(
       fetchRemoteAppConfig('https://config.example.com/app.json', fetchFn)
     ).resolves.toEqual(baseConfig);
-    expect(fetchFn).toHaveBeenCalledWith('https://config.example.com/app.json');
+    // The abort signal is passed on every call now — it is what bounds the
+    // startup gate (#1352).
+    expect(fetchFn).toHaveBeenCalledWith('https://config.example.com/app.json', {
+      signal: expect.any(AbortSignal),
+    });
   });
 
   it('throws on non-2xx responses', async () => {
@@ -242,5 +247,82 @@ describe('checkAppGate', () => {
         fetchFn,
       })
     ).resolves.toEqual({ status: 'ok' });
+  });
+});
+
+/**
+ * #1352: the gate's "an unreachable config host must never brick the wallet"
+ * promise only held against clean failures. A stalled connection never
+ * rejects, so nothing forced the startup gate to resolve.
+ */
+describe('fetchRemoteAppConfig timeout (#1352)', () => {
+  /** A fetch that respects the abort signal but never resolves on its own. */
+  const stalledFetch = jest.fn(
+    (_url: string, init?: { signal?: AbortSignal }) =>
+      new Promise<never>((_resolve, reject) => {
+        init?.signal?.addEventListener('abort', () => {
+          const error = new Error('Aborted');
+          error.name = 'AbortError';
+          reject(error);
+        });
+      })
+  );
+
+  beforeEach(() => {
+    stalledFetch.mockClear();
+  });
+
+  it('gives up on a connection that never settles', async () => {
+    await expect(
+      fetchRemoteAppConfig('https://config.example.com/app.json', stalledFetch, 20)
+    ).rejects.toThrow(RemoteConfigError);
+  });
+
+  it('reports the timeout as an ordinary config error, so the gate fails open', async () => {
+    await expect(
+      fetchRemoteAppConfig('https://config.example.com/app.json', stalledFetch, 20)
+    ).rejects.toThrow(/timed out after 20ms/);
+  });
+
+  it('lets the app through when the config host stalls', async () => {
+    await expect(
+      checkAppGate({
+        configUrl: 'https://config.example.com/app.json',
+        appVersion: '1.0.0',
+        fetchFn: stalledFetch,
+        timeoutMs: 20,
+      })
+    ).resolves.toEqual({ status: 'ok' });
+  });
+
+  /**
+   * The gate runs before the user can do anything, so the bound has to be
+   * short enough to be invisible on a launch screen.
+   */
+  it('defaults to a startup-appropriate timeout', () => {
+    expect(REMOTE_CONFIG_TIMEOUT_MS).toBeGreaterThan(0);
+    expect(REMOTE_CONFIG_TIMEOUT_MS).toBeLessThanOrEqual(5_000);
+  });
+
+  it('does not abort a response that arrives in time', async () => {
+    const quickFetch = jest.fn(async () => ({
+      ok: true,
+      status: 200,
+      json: async () => ({ minimumAppVersion: '1.2.0', maintenanceMode: false }),
+    }));
+
+    await expect(
+      fetchRemoteAppConfig('https://config.example.com/app.json', quickFetch, 1_000)
+    ).resolves.toEqual(baseConfig);
+  });
+
+  it('still surfaces a non-timeout network failure unchanged', async () => {
+    const failing = jest.fn(async () => {
+      throw new Error('DNS lookup failed');
+    });
+
+    await expect(
+      fetchRemoteAppConfig('https://config.example.com/app.json', failing, 1_000)
+    ).rejects.toThrow('DNS lookup failed');
   });
 });
