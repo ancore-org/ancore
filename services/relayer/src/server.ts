@@ -9,6 +9,7 @@ import { z } from 'zod';
 import { Pool } from 'pg';
 import { TransferPolicySchema } from '@ancore/types';
 import { loadEnvOrExit } from './config/env';
+import { runMigrations } from './migrations';
 import { RelayService } from './services/relayService';
 import { createStellarSubmitterFromEnv } from './services/stellarSubmitter';
 import { createAuthMiddleware } from './middleware/auth';
@@ -108,8 +109,7 @@ export function createApp(
     process.exit(1);
   }
 
-  const dbPool =
-    pool ?? (env.DATABASE_URL ? new Pool({ connectionString: env.DATABASE_URL }) : undefined);
+  const dbPool = pool ?? (env.DATABASE_URL ? createDatabasePool(env.DATABASE_URL) : undefined);
 
   if (env.NODE_ENV === 'production' && !dbPool) {
     console.error('DATABASE_URL must be set in production for persistent storage');
@@ -263,13 +263,43 @@ export function createApp(
   return app;
 }
 
+export function createDatabasePool(connectionString: string): Pool {
+  const pool = new Pool({
+    connectionString,
+    max: 10,
+    idleTimeoutMillis: 30_000,
+    connectionTimeoutMillis: 5_000,
+  });
+  // Idle-client errors are emitted on the Pool, not on a request promise.
+  pool.on('error', (error) => {
+    console.error('Unexpected Postgres idle-client error', error);
+  });
+  return pool;
+}
+
 if (require.main === module) {
   // Validate the whole environment before doing anything else, so a bad config
   // is a clear boot-time failure rather than a runtime surprise.
-  const { PORT } = loadEnvOrExit();
-  const app = createApp();
-
-  app.listen(PORT, () => {
-    console.log(`Relayer service listening on port ${PORT}`);
+  void (async () => {
+    const env = loadEnvOrExit();
+    const pool = env.DATABASE_URL ? createDatabasePool(env.DATABASE_URL) : undefined;
+    if (pool) await runMigrations(pool);
+    const app = createApp(
+      undefined,
+      undefined,
+      undefined,
+      undefined,
+      undefined,
+      undefined,
+      undefined,
+      undefined,
+      pool
+    );
+    app.listen(env.PORT, () => {
+      console.log(`Relayer service listening on port ${env.PORT}`);
+    });
+  })().catch((error) => {
+    console.error('Relayer startup failed', error);
+    process.exit(1);
   });
 }
