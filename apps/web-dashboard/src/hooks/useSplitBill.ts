@@ -17,7 +17,7 @@ export interface UseSplitBillReturn {
     billId: string,
     participantId: string,
     status: ParticipantStatus,
-    extra?: { failedReason?: string }
+    extra?: { failedReason?: string; txHash?: string }
   ) => void;
   cancelBill: (billId: string) => void;
   getBill: (billId: string) => SplitBill | undefined;
@@ -46,7 +46,7 @@ export function useSplitBill(): UseSplitBillReturn {
       billId: string,
       participantId: string,
       status: ParticipantStatus,
-      extra?: { failedReason?: string }
+      extra?: { failedReason?: string; txHash?: string }
     ) => {
       const updated = storageUpdateParticipant(
         loadSplitBills(),

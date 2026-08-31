@@ -45,18 +45,13 @@ export class PgIdempotencyStore implements IdempotencyStoreContract {
 
     if (Date.now() > expiresAt) {
       // Lazily evict expired row
-      await this.pool
-        .query(`DELETE FROM idempotency_keys WHERE key = $1`, [key])
-        .catch(() => {});
+      await this.pool.query(`DELETE FROM idempotency_keys WHERE key = $1`, [key]).catch(() => {});
       return undefined;
     }
 
-    const body =
-      typeof row.body === 'string' ? JSON.parse(row.body) : row.body;
+    const body = typeof row.body === 'string' ? JSON.parse(row.body) : row.body;
     const statusCode =
-      typeof row.status_code === 'string'
-        ? parseInt(row.status_code, 10)
-        : Number(row.status_code);
+      typeof row.status_code === 'string' ? parseInt(row.status_code, 10) : Number(row.status_code);
 
     return { statusCode, body };
   }

@@ -141,10 +141,9 @@ describe('PgJobQueue', () => {
       const queue = new PgJobQueue(pool as never);
 
       await queue.ack('job-uuid-1');
-      expect(pool.query).toHaveBeenCalledWith(
-        expect.stringContaining("SET status = 'completed'"),
-        ['job-uuid-1']
-      );
+      expect(pool.query).toHaveBeenCalledWith(expect.stringContaining("SET status = 'completed'"), [
+        'job-uuid-1',
+      ]);
     });
   });
 

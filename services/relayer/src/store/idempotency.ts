@@ -66,4 +66,7 @@ export class IdempotencyStore implements IdempotencyStoreContract {
   }
 }
 
-export type AnyIdempotencyStore = IdempotencyStore | import('./pgIdempotencyStore').PgIdempotencyStore | IdempotencyStoreContract;
+export type AnyIdempotencyStore =
+  | IdempotencyStore
+  | import('./pgIdempotencyStore').PgIdempotencyStore
+  | IdempotencyStoreContract;
