@@ -9,7 +9,7 @@ import { z } from 'zod';
 import { Pool } from 'pg';
 import { TransferPolicySchema } from '@ancore/types';
 import { loadEnvOrExit } from './config/env';
-import { installShutdownHandlers } from './shutdown';
+
 import { RelayService } from './services/relayService';
 import { createStellarSubmitterFromEnv } from './services/stellarSubmitter';
 import { createAuthMiddleware } from './middleware/auth';
@@ -109,8 +109,7 @@ export function createApp(
     process.exit(1);
   }
 
-  const dbPool =
-    pool ?? (env.DATABASE_URL ? new Pool({ connectionString: env.DATABASE_URL }) : undefined);
+  const dbPool = pool ?? (env.DATABASE_URL ? createDatabasePool(env.DATABASE_URL) : undefined);
 
   if (env.NODE_ENV === 'production' && !dbPool) {
     console.error('DATABASE_URL must be set in production for persistent storage');
@@ -270,14 +269,24 @@ export function createApp(
   return app;
 }
 
+export function createDatabasePool(connectionString: string): Pool {
+  const pool = new Pool({
+    connectionString,
+    max: 10,
+    idleTimeoutMillis: 30_000,
+    connectionTimeoutMillis: 5_000,
+  });
+  // Idle-client errors are emitted on the Pool, not on a request promise.
+  pool.on('error', (error) => {
+    console.error('Unexpected Postgres idle-client error', error);
+  });
+  return pool;
+}
+
 if (require.main === module) {
   // Validate the whole environment before doing anything else, so a bad config
   // is a clear boot-time failure rather than a runtime surprise.
-  const { PORT } = loadEnvOrExit();
-  const app = createApp();
 
-  const server = app.listen(PORT, () => {
-    console.log(`Relayer service listening on port ${PORT}`);
   });
 
   // Drain on SIGTERM/SIGINT instead of dying mid-flight (#1346). Installed

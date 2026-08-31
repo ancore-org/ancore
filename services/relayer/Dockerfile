@@ -39,6 +39,8 @@ RUN pnpm install --frozen-lockfile --prod
 
 # Copy built application
 COPY --from=builder /app/services/relayer/dist ./services/relayer/dist
+# Migrations are executed by the relayer before it accepts traffic.
+COPY --from=builder /app/services/relayer/migrations ./services/relayer/migrations
 
 WORKDIR /app/services/relayer
 
