@@ -22,7 +22,7 @@ import { rootLogger } from '../logging';
  * ```
  */
 export function createIdempotencyMiddleware(store: IdempotencyStoreContract | AnyIdempotencyStore) {
-  return (req: Request, res: Response, next: NextFunction): void => {
+  return async (req: Request, res: Response, next: NextFunction): Promise<void> => {
     try {
       const rawKey = req.headers['idempotency-key'];
       // Only accept a single string value; reject arrays.
@@ -33,48 +33,30 @@ export function createIdempotencyMiddleware(store: IdempotencyStoreContract | An
 
       const key = rawKey.trim();
 
-      const proceed = (cached: unknown) => {
-        if (cached && typeof cached === 'object' && 'statusCode' in cached) {
-          const entry = cached as { statusCode: number; body: unknown };
-          res.status(entry.statusCode).json(entry.body);
-          return;
-        }
+      const cached = await store.get(key);
+      if (cached) {
+        // Replay the original response deterministically.
+        res.status(cached.statusCode).json(cached.body);
+        return;
+      }
 
-        // Intercept res.json to capture the outgoing response before it is sent.
-        const originalJson = res.json.bind(res) as (body: unknown) => Response;
-        res.json = function (body: unknown): Response {
-          // Only cache successful responses (2xx). Error responses (4xx/5xx) or transient
-          // failures must not permanently poison the idempotency key for retries.
-          if (res.statusCode >= 200 && res.statusCode < 300) {
-            try {
-              const resSet = store.set(key, { statusCode: res.statusCode, body });
-              if (resSet && typeof (resSet as any).catch === 'function') {
-                (resSet as Promise<unknown>).catch((err) => {
-                  rootLogger.error(
-                    { error: err instanceof Error ? err.message : String(err) },
-                    'Failed to persist idempotency entry'
-                  );
-                });
-              }
-            } catch (err) {
+      // Cache only successful responses so a transient failure never poisons retries.
+      const originalJson = res.json.bind(res) as (body: unknown) => Response;
+      res.json = function (body: unknown): Response {
+        if (res.statusCode >= 200 && res.statusCode < 300) {
+          void Promise.resolve(store.set(key, { statusCode: res.statusCode, body })).catch(
+            (error) => {
               rootLogger.error(
-                { error: err instanceof Error ? err.message : String(err) },
+                { error: error instanceof Error ? error.message : String(error) },
                 'Failed to persist idempotency entry'
               );
             }
-          }
-          return originalJson(body);
-        };
-
-        next();
+          );
+        }
+        return originalJson(body);
       };
 
-      const result = store.get(key);
-      if (result && typeof (result as any).then === 'function') {
-        (result as Promise<unknown>).then(proceed).catch(next);
-      } else {
-        proceed(result);
-      }
+      next();
     } catch (err) {
       next(err);
     }

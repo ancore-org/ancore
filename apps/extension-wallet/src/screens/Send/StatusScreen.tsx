@@ -9,6 +9,7 @@ import {
   ArrowLeft,
   Info,
   RefreshCw,
+  WifiOff,
 } from 'lucide-react';
 
 interface StatusScreenProps {
@@ -48,6 +49,23 @@ const STATUS_CONFIG: Record<
     color: 'red',
     icon: <XCircle className="w-8 h-8 text-red-400" />,
     description: 'Transaction failed. This may be due to network congestion or invalid state.',
+  },
+  /**
+   * The status *check* failed, not the transaction (#1351).
+   *
+   * Deliberately worded as uncertainty rather than progress: the previous
+   * behaviour reported a dead RPC endpoint as "Processing", which told the
+   * user their transaction was on its way when in truth nobody had been able
+   * to look. It stays amber rather than red because the transaction really
+   * may have gone through.
+   */
+  unreachable: {
+    label: 'Unconfirmed',
+    color: 'amber',
+    icon: <WifiOff className="w-8 h-8 text-amber-400" />,
+    description:
+      'Cannot reach the network to check this transaction. It may still have gone through — ' +
+      'check your balance or try again in a moment.',
   },
 };
 

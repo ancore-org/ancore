@@ -34,6 +34,8 @@ export interface RefreshSessionKeyTtlOptions extends AccountContractReadOptions 
    * Defaults to `Date.now()`. Useful for deterministic testing.
    */
   nowMs?: number;
+  /** Maximum time to wait for the Soroban simulation RPC call. Defaults to 15 seconds. */
+  simulationTimeoutMs?: number;
 }
 
 export interface SessionKeyTtlRefresher {
@@ -106,7 +108,7 @@ export function refreshSessionKeyTtl(
 ): InvocationArgs | Promise<RefreshSessionKeyTtlResult> {
   /* eslint-enable no-redeclare */
   validateRefreshSessionKeyTtlParams(params, options?.nowMs);
-  /* eslint-enable no-redeclare */
+   
 
   if (options) {
     return simulateRefreshSessionKeyTtl(accountContract, params, options);
@@ -237,7 +239,26 @@ async function simulateInvocation(
     .setTimeout(180)
     .build();
 
-  return options.server.simulateTransaction(tx) as Promise<rpc.Api.SimulateTransactionResponse>;
+  const timeoutMs = options.simulationTimeoutMs ?? 15_000;
+  let timeout: ReturnType<typeof globalThis.setTimeout> | undefined;
+  try {
+    return await Promise.race([
+      options.server.simulateTransaction(tx) as Promise<rpc.Api.SimulateTransactionResponse>,
+      new Promise<never>((_, reject) => {
+        timeout = globalThis.setTimeout(
+          () =>
+            reject(
+              new SimulationFailedError(
+                `Session key TTL simulation timed out after ${timeoutMs}ms.`
+              )
+            ),
+          timeoutMs
+        );
+      }),
+    ]);
+  } finally {
+    if (timeout) globalThis.clearTimeout(timeout);
+  }
 }
 
 function mapSimulationError(message: string, params: RefreshSessionKeyTtlParams): AncoreSdkError {

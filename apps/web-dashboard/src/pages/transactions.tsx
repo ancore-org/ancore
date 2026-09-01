@@ -1,82 +1,48 @@
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 
 import { TransactionTable } from '../components/transactions/TransactionTable';
 import { StatementExportModal } from '../features/statements/StatementExportModal';
 import { PaymentDetail } from '../features/payments';
 import { mapMerchantMetadata } from '../components/merchant/merchant-metadata';
-import type { Transaction } from '../components/transactions/transaction-types';
+import type { Transaction as TableTransaction } from '../components/transactions/transaction-types';
+import { useWalletConnection } from '../hooks/useWalletConnection';
+import { useIndexerActivity } from '../hooks/useIndexerActivity';
 
-const STATEMENT_ACCOUNT_ID = 'GABC1234567890ABCDEFGHIJKLMNOPQRSTUVWXYZ1234567890';
-
-const DASHBOARD_TRANSACTIONS: Transaction[] = [
-  {
-    id: 'tx-1',
-    occurredAt: '2026-04-24T10:00:00.000Z',
-    type: 'payment',
-    status: 'completed',
-    amount: 142.5,
-    counterparty: 'Acme Treasury',
-    memo: 'Invoice 1042',
-    merchant: mapMerchantMetadata({
-      merchant_name: 'Acme Treasury',
-      merchant_verification_status: 'verified',
-    }),
-  },
-  {
-    id: 'tx-2',
-    occurredAt: '2026-04-24T10:00:00.000Z',
-    type: 'swap',
-    status: 'completed',
-    amount: 142.5,
-    counterparty: 'DEX Route',
-    memo: 'USDC to XLM',
-  },
-  {
-    id: 'tx-3',
-    occurredAt: '2026-04-22T15:30:00.000Z',
-    type: 'transfer',
-    status: 'pending',
-    amount: 85,
-    counterparty: 'Client Wallet',
-    memo: 'Refund',
-  },
-  {
-    id: 'tx-4',
-    occurredAt: '2026-04-18T08:15:00.000Z',
-    type: 'payment',
-    status: 'failed',
-    amount: 12.75,
-    counterparty: 'Merchant POS',
-    memo: 'Failed charge',
-    merchant: mapMerchantMetadata({
-      merchant: { name: 'Merchant POS', verificationStatus: 'unverified' },
-    }),
-  },
-  {
-    id: 'tx-5',
-    occurredAt: '2026-04-23T18:20:00.000Z',
-    type: 'transfer',
-    status: 'completed',
-    amount: 320,
-    counterparty: 'Operations Vault',
-    memo: 'Liquidity move',
-  },
-];
+function mapIndexerToTable(tx: any): TableTransaction {
+  return {
+    id: tx.id,
+    occurredAt: tx.timestamp instanceof Date ? tx.timestamp.toISOString() : new Date(tx.timestamp).toISOString(),
+    type: tx.type === 'send' ? 'transfer' : 'payment',
+    status: tx.status === 'confirmed' ? 'completed' : tx.status === 'pending' ? 'pending' : 'failed',
+    amount: tx.amount,
+    counterparty: tx.counterparty,
+    memo: tx.memo ?? '',
+    merchant: tx.merchant ? mapMerchantMetadata(tx.merchant) : null,
+  };
+}
 
 export function TransactionsPage() {
   const [isStatementExportOpen, setIsStatementExportOpen] = useState(false);
+  const { smartAccountId } = useWalletConnection();
+
+  const { items: indexerItems } = useIndexerActivity(smartAccountId ?? '');
+
+  const transactions: TableTransaction[] = useMemo(
+    () => indexerItems.map((t) => mapIndexerToTable(t)),
+    [indexerItems]
+  );
 
   return (
     <>
       <div className="space-y-6">
-        <PaymentDetail transaction={DASHBOARD_TRANSACTIONS[0]} />
+        {transactions[0] ? <PaymentDetail transaction={transactions[0]} /> : null}
         <TransactionTable
           onExportStatement={() => setIsStatementExportOpen(true)}
-          transactions={DASHBOARD_TRANSACTIONS}
+          transactions={transactions}
         />
       </div>
       <StatementExportModal
-        accountId={STATEMENT_ACCOUNT_ID}
+        accountId={smartAccountId ?? ''}
         isOpen={isStatementExportOpen}
         onClose={() => setIsStatementExportOpen(false)}
       />
