@@ -59,6 +59,15 @@ pub struct Proposal {
 /// Maximum number of multisig signers.
 pub const MAX_SIGNERS: u32 = 50;
 
+/// Multisig governance policy: the number of signer approvals required to
+/// execute a timelocked upgrade, and the addresses eligible to sign.
+#[contracttype]
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct MultisigConfig {
+    pub threshold: u32,
+    pub signers: Vec<Address>,
+}
+
 #[contracttype]
 pub enum DataKey {
     Owner,
