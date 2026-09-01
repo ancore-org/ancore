@@ -92,7 +92,8 @@ export class AccountPersistence {
 
   /**
    * Persist or update an account in the vault.
-   * If the account already exists, updates metadata and secret while preserving createdAt.
+   * If the account already exists, updates metadata and secret while preserving createdAt
+   * and preserving label if omitted by caller.
    * If new, generates createdAt timestamp.
    */
   async persistAccount(input: PersistAccountInput): Promise<AccountMetadata> {
@@ -104,7 +105,7 @@ export class AccountPersistence {
     const metadata: AccountMetadata = {
       id: input.id,
       address: input.address,
-      label: input.label,
+      label: input.label ?? existingRecord?.metadata.label,
       createdAt,
       updatedAt,
     };

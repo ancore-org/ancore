@@ -81,7 +81,7 @@ export function updateParticipantStatus(
   billId: string,
   participantId: string,
   status: ParticipantStatus,
-  extra?: { failedReason?: string }
+  extra?: { failedReason?: string; txHash?: string }
 ): SplitBill[] {
   return bills.map((bill) => {
     if (bill.id !== billId) return bill;
@@ -93,7 +93,8 @@ export function updateParticipantStatus(
             ...p,
             status,
             paidAt: status === 'paid' ? Date.now() : p.paidAt,
-            failedReason: extra?.failedReason,
+            txHash: extra?.txHash !== undefined ? extra.txHash : p.txHash,
+            failedReason: extra?.failedReason !== undefined ? extra.failedReason : p.failedReason,
           }
     );
 

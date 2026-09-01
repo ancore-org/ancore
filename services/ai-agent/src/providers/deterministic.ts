@@ -12,6 +12,7 @@ const ASSET_KEYWORDS = '(?:xlm|lumens?|usdc)';
 // prompt ("wait 3 days then send 25 XLM to G..." should extract "25", not "3").
 const AMOUNT_BEFORE_ASSET_RE = new RegExp(`(\\d+(?:\\.\\d+)?)\\s*${ASSET_KEYWORDS}\\b`, 'i');
 const AMOUNT_AFTER_ASSET_RE = new RegExp(`${ASSET_KEYWORDS}\\s*(\\d+(?:\\.\\d+)?)`, 'i');
+const DEFAULT_INVOICE_DUE_DAYS = 7;
 
 function isInvoicePrompt(prompt: string): boolean {
   const lower = prompt.toLowerCase();
@@ -59,7 +60,7 @@ export function deterministicDraftIntent({
       amount,
       asset,
       recipient: accountId,
-      dueDate: new Date().toISOString(),
+      dueDate: new Date(Date.now() + DEFAULT_INVOICE_DUE_DAYS * 24 * 60 * 60 * 1000).toISOString(),
     };
     return { intent, summary: 'Drafted invoice intent' };
   }

@@ -40,16 +40,14 @@ export function createIdempotencyMiddleware(store: IdempotencyStoreContract | An
         return;
       }
 
-      // Intercept res.json to capture the outgoing response before it is sent.
+      // Cache only successful responses so a transient failure never poisons retries.
       const originalJson = res.json.bind(res) as (body: unknown) => Response;
       res.json = function (body: unknown): Response {
-        // Only cache successful responses (2xx). Error responses (4xx/5xx) or transient
-        // failures must not permanently poison the idempotency key for retries.
         if (res.statusCode >= 200 && res.statusCode < 300) {
           void Promise.resolve(store.set(key, { statusCode: res.statusCode, body })).catch(
-            (err) => {
+            (error) => {
               rootLogger.error(
-                { error: err instanceof Error ? err.message : String(err) },
+                { error: error instanceof Error ? error.message : String(error) },
                 'Failed to persist idempotency entry'
               );
             }

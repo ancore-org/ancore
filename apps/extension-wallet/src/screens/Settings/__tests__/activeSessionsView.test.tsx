@@ -1,6 +1,9 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
-import { render, screen, fireEvent } from '@testing-library/react';
+import { render, screen, fireEvent, act } from '@testing-library/react';
 import { useDeviceSessionsStore, type DeviceSession } from '../../../stores/deviceSessions';
+import { recordCurrentDevice } from '../../../security/device-session-recorder';
+import { DEVICE_ID_STORAGE_KEY, resetDeviceIdCache } from '../../../security/device-identity';
+import { extensionStorage } from '../../../stores/_storage';
 import { SecuritySettings } from '../SecuritySettings';
 
 // vault-export pulls in @ancore/crypto which is not built in test env — mock it
@@ -175,5 +178,45 @@ describe('ActiveSessionsView', () => {
     fireEvent.click(doneBtn);
 
     expect(screen.getByText('Security')).toBeTruthy();
+  });
+});
+
+// Regression guard: the store used to have no production writer at all, so this
+// screen could only ever render the empty state. Drive the real recorder and
+// assert the list actually fills in.
+describe('ActiveSessionsView populated by the device recorder', () => {
+  beforeEach(async () => {
+    resetDeviceIdCache();
+    await extensionStorage.removeItem(DEVICE_ID_STORAGE_KEY);
+  });
+
+  it('shows the current device after an unlock is recorded', async () => {
+    renderSecuritySettings();
+    navigateToActiveSessions();
+    expect(screen.getByText('No active sessions')).toBeTruthy();
+
+    await act(async () => {
+      await recordCurrentDevice();
+    });
+
+    expect(screen.queryByText('No active sessions')).toBeNull();
+    expect(screen.getByText(/\(this device\)/i)).toBeTruthy();
+    expect(screen.getByRole('button', { name: /revoke/i })).toHaveProperty('disabled', true);
+  });
+
+  it('raises the new-device alert when a second device appears alongside this one', async () => {
+    await act(async () => {
+      await recordCurrentDevice();
+    });
+
+    act(() => {
+      useDeviceSessionsStore.getState().addDevice(makeDevice({ id: 'device-2' }));
+    });
+
+    renderSecuritySettings();
+    navigateToActiveSessions();
+
+    expect(screen.getByTestId('new-device-alert')).toBeTruthy();
+    expect(screen.getAllByRole('button', { name: /revoke/i })).toHaveLength(2);
   });
 });

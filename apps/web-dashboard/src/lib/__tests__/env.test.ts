@@ -163,4 +163,26 @@ describe('parseEnv()', () => {
       (import.meta.env as Record<string, unknown>).DEV = originalDev;
     }
   });
+
+  it('throws when DEV is false and config is invalid, instead of returning unvalidated raw config', () => {
+    const originalDev = import.meta.env.DEV;
+    try {
+      (import.meta.env as Record<string, unknown>).DEV = false;
+      expect(() => parseEnv({ VITE_RELAYER_URL: 'bad' })).toThrow(
+        '[env] Invalid environment configuration'
+      );
+    } finally {
+      (import.meta.env as Record<string, unknown>).DEV = originalDev;
+    }
+  });
+
+  it('throws when config is missing required values, regardless of DEV', () => {
+    const originalDev = import.meta.env.DEV;
+    try {
+      (import.meta.env as Record<string, unknown>).DEV = false;
+      expect(() => parseEnv({})).toThrow('[env] Invalid environment configuration');
+    } finally {
+      (import.meta.env as Record<string, unknown>).DEV = originalDev;
+    }
+  });
 });

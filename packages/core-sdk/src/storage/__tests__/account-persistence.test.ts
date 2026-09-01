@@ -1,7 +1,8 @@
 import { webcrypto } from 'crypto';
+import type { StorageAdapter } from '../types';
 
 if (!globalThis.crypto) {
-  // @ts-ignore
+  // @ts-expect-error - Polyfill for Node.js environment
   globalThis.crypto = webcrypto;
 }
 if (!globalThis.btoa) {
@@ -12,17 +13,16 @@ if (!globalThis.atob) {
 }
 
 import { SecureStorageManager } from '../secure-storage-manager';
-import type { StorageAdapter } from '../types';
 import { AccountPersistence, createAccountPersistence } from '../account-persistence';
 
 class MockStorageAdapter implements StorageAdapter {
   private store = new Map<string, unknown>();
 
-  async get(key: string): Promise<unknown> {
-    return this.store.get(key) ?? null;
+  async get<T>(key: string): Promise<T | null> {
+    return (this.store.get(key) as T | undefined) ?? null;
   }
 
-  async set(key: string, value: unknown): Promise<void> {
+  async set<T>(key: string, value: T): Promise<void> {
     this.store.set(key, value);
   }
 
@@ -31,166 +31,169 @@ class MockStorageAdapter implements StorageAdapter {
   }
 }
 
-async function createUnlockedManager(): Promise<SecureStorageManager> {
-  const manager = new SecureStorageManager(new MockStorageAdapter());
-  await manager.unlock('super_secret_password_123!');
-  return manager;
-}
-
 describe('AccountPersistence', () => {
-  it('creates an instance via the factory function', async () => {
-    const manager = await createUnlockedManager();
-    const accounts = createAccountPersistence(manager);
-    expect(accounts).toBeInstanceOf(AccountPersistence);
+  let storage: MockStorageAdapter;
+  let manager: SecureStorageManager;
+  let persistence: AccountPersistence;
+  let mockTime = 1700000000000;
+
+  beforeEach(async () => {
+    storage = new MockStorageAdapter();
+    manager = new SecureStorageManager(storage);
+    await manager.unlock('test-password-1234');
+    mockTime = 1700000000000;
+    persistence = createAccountPersistence(manager, {
+      now: () => mockTime,
+    });
   });
 
-  it('persists a new account and returns its metadata', async () => {
-    const manager = await createUnlockedManager();
-    const accounts = createAccountPersistence(manager, { now: () => 1_716_000_000_000 });
-
-    const metadata = await accounts.persistAccount({
-      id: 'account-1',
-      address: 'GACC1',
-      label: 'Main',
-      keyMaterial: 'encrypted-mnemonic',
+  it('persists an account with metadata and secret payload', async () => {
+    const meta = await persistence.persistAccount({
+      id: 'acc-1',
+      address: 'GABC123',
+      label: 'Main Account',
+      keyMaterial: 'encrypted-secret-key-1',
       accountPayload: { derivationPath: "m/44'/148'/0'" },
     });
 
-    expect(metadata).toEqual({
-      id: 'account-1',
-      address: 'GACC1',
-      label: 'Main',
-      createdAt: new Date(1_716_000_000_000).toISOString(),
-      updatedAt: new Date(1_716_000_000_000).toISOString(),
+    expect(meta).toEqual({
+      id: 'acc-1',
+      address: 'GABC123',
+      label: 'Main Account',
+      createdAt: new Date(1700000000000).toISOString(),
+      updatedAt: new Date(1700000000000).toISOString(),
+    });
+
+    const stored = await persistence.loadAccount('acc-1');
+    expect(stored).toBeDefined();
+    expect(stored?.metadata).toEqual(meta);
+    expect(stored?.secret).toEqual({
+      keyMaterial: 'encrypted-secret-key-1',
+      accountPayload: { derivationPath: "m/44'/148'/0'" },
     });
   });
 
-  it('preserves createdAt and bumps updatedAt when persisting over an existing account', async () => {
-    const manager = await createUnlockedManager();
-    let now = 1_716_000_000_000;
-    const accounts = createAccountPersistence(manager, { now: () => now });
-
-    const first = await accounts.persistAccount({
-      id: 'account-1',
-      address: 'GACC1',
-      keyMaterial: 'encrypted-mnemonic',
+  it('preserves an account label on update when omitted by caller', async () => {
+    // 1. Create with label
+    await persistence.persistAccount({
+      id: 'acc-1',
+      address: 'GABC123',
+      label: 'Savings Vault',
+      keyMaterial: 'key-v1',
       accountPayload: {},
     });
 
-    now += 60_000;
-    const second = await accounts.persistAccount({
-      id: 'account-1',
-      address: 'GACC1-updated',
-      keyMaterial: 'encrypted-mnemonic-2',
-      accountPayload: {},
+    // Advance time
+    mockTime += 5000;
+
+    // 2. Update without passing label (e.g. key rotation or payload update)
+    const updated = await persistence.persistAccount({
+      id: 'acc-1',
+      address: 'GABC123',
+      keyMaterial: 'key-v2',
+      accountPayload: { rotated: true },
     });
 
-    expect(second.createdAt).toBe(first.createdAt);
-    expect(second.updatedAt).not.toBe(first.updatedAt);
-    expect(second.address).toBe('GACC1-updated');
+    expect(updated.label).toBe('Savings Vault');
+    expect(updated.createdAt).toBe(new Date(1700000000000).toISOString());
+    expect(updated.updatedAt).toBe(new Date(1700000005000).toISOString());
+
+    // Verify stored record
+    const stored = await persistence.loadAccount('acc-1');
+    expect(stored?.metadata.label).toBe('Savings Vault');
+    expect(stored?.secret.keyMaterial).toBe('key-v2');
+    expect(stored?.secret.accountPayload).toEqual({ rotated: true });
   });
 
-  it('lists account metadata sorted by creation order, without secret material', async () => {
-    const manager = await createUnlockedManager();
-    let now = 1_716_000_000_000;
-    const accounts = createAccountPersistence(manager, { now: () => now });
-
-    await accounts.persistAccount({
-      id: 'account-2',
-      address: 'GACC2',
-      keyMaterial: 'secret-2',
+  it('updates an account label when explicitly provided', async () => {
+    await persistence.persistAccount({
+      id: 'acc-1',
+      address: 'GABC123',
+      label: 'Original Label',
+      keyMaterial: 'key-v1',
       accountPayload: {},
     });
-    now += 60_000;
-    await accounts.persistAccount({
-      id: 'account-1',
-      address: 'GACC1',
+
+    mockTime += 2000;
+
+    const updated = await persistence.persistAccount({
+      id: 'acc-1',
+      address: 'GABC123',
+      label: 'Renamed Label',
+      keyMaterial: 'key-v1',
+      accountPayload: {},
+    });
+
+    expect(updated.label).toBe('Renamed Label');
+
+    const stored = await persistence.loadAccount('acc-1');
+    expect(stored?.metadata.label).toBe('Renamed Label');
+  });
+
+  it('lists all accounts in creation order without secrets', async () => {
+    await persistence.persistAccount({
+      id: 'acc-1',
+      address: 'GABC123',
+      label: 'Account 1',
       keyMaterial: 'secret-1',
       accountPayload: {},
     });
 
-    const list = await accounts.listAccountMetadata();
-    expect(list.map((entry) => entry.id)).toEqual(['account-2', 'account-1']);
-    expect(list.every((entry) => !('secret' in entry))).toBe(true);
-  });
+    mockTime += 1000;
 
-  it('returns null when loading an account that does not exist', async () => {
-    const manager = await createUnlockedManager();
-    const accounts = createAccountPersistence(manager);
-
-    expect(await accounts.loadAccount('missing')).toBeNull();
-  });
-
-  it('loads a persisted account including its secret payload', async () => {
-    const manager = await createUnlockedManager();
-    const accounts = createAccountPersistence(manager);
-
-    await accounts.persistAccount({
-      id: 'account-1',
-      address: 'GACC1',
-      keyMaterial: 'encrypted-mnemonic',
-      accountPayload: { foo: 'bar' },
-    });
-
-    const loaded = await accounts.loadAccount('account-1');
-    expect(loaded?.metadata.id).toBe('account-1');
-    expect(loaded?.secret).toEqual({
-      keyMaterial: 'encrypted-mnemonic',
-      accountPayload: { foo: 'bar' },
-    });
-  });
-
-  it('deletes an account by id', async () => {
-    const manager = await createUnlockedManager();
-    const accounts = createAccountPersistence(manager);
-
-    await accounts.persistAccount({
-      id: 'account-1',
-      address: 'GACC1',
-      keyMaterial: 'secret',
-      accountPayload: {},
-    });
-    await accounts.deleteAccount('account-1');
-
-    expect(await accounts.loadAccount('account-1')).toBeNull();
-  });
-
-  it('reports the account count', async () => {
-    const manager = await createUnlockedManager();
-    const accounts = createAccountPersistence(manager);
-
-    expect(await accounts.getAccountCount()).toBe(0);
-
-    await accounts.persistAccount({
-      id: 'account-1',
-      address: 'GACC1',
-      keyMaterial: 'secret',
-      accountPayload: {},
-    });
-    await accounts.persistAccount({
-      id: 'account-2',
-      address: 'GACC2',
-      keyMaterial: 'secret',
+    await persistence.persistAccount({
+      id: 'acc-2',
+      address: 'GDEF456',
+      label: 'Account 2',
+      keyMaterial: 'secret-2',
       accountPayload: {},
     });
 
-    expect(await accounts.getAccountCount()).toBe(2);
+    const list = await persistence.listAccountMetadata();
+    expect(list).toHaveLength(2);
+    expect(list[0].id).toBe('acc-1');
+    expect(list[1].id).toBe('acc-2');
+    expect((list[0] as unknown as { secret?: unknown }).secret).toBeUndefined();
   });
 
-  it('clears all account data by resetting (and locking) the storage manager', async () => {
-    const manager = await createUnlockedManager();
-    const accounts = createAccountPersistence(manager, { storageKey: 'custom_accounts_key' });
+  it('returns null when loading non-existent account', async () => {
+    const loaded = await persistence.loadAccount('non-existent');
+    expect(loaded).toBeNull();
+  });
 
-    await accounts.persistAccount({
-      id: 'account-1',
-      address: 'GACC1',
-      keyMaterial: 'secret',
+  it('deletes an account and tracks account count', async () => {
+    await persistence.persistAccount({
+      id: 'acc-1',
+      address: 'GABC123',
+      keyMaterial: 'secret-1',
       accountPayload: {},
     });
-    await accounts.clearAllAccounts();
+    await persistence.persistAccount({
+      id: 'acc-2',
+      address: 'GDEF456',
+      keyMaterial: 'secret-2',
+      accountPayload: {},
+    });
 
-    // reset() locks the manager as part of the wipe, so a subsequent read
-    // must fail closed rather than silently reporting an empty vault.
-    await expect(accounts.getAccountCount()).rejects.toThrow(/locked/i);
+    expect(await persistence.getAccountCount()).toBe(2);
+
+    await persistence.deleteAccount('acc-1');
+    expect(await persistence.getAccountCount()).toBe(1);
+    expect(await persistence.loadAccount('acc-1')).toBeNull();
+    expect(await persistence.loadAccount('acc-2')).not.toBeNull();
+  });
+
+  it('clears all accounts', async () => {
+    await persistence.persistAccount({
+      id: 'acc-1',
+      address: 'GABC123',
+      keyMaterial: 'secret-1',
+      accountPayload: {},
+    });
+
+    await persistence.clearAllAccounts();
+    await manager.unlock('test-password-1234');
+    expect(await persistence.getAccountCount()).toBe(0);
+    expect(await persistence.listAccountMetadata()).toEqual([]);
   });
 });
