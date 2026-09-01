@@ -1,6 +1,13 @@
 import { randomUUID } from 'crypto';
 import type { Pool } from 'pg';
-import type { Job, JobStatus, JobType, EnqueueOptions, DequeueResult, JobQueueContract } from './types';
+import type {
+  Job,
+  JobStatus,
+  JobType,
+  EnqueueOptions,
+  DequeueResult,
+  JobQueueContract,
+} from './types';
 import { nextRetryAfter } from './backoff';
 
 const DEFAULT_MAX_ATTEMPTS = 5;
@@ -21,9 +28,7 @@ interface JobRow {
 
 function rowToJob<T = unknown>(row: JobRow): Job<T> {
   const payload =
-    typeof row.payload === 'string'
-      ? (JSON.parse(row.payload) as T)
-      : (row.payload as T);
+    typeof row.payload === 'string' ? (JSON.parse(row.payload) as T) : (row.payload as T);
 
   return {
     id: row.id,
@@ -161,10 +166,7 @@ export class PgJobQueue implements JobQueueContract {
   // ── Accessors ──────────────────────────────────────────────────────────────
 
   async getById(id: string): Promise<Job | undefined> {
-    const result = await this.pool.query<JobRow>(
-      `SELECT * FROM jobs WHERE id = $1`,
-      [id]
-    );
+    const result = await this.pool.query<JobRow>(`SELECT * FROM jobs WHERE id = $1`, [id]);
     return result.rows.length > 0 ? rowToJob(result.rows[0]) : undefined;
   }
 

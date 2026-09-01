@@ -6,7 +6,6 @@
   "scripts": {
     "predev": "pnpm --dir ../.. --filter @ancore/ui-kit build",
     "dev": "vite",
-    "prebuild": "pnpm --dir ../.. --filter @ancore/ui-kit build",
     "build": "vite build",
     "test": "vitest run",
     "test:coverage": "vitest run --coverage",

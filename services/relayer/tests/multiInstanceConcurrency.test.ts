@@ -74,12 +74,7 @@ function createSharedPostgresDatabase() {
       }
 
       if (trimmed.startsWith('INSERT INTO idempotency_keys')) {
-        const [key, statusCode, bodyJson, expiresAt] = params as [
-          string,
-          number,
-          string,
-          Date,
-        ];
+        const [key, statusCode, bodyJson, expiresAt] = params as [string, number, string, Date];
         idempotencyTable.set(key, {
           key,
           status_code: statusCode,
@@ -110,7 +105,9 @@ function createSharedPostgresDatabase() {
       if (trimmed.includes('SELECT * FROM jobs') && trimmed.includes('idempotency_key = $1')) {
         const key = params[0] as string;
         const active = jobsTable
-          .filter((j) => j.idempotency_key === key && j.status !== 'completed' && j.status !== 'dead')
+          .filter(
+            (j) => j.idempotency_key === key && j.status !== 'completed' && j.status !== 'dead'
+          )
           .sort((a, b) => b.created_at.getTime() - a.created_at.getTime());
 
         return { rows: active, rowCount: active.length };
@@ -205,12 +202,7 @@ function createSharedPostgresDatabase() {
       }
 
       if (trimmed.includes("SET status = 'pending'") && trimmed.includes('UPDATE jobs')) {
-        const [attempts, lastError, retryAfter, id] = params as [
-          number,
-          string,
-          Date,
-          string,
-        ];
+        const [attempts, lastError, retryAfter, id] = params as [number, string, Date, string];
         const job = jobsTable.find((j) => j.id === id);
         if (job) {
           job.status = 'pending';

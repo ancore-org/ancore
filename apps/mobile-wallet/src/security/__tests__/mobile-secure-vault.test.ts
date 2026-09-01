@@ -151,7 +151,9 @@ describe('Unified Vault (SecureStorageManager + AccountPersistence)', () => {
     await expect(secondManager.unlock('wrong password')).resolves.toBe(false);
     expect(secondManager.isUnlocked).toBe(false);
     const secondAccounts = createAccountPersistence(secondManager);
-    await expect(secondAccounts.loadAccount('primary')).rejects.toThrow('Storage manager is locked');
+    await expect(secondAccounts.loadAccount('primary')).rejects.toThrow(
+      'Storage manager is locked'
+    );
   });
 
   it('locks after the inactivity timeout elapses', async () => {
@@ -232,4 +234,3 @@ describe('Unified Vault (SecureStorageManager + AccountPersistence)', () => {
     expect(mockAppStateListeners.size).toBe(0);
   });
 });
-
