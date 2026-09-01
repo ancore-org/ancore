@@ -2,7 +2,7 @@
   "name": "@ancore/relayer",
   "version": "0.1.0",
   "description": "Relayer API service for Ancore smart account operations",
-  "main": "./dist/index.js",
+  "main": "./dist/server.js",
   "scripts": {
     "build": "tsc --project tsconfig.json",
     "test": "jest --coverage",

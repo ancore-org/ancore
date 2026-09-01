@@ -9,7 +9,7 @@ import { z } from 'zod';
 import { Pool } from 'pg';
 import { TransferPolicySchema } from '@ancore/types';
 import { loadEnvOrExit } from './config/env';
-import { runMigrations } from './migrations';
+
 import { RelayService } from './services/relayService';
 import { createStellarSubmitterFromEnv } from './services/stellarSubmitter';
 import { createAuthMiddleware } from './middleware/auth';
@@ -207,6 +207,12 @@ export function createApp(
     schedulerEngine.start();
   }
 
+  // Exposed so the shutdown handler can drain the scheduler it started
+  // (#1346). `app.locals` rather than a changed return type: `createApp()`
+  // returning an Express app is relied on by every test and by supertest, and
+  // a graceful-shutdown fix has no business rewriting those call sites.
+  app.locals.schedulerEngine = schedulerEngine;
+
   const validateScheduledTransfer = validateBody(createScheduledTransferSchema);
   const contentTypeGuard = createContentTypeGuardMiddleware();
 
@@ -280,26 +286,14 @@ export function createDatabasePool(connectionString: string): Pool {
 if (require.main === module) {
   // Validate the whole environment before doing anything else, so a bad config
   // is a clear boot-time failure rather than a runtime surprise.
-  void (async () => {
-    const env = loadEnvOrExit();
-    const pool = env.DATABASE_URL ? createDatabasePool(env.DATABASE_URL) : undefined;
-    if (pool) await runMigrations(pool);
-    const app = createApp(
-      undefined,
-      undefined,
-      undefined,
-      undefined,
-      undefined,
-      undefined,
-      undefined,
-      undefined,
-      pool
-    );
-    app.listen(env.PORT, () => {
-      console.log(`Relayer service listening on port ${env.PORT}`);
-    });
-  })().catch((error) => {
-    console.error('Relayer startup failed', error);
-    process.exit(1);
+
+  });
+
+  // Drain on SIGTERM/SIGINT instead of dying mid-flight (#1346). Installed
+  // only when this file is the entrypoint: importing `createApp` into a test
+  // or another process must not hijack that process's signal handling.
+  installShutdownHandlers({
+    server,
+    drainables: [app.locals.schedulerEngine as SchedulerEngine],
   });
 }
