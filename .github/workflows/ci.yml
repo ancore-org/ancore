@@ -24,8 +24,8 @@ jobs:
       packages: ${{ steps.filter.outputs.packages }}
       indexer: ${{ steps.filter.outputs.indexer }}
     steps:
-      - uses: actions/checkout@v4
-      - uses: dorny/paths-filter@v3
+      - uses: actions/checkout@v7
+      - uses: dorny/paths-filter@v4
         id: filter
         with:
           filters: |
@@ -60,7 +60,7 @@ jobs:
     name: Actionlint — Workflow YAML
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       - name: Download actionlint
         id: get_actionlint
@@ -75,13 +75,13 @@ jobs:
     name: Dependency Audit
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
-      - uses: pnpm/action-setup@v2
+      - uses: pnpm/action-setup@v6
         with:
           version: 9
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v7
         with:
           node-version: '20'
           cache: 'pnpm'
@@ -93,10 +93,10 @@ jobs:
         run: node scripts/check-audit-allowlist.js
 
       - name: Setup Rust
-        uses: dtolnay/rust-toolchain@1.81.0
+        uses: dtolnay/rust-toolchain@1.100.0
 
       - name: Cache cargo-audit
-        uses: actions/cache@v4
+        uses: actions/cache@v6
         with:
           path: ~/.cargo/bin/cargo-audit
           key: ${{ runner.os }}-cargo-audit-v0.21
@@ -120,13 +120,13 @@ jobs:
     name: Install Script Policy
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
-      - uses: pnpm/action-setup@v2
+      - uses: pnpm/action-setup@v6
         with:
           version: 9
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v7
         with:
           node-version: '20'
           cache: 'pnpm'
@@ -140,13 +140,13 @@ jobs:
     name: Format Check
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
-      - uses: pnpm/action-setup@v2
+      - uses: pnpm/action-setup@v6
         with:
           version: 9
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v7
         with:
           node-version: '20'
           cache: 'pnpm'
@@ -166,13 +166,13 @@ jobs:
     name: Type Check
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
-      - uses: pnpm/action-setup@v2
+      - uses: pnpm/action-setup@v6
         with:
           version: 9
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v7
         with:
           node-version: '20'
           cache: 'pnpm'
@@ -188,13 +188,13 @@ jobs:
     needs: changes
     if: github.event_name == 'push' || needs.changes.outputs.apps == 'true'
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
-      - uses: pnpm/action-setup@v2
+      - uses: pnpm/action-setup@v6
         with:
           version: 9
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v7
         with:
           node-version: '20'
           cache: 'pnpm'
@@ -231,13 +231,13 @@ jobs:
           - name: wallet-api
             filter: '@ancore/wallet-api'
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
-      - uses: pnpm/action-setup@v2
+      - uses: pnpm/action-setup@v6
         with:
           version: 9
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v7
         with:
           node-version: '20'
           cache: 'pnpm'
@@ -271,13 +271,13 @@ jobs:
           - name: mobile-wallet
             filter: '@ancore/mobile-wallet'
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
-      - uses: pnpm/action-setup@v2
+      - uses: pnpm/action-setup@v6
         with:
           version: 9
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v7
         with:
           node-version: '20'
           cache: 'pnpm'
@@ -297,13 +297,13 @@ jobs:
     needs: changes
     if: github.event_name == 'push' || needs.changes.outputs.services == 'true'
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
-      - uses: pnpm/action-setup@v2
+      - uses: pnpm/action-setup@v6
         with:
           version: 9
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v7
         with:
           node-version: '20'
           cache: 'pnpm'
@@ -332,9 +332,9 @@ jobs:
     needs: changes
     if: github.event_name == 'push' || needs.changes.outputs.contracts == 'true'
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
-      - uses: dtolnay/rust-toolchain@1.81.0
+      - uses: dtolnay/rust-toolchain@1.100.0
 
       - name: Ensure Cargo cache directories exist
         run: |
@@ -344,7 +344,7 @@ jobs:
           mkdir -p "$HOME/.cargo/git/db"
           mkdir -p ${{ github.workspace }}/contracts/target
 
-      - uses: actions/cache@v4
+      - uses: actions/cache@v6
         with:
           path: |
             ~/.cargo/bin
@@ -402,7 +402,7 @@ jobs:
           --health-timeout 5s
           --health-retries 10
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       - name: Apply migrations (up smoke)
         env:
@@ -415,13 +415,13 @@ jobs:
     needs: changes
     if: github.event_name == 'push' || needs.changes.outputs.indexer == 'true'
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
-      - uses: pnpm/action-setup@v2
+      - uses: pnpm/action-setup@v6
         with:
           version: 9
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v7
         with:
           node-version: '20'
           cache: 'pnpm'
@@ -432,11 +432,11 @@ jobs:
       - name: Lint indexer migrations
         run: pnpm indexer:lint-migrations
 
-      - uses: dtolnay/rust-toolchain@1.81.0
+      - uses: dtolnay/rust-toolchain@1.100.0
         with:
           components: rustfmt, clippy
 
-      - uses: actions/cache@v4
+      - uses: actions/cache@v6
         with:
           path: |
             ~/.cargo/bin

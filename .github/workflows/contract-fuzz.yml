@@ -50,7 +50,7 @@ jobs:
           - fuzz_add_session_key
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       - name: Install Rust nightly (cargo-fuzz)
         if: ${{ github.event.inputs.target == '' || github.event.inputs.target == matrix.target }}
@@ -60,7 +60,7 @@ jobs:
 
       - name: Cache cargo
         if: ${{ github.event.inputs.target == '' || github.event.inputs.target == matrix.target }}
-        uses: actions/cache@v4
+        uses: actions/cache@v6
         with:
           path: |
             ~/.cargo/bin
@@ -94,7 +94,7 @@ jobs:
 
       - name: Upload corpus
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: fuzz-corpus-${{ matrix.target }}-${{ github.run_id }}
           path: contracts/account/fuzz/corpus/${{ matrix.target }}
@@ -103,7 +103,7 @@ jobs:
 
       - name: Upload crash artifacts
         if: failure()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: fuzz-crashes-${{ matrix.target }}-${{ github.run_id }}
           path: |
@@ -117,13 +117,13 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 20
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       - name: Install Rust
-        uses: dtolnay/rust-toolchain@1.81.0
+        uses: dtolnay/rust-toolchain@1.100.0
 
       - name: Cache cargo
-        uses: actions/cache@v4
+        uses: actions/cache@v6
         with:
           path: |
             ~/.cargo/registry
