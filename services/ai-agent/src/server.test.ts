@@ -3,6 +3,9 @@ import { enforceNoAutonomousExecution } from './guardrail';
 import { createApp } from './server';
 import type { DraftIntentResponse } from './types';
 
+const TEST_API_KEY = 'test-api-key';
+process.env['AI_AGENT_API_KEY'] = TEST_API_KEY;
+
 const app = createApp();
 
 describe('GET /health', () => {
@@ -20,6 +23,48 @@ describe('GET /health', () => {
   });
 });
 
+describe('authentication', () => {
+  it('rejects /agent/draft-intent with 401 when no API key is provided', async () => {
+    const res = await request(app)
+      .post('/agent/draft-intent')
+      .send({ prompt: 'Send 10 XLM to GABC', accountId: 'GABC123' });
+    expect(res.status).toBe(401);
+  });
+
+  it('rejects /agent/draft-intent with 401 when an invalid API key is provided', async () => {
+    const res = await request(app)
+      .post('/agent/draft-intent')
+      .set('x-api-key', 'wrong-key')
+      .send({ prompt: 'Send 10 XLM to GABC', accountId: 'GABC123' });
+    expect(res.status).toBe(401);
+  });
+
+  it('rejects /v1/intents/validate with 401 when no API key is provided', async () => {
+    const res = await request(app).post('/v1/intents/validate').send({
+      type: 'payment',
+      amount: '100',
+      asset: 'XLM',
+      destination: 'GCZST3XVCDTUJ76ZAV2HA72KYPJW5YJSNXVZTSKNBPWTXGVLNPXQ4JH',
+    });
+    expect(res.status).toBe(401);
+  });
+
+  it('rejects requests with 503 when AI_AGENT_API_KEY is not configured', async () => {
+    const previous = process.env['AI_AGENT_API_KEY'];
+    delete process.env['AI_AGENT_API_KEY'];
+    try {
+      const unconfiguredApp = createApp();
+      const res = await request(unconfiguredApp)
+        .post('/agent/draft-intent')
+        .set('x-api-key', TEST_API_KEY)
+        .send({ prompt: 'Send 10 XLM to GABC', accountId: 'GABC123' });
+      expect(res.status).toBe(503);
+    } finally {
+      process.env['AI_AGENT_API_KEY'] = previous;
+    }
+  });
+});
+
 describe('POST /agent/draft-intent', () => {
   const validBody = {
     prompt: 'Send 10 XLM to GDKRY7GNU3CJQX6FMT2BIPW5ELSZAHOV4DKRY7GNU3CJQX6FMT2BIPW5',
@@ -27,7 +72,7 @@ describe('POST /agent/draft-intent', () => {
   };
 
   it('returns 200 with a draft payment intent', async () => {
-    const res = await request(app).post('/agent/draft-intent').send(validBody);
+    const res = await request(app).post('/agent/draft-intent').set('x-api-key', TEST_API_KEY).send(validBody);
     expect(res.status).toBe(200);
     expect(res.body.status).toBe('draft');
     expect(res.body.requiresConfirmation).toBe(true);
@@ -38,6 +83,7 @@ describe('POST /agent/draft-intent', () => {
   it('returns 200 with a draft invoice intent when prompt contains "invoice"', async () => {
     const res = await request(app)
       .post('/agent/draft-intent')
+      .set('x-api-key', TEST_API_KEY)
       .send({ prompt: 'Create an invoice for 50 XLM', accountId: 'GABC123' });
     expect(res.status).toBe(200);
     expect(res.body.status).toBe('draft');
@@ -46,26 +92,26 @@ describe('POST /agent/draft-intent', () => {
   });
 
   it('returns 400 when prompt is missing', async () => {
-    const res = await request(app).post('/agent/draft-intent').send({ accountId: 'GABC123' });
+    const res = await request(app).post('/agent/draft-intent').set('x-api-key', TEST_API_KEY).send({ accountId: 'GABC123' });
     expect(res.status).toBe(400);
     expect(res.body.error).toBe('Invalid request: prompt and accountId required');
   });
 
   it('returns 400 when accountId is missing', async () => {
-    const res = await request(app).post('/agent/draft-intent').send({ prompt: 'Send 10 XLM' });
+    const res = await request(app).post('/agent/draft-intent').set('x-api-key', TEST_API_KEY).send({ prompt: 'Send 10 XLM' });
     expect(res.status).toBe(400);
     expect(res.body.error).toBe('Invalid request: prompt and accountId required');
   });
 
   it('returns 400 when body is empty', async () => {
-    const res = await request(app).post('/agent/draft-intent').send({});
+    const res = await request(app).post('/agent/draft-intent').set('x-api-key', TEST_API_KEY).send({});
     expect(res.status).toBe(400);
   });
 });
 
 describe('POST /v1/intents/validate', () => {
   it('validates a payment intent and returns confirmation false for low-value payments', async () => {
-    const res = await request(app).post('/v1/intents/validate').send({
+    const res = await request(app).post('/v1/intents/validate').set('x-api-key', TEST_API_KEY).send({
       type: 'payment',
       amount: '100',
       asset: 'XLM',
@@ -78,7 +124,7 @@ describe('POST /v1/intents/validate', () => {
   });
 
   it('validates a payment intent and returns confirmation true for high-value payments', async () => {
-    const res = await request(app).post('/v1/intents/validate').send({
+    const res = await request(app).post('/v1/intents/validate').set('x-api-key', TEST_API_KEY).send({
       type: 'payment',
       amount: '1500',
       asset: 'XLM',
@@ -91,7 +137,7 @@ describe('POST /v1/intents/validate', () => {
   });
 
   it('validates a payment intent at exactly the threshold and returns confirmation true', async () => {
-    const res = await request(app).post('/v1/intents/validate').send({
+    const res = await request(app).post('/v1/intents/validate').set('x-api-key', TEST_API_KEY).send({
       type: 'payment',
       amount: '1000',
       asset: 'USDC',
@@ -104,7 +150,7 @@ describe('POST /v1/intents/validate', () => {
   });
 
   it('validates a payment intent with decimal amount below threshold', async () => {
-    const res = await request(app).post('/v1/intents/validate').send({
+    const res = await request(app).post('/v1/intents/validate').set('x-api-key', TEST_API_KEY).send({
       type: 'payment',
       amount: '999.99',
       asset: 'XLM',
@@ -117,7 +163,7 @@ describe('POST /v1/intents/validate', () => {
   });
 
   it('validates a payment intent with decimal amount above threshold', async () => {
-    const res = await request(app).post('/v1/intents/validate').send({
+    const res = await request(app).post('/v1/intents/validate').set('x-api-key', TEST_API_KEY).send({
       type: 'payment',
       amount: '1000.01',
       asset: 'USDC',
@@ -130,7 +176,7 @@ describe('POST /v1/intents/validate', () => {
   });
 
   it('accepts payment intent with requiresConfirmation field in request', async () => {
-    const res = await request(app).post('/v1/intents/validate').send({
+    const res = await request(app).post('/v1/intents/validate').set('x-api-key', TEST_API_KEY).send({
       type: 'payment',
       amount: '100',
       asset: 'XLM',
@@ -143,7 +189,7 @@ describe('POST /v1/intents/validate', () => {
   });
 
   it('returns validation errors for invalid intent', async () => {
-    const res = await request(app).post('/v1/intents/validate').send({
+    const res = await request(app).post('/v1/intents/validate').set('x-api-key', TEST_API_KEY).send({
       type: 'payment',
       amount: 'invalid',
       asset: 'XLM',
@@ -154,7 +200,7 @@ describe('POST /v1/intents/validate', () => {
   });
 
   it('returns validation errors for missing required fields', async () => {
-    const res = await request(app).post('/v1/intents/validate').send({
+    const res = await request(app).post('/v1/intents/validate').set('x-api-key', TEST_API_KEY).send({
       type: 'payment',
       amount: '100',
     });

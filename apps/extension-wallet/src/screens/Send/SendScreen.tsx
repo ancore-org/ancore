@@ -9,7 +9,7 @@ import {
 } from '@/hooks/useSendTransaction';
 import { useRecentRecipients } from '@/hooks/useRecentRecipients';
 import { useAccountStore } from '@/stores/account';
-import { DEMO_ACCOUNT_ADDRESS } from '@/services/scheduler-client';
+import { useExtensionAuth } from '@/router/AuthGuard';
 import { ConfirmDialog } from '@/screens/Send/ConfirmDialog';
 import { ReviewScreen } from '@/screens/Send/ReviewScreen';
 import { StatusScreen } from '@/screens/Send/StatusScreen';
@@ -58,11 +58,13 @@ export function SendScreen({
   const [memoWarning, setMemoWarning] = useState<string | null>(null);
   const [showAiDraft, setShowAiDraft] = useState(false);
 
+  const { authState } = useExtensionAuth();
   const activeAccountId = useAccountStore((state) => state.activeAccountId);
   const accounts = useAccountStore((state) => state.accounts);
   const accountAddress = useMemo(
-    () => accounts.find((a) => a.id === activeAccountId)?.address ?? DEMO_ACCOUNT_ADDRESS,
-    [accounts, activeAccountId]
+    () =>
+      accounts.find((a) => a.id === activeAccountId)?.address ?? authState.accountAddress,
+    [accounts, activeAccountId, authState.accountAddress]
   );
 
   /**

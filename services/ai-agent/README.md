@@ -28,6 +28,17 @@ AI-assisted financial workflow orchestration service for the Ancore account abst
 | `NODE_ENV`          | No       | `production` | Runtime environment (`production` / `development`)                                                                                                                                                                                                                  |
 | `SERVICE_VERSION`   | No       | `0.1.0`      | Version string returned by the `/health` endpoint                                                                                                                                                                                                                   |
 | `ANTHROPIC_API_KEY` | No       | unset        | Enables the Claude Haiku (`claude-haiku-4-5`) provider for `/agent/draft-intent`. When unset, unavailable, or when the LLM errors/times out/returns invalid output, the endpoint transparently falls back to a deterministic parser — the endpoint always succeeds. |
+| `AI_AGENT_API_KEY`  | **Yes**  | unset        | Shared secret required on every `/agent/*` and `/v1/*` request via the `x-api-key` header (see Authentication below). The service fails closed: while unset, all protected routes return `503`. |
+
+---
+
+## Authentication
+
+Every route except `/health` requires a valid `x-api-key` header matching `AI_AGENT_API_KEY`. This is a request to a service that spends real `ANTHROPIC_API_KEY` budget and returns per-account risk data, so it must never be reachable without credentials — see the request examples below for the header.
+
+Missing or incorrect key: `401 Unauthorized`. `AI_AGENT_API_KEY` not configured on the server: `503 Service Unavailable` (fails closed rather than silently allowing traffic through).
+
+This is a single shared secret suitable for a service reached only from trusted backends or a gateway. If this service is ever called directly from a public browser client, the key is visible to that client and a per-caller credential (session token, OAuth) should replace it — that's a deployment-topology decision for whoever owns the service's network placement.
 
 ---
 
@@ -72,6 +83,7 @@ Backed by Claude Haiku (`claude-haiku-4-5`, tool-forced structured output valida
 ```bash
 curl -X POST http://localhost:3001/agent/draft-intent \
   -H "Content-Type: application/json" \
+  -H "x-api-key: $AI_AGENT_API_KEY" \
   -d '{
     "prompt": "Create an invoice for 10 XLM",
     "accountId": "GA2C5RFPE6GCKMY3E5CCXBVOV2BLTCED63WBZ3XCABN35Y72EO6S2N3S"
@@ -130,6 +142,7 @@ Validates agent-extracted intents against strict Zod schemas without executing t
 ```bash
 curl -X POST http://localhost:3001/v1/intents/validate \
   -H "Content-Type: application/json" \
+  -H "x-api-key: $AI_AGENT_API_KEY" \
   -d '{
     "type": "payment",
     "amount": "250.00",
