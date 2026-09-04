@@ -27,7 +27,7 @@ import { Keypair } from '@stellar/stellar-sdk';
 // Generate temporary session key
 const sessionKeypair = Keypair.random();
 
-const tx = await ancoreClient.createSessionKey({
+const tx = await ancoreClient.addSessionKey({
   publicKey: sessionKeypair.publicKey(),
   // `permissions` is an array of SessionPermission values, not a single value.
   permissions: [SessionPermission.MANAGE_DATA],
