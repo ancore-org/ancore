@@ -28,7 +28,7 @@ AI-assisted financial workflow orchestration service for the Ancore account abst
 | `NODE_ENV`          | No       | `production` | Runtime environment (`production` / `development`)                                                                                                                                                                                                                  |
 | `SERVICE_VERSION`   | No       | `0.1.0`      | Version string returned by the `/health` endpoint                                                                                                                                                                                                                   |
 | `ANTHROPIC_API_KEY` | No       | unset        | Enables the Claude Haiku (`claude-haiku-4-5`) provider for `/agent/draft-intent`. When unset, unavailable, or when the LLM errors/times out/returns invalid output, the endpoint transparently falls back to a deterministic parser — the endpoint always succeeds. |
-| `AI_AGENT_API_KEY`  | **Yes**  | unset        | Shared secret required on every `/agent/*` and `/v1/*` request via the `x-api-key` header (see Authentication below). The service fails closed: while unset, all protected routes return `503`. |
+| `AI_AGENT_API_KEY`  | **Yes**  | unset        | Shared secret required on every `/agent/*` and `/v1/*` request via the `x-api-key` header (see Authentication below). The service fails closed: while unset, all protected routes return `503`.                                                                     |
 
 ---
 

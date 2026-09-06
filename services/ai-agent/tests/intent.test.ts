@@ -3,6 +3,7 @@ import {
   paymentIntentSchema,
   HIGH_VALUE_PAYMENT_THRESHOLD,
 } from '../src/schemas/intent';
+import { VALID_ADDRESS } from '../src/__tests__/fixtures/addresses';
 
 describe('Intent Schema Validation', () => {
   describe('Payment Intent', () => {
@@ -11,7 +12,7 @@ describe('Intent Schema Validation', () => {
         type: 'payment' as const,
         amount: '100.50',
         asset: 'XLM' as const,
-        destination: 'GCZST3XVCDTUJ76ZAV2HA72KYPJW5YJSNXVZTSKNBPWTXGVLNPXQ4JH',
+        destination: VALID_ADDRESS,
       };
       const result = paymentIntentSchema.safeParse(intent);
       expect(result.success).toBe(true);
@@ -22,7 +23,7 @@ describe('Intent Schema Validation', () => {
         type: 'payment' as const,
         amount: '1000',
         asset: 'XLM' as const,
-        destination: 'GCZST3XVCDTUJ76ZAV2HA72KYPJW5YJSNXVZTSKNBPWTXGVLNPXQ4JH',
+        destination: VALID_ADDRESS,
       };
       const result = paymentIntentSchema.safeParse(intent);
       expect(result.success).toBe(true);
@@ -33,7 +34,7 @@ describe('Intent Schema Validation', () => {
         type: 'payment' as const,
         amount: '50',
         asset: 'USDC' as const,
-        destination: 'GCZST3XVCDTUJ76ZAV2HA72KYPJW5YJSNXVZTSKNBPWTXGVLNPXQ4JH',
+        destination: VALID_ADDRESS,
       };
       const result = paymentIntentSchema.safeParse(intent);
       expect(result.success).toBe(true);
@@ -44,7 +45,7 @@ describe('Intent Schema Validation', () => {
         type: 'payment' as const,
         amount: 'invalid-amount',
         asset: 'XLM' as const,
-        destination: 'GCZST3XVCDTUJ76ZAV2HA72KYPJW5YJSNXVZTSKNBPWTXGVLNPXQ4JH',
+        destination: VALID_ADDRESS,
       };
       const result = paymentIntentSchema.safeParse(intent);
       expect(result.success).toBe(false);
@@ -55,7 +56,7 @@ describe('Intent Schema Validation', () => {
         type: 'payment' as const,
         amount: '0',
         asset: 'XLM' as const,
-        destination: 'GCZST3XVCDTUJ76ZAV2HA72KYPJW5YJSNXVZTSKNBPWTXGVLNPXQ4JH',
+        destination: VALID_ADDRESS,
       };
       const result = paymentIntentSchema.safeParse(intent);
       expect(result.success).toBe(false);
@@ -66,7 +67,7 @@ describe('Intent Schema Validation', () => {
         type: 'payment' as const,
         amount: '-1',
         asset: 'XLM' as const,
-        destination: 'GCZST3XVCDTUJ76ZAV2HA72KYPJW5YJSNXVZTSKNBPWTXGVLNPXQ4JH',
+        destination: VALID_ADDRESS,
       };
       const result = paymentIntentSchema.safeParse(intent);
       expect(result.success).toBe(false);
@@ -77,7 +78,7 @@ describe('Intent Schema Validation', () => {
         type: 'payment' as const,
         amount: '1.123456789',
         asset: 'XLM' as const,
-        destination: 'GCZST3XVCDTUJ76ZAV2HA72KYPJW5YJSNXVZTSKNBPWTXGVLNPXQ4JH',
+        destination: VALID_ADDRESS,
       };
       const result = paymentIntentSchema.safeParse(intent);
       expect(result.success).toBe(false);
@@ -88,7 +89,7 @@ describe('Intent Schema Validation', () => {
         type: 'payment' as const,
         amount: '1000000000000000000000000',
         asset: 'XLM' as const,
-        destination: 'GCZST3XVCDTUJ76ZAV2HA72KYPJW5YJSNXVZTSKNBPWTXGVLNPXQ4JH',
+        destination: VALID_ADDRESS,
       };
       const result = paymentIntentSchema.safeParse(intent);
       expect(result.success).toBe(false);
@@ -99,7 +100,7 @@ describe('Intent Schema Validation', () => {
         type: 'payment' as const,
         amount: '100',
         asset: 'EUR' as any,
-        destination: 'GCZST3XVCDTUJ76ZAV2HA72KYPJW5YJSNXVZTSKNBPWTXGVLNPXQ4JH',
+        destination: VALID_ADDRESS,
       };
       const result = paymentIntentSchema.safeParse(intent);
       expect(result.success).toBe(false);
@@ -120,7 +121,7 @@ describe('Intent Schema Validation', () => {
       const intent = {
         amount: '100',
         asset: 'XLM' as const,
-        destination: 'GCZST3XVCDTUJ76ZAV2HA72KYPJW5YJSNXVZTSKNBPWTXGVLNPXQ4JH',
+        destination: VALID_ADDRESS,
       };
       const result = paymentIntentSchema.safeParse(intent);
       expect(result.success).toBe(false);
@@ -131,7 +132,7 @@ describe('Intent Schema Validation', () => {
         type: 'payment' as const,
         amount: '100',
         asset: 'XLM' as const,
-        destination: 'GCZST3XVCDTUJ76ZAV2HA72KYPJW5YJSNXVZTSKNBPWTXGVLNPXQ4JH',
+        destination: VALID_ADDRESS,
         requiresConfirmation: true,
       };
       const result = paymentIntentSchema.safeParse(intent);
@@ -143,7 +144,7 @@ describe('Intent Schema Validation', () => {
         type: 'payment' as const,
         amount: '100',
         asset: 'XLM' as const,
-        destination: 'GCZST3XVCDTUJ76ZAV2HA72KYPJW5YJSNXVZTSKNBPWTXGVLNPXQ4JH',
+        destination: VALID_ADDRESS,
         requiresConfirmation: false,
       };
       const result = paymentIntentSchema.safeParse(intent);
@@ -155,7 +156,7 @@ describe('Intent Schema Validation', () => {
         type: 'payment' as const,
         amount: '100',
         asset: 'XLM' as const,
-        destination: 'GCZST3XVCDTUJ76ZAV2HA72KYPJW5YJSNXVZTSKNBPWTXGVLNPXQ4JH',
+        destination: VALID_ADDRESS,
       };
       const result = paymentIntentSchema.safeParse(intent);
       expect(result.success).toBe(true);
@@ -166,7 +167,7 @@ describe('Intent Schema Validation', () => {
         type: 'payment' as const,
         amount: '100',
         asset: 'XLM' as const,
-        destination: 'GCZST3XVCDTUJ76ZAV2HA72KYPJW5YJSNXVZTSKNBPWTXGVLNPXQ4JH',
+        destination: VALID_ADDRESS,
         requiresConfirmation: 'true' as any,
       };
       const result = paymentIntentSchema.safeParse(intent);
@@ -180,7 +181,7 @@ describe('Intent Schema Validation', () => {
         type: 'payment' as const,
         amount: '75.25',
         asset: 'USDC' as const,
-        destination: 'GCZST3XVCDTUJ76ZAV2HA72KYPJW5YJSNXVZTSKNBPWTXGVLNPXQ4JH',
+        destination: VALID_ADDRESS,
       };
       const result = intentSchema.safeParse(intent);
       expect(result.success).toBe(true);
@@ -191,7 +192,7 @@ describe('Intent Schema Validation', () => {
         type: 'swap' as any,
         amount: '100',
         asset: 'XLM' as const,
-        destination: 'GCZST3XVCDTUJ76ZAV2HA72KYPJW5YJSNXVZTSKNBPWTXGVLNPXQ4JH',
+        destination: VALID_ADDRESS,
       };
       const result = intentSchema.safeParse(intent);
       expect(result.success).toBe(false);

@@ -1,5 +1,6 @@
 import { z } from 'zod';
 import { amountStringSchema } from '../schemas/amount';
+import { createRecipientSchema } from '../schemas/recipient';
 
 /**
  * Invoice intent schema validates requests to create invoices.
@@ -8,7 +9,17 @@ export const InvoiceIntentSchema = z.object({
   type: z.literal('invoice'),
   amount: amountStringSchema,
   asset: z.enum(['XLM', 'USDC']),
-  recipient: z.string().min(1, 'Recipient is required'),
+  /**
+   * A checksum-valid Stellar address, or an `@username` handle that
+   * ../recipients.ts resolves to one before the draft is returned (#1210).
+   * Previously any non-empty string, including a bare display name.
+   */
+  recipient: createRecipientSchema('Recipient'),
+  /**
+   * Original `@handle` when `recipient` was resolved from one. Absent when
+   * the caller supplied an address directly.
+   */
+  resolvedFrom: z.string().optional(),
   dueDate: z
     .string()
     .refine((date) => !isNaN(Date.parse(date)), {

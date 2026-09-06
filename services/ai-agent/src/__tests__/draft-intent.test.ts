@@ -1,5 +1,6 @@
 import { generateDraftIntent } from '../draft-intent';
 import type { DraftIntentInput, LlmProvider, ProviderDraftResult } from '../providers/types';
+import { VALID_ACCOUNT_ID, VALID_ADDRESS } from './fixtures/addresses';
 
 function stubProvider(overrides: Partial<LlmProvider>): LlmProvider {
   return {
@@ -14,13 +15,13 @@ function stubProvider(overrides: Partial<LlmProvider>): LlmProvider {
 
 describe('generateDraftIntent', () => {
   const input: DraftIntentInput = {
-    prompt: 'Send 10 XLM to GDKRY7GNU3CJQX6FMT2BIPW5ELSZAHOV4DKRY7GNU3CJQX6FMT2BIPW5',
-    accountId: 'GACC',
+    prompt: `Send 10 XLM to ${VALID_ADDRESS}`,
+    accountId: VALID_ACCOUNT_ID,
   };
 
   it('uses the LLM provider and reports source "llm" when it succeeds', async () => {
     const llmResult: ProviderDraftResult = {
-      intent: { type: 'payment', amount: '10', asset: 'XLM', destination: 'GDEST' },
+      intent: { type: 'payment', amount: '10', asset: 'XLM', destination: VALID_ADDRESS },
       summary: 'from llm',
     };
     const provider = stubProvider({
@@ -85,7 +86,7 @@ describe('generateDraftIntent', () => {
     };
 
     await expect(generateDraftIntent(zeroAmountInput, provider)).rejects.toThrow(
-      /failed schema validation/
+      /Unable to draft payment intent/
     );
   });
 });

@@ -11,9 +11,13 @@ import { useIndexerActivity } from '../hooks/useIndexerActivity';
 function mapIndexerToTable(tx: any): TableTransaction {
   return {
     id: tx.id,
-    occurredAt: tx.timestamp instanceof Date ? tx.timestamp.toISOString() : new Date(tx.timestamp).toISOString(),
+    occurredAt:
+      tx.timestamp instanceof Date
+        ? tx.timestamp.toISOString()
+        : new Date(tx.timestamp).toISOString(),
     type: tx.type === 'send' ? 'transfer' : 'payment',
-    status: tx.status === 'confirmed' ? 'completed' : tx.status === 'pending' ? 'pending' : 'failed',
+    status:
+      tx.status === 'confirmed' ? 'completed' : tx.status === 'pending' ? 'pending' : 'failed',
     amount: tx.amount,
     counterparty: tx.counterparty,
     memo: tx.memo ?? '',

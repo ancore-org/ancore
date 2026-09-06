@@ -100,10 +100,14 @@ export function createApp(): Express {
         const message = err instanceof Error ? err.message : String(err);
         log.error({ accountId, error: message }, 'draft_intent_failed');
 
-        if (/destination/i.test(message)) {
+        // A recipient we cannot validate or resolve is a question for the user,
+        // not a server fault — covers a missing/malformed destination and an
+        // unresolvable @handle on either intent type (#1210).
+        if (/destination|recipient/i.test(message)) {
           return res.status(400).json({
             error: 'Needs clarification',
-            message: 'Please specify a Stellar destination address for the payment intent.',
+            message:
+              'Please specify a valid Stellar address (G...) or @username handle for the recipient.',
           });
         }
 

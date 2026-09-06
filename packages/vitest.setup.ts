@@ -11,7 +11,7 @@
 
 import '@testing-library/jest-dom';
 import { afterEach, beforeEach } from 'vitest';
-import { cleanup } from '@testing-library/react';
+import { cleanup, configure } from '@testing-library/react';
 import { ensureWebCrypto } from './ensure-webcrypto';
 
 function ensureBinaryCodec(): void {
@@ -21,6 +21,14 @@ function ensureBinaryCodec(): void {
 
 ensureWebCrypto();
 ensureBinaryCodec();
+
+// `waitFor`'s default 1000ms timeout assumes each test file has the machine to
+// itself. Under `turbo run test`, every package's suite (several spawning their
+// own worker pools) runs concurrently, and CPU contention alone can push a
+// legitimately-fast async update past 1000ms — failing tests that pass reliably
+// in isolation, with a different subset tripping on each run. Raised well above
+// what any of these apps' polling/localStorage-load assertions actually need.
+configure({ asyncUtilTimeout: 5000 });
 
 afterEach(() => {
   cleanup();

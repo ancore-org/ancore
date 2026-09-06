@@ -19,7 +19,8 @@ Validates requests to transfer funds to a destination account.
 | `type` | `literal("payment")` | Discriminator field. | Must be exactly `"payment"`. |
 | `amount` | `string` | The sum of funds to transfer. | Must match a numeric string regex `^\d+(\.\d+)?$`. |
 | `asset` | `enum` | The currency code. | Must be `"XLM"` or `"USDC"`. |
-| `destination` | `string` | The receiving address/identifier. | Must be at least 1 character. |
+| `destination` | `string` | The receiving address or `@username` handle. | Must be a checksum-valid Stellar address (`G…`) or a well-formed `@username` handle. See [Recipient validation](#recipient-validation). |
+| `resolvedFrom` | `string?` | Original `@handle`, when `destination` was resolved from one. | Absent when an address was supplied directly. |
 
 ---
 
@@ -34,5 +35,37 @@ Validates requests to create invoices.
 | `type` | `literal("invoice")` | Discriminator field. | Must be exactly `"invoice"`. |
 | `amount` | `string` | The sum of funds to request. | Must match a numeric string regex `^\d+(\.\d+)?$`. |
 | `asset` | `enum` | The currency code. | Must be `"XLM"` or `"USDC"`. |
-| `recipient` | `string` | The identifier of the recipient (person/entity paying/billing). | Must be at least 1 character. Supports multilingual Unicode names. |
-| `dueDate` | `string` | The ISO 8601 or parseable date string representing when the invoice is due. | Must parse successfully via JS `Date.parse()`. |
+| `recipient` | `string` | The party being billed, as an address or `@username` handle. | Must be a checksum-valid Stellar address (`G…`) or a well-formed `@username` handle. See [Recipient validation](#recipient-validation). |
+| `resolvedFrom` | `string?` | Original `@handle`, when `recipient` was resolved from one. | Absent when an address was supplied directly. |
+| `dueDate` | `string` | The ISO 8601 or parseable date string representing when the invoice is due. | Must parse successfully via JS `Date.parse()`, and must not be in the past. |
+
+---
+
+## Recipient validation
+
+`payment.destination` and `invoice.recipient` share one definition
+(`services/ai-agent/src/schemas/recipient.ts`). Both previously accepted any
+non-empty string, which let a hallucinated address or a bare display name into
+a draft (issue #1210).
+
+Validation happens in two phases, because resolving a handle needs a network
+call and no Zod schema in this repo is async:
+
+1. **Synchronous, in the schema.** The value must be either a Stellar account
+   address — shape-checked by `stellarAddressSchema` (`@ancore/types`), then
+   checksum-checked by `assertValidEd25519PublicKey`
+   (`@ancore/account-abstraction`) — or a well-formed `@username` handle, per
+   `isUsernameHandle` (`@ancore/types`). A handle passes this phase on syntax
+   alone.
+2. **Asynchronous, in `recipients.ts`.** A handle is resolved via
+   `HandleResolver` (`@ancore/types`, configured by `HANDLE_RESOLVER_URL`) and
+   **replaced** by the resulting address; the original handle is preserved in
+   `resolvedFrom`. An unresolvable handle is rejected. This runs in
+   `generateDraftIntent`, so it covers both the LLM and deterministic paths
+   before a draft is returned or risk-scored.
+
+Downstream consumers therefore only ever see an address in
+`destination`/`recipient`, never an unresolved handle.
+
+> A display name such as `Ramón Núñez S.A.` is **not** a valid recipient. It is
+> not a payable identifier; names belong in a separate display field.

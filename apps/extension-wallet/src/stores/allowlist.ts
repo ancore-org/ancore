@@ -59,7 +59,9 @@ function isValidOrigin(value: unknown): value is string {
 }
 
 function isValidConnectedAt(value: unknown): value is number {
-  return typeof value === 'number' && Number.isFinite(value) && Number.isInteger(value) && value >= 0;
+  return (
+    typeof value === 'number' && Number.isFinite(value) && Number.isInteger(value) && value >= 0
+  );
 }
 
 function sanitizeApprovedSites(raw: unknown): AllowlistState['approvedSites'] {
@@ -105,7 +107,12 @@ function sanitizeConnectedSites(raw: unknown): AllowlistState['connectedSites'] 
 
         result[accountId] ??= {};
         result[accountId][network] ??= {};
-        result[accountId][network][origin] = { origin, accountId, network, connectedAt: r.connectedAt };
+        result[accountId][network][origin] = {
+          origin,
+          accountId,
+          network,
+          connectedAt: r.connectedAt,
+        };
       }
     }
   }

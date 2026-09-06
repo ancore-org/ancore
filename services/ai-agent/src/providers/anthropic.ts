@@ -20,6 +20,12 @@ const TOOL_NAME = 'draft_intent';
  * Forced tool_choice guarantees the model's entire response is this shape —
  * final validation still happens against the Zod schemas in ../schemas/intent
  * before anything is trusted (see draftIntent() below).
+ *
+ * The destination/recipient descriptions are deliberately strict about what a
+ * recipient may be, and tell the model to omit the field rather than invent
+ * one (issue #1210). Steering is a first line of defence only: an invented
+ * address is still rejected by ../schemas/recipient, which is what actually
+ * enforces this.
  */
 const DRAFT_INTENT_TOOL: Anthropic.Tool = {
   name: TOOL_NAME,
@@ -46,12 +52,20 @@ const DRAFT_INTENT_TOOL: Anthropic.Tool = {
       },
       destination: {
         type: 'string',
-        description: 'Required when type is "payment": the receiving address or identifier.',
+        description:
+          'Required when type is "payment": the recipient, as either a full Stellar address ' +
+          '(56 characters, beginning with "G") or an Ancore @username handle such as "@alice". ' +
+          'Copy it verbatim from the prompt — never invent, guess, complete, or correct one. ' +
+          'If the prompt contains neither, omit this field.',
       },
       recipient: {
         type: 'string',
         description:
-          'Required when type is "invoice": the identifier of the person/entity being billed.',
+          'Required when type is "invoice": the party being billed, as either a full Stellar ' +
+          'address (56 characters, beginning with "G") or an Ancore @username handle such as ' +
+          '"@alice". A bare display name is not accepted. Copy it verbatim from the prompt — ' +
+          'never invent, guess, complete, or correct one. If the prompt contains neither, ' +
+          'omit this field.',
       },
       dueDate: {
         type: 'string',
@@ -74,6 +88,8 @@ function buildSystemPrompt(accountId: string): string {
     'You NEVER execute, submit, or sign any transaction — you only produce a draft that a human will review and explicitly confirm.',
     'Always call the draft_intent tool exactly once with your best-effort structured extraction.',
     'If the prompt is ambiguous, make a reasonable assumption (default asset XLM) rather than refusing.',
+    'Never guess an address or handle: assumptions are only permitted for asset and due date.',
+    'If the prompt has no Stellar address and no @username handle, omit the destination/recipient field entirely — an omitted field is corrected downstream, an invented address is not.',
   ].join(' ');
 }
 

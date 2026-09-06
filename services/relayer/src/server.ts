@@ -9,6 +9,8 @@ import { z } from 'zod';
 import { Pool } from 'pg';
 import { TransferPolicySchema } from '@ancore/types';
 import { loadEnvOrExit } from './config/env';
+import { runMigrations } from './migrations';
+import { installShutdownHandlers } from './shutdown';
 
 import { RelayService } from './services/relayService';
 import { createStellarSubmitterFromEnv } from './services/stellarSubmitter';
@@ -286,14 +288,34 @@ export function createDatabasePool(connectionString: string): Pool {
 if (require.main === module) {
   // Validate the whole environment before doing anything else, so a bad config
   // is a clear boot-time failure rather than a runtime surprise.
+  void (async () => {
+    const env = loadEnvOrExit();
+    const pool = env.DATABASE_URL ? createDatabasePool(env.DATABASE_URL) : undefined;
+    if (pool) await runMigrations(pool);
+    const app = createApp(
+      undefined,
+      undefined,
+      undefined,
+      undefined,
+      undefined,
+      undefined,
+      undefined,
+      undefined,
+      pool
+    );
+    const server = app.listen(env.PORT, () => {
+      console.log(`Relayer service listening on port ${env.PORT}`);
+    });
 
-  });
-
-  // Drain on SIGTERM/SIGINT instead of dying mid-flight (#1346). Installed
-  // only when this file is the entrypoint: importing `createApp` into a test
-  // or another process must not hijack that process's signal handling.
-  installShutdownHandlers({
-    server,
-    drainables: [app.locals.schedulerEngine as SchedulerEngine],
+    // Drain on SIGTERM/SIGINT instead of dying mid-flight (#1346). Installed
+    // only when this file is the entrypoint: importing `createApp` into a test
+    // or another process must not hijack that process's signal handling.
+    installShutdownHandlers({
+      server,
+      drainables: [app.locals.schedulerEngine as SchedulerEngine],
+    });
+  })().catch((error) => {
+    console.error('Relayer startup failed', error);
+    process.exit(1);
   });
 }

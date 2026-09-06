@@ -62,8 +62,7 @@ export function SendScreen({
   const activeAccountId = useAccountStore((state) => state.activeAccountId);
   const accounts = useAccountStore((state) => state.accounts);
   const accountAddress = useMemo(
-    () =>
-      accounts.find((a) => a.id === activeAccountId)?.address ?? authState.accountAddress,
+    () => accounts.find((a) => a.id === activeAccountId)?.address ?? authState.accountAddress,
     [accounts, activeAccountId, authState.accountAddress]
   );
 

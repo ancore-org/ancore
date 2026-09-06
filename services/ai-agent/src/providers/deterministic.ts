@@ -1,4 +1,5 @@
-import type { Intent } from '../schemas/intent';
+import { isUsernameHandle } from '@ancore/types';
+import { intentSchema, type Intent } from '../schemas/intent';
 import type { DraftIntentInput, ProviderDraftResult } from './types';
 
 const INVOICE_KEYWORDS = ['invoice', 'bill me', 'request payment', 'request a payment'];
@@ -12,7 +13,17 @@ const ASSET_KEYWORDS = '(?:xlm|lumens?|usdc)';
 // prompt ("wait 3 days then send 25 XLM to G..." should extract "25", not "3").
 const AMOUNT_BEFORE_ASSET_RE = new RegExp(`(\\d+(?:\\.\\d+)?)\\s*${ASSET_KEYWORDS}\\b`, 'i');
 const AMOUNT_AFTER_ASSET_RE = new RegExp(`${ASSET_KEYWORDS}\\s*(\\d+(?:\\.\\d+)?)`, 'i');
-const DEFAULT_INVOICE_DUE_DAYS = 7;
+
+/**
+ * Default invoice term, matching the LLM tool description's
+ * "Default to 7 days from now if unspecified" for the same field.
+ *
+ * This path used to emit `new Date().toISOString()` — already in the past by
+ * the time `InvoiceIntentSchema`'s "must not be in the past" refinement ran.
+ * Nothing caught it because the deterministic output was never parsed.
+ */
+const DEFAULT_INVOICE_TERM_DAYS = 7;
+const MS_PER_DAY = 24 * 60 * 60 * 1000;
 
 function isInvoicePrompt(prompt: string): boolean {
   const lower = prompt.toLowerCase();
@@ -36,7 +47,18 @@ function extractAsset(prompt: string): 'XLM' | 'USDC' {
 
 function extractDestination(prompt: string): string | undefined {
   const match = prompt.match(STELLAR_ADDRESS_RE);
-  return match ? match[0] : undefined;
+  if (match) {
+    return match[0];
+  }
+
+  // No address — fall back to an @handle, which the schema accepts and
+  // ../recipients.ts resolves. Tokenising and testing each candidate with the
+  // shared `isUsernameHandle` guard keeps handle syntax defined in exactly one
+  // place (@ancore/types) rather than in a second regex here.
+  return prompt
+    .split(/\s+/)
+    .map((token) => token.replace(/[.,;:!?]+$/, ''))
+    .find(isUsernameHandle);
 }
 
 /**
@@ -46,6 +68,11 @@ function extractDestination(prompt: string): string | undefined {
  * output that fails schema validation. Deliberately simple and dependency-free
  * so it always succeeds — this is the guaranteed-availability floor beneath
  * the LLM path (item 3 of issue #1005).
+ *
+ * Output goes through `intentSchema` exactly as the Anthropic provider's does.
+ * This path previously only *asserted* the `Intent` type on a hand-built
+ * object, so nothing it produced was ever validated at runtime — which let an
+ * unchecked `accountId` through as an invoice recipient (issue #1210).
  */
 export function deterministicDraftIntent({
   prompt,
@@ -55,21 +82,43 @@ export function deterministicDraftIntent({
   const asset = extractAsset(prompt);
 
   if (isInvoicePrompt(prompt)) {
-    const intent: Intent = {
-      type: 'invoice',
-      amount,
-      asset,
-      recipient: accountId,
-      dueDate: new Date(Date.now() + DEFAULT_INVOICE_DUE_DAYS * 24 * 60 * 60 * 1000).toISOString(),
-    };
+    const intent = parseOrThrow(
+      {
+        type: 'invoice',
+        amount,
+        asset,
+        recipient: accountId,
+        dueDate: new Date(Date.now() + DEFAULT_INVOICE_TERM_DAYS * MS_PER_DAY).toISOString(),
+      },
+      'invoice'
+    );
     return { intent, summary: 'Drafted invoice intent' };
   }
 
   const destination = extractDestination(prompt);
   if (!destination) {
-    throw new Error('Unable to draft payment intent: destination address missing from prompt');
+    throw new Error(
+      'Unable to draft payment intent: destination address or @handle missing from prompt'
+    );
   }
 
-  const intent: Intent = { type: 'payment', destination, amount, asset };
+  const intent = parseOrThrow({ type: 'payment', destination, amount, asset }, 'payment');
   return { intent, summary: 'Drafted payment intent' };
+}
+
+/**
+ * Validates a constructed intent against the shared schema.
+ *
+ * The deterministic parser is the availability floor, but "always succeeds"
+ * must not mean "emits anything" — an intent it cannot validate is a rejection,
+ * not a draft.
+ */
+function parseOrThrow(candidate: unknown, kind: 'payment' | 'invoice'): Intent {
+  const parsed = intentSchema.safeParse(candidate);
+  if (!parsed.success) {
+    throw new Error(
+      `Unable to draft ${kind} intent: ${parsed.error.issues.map((i) => i.message).join('; ')}`
+    );
+  }
+  return parsed.data;
 }
