@@ -158,7 +158,7 @@ export function DashboardAuthProvider({ children }: { children: ReactNode }) {
       }
 
       // Emit a visible warning for developers during local/dev runs.
-       
+
       console.warn(
         '[DashboardAuthProvider] session refresh is a stub — no backend available; signing out.'
       );
