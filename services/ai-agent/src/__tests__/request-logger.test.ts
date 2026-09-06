@@ -3,6 +3,9 @@ import { createApp } from '../server';
 import { log } from '../logging/logger';
 import { VALID_ADDRESS } from './fixtures/addresses';
 
+const TEST_API_KEY = 'test-api-key';
+process.env['AI_AGENT_API_KEY'] = TEST_API_KEY;
+
 describe('Request Logger Middleware', () => {
   let app: ReturnType<typeof createApp>;
   let infoSpy: jest.SpyInstance;
@@ -22,6 +25,7 @@ describe('Request Logger Middleware', () => {
   it('logs request completion and redacts prompt if it ever gets logged', async () => {
     const response = await request(app)
       .post('/agent/draft-intent')
+      .set('x-api-key', TEST_API_KEY)
       .send({
         prompt: `Send $5 to ${VALID_ADDRESS}`,
         accountId: '123',
@@ -62,6 +66,7 @@ describe('Request Logger Middleware', () => {
 
     const response = await request(app)
       .post('/agent/draft-intent')
+      .set('x-api-key', TEST_API_KEY)
       .send({
         prompt: `Send $5 to ${VALID_ADDRESS}`,
         accountId: stellarSecret,
@@ -82,6 +87,7 @@ describe('Request Logger Middleware', () => {
 
     const response = await request(app)
       .post('/agent/draft-intent')
+      .set('x-api-key', TEST_API_KEY)
       .send({
         prompt: `Send $5 to ${VALID_ADDRESS}`,
         accountId: '123',
@@ -102,6 +108,7 @@ describe('Request Logger Middleware', () => {
   it('leaves an ordinary, non-secret-shaped accountId unredacted', async () => {
     const response = await request(app)
       .post('/agent/draft-intent')
+      .set('x-api-key', TEST_API_KEY)
       .send({
         prompt: `Send $5 to ${VALID_ADDRESS}`,
         accountId: 'account_42',

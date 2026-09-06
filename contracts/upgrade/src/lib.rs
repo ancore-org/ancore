@@ -59,6 +59,15 @@ pub struct Proposal {
 /// Maximum number of multisig signers.
 pub const MAX_SIGNERS: u32 = 50;
 
+/// Multisig governance policy: the number of signer approvals required to
+/// execute a timelocked upgrade, and the addresses eligible to sign.
+#[contracttype]
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct MultisigConfig {
+    pub threshold: u32,
+    pub signers: Vec<Address>,
+}
+
 #[contracttype]
 pub enum DataKey {
     Owner,
@@ -100,18 +109,6 @@ pub struct WasmAttestation {
     pub wasm_size: u32,
     pub exports: Vec<String>,
     pub imports: Vec<String>,
-}
-
-/// Multisig governance configuration.
-///
-/// The `threshold` number of unique signers must approve a proposal (via
-/// `submit_multisig_signature`) before `execute_multisig_upgrade` will
-/// proceed. `threshold` must be ≥ 1 and ≤ `signers.len()`.
-#[contracttype]
-#[derive(Clone, Debug)]
-pub struct MultisigConfig {
-    pub threshold: u32,
-    pub signers: Vec<Address>,
 }
 
 pub mod factory;

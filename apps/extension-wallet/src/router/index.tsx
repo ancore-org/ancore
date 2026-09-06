@@ -10,6 +10,7 @@ import {
   Routes,
   useLocation,
   useNavigate,
+  useParams,
   useSearchParams,
 } from 'react-router-dom';
 import {
@@ -41,6 +42,8 @@ import { SettingsScreen } from '../screens/Settings/SettingsScreen';
 import { SendScreen as SendFlowScreen } from '../screens/Send/SendScreen';
 import { ScheduledTransfersScreen } from '../screens/ScheduledTransfers/ScheduledTransfersScreen';
 import { SessionKeysScreen } from '../screens/SessionKeys/SessionKeysScreen';
+import { TransactionDetail, type TransactionDetailData } from '../screens/TransactionDetail';
+import type { StellarNetwork } from '../utils/explorer-links';
 import { useDashboardSettingsStore } from '../state/dashboard-settings';
 import { useTelemetrySettingsSync } from '../hooks/useTelemetrySettingsSync';
 import { EmptyTransactions } from '../components/EmptyTransactions';
@@ -67,6 +70,9 @@ const pageTitles: Record<string, string> = {
 };
 
 function getPageTitle(pathname: string): string {
+  if (pathname.startsWith('/history/')) {
+    return 'Transaction Detail';
+  }
   return pageTitles[pathname] ?? 'Page Not Found';
 }
 
@@ -105,9 +111,9 @@ function RootRedirect() {
 
 function ProtectedLayout() {
   const location = useLocation();
-  const isImmersiveRoute = ['/send', '/receive', '/sign-transaction', '/session-keys'].includes(
-    location.pathname
-  );
+  const isImmersiveRoute =
+    ['/send', '/receive', '/sign-transaction', '/session-keys'].includes(location.pathname) ||
+    location.pathname.startsWith('/history/');
 
   return (
     <div className="flex min-h-screen flex-col bg-background">
@@ -636,11 +642,13 @@ export function HistoryActivityList({
   entries,
   onFilterChange,
   onReceive,
+  onSelectEntry,
 }: {
   activeFilter: HistoryFilter;
   entries: HistoryEntry[];
   onFilterChange: (filter: HistoryFilter) => void;
   onReceive?: () => void;
+  onSelectEntry?: (entry: HistoryEntry) => void;
 }) {
   return (
     <Card title="Recent activity">
@@ -675,7 +683,20 @@ export function HistoryActivityList({
           {entries.map((entry) => (
             <div
               key={entry.id}
-              className="flex items-center justify-between rounded-xl border border-border px-4 py-3"
+              role={onSelectEntry ? 'button' : undefined}
+              tabIndex={onSelectEntry ? 0 : undefined}
+              onClick={() => onSelectEntry?.(entry)}
+              onKeyDown={(e) => {
+                if (onSelectEntry && (e.key === 'Enter' || e.key === ' ')) {
+                  e.preventDefault();
+                  onSelectEntry(entry);
+                }
+              }}
+              className={`flex items-center justify-between rounded-xl border border-border px-4 py-3 ${
+                onSelectEntry
+                  ? 'cursor-pointer transition hover:border-primary/40 hover:bg-accent/40'
+                  : ''
+              }`}
             >
               <div>
                 <p className="text-sm font-medium text-foreground">{entry.label}</p>
@@ -692,7 +713,49 @@ export function HistoryActivityList({
   );
 }
 
+function TransactionDetailRoute() {
+  const { id } = useParams<{ id: string }>();
+  const navigate = useNavigate();
+  const location = useLocation();
+  const network = useDashboardSettingsStore((state) => state.network);
+  const { authState } = useExtensionAuth();
+
+  const stateTx = (location.state as { transaction?: TransactionDetailData } | null)?.transaction;
+
+  const transaction: TransactionDetailData = React.useMemo(() => {
+    if (stateTx) {
+      return {
+        ...stateTx,
+        network: stateTx.network ?? (network as StellarNetwork),
+      };
+    }
+
+    return {
+      id: id ?? 'unknown',
+      status: 'confirmed',
+      type: 'sent',
+      from: authState.accountAddress || 'Self',
+      to: 'Recipient',
+      amount: '0',
+      assetCode: 'XLM',
+      fee: '0.00001 XLM',
+      memo: null,
+      timestamp: new Date().toISOString(),
+      blockNumber: null,
+      hash: id ?? 'TX-HASH',
+      network: network as StellarNetwork,
+    };
+  }, [stateTx, id, network, authState.accountAddress]);
+
+  return (
+    <div className="p-4">
+      <TransactionDetail transaction={transaction} onBack={() => navigate('/history')} />
+    </div>
+  );
+}
+
 function HistoryScreen() {
+  const navigate = useNavigate();
   const {
     entries,
     isLoading,
@@ -704,6 +767,24 @@ function HistoryScreen() {
     setFilter,
     smartAccountId,
   } = useTransactionHistory();
+
+  const handleSelectEntry = (entry: HistoryEntry) => {
+    const detailData: TransactionDetailData = {
+      id: entry.id,
+      status: entry.status === 'failed' ? 'failed' : 'confirmed',
+      type: entry.kind === 'received' ? 'received' : 'sent',
+      from: entry.kind === 'received' ? entry.label.replace(/^Received from\s+/i, '') : 'Self',
+      to: entry.kind === 'sent' ? entry.label.replace(/^Sent to\s+/i, '') : 'Recipient',
+      amount: entry.amount.replace(/^[+-]/, '').split(' ')[0] ?? '0',
+      assetCode: entry.amount.split(' ')[1] ?? 'XLM',
+      fee: '0.00001 XLM',
+      memo: null,
+      timestamp: new Date().toISOString(),
+      blockNumber: null,
+      hash: entry.id,
+    };
+    navigate(`/history/${entry.id}`, { state: { transaction: detailData } });
+  };
 
   if (!smartAccountId) {
     return (
@@ -758,6 +839,7 @@ function HistoryScreen() {
             activeFilter={activeFilter}
             entries={entries}
             onFilterChange={setFilter}
+            onSelectEntry={handleSelectEntry}
           />
           {hasMore && (
             <button
@@ -839,6 +921,7 @@ export function ExtensionRouterContent() {
               <Route element={<ScheduledTransfersRoute />} path="/scheduled" />
               <Route element={<ReceiveScreen />} path="/receive" />
               <Route element={<HistoryScreen />} path="/history" />
+              <Route element={<TransactionDetailRoute />} path="/history/:id" />
               <Route element={<SettingsScreen />} path="/settings" />
               <Route element={<SessionKeysScreen />} path="/session-keys" />
             </Route>

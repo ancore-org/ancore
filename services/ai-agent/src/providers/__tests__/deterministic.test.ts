@@ -70,6 +70,30 @@ describe('deterministicDraftIntent', () => {
     }
   });
 
+  it('picks the amount near the asset keyword, not the first number in the prompt', () => {
+    // "3 days" precedes the actual payment amount here; a naive first-number
+    // scan would extract "3" instead of "25".
+    const dest = VALID_ADDRESS;
+    const result = deterministicDraftIntent({
+      prompt: `wait 3 days then send 25 XLM to ${dest}`,
+      accountId: VALID_ACCOUNT_ID,
+    });
+    if (result.intent.type === 'payment') {
+      expect(result.intent.amount).toBe('25');
+    }
+  });
+
+  it('picks the amount near the asset keyword when the keyword precedes the number', () => {
+    const dest = VALID_ADDRESS;
+    const result = deterministicDraftIntent({
+      prompt: `after 2 attempts send USDC 25 to ${dest}`,
+      accountId: VALID_ACCOUNT_ID,
+    });
+    if (result.intent.type === 'payment') {
+      expect(result.intent.amount).toBe('25');
+    }
+  });
+
   it('always produces schema-valid output', () => {
     const result = deterministicDraftIntent({
       prompt: 'invoice bill me for 1.5 usdc',

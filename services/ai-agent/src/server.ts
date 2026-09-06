@@ -2,6 +2,7 @@ import express, { Express, Request, Response } from 'express';
 import { intentSchema, HIGH_VALUE_PAYMENT_THRESHOLD } from './schemas/intent';
 import { requestLogger } from './middleware/request-logger';
 import { draftIntentRateLimiter } from './middleware/rate-limiter';
+import { requireApiKey } from './middleware/auth';
 import { scoreRisk } from './risk';
 import { generateDraftIntent } from './draft-intent';
 import { enforceNoAutonomousExecution } from './guardrail';
@@ -44,76 +45,81 @@ export function createApp(): Express {
   // LLM-backed (Claude Haiku, env-gated) with a deterministic offline fallback.
   // GUARDRAIL: every response is validated by enforceNoAutonomousExecution()
   // before it is returned — a violation is a 500, never a silent pass-through.
-  app.post('/agent/draft-intent', draftIntentRateLimiter, async (req: Request, res: Response) => {
-    const { prompt, accountId } = req.body;
-    if (!prompt || !accountId || typeof prompt !== 'string' || typeof accountId !== 'string') {
-      return res.status(400).json({ error: 'Invalid request: prompt and accountId required' });
-    }
+  app.post(
+    '/agent/draft-intent',
+    requireApiKey,
+    draftIntentRateLimiter,
+    async (req: Request, res: Response) => {
+      const { prompt, accountId } = req.body;
+      if (!prompt || !accountId || typeof prompt !== 'string' || typeof accountId !== 'string') {
+        return res.status(400).json({ error: 'Invalid request: prompt and accountId required' });
+      }
 
-    if (prompt.length > MAX_PROMPT_LENGTH) {
-      return res.status(413).json({
-        error: `Prompt exceeds maximum length limit of ${MAX_PROMPT_LENGTH} characters`,
-      });
-    }
-
-    if (accountId.length > MAX_ACCOUNT_ID_LENGTH) {
-      return res.status(400).json({
-        error: `accountId exceeds maximum length limit of ${MAX_ACCOUNT_ID_LENGTH} characters`,
-      });
-    }
-
-    try {
-      const { intent, summary, source } = await generateDraftIntent({ prompt, accountId });
-      const risk = scoreRisk(intent);
-
-      const response = {
-        status: 'draft' as const,
-        requiresConfirmation: true as const,
-        summary,
-        intent,
-        risk,
-        source,
-      };
-
-      // Fail closed: never return a response that hasn't passed the guardrail.
-      enforceNoAutonomousExecution(response as unknown as DraftIntentResponse);
-
-      log.info(
-        {
-          timestamp: new Date().toISOString(),
-          accountId,
-          source,
-          intentType: intent.type,
-          riskLevel: risk.level,
-          promptRedacted: redactSecrets(prompt),
-        },
-        'draft_intent_audit'
-      );
-
-      return res.status(200).json(response);
-    } catch (err) {
-      const message = err instanceof Error ? err.message : String(err);
-      log.error({ accountId, error: message }, 'draft_intent_failed');
-
-      // A recipient we cannot validate or resolve is a question for the user,
-      // not a server fault — covers a missing/malformed destination and an
-      // unresolvable @handle on either intent type (#1210).
-      if (/destination|recipient/i.test(message)) {
-        return res.status(400).json({
-          error: 'Needs clarification',
-          message:
-            'Please specify a valid Stellar address (G...) or @username handle for the recipient.',
+      if (prompt.length > MAX_PROMPT_LENGTH) {
+        return res.status(413).json({
+          error: `Prompt exceeds maximum length limit of ${MAX_PROMPT_LENGTH} characters`,
         });
       }
 
-      return res.status(500).json({ error: 'Failed to draft intent' });
+      if (accountId.length > MAX_ACCOUNT_ID_LENGTH) {
+        return res.status(400).json({
+          error: `accountId exceeds maximum length limit of ${MAX_ACCOUNT_ID_LENGTH} characters`,
+        });
+      }
+
+      try {
+        const { intent, summary, source } = await generateDraftIntent({ prompt, accountId });
+        const risk = scoreRisk(intent);
+
+        const response = {
+          status: 'draft' as const,
+          requiresConfirmation: true as const,
+          summary,
+          intent,
+          risk,
+          source,
+        };
+
+        // Fail closed: never return a response that hasn't passed the guardrail.
+        enforceNoAutonomousExecution(response as unknown as DraftIntentResponse);
+
+        log.info(
+          {
+            timestamp: new Date().toISOString(),
+            accountId,
+            source,
+            intentType: intent.type,
+            riskLevel: risk.level,
+            promptRedacted: redactSecrets(prompt),
+          },
+          'draft_intent_audit'
+        );
+
+        return res.status(200).json(response);
+      } catch (err) {
+        const message = err instanceof Error ? err.message : String(err);
+        log.error({ accountId, error: message }, 'draft_intent_failed');
+
+        // A recipient we cannot validate or resolve is a question for the user,
+        // not a server fault — covers a missing/malformed destination and an
+        // unresolvable @handle on either intent type (#1210).
+        if (/destination|recipient/i.test(message)) {
+          return res.status(400).json({
+            error: 'Needs clarification',
+            message:
+              'Please specify a valid Stellar address (G...) or @username handle for the recipient.',
+          });
+        }
+
+        return res.status(500).json({ error: 'Failed to draft intent' });
+      }
     }
-  });
+  );
 
   // ── Intent validation ──────────────────────────────────────────────────────
   // Validates intent payloads against Zod schemas.
   // No LLM or external service call — purely structural validation.
-  app.post('/v1/intents/validate', (req: Request, res: Response) => {
+  app.post('/v1/intents/validate', requireApiKey, (req: Request, res: Response) => {
     const parsed = intentSchema.safeParse(req.body);
     if (!parsed.success) {
       const fieldErrors: Record<string, string[]> = {};

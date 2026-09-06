@@ -1,6 +1,9 @@
 import * as React from 'react';
 import { Navigate, Outlet, useLocation } from 'react-router-dom';
 import { sendMessage } from '../messaging/sender';
+import { recordCurrentDevice } from '../security/device-session-recorder';
+import { useDeviceSessionsStore } from '../stores/deviceSessions';
+import { useAccountStore } from '../stores/account';
 
 export const AUTH_STORAGE_KEY = 'ancore_extension_auth';
 
@@ -96,6 +99,29 @@ export function ExtensionAuthProvider({
     writeAuthState(authState);
   }, [authState]);
 
+  // Keep the multi-account store's single real entry in sync with the vault
+  // account backing this session, so consumers reading from useAccountStore
+  // (Send, Settings, router) see the real address instead of falling through
+  // to a placeholder.
+  React.useEffect(() => {
+    if (!authState.hasOnboarded || authState.accountAddress === DEFAULT_AUTH_STATE.accountAddress) {
+      return;
+    }
+
+    useAccountStore.getState().setAccount({
+      id: authState.accountAddress,
+      address: authState.accountAddress,
+      label: authState.walletName,
+      contractId: authState.smartAccountId,
+    });
+    useAccountStore.getState().setActiveAccount(authState.accountAddress);
+  }, [
+    authState.hasOnboarded,
+    authState.accountAddress,
+    authState.walletName,
+    authState.smartAccountId,
+  ]);
+
   React.useEffect(() => {
     async function initVault() {
       if (!hasExtensionStorage()) {
@@ -180,6 +206,7 @@ export function ExtensionAuthProvider({
           ...(smartAccountId ? { smartAccountId } : {}),
         });
         setIsUnlocked(true);
+        void recordCurrentDevice();
       },
       unlockWallet: async (password: string) => {
         try {
@@ -202,6 +229,9 @@ export function ExtensionAuthProvider({
 
           setUnlockError(null);
           setIsUnlocked(true);
+          // Fire-and-forget: device bookkeeping must never delay or fail an
+          // otherwise successful unlock.
+          void recordCurrentDevice();
           return true;
         } catch {
           setUnlockError(DEFAULT_UNLOCK_ERROR);
@@ -222,6 +252,10 @@ export function ExtensionAuthProvider({
         setUnlockError(null);
         setAuthState(DEFAULT_AUTH_STATE);
         setIsUnlocked(false);
+        // A reset discards the vault, so the trusted-device list and account
+        // entry that belonged to it must not survive into the next wallet.
+        useDeviceSessionsStore.getState().reset();
+        useAccountStore.getState().clear();
       },
       refreshUnlockStatus: refreshUnlockStatusInternal,
     }),

@@ -10,6 +10,8 @@ export interface InvoiceClientOptions {
   baseUrl?: string;
   /** Returns a bearer token to authenticate requests. */
   getAuthToken?: () => string | Promise<string>;
+  /** Maximum time to wait for an invoice-service request. Defaults to 15 seconds. */
+  timeoutMs?: number;
 }
 
 export interface PayInvoiceParams {
@@ -55,10 +57,12 @@ export interface ListInvoicesResult {
 export class InvoiceClient {
   private readonly baseUrl: string;
   private readonly getAuthToken?: () => string | Promise<string>;
+  private readonly timeoutMs: number;
 
   constructor(options: InvoiceClientOptions = {}) {
     this.baseUrl = options.baseUrl ?? resolveRelayerBaseUrl();
     this.getAuthToken = options.getAuthToken;
+    this.timeoutMs = options.timeoutMs ?? 15_000;
   }
 
   // ── CRUD ──────────────────────────────────────────────────────────────────
@@ -142,11 +146,27 @@ export class InvoiceClient {
       }
     }
 
-    const response = await fetch(`${this.baseUrl}${path}`, {
-      method,
-      headers,
-      body: body !== undefined ? JSON.stringify(body) : undefined,
-    });
+    const controller = new globalThis.AbortController();
+    const timeout = globalThis.setTimeout(() => controller.abort(), this.timeoutMs);
+    let response: Response;
+    try {
+      response = await fetch(`${this.baseUrl}${path}`, {
+        method,
+        headers,
+        body: body !== undefined ? JSON.stringify(body) : undefined,
+        signal: controller.signal,
+      });
+    } catch (error) {
+      if (controller.signal.aborted) {
+        throw new InvoiceClientError(
+          `InvoiceClient: ${method} ${path} timed out after ${this.timeoutMs}ms`,
+          408
+        );
+      }
+      throw error;
+    } finally {
+      globalThis.clearTimeout(timeout);
+    }
 
     if (!response.ok) {
       let message = `InvoiceClient: ${method} ${path} failed (${response.status})`;

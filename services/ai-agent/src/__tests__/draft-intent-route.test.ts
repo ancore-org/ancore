@@ -3,6 +3,9 @@ import { createApp } from '../server';
 import { log } from '../logging/logger';
 import { VALID_ACCOUNT_ID, VALID_ADDRESS } from './fixtures/addresses';
 
+const TEST_API_KEY = 'test-api-key';
+process.env['AI_AGENT_API_KEY'] = TEST_API_KEY;
+
 describe('POST /agent/draft-intent — LLM integration, guardrail, and audit logging', () => {
   const app = createApp();
   let infoSpy: jest.SpyInstance;
@@ -20,6 +23,7 @@ describe('POST /agent/draft-intent — LLM integration, guardrail, and audit log
 
     const res = await request(app)
       .post('/agent/draft-intent')
+      .set('x-api-key', TEST_API_KEY)
       .send({
         prompt: `Send 10 XLM to ${VALID_ADDRESS}`,
         accountId: VALID_ACCOUNT_ID,
@@ -34,6 +38,7 @@ describe('POST /agent/draft-intent — LLM integration, guardrail, and audit log
   it('always returns a guardrail-satisfying draft response (status=draft, requiresConfirmation=true)', async () => {
     const res = await request(app)
       .post('/agent/draft-intent')
+      .set('x-api-key', TEST_API_KEY)
       .send({ prompt: 'Create an invoice for 50 XLM', accountId: VALID_ACCOUNT_ID });
 
     expect(res.status).toBe(200);
@@ -46,6 +51,7 @@ describe('POST /agent/draft-intent — LLM integration, guardrail, and audit log
   it('writes an audit log entry with timestamp, accountId, source, intentType, and riskLevel', async () => {
     await request(app)
       .post('/agent/draft-intent')
+      .set('x-api-key', TEST_API_KEY)
       .send({
         prompt: `Send 10 XLM to ${VALID_ADDRESS}`,
         accountId: VALID_ACCOUNT_ID,
@@ -71,6 +77,7 @@ describe('POST /agent/draft-intent — LLM integration, guardrail, and audit log
 
     const res = await request(app)
       .post('/agent/draft-intent')
+      .set('x-api-key', TEST_API_KEY)
       .send({ prompt: promptWithSecret, accountId: VALID_ACCOUNT_ID });
 
     expect(res.status).toBe(200);

@@ -3,6 +3,9 @@ import { createApp } from '../server';
 import { parseInvoiceIntent, InvoiceIntentSchema } from '../intents/invoice';
 import { VALID_ADDRESS, VALID_HANDLE } from './fixtures/addresses';
 
+const TEST_API_KEY = 'test-api-key';
+process.env['AI_AGENT_API_KEY'] = TEST_API_KEY;
+
 describe('Invoice Intent Schema and Validation', () => {
   describe('Schema Validation', () => {
     it('validates a complete and correct invoice intent', () => {
@@ -175,7 +178,10 @@ describe('Invoice Intent Schema and Validation', () => {
         recipient: VALID_ADDRESS,
         dueDate: '2026-12-31T23:59:59Z',
       };
-      const res = await request(app).post('/v1/intents/validate').send(fixture);
+      const res = await request(app)
+        .post('/v1/intents/validate')
+        .set('x-api-key', TEST_API_KEY)
+        .send(fixture);
       expect(res.status).toBe(200);
       expect(res.body.valid).toBe(true);
       expect(res.body.intent).toEqual(fixture);
@@ -189,7 +195,10 @@ describe('Invoice Intent Schema and Validation', () => {
         recipient: VALID_ADDRESS,
         dueDate: '2026-12-31T23:59:59Z',
       };
-      const res = await request(app).post('/v1/intents/validate').send(fixture);
+      const res = await request(app)
+        .post('/v1/intents/validate')
+        .set('x-api-key', TEST_API_KEY)
+        .send(fixture);
       expect(res.status).toBe(400);
       expect(res.body.errors).toBeDefined();
       expect(res.body.errors.fieldErrors).toBeDefined();

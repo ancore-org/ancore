@@ -2,7 +2,8 @@
  * In-memory idempotency store with short TTL.
  *
  * Stores `idempotency-key -> CachedResponse` entries.  Expired entries are
- * evicted lazily on every `get()` call for that key.
+ * evicted lazily on every `get()` call for that key. Retained as an in-memory
+ * adapter for unit tests.
  */
 
 export interface CachedResponse {
@@ -10,7 +11,14 @@ export interface CachedResponse {
   body: unknown;
 }
 
-export class IdempotencyStore {
+export interface IdempotencyStoreContract {
+  get(key: string): CachedResponse | undefined | Promise<CachedResponse | undefined>;
+  set(key: string, response: CachedResponse): void | Promise<void>;
+  size(): number | Promise<number>;
+  clearExpired?(): void | Promise<void>;
+}
+
+export class IdempotencyStore implements IdempotencyStoreContract {
   private readonly store = new Map<string, { response: CachedResponse; expiresAt: number }>();
 
   constructor(
@@ -46,4 +54,19 @@ export class IdempotencyStore {
     }
     return count;
   }
+
+  /** Clears all expired entries from memory. */
+  clearExpired(): void {
+    const now = Date.now();
+    for (const [key, entry] of this.store.entries()) {
+      if (entry.expiresAt <= now) {
+        this.store.delete(key);
+      }
+    }
+  }
 }
+
+export type AnyIdempotencyStore =
+  | IdempotencyStore
+  | import('./pgIdempotencyStore').PgIdempotencyStore
+  | IdempotencyStoreContract;

@@ -6,6 +6,7 @@ import type {
   LlmProvider,
   ProviderDraftResult,
 } from './providers/types';
+import { intentSchema } from './schemas/intent';
 import { log } from './logging/logger';
 import { resolveIntentRecipient } from './recipients';
 import { defaultHandleResolver } from './handle-resolver';
@@ -34,6 +35,11 @@ const defaultProvider: LlmProvider = new AnthropicProvider();
  * draft is returned, so a handle that resolves to nothing never reaches
  * scoreRisk() or the user — and a returned draft's recipient is always a
  * checksum-valid address, never an unresolved handle.
+ *
+ * The deterministic parser's output is validated against the same
+ * intentSchema the LLM path enforces before it is ever returned, so a
+ * malformed draft (e.g. a zero or out-of-range amount) throws here instead
+ * of silently reaching the caller.
  */
 export async function generateDraftIntent(
   input: DraftIntentInput,
@@ -67,5 +73,13 @@ async function produceDraft(
     }
   }
 
-  return { ...deterministicDraftIntent(input), source: 'deterministic' };
+  const result = deterministicDraftIntent(input);
+  const parsed = intentSchema.safeParse(result.intent);
+  if (!parsed.success) {
+    throw new Error(
+      `Deterministic provider output failed schema validation: ${parsed.error.message}`
+    );
+  }
+
+  return { ...result, intent: parsed.data, source: 'deterministic' };
 }
