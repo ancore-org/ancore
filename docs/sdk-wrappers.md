@@ -181,6 +181,115 @@ interface RevokeSessionKeyParams {
 
 ---
 
+#### `client.createWallet`
+
+Creates a new Ancore wallet by generating a fresh BIP39 mnemonic, deriving an Ed25519 keypair via BIP-44 HD derivation, and optionally encrypting the mnemonic with the provided password. Asynchronous.
+
+```typescript
+createWallet(params?: CreateWalletParams): Promise<CreateWalletResult>
+```
+
+```typescript
+interface CreateWalletParams {
+  password?:     string; // Password used to encrypt mnemonic (optional)
+  accountIndex?: number; // BIP-44 account index (default: 0)
+}
+```
+
+```typescript
+interface CreateWalletResult {
+  mnemonic:           string;                     // BIP39 mnemonic phrase (sensitive)
+  publicKey:          string;                     // G… Ed25519 public key (safe to persist)
+  secretKey:          string;                     // S… Ed25519 secret key (sensitive)
+  accountIndex:       number;                     // HD account index used
+  contractId:         string;                     // C… contract ID derived from public key (safe to persist)
+  encryptedMnemonic?: EncryptedSecretKeyPayload;  // Present only when password was supplied
+}
+```
+
+**Validation rules**
+
+| Field | Rule |
+|-------|------|
+| `accountIndex` | Non-negative integer when supplied |
+
+**Example**
+
+```typescript
+const client = new AncoreClient({ accountContractId: 'C...' });
+const wallet = await client.createWallet({ password: 'user-password' });
+// wallet.publicKey  → G…  (safe to persist)
+// wallet.contractId → C…  (safe to persist)
+// wallet.encryptedMnemonic → persist this; do NOT persist wallet.secretKey
+```
+
+---
+
+#### `client.refreshSessionKeyTtl`
+
+Builds the `InvocationArgs` or simulates/refreshes the Soroban persistent storage TTL for an active session key entry so it is not evicted before its logical expiration. When `options` are provided, simulates against the RPC network and returns a `RefreshSessionKeyTtlResult`. Without `options`, synchronously returns `InvocationArgs`.
+
+```typescript
+refreshSessionKeyTtl(
+  params: RefreshSessionKeyTtlParams,
+  options?: RefreshSessionKeyTtlOptions
+): InvocationArgs | Promise<RefreshSessionKeyTtlResult>
+```
+
+```typescript
+interface RefreshSessionKeyTtlParams {
+  publicKey: string; // G… Ed25519 public key of the session key to extend
+  expiresAt: number; // Known logical expiry in unix seconds (used for client-side preflight)
+}
+
+interface RefreshSessionKeyTtlOptions extends AccountContractReadOptions {
+  nowMs?:               number; // Override current time in ms (useful for deterministic testing)
+  simulationTimeoutMs?: number; // Maximum time in ms to wait for Soroban simulation RPC (default: 15000)
+}
+
+interface RefreshSessionKeyTtlResult {
+  invocation: InvocationArgs;
+  operation:  ReturnType<AccountContract['buildInvokeOperation']>;
+  event:      SessionKeyTtlRefreshedEvent | null;
+}
+```
+
+**Validation rules**
+
+| Field | Rule |
+|-------|------|
+| `publicKey` | Valid Stellar Ed25519 public key (G…) |
+| `expiresAt` | Finite number in Unix seconds; key must be active (`expiresAt > now`) |
+
+**Errors**
+
+| Error | Code | Condition |
+|-------|------|-----------|
+| `BuilderValidationError` | `BUILDER_VALIDATION` | Invalid `publicKey` format or non-finite `expiresAt` |
+| `SessionKeyManagementError` | `SESSION_KEY_EXPIRED` | Session key has already expired (`expiresAt <= now`) |
+| `SimulationFailedError` | `SIMULATION_FAILED` | Simulation RPC call fails or returns error |
+
+**Example**
+
+```typescript
+// Build invocation args only (synchronous, no network)
+const invocation = client.refreshSessionKeyTtl({
+  publicKey: 'GABC...XYZ',
+  expiresAt: Math.floor(Date.now() / 1000) + 3600,
+});
+
+// With simulation against RPC network (asynchronous)
+const result = await client.refreshSessionKeyTtl(
+  {
+    publicKey: 'GABC...XYZ',
+    expiresAt: Math.floor(Date.now() / 1000) + 3600,
+  },
+  { rpcUrl: 'https://soroban-testnet.stellar.org' }
+);
+```
+
+---
+
 ### `executeWithSessionKey` (standalone export)
 
 > **Not a method on `AncoreClient`** (the one exported from `ancore-client.ts`).
@@ -327,6 +436,40 @@ const invocation = addSessionKey(accountContract, {
 import { revokeSessionKey } from '@ancore/core-sdk';
 
 const invocation = revokeSessionKey(accountContract, { publicKey: 'GABC...XYZ' });
+```
+
+---
+
+### `createWallet` (standalone)
+
+```typescript
+import { createWallet } from '@ancore/core-sdk';
+
+const wallet = await createWallet({ password: 'user-password' });
+```
+
+---
+
+### `refreshSessionKeyTtl` (standalone)
+
+```typescript
+import { refreshSessionKeyTtl } from '@ancore/core-sdk';
+
+// Build invocation args only (synchronous)
+const invocation = refreshSessionKeyTtl(accountContract, {
+  publicKey: 'GABC...XYZ',
+  expiresAt: Math.floor(Date.now() / 1000) + 3600,
+});
+
+// Or with simulation against RPC network (asynchronous)
+const result = await refreshSessionKeyTtl(
+  accountContract,
+  {
+    publicKey: 'GABC...XYZ',
+    expiresAt: Math.floor(Date.now() / 1000) + 3600,
+  },
+  { rpcUrl: 'https://soroban-testnet.stellar.org' }
+);
 ```
 
 ---

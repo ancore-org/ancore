@@ -495,6 +495,67 @@ sdk_methods:
         condition: AccountContract layer throws an unexpected error
     async: false
 
+  AncoreClient.createWallet:
+    package: "@ancore/core-sdk"
+    description: |
+      Creates a new Ancore wallet by generating a fresh BIP39 mnemonic, deriving
+      an Ed25519 keypair via BIP-44 HD derivation, and optionally encrypting the
+      mnemonic with the provided password.
+      Delegates to the createWallet() orchestration function from create-wallet.ts.
+    signature: "createWallet(params?: CreateWalletParams): Promise<CreateWalletResult>"
+    parameters:
+      - name: params.password
+        type: string
+        required: false
+        description: Password used to encrypt the mnemonic with PBKDF2 + AES-GCM
+      - name: params.accountIndex
+        type: number
+        required: false
+        description: BIP-44 account index (default 0)
+        validation: non-negative integer
+    returns:
+      success: Promise<CreateWalletResult>
+    errors:
+      - name: Error
+        code: INVALID_ACCOUNT_INDEX
+        condition: accountIndex is not a non-negative integer
+    async: true
+
+  AncoreClient.refreshSessionKeyTtl:
+    package: "@ancore/core-sdk"
+    description: |
+      Build invocation args or refresh the Soroban persistent storage TTL for an active session key.
+      Delegates to refreshSessionKeyTtl() from refresh-session-key-ttl.ts.
+    signature: "refreshSessionKeyTtl(params: RefreshSessionKeyTtlParams, options?: RefreshSessionKeyTtlOptions): InvocationArgs | Promise<RefreshSessionKeyTtlResult>"
+    parameters:
+      - name: params.publicKey
+        type: string
+        required: true
+        description: Ed25519 public key of the session key whose Soroban TTL should be extended
+        validation: valid Ed25519 public key (G...)
+      - name: params.expiresAt
+        type: number
+        required: true
+        description: Known logical expiry in unix seconds (used for client-side preflight)
+        validation: finite number; key must be active (expiresAt > now)
+      - name: options
+        type: RefreshSessionKeyTtlOptions
+        required: false
+        description: Optional simulation and read options to simulate the refresh against Soroban RPC
+    returns:
+      success: "InvocationArgs | Promise<RefreshSessionKeyTtlResult>"
+    errors:
+      - name: BuilderValidationError
+        code: BUILDER_VALIDATION
+        condition: Invalid publicKey format or non-finite expiresAt
+      - name: SessionKeyManagementError
+        code: SESSION_KEY_EXPIRED
+        condition: Session key is expired or revoked (expiresAt <= now)
+      - name: SimulationFailedError
+        code: SIMULATION_FAILED
+        condition: Simulation RPC fails or contract rejects invocation
+    async: false
+
   executeWithSessionKey:
     package: "@ancore/core-sdk"
     exported_from: "execute-with-session-key.ts"
