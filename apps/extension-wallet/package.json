@@ -21,7 +21,8 @@
     "test:e2e:ui": "playwright test --config=tests/playwright.config.ts --ui",
     "analyze": "node scripts/analyze-bundle.js",
     "check:csp": "node scripts/check-csp.js",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "sync:wasm": "node scripts/sync-account-wasm.mjs"
   },
   "dependencies": {
     "@ancore/account-abstraction": "workspace:*",

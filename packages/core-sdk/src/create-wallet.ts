@@ -31,6 +31,7 @@ import {
   generateMnemonic,
   type EncryptedSecretKeyPayload,
 } from '@ancore/crypto';
+import type { Network } from '@ancore/types';
 
 import { deriveContractId } from './wallet';
 
@@ -50,6 +51,8 @@ export interface CreateWalletParams {
    * Must be a non-negative integer.
    */
   accountIndex?: number;
+  /** Network the derived contractId is computed for (default: 'testnet'). */
+  network?: Network;
 }
 
 /**
@@ -110,7 +113,7 @@ export async function createWallet(params: CreateWalletParams = {}): Promise<Cre
     publicKey: keypair.publicKey(),
     secretKey: keypair.secret(),
     accountIndex: rawIndex,
-    contractId: deriveContractId(keypair.publicKey()),
+    contractId: deriveContractId(keypair.publicKey(), params.network ?? 'testnet'),
     encryptedMnemonic,
   };
 }
