@@ -1,5 +1,7 @@
 #!/usr/bin/env node
 const fs = require('node:fs');
+const os = require('node:os');
+const path = require('node:path');
 const { spawnSync } = require('node:child_process');
 
 const allowlistPath = '.pnpm-audit-allowlist.json';
@@ -22,23 +24,40 @@ for (const entry of allowlist.advisories ?? []) {
   }
 }
 
-// Large monorepo trees produce multi-MB audit JSON. Node's default maxBuffer (1 MiB)
-// truncates stdout mid-object and makes JSON.parse fail ("Unable to parse…").
-const audit = spawnSync('pnpm', ['audit', '--audit-level=high', '--json'], {
-  encoding: 'utf8',
-  maxBuffer: 64 * 1024 * 1024,
-  // Windows needs a shell to resolve the pnpm.cmd shim from PATH.
-  shell: process.platform === 'win32',
-});
+// Large monorepo trees produce multi-MB audit JSON. Capturing it through a
+// pipe (spawnSync's default 'pipe' stdio) has failed two ways in practice:
+// Node's default maxBuffer (1 MiB) truncated stdout mid-object, and even
+// after raising maxBuffer, GitHub's Linux runners threw `spawnSync pnpm
+// ENOBUFS` — a kernel pipe-buffer overflow from pnpm writing the JSON faster
+// than spawnSync's synchronous read loop can drain it, unrelated to
+// maxBuffer. Redirecting stdout straight to a file sidesteps the pipe
+// entirely: the kernel writes it directly, nothing needs draining, and
+// there's no in-memory size limit to hit.
+const stdoutPath = path.join(os.tmpdir(), `pnpm-audit-${process.pid}.json`);
+const stdoutFd = fs.openSync(stdoutPath, 'w');
+let audit;
+try {
+  audit = spawnSync('pnpm', ['audit', '--audit-level=high', '--json'], {
+    stdio: ['ignore', stdoutFd, 'pipe'],
+    encoding: 'utf8',
+    // Windows needs a shell to resolve the pnpm.cmd shim from PATH.
+    shell: process.platform === 'win32',
+  });
+} finally {
+  fs.closeSync(stdoutFd);
+}
 if (audit.error) {
+  fs.unlinkSync(stdoutPath);
   console.error('Failed to run pnpm audit:', audit.error.message);
   process.exit(1);
 }
 if (audit.status === 0) {
+  fs.unlinkSync(stdoutPath);
   process.exit(0);
 }
 
-const rawAuditOutput = (audit.stdout || '').trim();
+const rawAuditOutput = fs.readFileSync(stdoutPath, 'utf8').trim();
+fs.unlinkSync(stdoutPath);
 const jsonStartIndex = rawAuditOutput.indexOf('{');
 const jsonEndIndex = rawAuditOutput.lastIndexOf('}');
 const auditJsonOutput =
@@ -53,7 +72,7 @@ try {
   console.error('Unable to parse pnpm audit JSON output.');
   console.error(error instanceof Error ? error.message : error);
   console.error(
-    `stdout bytes: ${(audit.stdout || '').length}, stderr bytes: ${(audit.stderr || '').length}`
+    `stdout bytes: ${rawAuditOutput.length}, stderr bytes: ${(audit.stderr || '').length}`
   );
   if (audit.stderr) {
     console.error(audit.stderr.slice(0, 2000));

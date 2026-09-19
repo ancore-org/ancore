@@ -71,6 +71,12 @@
       "issue": "https://github.com/ancore-org/ancore/issues/1206",
       "justification": "extract-zip unvalidated symlink path traversal (GHSA-jmr9-qjv8-65gv); no patched version exists upstream. Transitive dev-only dependency of puppeteer-core; only extracts trusted Puppeteer/Chromium download artifacts, never user-supplied zips.",
       "expires": "2026-10-31T00:00:00.000Z"
+    },
+    {
+      "id": "1193685",
+      "issue": "https://github.com/ancore-org/ancore/issues/1206",
+      "justification": "extract-zip arbitrary file write via symlink archive entries (GHSA-7pqw-9j4j-h8q3) — a separate advisory from 1139346 above, same package. No patched version exists upstream. Transitive dev-only dependency of puppeteer-core; only extracts trusted Puppeteer/Chromium download artifacts, never user-supplied zips.",
+      "expires": "2026-10-31T00:00:00.000Z"
     }
   ]
 }
