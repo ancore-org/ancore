@@ -234,7 +234,7 @@ describe('executeBulkPayoutBatch checkpointing (#1349)', () => {
       })
     );
 
-    const submit = vi.fn(async () => {});
+    const submit = vi.fn(async (_submission: PayoutSubmission) => {});
     const summary = await executeBulkPayoutBatch(rows, submit, {
       batchId: 'batch-1',
       storage,

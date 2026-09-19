@@ -36,6 +36,7 @@
     "typescript": "^5.3.0"
   },
   "jest": {
+    "maxWorkers": 2,
     "preset": "ts-jest",
     "testEnvironment": "node",
     "testMatch": [

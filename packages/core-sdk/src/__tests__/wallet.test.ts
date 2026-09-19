@@ -64,10 +64,22 @@ describe('wallet material helpers', () => {
     ).rejects.toThrow('Invalid password or corrupted encrypted payload.');
   });
 
-  it('derives the placeholder contract id deterministically from the public key', async () => {
+  it('derives the contract id deterministically from the public key', async () => {
     const wallet = await importWallet({ mnemonic: generateMnemonic() });
 
     expect(deriveContractId(wallet.publicKey)).toBe(wallet.contractId);
     expect(wallet.contractId).toMatch(/^C[A-Z2-7]{55}$/);
+  });
+
+  it("matches Soroban testnet's real CREATE2 address for a known owner", () => {
+    // Verified against a live deploy: `stellar contract deploy --source-account
+    // <owner> --salt 00...00 --network testnet` produced exactly this contract
+    // id for this owner. If this test ever needs updating, the fix belongs in
+    // deriveContractId (or ACCOUNT_CONTRACT_SALT) matching deploy-account.ts's
+    // createCustomContract call — not in loosening this assertion.
+    const owner = 'GBUX23MDN46BS64SS2BMGBFSRCTSOUNO35MM3UJSUXMXF533URT7LDLD';
+    const expectedContractId = 'CCJQOHWTZUCFYLEYWVKUS2AFUVTMN6V5UIA33MSVTP5CP4W5CRBF7V3M';
+
+    expect(deriveContractId(owner, 'testnet')).toBe(expectedContractId);
   });
 });

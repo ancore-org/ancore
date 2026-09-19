@@ -10,6 +10,7 @@ export {
   importWallet,
   restoreWallet,
   deriveContractId,
+  ACCOUNT_CONTRACT_SALT,
   type CreateWalletOptions,
   type ImportWalletOptions,
   type RestoreWalletOptions,
