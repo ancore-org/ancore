@@ -14,3 +14,10 @@ services/relayer/tsconfig.json
 services/relayer/src/api/types.ts
 services/relayer/src/queue/backoff.ts
 services/relayer/src/workers/__tests__/QueueWorker.test.ts
+
+# CocoaPods/Ruby vendor dirs from local iOS tooling (fastlane, cocoapods) —
+# gitignored but Prettier's own glob ignores .gitignore, so left on disk they
+# fail the pre-push hook's Format Check for anyone who has run `pod install`
+# or `bundle install` locally.
+apps/mobile-app/ios/Pods/
+apps/mobile-app/vendor/
