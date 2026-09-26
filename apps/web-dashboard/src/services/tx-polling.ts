@@ -1,4 +1,5 @@
 import { DEFAULT_HORIZON_URLS } from '@ancore/wallet-shared';
+import { AuthRequiredError } from '../auth';
 
 // ---------------------------------------------------------------------------
 // Types
@@ -114,7 +115,10 @@ async function pollRelayerJob(jobId: string, options: PollOptions): Promise<Tran
 
   for (let attempt = 0; attempt < maxAttempts; attempt++) {
     try {
-      const token = options.getAuthToken ? await options.getAuthToken() : 'ancore-dashboard-token';
+      if (!options.getAuthToken) {
+        throw new AuthRequiredError();
+      }
+      const token = await options.getAuthToken();
 
       const response = await fetchImpl(`${baseUrl}/relay/status/${encodeURIComponent(jobId)}`, {
         headers: {

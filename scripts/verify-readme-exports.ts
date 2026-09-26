@@ -4,6 +4,29 @@ import * as path from 'path';
 const INDEX_PATH = path.join(__dirname, '../packages/core-sdk/src/index.ts');
 const README_PATH = path.join(__dirname, '../packages/core-sdk/README.md');
 
+function escapeRegExp(value: string): string {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
+
+/**
+ * An export counts as documented only when its name appears as a genuine API
+ * entry: a markdown heading, or wrapped in backticks (inline code or inside a
+ * fenced code block). A bare substring match anywhere in prose is not enough,
+ * since that can match unrelated sentences or other identifiers that merely
+ * contain this name.
+ */
+function isDocumented(exportName: string, readmeContent: string): boolean {
+  const escaped = escapeRegExp(exportName);
+
+  const headingRegex = new RegExp(`^#{1,6}\\s+.*\\b${escaped}\\b`, 'm');
+  if (headingRegex.test(readmeContent)) {
+    return true;
+  }
+
+  const backtickRegex = new RegExp('`[^`\\n]*\\b' + escaped + '\\b[^`\\n]*`');
+  return backtickRegex.test(readmeContent);
+}
+
 function main() {
   if (!fs.existsSync(INDEX_PATH)) {
     console.error(`Index file not found at: ${INDEX_PATH}`);
@@ -52,7 +75,7 @@ function main() {
 
   const missing: string[] = [];
   for (const exp of exports) {
-    if (!readmeContent.includes(exp)) {
+    if (!isDocumented(exp, readmeContent)) {
       missing.push(exp);
     }
   }

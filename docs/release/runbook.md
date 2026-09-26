@@ -102,3 +102,20 @@ Manual overrides are reserved for critical hotfixes where waiting for a full gat
 | 3 | Security Audit | Patch or triage vulnerable dependencies |
 | 4 | Observability Configs | Fix invalid Prometheus/Alertmanager YAML |
 | 5 | Release Docs | Ensure required docs exist; check BLOCKING items |
+
+---
+
+## 7. Mobile app release
+
+Mobile store builds use a separate tag prefix and workflow from the monorepo npm/WASM
+release. See [docs/release/mobile.md](./mobile.md) and
+[apps/mobile-app/RELEASE.md](../../apps/mobile-app/RELEASE.md).
+
+```bash
+# Bump marketing version across native projects
+node apps/mobile-app/scripts/set-app-version.mjs X.Y.Z
+
+# After merge, tag to trigger TestFlight + Play internal upload
+git tag -a mobile-vX.Y.Z -m "Mobile release vX.Y.Z"
+git push origin mobile-vX.Y.Z
+```

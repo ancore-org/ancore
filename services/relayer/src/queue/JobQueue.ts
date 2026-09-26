@@ -1,5 +1,5 @@
 import { randomUUID } from 'crypto';
-import type { Job, EnqueueOptions, DequeueResult, JobStatus } from './types';
+import type { Job, EnqueueOptions, DequeueResult, JobStatus, JobQueueContract } from './types';
 import { nextRetryAfter } from './backoff';
 
 const DEFAULT_MAX_ATTEMPTS = 5;
@@ -8,9 +8,9 @@ const DEFAULT_MAX_ATTEMPTS = 5;
  * In-memory job queue with idempotency, retry/backoff, and dead-letter support.
  *
  * Designed to be swapped for a persistent backend (Redis, Postgres, etc.) by
- * implementing the same interface.
+ * implementing the same interface. Retained as an in-memory adapter for unit tests.
  */
-export class JobQueue {
+export class JobQueue implements JobQueueContract {
   /** Primary store: jobId → Job */
   private readonly jobs = new Map<string, Job>();
   /** Idempotency index: idempotencyKey → jobId */

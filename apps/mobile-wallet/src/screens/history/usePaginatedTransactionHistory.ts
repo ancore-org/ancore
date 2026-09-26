@@ -26,6 +26,8 @@ type State = {
   retryCount: number;
 };
 
+type FetchMode = 'initial' | 'loadMore' | 'refresh';
+
 const DEFAULT_PAGE_SIZE = 20;
 const DEFAULT_MAX_RETRIES = 3;
 const DEFAULT_INITIAL_BACKOFF_MS = 1000;
@@ -53,8 +55,8 @@ const mergeUniqueTransactions = (
 export const usePaginatedTransactionHistory = ({
   adapter,
   pageSize = DEFAULT_PAGE_SIZE,
-  maxRetries: _maxRetries = DEFAULT_MAX_RETRIES,
-  initialBackoffMs: _initialBackoffMs = DEFAULT_INITIAL_BACKOFF_MS,
+  maxRetries = DEFAULT_MAX_RETRIES,
+  initialBackoffMs = DEFAULT_INITIAL_BACKOFF_MS,
   isOnline = getDefaultOnlineStatus(),
 }: Options) => {
   const [state, setState] = useState<State>({
@@ -70,16 +72,32 @@ export const usePaginatedTransactionHistory = ({
 
   const requestIdRef = useRef(0);
   const backoffTimeoutRef = useRef<ReturnType<typeof setTimeout> | undefined>();
+  const retryCountRef = useRef(0);
+
+  const clearScheduledRetry = useCallback(() => {
+    if (backoffTimeoutRef.current) {
+      clearTimeout(backoffTimeoutRef.current);
+      backoffTimeoutRef.current = undefined;
+    }
+  }, []);
 
   const fetchPage = useCallback(
     async ({
       mode,
       cursor,
+      isAutoRetry = false,
     }: {
-      mode: 'initial' | 'loadMore' | 'refresh';
+      mode: FetchMode;
       cursor: string | null;
+      isAutoRetry?: boolean;
     }) => {
+      clearScheduledRetry();
+
       const requestId = ++requestIdRef.current;
+
+      if (!isAutoRetry) {
+        retryCountRef.current = 0;
+      }
 
       if (!isOnline) {
         setState((prev) => ({
@@ -100,6 +118,7 @@ export const usePaginatedTransactionHistory = ({
         isRefreshing: mode === 'refresh',
         isOffline: false,
         error: null,
+        retryCount: retryCountRef.current,
       }));
 
       try {
@@ -108,6 +127,12 @@ export const usePaginatedTransactionHistory = ({
           pageSize,
         };
         const page = await adapter.fetchTransactionPage(params);
+
+        if (requestId !== requestIdRef.current) {
+          return;
+        }
+
+        retryCountRef.current = 0;
 
         setState((prev) => {
           if (requestId !== requestIdRef.current) {
@@ -124,32 +149,44 @@ export const usePaginatedTransactionHistory = ({
             isRefreshing: false,
             isOffline: false,
             error: null,
-          };
-        });
-      } catch (error) {
-        setState((prev) => {
-          if (requestId !== requestIdRef.current) {
-            return prev;
-          }
-
-          const historyError = detectErrorKind(error);
-          return {
-            ...prev,
-            isLoadingInitial: false,
-            isLoadingMore: false,
-            isRefreshing: false,
-            isOffline: false,
-            error: historyError,
             retryCount: 0,
           };
         });
+      } catch (error) {
+        if (requestId !== requestIdRef.current) {
+          return;
+        }
+
+        const historyError = detectErrorKind(error);
+        retryCountRef.current += 1;
+        const attempt = retryCountRef.current;
+
+        setState((prev) => ({
+          ...prev,
+          isLoadingInitial: false,
+          isLoadingMore: false,
+          isRefreshing: false,
+          isOffline: false,
+          error: historyError,
+          retryCount: attempt,
+        }));
+
+        if (attempt <= maxRetries) {
+          const backoffMs = initialBackoffMs * 2 ** (attempt - 1);
+          backoffTimeoutRef.current = setTimeout(() => {
+            if (requestId !== requestIdRef.current) {
+              return;
+            }
+            void fetchPage({ mode, cursor, isAutoRetry: true });
+          }, backoffMs);
+        }
       }
     },
-    [adapter, isOnline, pageSize]
+    [adapter, isOnline, pageSize, maxRetries, initialBackoffMs, clearScheduledRetry]
   );
 
   useEffect(() => {
-    fetchPage({ mode: 'initial', cursor: null });
+    void fetchPage({ mode: 'initial', cursor: null });
   }, [fetchPage]);
 
   const loadMore = useCallback(() => {
@@ -183,23 +220,20 @@ export const usePaginatedTransactionHistory = ({
   }, [fetchPage, state.items.length, state.nextCursor]);
 
   useEffect(() => {
-    const backoffTimeout = backoffTimeoutRef.current;
-
     return () => {
-      if (backoffTimeout) {
-        clearTimeout(backoffTimeout);
-      }
+      clearScheduledRetry();
     };
-  }, []);
+  }, [clearScheduledRetry]);
 
   return useMemo(
     () => ({
       ...state,
       hasMore: state.nextCursor !== null,
+      maxRetries,
       loadMore,
       refresh,
       retry,
     }),
-    [loadMore, refresh, retry, state]
+    [loadMore, refresh, retry, state, maxRetries]
   );
 };

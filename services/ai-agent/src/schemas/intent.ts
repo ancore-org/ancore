@@ -1,6 +1,7 @@
 import { z } from 'zod';
 import { InvoiceIntentSchema } from '../intents/invoice';
 import { amountStringSchema } from './amount';
+import { createRecipientSchema } from './recipient';
 
 /**
  * Payment intent schema validates requests to transfer funds.
@@ -9,7 +10,16 @@ export const paymentIntentSchema = z.object({
   type: z.literal('payment'),
   amount: amountStringSchema,
   asset: z.enum(['XLM', 'USDC']),
-  destination: z.string().min(1, 'Destination is required'),
+  /**
+   * A checksum-valid Stellar address, or an `@username` handle that
+   * ../recipients.ts resolves to one before the draft is returned (#1210).
+   */
+  destination: createRecipientSchema('Destination'),
+  /**
+   * Original `@handle` when `destination` was resolved from one. Absent when
+   * the caller supplied an address directly.
+   */
+  resolvedFrom: z.string().optional(),
   requiresConfirmation: z.boolean().optional(),
 });
 

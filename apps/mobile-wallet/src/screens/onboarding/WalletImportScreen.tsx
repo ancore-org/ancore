@@ -23,9 +23,7 @@ export function WalletImportScreen({ onBack = noop, onCancel = noop, onContinue 
       setError(null);
       onContinue(normalized);
     } else {
-      setError(
-        'Invalid recovery phrase. Please check each word is spelled correctly and you have exactly 12 words.'
-      );
+      setError('Invalid recovery phrase. Please check that each word is spelled correctly.');
     }
   };
 
@@ -45,7 +43,7 @@ export function WalletImportScreen({ onBack = noop, onCancel = noop, onContinue 
             setMnemonic(event.target.value);
             setError(null);
           }}
-          placeholder="Enter your 12-word recovery phrase"
+          placeholder="Enter your recovery phrase (12-24 words)"
           value={mnemonic}
         />
       </label>

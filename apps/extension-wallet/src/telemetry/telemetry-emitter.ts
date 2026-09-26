@@ -169,7 +169,7 @@ export function initTelemetry(config: TelemetryConfig): TelemetryEmitter {
 
 export function getTelemetry(): TelemetryEmitter {
   if (!defaultEmitter) {
-    const sessionId = `session_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+    const sessionId = `session_${Date.now()}_${Math.random().toString(36).slice(2, 11)}`;
     defaultEmitter = new TelemetryEmitter({
       enabled: false,
       sessionId,

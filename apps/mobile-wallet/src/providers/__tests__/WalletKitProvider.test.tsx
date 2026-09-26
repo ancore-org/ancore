@@ -208,7 +208,10 @@ describe('WalletKitProvider', () => {
 
   it('shows sign auth entry approval sheet on session_request', async () => {
     const mockWalletKit = createMockWalletKit() as any;
-    const entryXdr = Buffer.from('invoke_transfer_CABCDEF').toString('base64');
+    // Real base64-encoded SorobanAuthorizationEntry XDR (single invocation, no args),
+    // generated with @stellar/stellar-sdk - not a synthetic ASCII byte pattern.
+    const entryXdr =
+      'AAAAAAAAAAAAAAABAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEAAAAIdHJhbnNmZXIAAAAAAAAAAA==';
 
     mockWalletKit.getActiveSessions.mockReturnValue({
       'topic-auth': {
@@ -243,5 +246,54 @@ describe('WalletKitProvider', () => {
     await waitFor(() => {
       expect(screen.getByTestId('sign-auth-entry-sheet')).toBeInTheDocument();
     });
+  });
+
+  it('explicitly rejects a stellar_signAuthEntry request with unparseable XDR', async () => {
+    const mockWalletKit = createMockWalletKit() as any;
+    const malformedEntryXdr = Buffer.from('not a real xdr payload').toString('base64');
+
+    mockWalletKit.getActiveSessions.mockReturnValue({
+      'topic-auth': {
+        topic: 'topic-auth',
+        peer: { metadata: { name: 'WC dApp', url: 'https://wc.example' } },
+        namespaces: {},
+      },
+    });
+
+    render(
+      <WalletKitProvider projectId="test-project-id" walletKitInstance={mockWalletKit}>
+        <div>child</div>
+      </WalletKitProvider>
+    );
+
+    mockWalletKit.triggerEvent('session_request', {
+      id: 43,
+      topic: 'topic-auth',
+      session: {
+        topic: 'topic-auth',
+        peer: { metadata: { name: 'WC dApp', url: 'https://wc.example' } },
+        namespaces: {},
+      },
+      params: {
+        request: {
+          method: 'stellar_signAuthEntry',
+          params: { authEntry: malformedEntryXdr },
+        },
+      },
+    });
+
+    await waitFor(() => {
+      expect(mockWalletKit.respondSessionRequest).toHaveBeenCalledWith(
+        expect.objectContaining({
+          topic: 'topic-auth',
+          response: expect.objectContaining({
+            id: 43,
+            error: expect.objectContaining({ code: 4001 }),
+          }),
+        })
+      );
+    });
+
+    expect(screen.queryByTestId('sign-auth-entry-sheet')).not.toBeInTheDocument();
   });
 });

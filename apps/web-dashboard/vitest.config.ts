@@ -35,5 +35,22 @@ export default defineConfig({
     },
     setupFiles: ['../../packages/ensure-webcrypto.ts', './src/test/setup.ts'],
     testTimeout: 30000,
+    // `turbo run test` (the pre-push hook) runs every package's tests
+    // concurrently (capped at 4 via --concurrency, but each package's own
+    // runner defaults to spawning threads sized to the CPU count regardless
+    // of that outer cap). This suite leans on real userEvent timing rather
+    // than fake timers, so under that compounded oversubscription individual
+    // interactions have been observed taking 3-7s instead of ~100ms — enough
+    // to blow even the 30s test timeout and leave the next test's DOM in a
+    // half-settled state. Capping this suite's own pool keeps its footprint
+    // fixed and modest instead of scaling with (and fighting for) whatever
+    // the host machine has, which is what actually caused the timeouts.
+    pool: 'threads',
+    poolOptions: {
+      threads: {
+        maxThreads: 1,
+        minThreads: 1,
+      },
+    },
   },
 });

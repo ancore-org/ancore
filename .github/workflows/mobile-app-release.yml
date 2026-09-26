@@ -1,0 +1,234 @@
+name: Mobile App Release
+
+permissions:
+  contents: read
+
+on:
+  push:
+    tags:
+      - 'mobile-v*.*.*'
+  workflow_dispatch:
+    inputs:
+      ref_name:
+        description: Git commit, branch, or tag to build
+        type: string
+        default: ''
+      build_env:
+        description: Build environment
+        type: choice
+        default: dev
+        options:
+          - dev
+          - prod
+      upload_to_testflight:
+        description: Upload iOS build to TestFlight
+        type: choice
+        default: 'yes'
+        options:
+          - 'yes'
+          - 'no'
+      upload_to_google_play:
+        description: Upload Android build to Play internal track
+        type: choice
+        default: 'yes'
+        options:
+          - 'yes'
+          - 'no'
+      release_notes:
+        description: Optional release notes override
+        type: string
+        default: ''
+
+concurrency:
+  group: mobile-app-release-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  MOBILE_APP_DIR: apps/mobile-app
+  NODE_VERSION: '20'
+  RUBY_VERSION: '3.1.4'
+  JAVA_VERSION: '17'
+
+jobs:
+  ios:
+    name: iOS TestFlight
+    runs-on: macos-14
+    timeout-minutes: 60
+    env:
+      APPLE_CONNECT_KEY_ID: ${{ secrets.APPLE_CONNECT_KEY_ID }}
+      APPLE_CONNECT_ISSUER_ID: ${{ secrets.APPLE_CONNECT_ISSUER_ID }}
+      APPLE_CONNECT_KEY_CONTENT: ${{ secrets.APPLE_CONNECT_KEY_CONTENT }}
+      FASTLANE_GIT_URL: ${{ vars.FASTLANE_GIT_URL }}
+      MATCH_PASSWORD: ${{ secrets.FASTLANE_MATCH_PASSWORD }}
+      MATCH_GIT_TOKEN: ${{ secrets.FASTLANE_MATCH_GIT_TOKEN }}
+    steps:
+      - name: Set ref
+        run: |
+          if [[ -n "${{ github.event.inputs.ref_name }}" ]]; then
+            echo "REF_NAME=${{ github.event.inputs.ref_name }}" >> "$GITHUB_ENV"
+          else
+            echo "REF_NAME=${{ github.ref_name }}" >> "$GITHUB_ENV"
+          fi
+
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ env.REF_NAME }}
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v2
+        with:
+          version: 9
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: pnpm
+
+      - name: Install monorepo dependencies
+        run: corepack pnpm install --frozen-lockfile
+
+      - name: Build workspace dependencies
+        run: corepack pnpm --filter @ancore/mobile-wallet build
+
+      - name: Make scripts executable
+        working-directory: ${{ env.MOBILE_APP_DIR }}
+        run: chmod +x scripts/*.sh
+
+      - name: Generate release notes
+        working-directory: ${{ env.MOBILE_APP_DIR }}
+        env:
+          INPUT_RELEASE_NOTES: ${{ github.event.inputs.release_notes }}
+          REF_NAME: ${{ env.REF_NAME }}
+        run: ./scripts/generate-release-notes.sh
+
+      - name: Set mobile build env
+        working-directory: ${{ env.MOBILE_APP_DIR }}
+        env:
+          UPLOAD_TO_TESTFLIGHT: ${{ github.event_name == 'workflow_dispatch' && github.event.inputs.upload_to_testflight || 'yes' }}
+          UPLOAD_TO_GOOGLE_PLAY: ${{ github.event_name == 'workflow_dispatch' && github.event.inputs.upload_to_google_play || 'yes' }}
+        run: ./scripts/gh-mobile-env.sh "${{ github.event.inputs.build_env || 'prod' }}"
+
+      - name: Setup Ruby
+        uses: ruby/setup-ruby@v1
+        with:
+          ruby-version: ${{ env.RUBY_VERSION }}
+          bundler-cache: true
+          working-directory: ${{ env.MOBILE_APP_DIR }}
+
+      - name: Install CocoaPods
+        working-directory: ${{ env.MOBILE_APP_DIR }}/ios
+        run: pod install
+
+      - name: Build and upload iOS
+        working-directory: ${{ env.MOBILE_APP_DIR }}
+        run: bundle exec fastlane ios "${{ env.FASTLANE_LANE }}"
+
+      - name: Upload iOS artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: ios-${{ env.FASTLANE_LANE }}-${{ env.BUILD_VERSION }}
+          path: /tmp/build
+          retention-days: 14
+
+  android:
+    name: Android Play Internal
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    permissions:
+      contents: read
+      id-token: write
+    env:
+      ANDROID_DEV_KEYSTORE_CONTENT: ${{ secrets.ANDROID_DEV_KEYSTORE_CONTENT }}
+      ANDROID_PROD_KEYSTORE_CONTENT: ${{ secrets.ANDROID_PROD_KEYSTORE_CONTENT }}
+      ANDROID_DEV_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_DEV_KEYSTORE_PASSWORD }}
+      ANDROID_DEV_KEYSTORE_ALIAS: ${{ vars.ANDROID_DEV_KEYSTORE_ALIAS }}
+      ANDROID_PROD_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_PROD_KEYSTORE_PASSWORD }}
+      ANDROID_PROD_KEYSTORE_ALIAS: ${{ vars.ANDROID_PROD_KEYSTORE_ALIAS }}
+      GCP_WORKLOAD_IDENTITY_PROVIDER: ${{ vars.GCP_WORKLOAD_IDENTITY_PROVIDER }}
+      GCP_SERVICE_ACCOUNT_EMAIL: ${{ vars.GCP_SERVICE_ACCOUNT_EMAIL }}
+    steps:
+      - name: Set ref
+        run: |
+          if [[ -n "${{ github.event.inputs.ref_name }}" ]]; then
+            echo "REF_NAME=${{ github.event.inputs.ref_name }}" >> "$GITHUB_ENV"
+          else
+            echo "REF_NAME=${{ github.ref_name }}" >> "$GITHUB_ENV"
+          fi
+
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ env.REF_NAME }}
+
+      - name: Authenticate to Google Cloud
+        if: env.GCP_WORKLOAD_IDENTITY_PROVIDER != ''
+        uses: google-github-actions/auth@v2
+        with:
+          workload_identity_provider: ${{ env.GCP_WORKLOAD_IDENTITY_PROVIDER }}
+          service_account: ${{ env.GCP_SERVICE_ACCOUNT_EMAIL }}
+
+      - name: Set Fastlane Google credentials
+        if: env.GCP_WORKLOAD_IDENTITY_PROVIDER != ''
+        run: echo "SUPPLY_JSON_KEY=$GOOGLE_APPLICATION_CREDENTIALS" >> "$GITHUB_ENV"
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v2
+        with:
+          version: 9
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: pnpm
+
+      - name: Setup JDK
+        uses: actions/setup-java@v4
+        with:
+          java-version: ${{ env.JAVA_VERSION }}
+          distribution: zulu
+          cache: gradle
+
+      - name: Install monorepo dependencies
+        run: corepack pnpm install --frozen-lockfile
+
+      - name: Build workspace dependencies
+        run: corepack pnpm --filter @ancore/mobile-wallet build
+
+      - name: Make scripts executable
+        working-directory: ${{ env.MOBILE_APP_DIR }}
+        run: chmod +x scripts/*.sh
+
+      - name: Generate release notes
+        working-directory: ${{ env.MOBILE_APP_DIR }}
+        env:
+          INPUT_RELEASE_NOTES: ${{ github.event.inputs.release_notes }}
+          REF_NAME: ${{ env.REF_NAME }}
+        run: ./scripts/generate-release-notes.sh
+
+      - name: Set mobile build env
+        working-directory: ${{ env.MOBILE_APP_DIR }}
+        env:
+          UPLOAD_TO_TESTFLIGHT: ${{ github.event_name == 'workflow_dispatch' && github.event.inputs.upload_to_testflight || 'yes' }}
+          UPLOAD_TO_GOOGLE_PLAY: ${{ github.event_name == 'workflow_dispatch' && github.event.inputs.upload_to_google_play || 'yes' }}
+        run: ./scripts/gh-mobile-env.sh "${{ github.event.inputs.build_env || 'prod' }}"
+
+      - name: Setup Ruby
+        uses: ruby/setup-ruby@v1
+        with:
+          ruby-version: ${{ env.RUBY_VERSION }}
+          bundler-cache: true
+          working-directory: ${{ env.MOBILE_APP_DIR }}
+
+      - name: Build and upload Android
+        working-directory: ${{ env.MOBILE_APP_DIR }}
+        run: bundle exec fastlane android "${{ env.FASTLANE_LANE }}"
+
+      - name: Upload Android artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: android-${{ env.FASTLANE_LANE }}-${{ env.BUILD_VERSION }}
+          path: apps/mobile-app/android/app/build/outputs/bundle/${{ env.ANDROID_FLAVOR }}Release/
+          retention-days: 14

@@ -43,8 +43,9 @@ export const SessionApprovalSheet: React.FC<SessionApprovalSheetProps> = ({
   ].flatMap((ns) => ns.methods ?? []);
 
   return (
-    <div className="session-approval-sheet">
+    <div className="session-approval-sheet" role="dialog" aria-label="Approve Session">
       <div className="session-approval-content">
+        <h2>Approve Session</h2>
         {/* dApp Info */}
         <div className="dapp-info">
           {metadata.icons && metadata.icons.length > 0 && (
@@ -72,8 +73,8 @@ export const SessionApprovalSheet: React.FC<SessionApprovalSheetProps> = ({
           <button onClick={onReject} className="reject-button">
             Reject
           </button>
-          <button onClick={onApprove} className="approve-button">
-            Connect
+          <button onClick={onApprove} className="approve-button" type="button">
+            Approve
           </button>
         </div>
       </div>

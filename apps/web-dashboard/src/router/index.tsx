@@ -25,6 +25,23 @@ import {
 import { cn } from '@ancore/ui-kit';
 
 import { DashboardAuthProvider, useDashboardAuth } from '../auth';
+import { AppErrorBoundary, RouteErrorBoundary } from '../components/AppErrorBoundary';
+
+/**
+ * This is the app's only router. A second `BrowserRouter` lived in
+ * `src/App.tsx` with a different, partly broken set of paths (`/send`,
+ * `/request`, `/scan` at the root, and a `/transactions` route hardcoded to
+ * `transactions={[]}`). Nothing imported it — not `main.tsx`, not
+ * `index.html`, not a test — so it was never mounted, but it was the obvious
+ * place to look when a nav link appeared dead, and it is the likely source of
+ * the earlier "dead nav route" reports. It has been deleted (#1347).
+ *
+ * Removing it orphaned the modules only it referenced: `components/Layout`,
+ * `pages/Account`, `pages/Dashboard`, `pages/SplitBill` and
+ * `pages/SplitBillDetail`. They are left in place rather than deleted in the
+ * same change — whether those features should be routed here or dropped is a
+ * product decision, not a dead-code cleanup, and their tests still pass.
+ */
 import { BulkPayoutsPage } from '../pages/BulkPayouts';
 import { ScheduledTransfersPage } from '../pages/ScheduledTransfers';
 import { SendPage } from '../pages/Send';
@@ -181,7 +198,11 @@ function DashboardLayout() {
       </aside>
       <main className="min-w-0 px-5 py-7 sm:px-8 lg:px-10 lg:py-10">
         <div className="mx-auto max-w-6xl">
-          <Outlet />
+          {/* Inside the shell, so a page that throws leaves the navigation
+              usable and the user can walk away from it (#1348). */}
+          <RouteErrorBoundary>
+            <Outlet />
+          </RouteErrorBoundary>
         </div>
       </main>
     </div>
@@ -405,20 +426,27 @@ export function DashboardRouterContent() {
 
 export function DashboardApp() {
   return (
-    <BrowserRouter>
-      <DashboardAuthProvider>
-        <DashboardRouterContent />
-      </DashboardAuthProvider>
-    </BrowserRouter>
+    // Outside the router and the auth provider, so a throw in either is still
+    // caught. This is the last line before React unmounts the whole tree and
+    // leaves a blank page (#1348).
+    <AppErrorBoundary>
+      <BrowserRouter>
+        <DashboardAuthProvider>
+          <DashboardRouterContent />
+        </DashboardAuthProvider>
+      </BrowserRouter>
+    </AppErrorBoundary>
   );
 }
 
 export function DashboardAppTestHarness({ initialEntries }: { initialEntries: string[] }) {
   return (
-    <MemoryRouter initialEntries={initialEntries}>
-      <DashboardAuthProvider>
-        <DashboardRouterContent />
-      </DashboardAuthProvider>
-    </MemoryRouter>
+    <AppErrorBoundary>
+      <MemoryRouter initialEntries={initialEntries}>
+        <DashboardAuthProvider>
+          <DashboardRouterContent />
+        </DashboardAuthProvider>
+      </MemoryRouter>
+    </AppErrorBoundary>
   );
 }

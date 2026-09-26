@@ -1,0 +1,11 @@
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+    <application android:name="org.ancore.wallet.dev.MainApplication">
+        <receiver
+            android:name="org.ancore.wallet.dev.MockWalletConnectReceiver"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="org.ancore.wallet.dev.MOCK_WC_REQUEST" />
+            </intent-filter>
+        </receiver>
+    </application>
+</manifest>

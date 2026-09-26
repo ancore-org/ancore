@@ -11,10 +11,21 @@ describe('encoding utilities', () => {
     expect(fromBase64(b64)).toEqual(bytes);
   });
 
+  // encoding.ts now re-exports the canonical signature-format.ts codec, which
+  // signals invalid input with Error rather than the removed duplicate's
+  // TypeError. Rejection behaviour is otherwise identical.
   it('rejects invalid hex and invalid base64', () => {
-    expect(() => fromHex('abc')).toThrow(TypeError);
-    expect(() => fromHex('zz')).toThrow(TypeError);
-    expect(() => fromBase64('@@@')).toThrow(TypeError);
+    expect(() => fromHex('abc')).toThrow(Error);
+    expect(() => fromHex('zz')).toThrow(Error);
+    expect(() => fromBase64('@@@')).toThrow(Error);
+  });
+
+  it('resolves to the same codec exposed by the package entry point', async () => {
+    const entry = await import('../index');
+    expect(entry.toHex).toBe(toHex);
+    expect(entry.fromHex).toBe(fromHex);
+    expect(entry.toBase64).toBe(toBase64);
+    expect(entry.fromBase64).toBe(fromBase64);
   });
 });
 

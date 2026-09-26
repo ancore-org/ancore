@@ -1,12 +1,9 @@
-import {
-  ANCORE_DEEP_LINK_PREFIX,
-  getWalletConnectNavigationState,
-  mobileWalletDeepLinking,
-} from '../deepLinkConfig';
+import { getWalletConnectDeepLinkPrefixes } from '../walletconnect';
+import { getWalletConnectNavigationState, mobileWalletDeepLinking } from '../deepLinkConfig';
 
 describe('mobileWalletDeepLinking', () => {
-  it('registers the ancore:// prefix and WCPairing screen path', () => {
-    expect(mobileWalletDeepLinking.prefixes).toEqual([ANCORE_DEEP_LINK_PREFIX]);
+  it('registers WalletConnect deep link prefixes and WCPairing screen path', () => {
+    expect(mobileWalletDeepLinking.prefixes).toEqual(getWalletConnectDeepLinkPrefixes());
     expect(mobileWalletDeepLinking.config.screens.WCPairing).toBe('wc');
   });
 

@@ -39,4 +39,29 @@ describe('formatFiatAmount', () => {
     const result = formatFiatAmount(1234.56, { currency: 'INVALID_CURRENCY' });
     expect(result).toBe('1234.56 INVALID_CURRENCY');
   });
+
+  describe('non-finite amounts', () => {
+    it.each([
+      ['NaN', NaN],
+      ['Infinity', Infinity],
+      ['-Infinity', -Infinity],
+    ])('throws a RangeError for %s instead of formatting it', (_label, amount) => {
+      expect(() => formatFiatAmount(amount)).toThrow(RangeError);
+    });
+
+    it('names the offending value in the error message', () => {
+      expect(() => formatFiatAmount(NaN)).toThrow(/finite amount, received NaN/);
+    });
+
+    it('throws before the invalid-currency fallback can format it', () => {
+      // The fallback path uses amount.toFixed(), which would otherwise emit
+      // "NaN INVALID_CURRENCY" rather than surfacing the bad input.
+      expect(() => formatFiatAmount(NaN, { currency: 'INVALID_CURRENCY' })).toThrow(RangeError);
+    });
+
+    it('still formats finite edge values', () => {
+      expect(formatFiatAmount(0)).toBe('$0.00');
+      expect(formatFiatAmount(-1234.56)).toBe('-$1,234.56');
+    });
+  });
 });

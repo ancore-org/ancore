@@ -1,5 +1,9 @@
 import React from 'react';
-import { getRemainingCharacters, MAX_NOTE_LENGTH, truncateTransferNote } from '@/utils/note-validation';
+import {
+  getRemainingCharacters,
+  MAX_NOTE_LENGTH,
+  truncateTransferNote,
+} from '@/utils/note-validation';
 import { Field } from '@ancore/ui-kit';
 
 interface TransferNoteInputProps {

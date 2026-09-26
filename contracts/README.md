@@ -15,6 +15,33 @@ Soroban smart contracts for the Ancore account abstraction system.
 | Multi-sig Auth     | 🚧 Planned     | See tracking issue [#990](https://github.com/ancore-org/ancore/issues/990).                     |
 | Passkey Auth       | 🚧 Planned     | WebAuthn secp256r1. See tracking issue [#971](https://github.com/ancore-org/ancore/issues/971). |
 
+## Live on Testnet
+
+The account contract WASM is deployed and installed on Stellar testnet — the
+hash below is reusable, so a new deploy doesn't need to re-upload it:
+
+|                    |                                                                                                                                                                                   |
+| :----------------- | :-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| WASM hash          | `0f5095c3dc59aee4302aa10a272a00b9e063ed8667439aa0e397d8e377620ae3`                                                                                                                |
+| Reference instance | [`CDIOEH26CW3LCA7L2ZTFJOQR5SW5KRAAEFAPJMRYVEDEDXGIHG37WAVE`](https://stellar.expert/explorer/testnet/contract/CDIOEH26CW3LCA7L2ZTFJOQR5SW5KRAAEFAPJMRYVEDEDXGIHG37WAVE)           |
+| Deploy tx          | [`9eeb0a2663cc93bff58a4d80ad013fc67476cb82f38e14345a34e496ae0f6d30`](https://stellar.expert/explorer/testnet/tx/9eeb0a2663cc93bff58a4d80ad013fc67476cb82f38e14345a34e496ae0f6d30) |
+
+The reference instance above is owned by a disposable local testing identity —
+it exists to prove the deploy → initialize → `get_owner()` round trip against
+real testnet, not as a shared account. Every real user gets their own
+instance, deployed by the extension during onboarding (`deployAccount` in
+`apps/extension-wallet/src/services/deploy-account.ts`).
+
+That instance's address is **deterministic**, not assigned after the fact:
+`deriveContractId(ownerPublicKey, network)` in `@ancore/core-sdk`
+(`packages/core-sdk/src/wallet.ts`) computes it client-side, offline, before
+any deploy happens, replicating Soroban's own `HashIdPreimage::ContractId`
+address derivation — network id + the owner as the `createCustomContract`
+deployer + a fixed, well-known 32-byte salt (`ACCOUNT_CONTRACT_SALT`, all
+zero bytes). `deployAccount` then deploys to exactly that address using the
+same salt. This is what lets onboarding show a receive address immediately
+and lets a reimport find an existing account without a lookup service.
+
 ## Structure
 
 ```

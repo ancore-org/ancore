@@ -157,6 +157,11 @@ jobs:
       - name: Check formatting
         run: pnpm format:check
 
+      # Separate step so a CR-only file is reported distinctly from an
+      # ordinary formatting miss — Prettier cannot flag it (#1353).
+      - name: Check line endings
+        run: pnpm check:line-endings
+
   typecheck:
     name: Type Check
     runs-on: ubuntu-latest

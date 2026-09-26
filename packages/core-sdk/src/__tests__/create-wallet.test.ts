@@ -114,9 +114,9 @@ describe('createWallet orchestration', () => {
     expect(result.encryptedMnemonic).toBeUndefined();
   });
 
-  it('calls deriveContractId with the derived public key', async () => {
+  it('calls deriveContractId with the derived public key, defaulting to testnet', async () => {
     await createWallet();
-    expect(deriveContractId).toHaveBeenCalledWith('GABC1234PUBLICKEY');
+    expect(deriveContractId).toHaveBeenCalledWith('GABC1234PUBLICKEY', 'testnet');
   });
 
   it('returns contractId derived from publicKey via mock', async () => {

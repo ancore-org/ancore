@@ -1,3 +1,4 @@
 <resources>
+    <!-- Overridden per flavor via resValue in build.gradle -->
     <string name="app_name">Ancore Wallet</string>
 </resources>

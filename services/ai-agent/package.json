@@ -18,6 +18,8 @@
   ],
   "license": "Apache-2.0",
   "dependencies": {
+    "@ancore/account-abstraction": "workspace:*",
+    "@ancore/types": "workspace:*",
     "@anthropic-ai/sdk": "^0.115.0",
     "express": "^4.18.2",
     "zod": "^3.22.4"
@@ -34,6 +36,7 @@
     "typescript": "^5.3.0"
   },
   "jest": {
+    "maxWorkers": 2,
     "preset": "ts-jest",
     "testEnvironment": "node",
     "testMatch": [

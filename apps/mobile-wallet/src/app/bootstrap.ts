@@ -1,4 +1,8 @@
-// @ts-nocheck
+import {
+  createAccountPersistence,
+  type SecureStorageManager,
+  type AccountPersistence,
+} from '@ancore/core-sdk';
 import { createReadOnlyAccount, type ReadOnlyAccount } from '../accounts';
 import {
   loadMobileWalletEnvironment,
@@ -7,15 +11,16 @@ import {
 } from '../config/environment';
 import { createMobileWalletSdkClient, type MobileWalletSdkClient } from '../sdk';
 
-import { MobileSecureVault } from '../security';
-import { KeychainSecureStoreAdapter } from '../security/KeychainAdapter';
-import { MemorySecureStoreAdapter } from '../storage/mobile-secure-storage-adapter';
+import { createMobileSecureStorageManager } from '../security/mobile-storage-manager';
+import { createSecureStoreAdapter } from '../storage/secure-store-factory';
 
 export interface MobileWalletBootstrap {
   environment: MobileWalletEnvironment;
   sdk: MobileWalletSdkClient;
   account: ReadOnlyAccount;
-  vault: MobileSecureVault;
+  storageManager: SecureStorageManager;
+  accounts: AccountPersistence;
+  dispose: () => void;
 }
 
 export const bootstrapMobileWallet = (source: MobileWalletEnvSource): MobileWalletBootstrap => {
@@ -27,14 +32,16 @@ export const bootstrapMobileWallet = (source: MobileWalletEnvSource): MobileWall
     network: sdk.network,
   });
 
-  const isTest = typeof process !== 'undefined' && process.env?.NODE_ENV === 'test';
-  const adapter = isTest ? new MemorySecureStoreAdapter() : new KeychainSecureStoreAdapter();
-  const vault = new MobileSecureVault(adapter);
+  const adapter = createSecureStoreAdapter();
+  const { manager: storageManager, dispose } = createMobileSecureStorageManager(adapter);
+  const accounts = createAccountPersistence(storageManager);
 
   return {
     environment,
     sdk,
     account,
-    vault,
+    storageManager,
+    accounts,
+    dispose,
   };
 };

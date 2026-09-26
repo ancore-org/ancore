@@ -8,7 +8,9 @@
 //! independently verify that the declaration matches the actual WASM at
 //! `new_wasm_hash` before signing or broadcasting the proposal.
 
-use soroban_sdk::{BytesN, Env, String, Vec};
+use soroban_sdk::{BytesN, Env};
+#[cfg(test)]
+use soroban_sdk::{String, Vec};
 
 use crate::{ContractValidation, UpgradeError, WasmAttestation};
 
@@ -53,6 +55,7 @@ pub fn validate_wasm_metadata(
 }
 
 /// Build a validation policy that requires specific exported function names.
+#[cfg(test)]
 pub fn require_exports(env: &Env, names: Vec<String>) -> ContractValidation {
     ContractValidation {
         min_wasm_size: 1024,
@@ -63,6 +66,7 @@ pub fn require_exports(env: &Env, names: Vec<String>) -> ContractValidation {
 }
 
 /// Build a validation policy that forbids specific import patterns.
+#[cfg(test)]
 pub fn forbid_imports(env: &Env, patterns: Vec<String>) -> ContractValidation {
     ContractValidation {
         min_wasm_size: 1024,
@@ -73,6 +77,7 @@ pub fn forbid_imports(env: &Env, patterns: Vec<String>) -> ContractValidation {
 }
 
 /// Merge two validation configs (intersection of constraints).
+#[cfg(test)]
 pub fn merge_validation(
     env: &Env,
     a: &ContractValidation,
@@ -283,8 +288,65 @@ mod tests {
             v
         });
         let merged = merge_validation(&env, &a, &b);
-        assert!(merged.required_exports.contains(String::from_str(&env, "upgrade")));
-        assert!(!merged.required_exports.contains(String::from_str(&env, "get_version")));
-        assert!(!merged.required_exports.contains(String::from_str(&env, "migrate")));
+        assert!(merged
+            .required_exports
+            .contains(String::from_str(&env, "upgrade")));
+        assert!(!merged
+            .required_exports
+            .contains(String::from_str(&env, "get_version")));
+        assert!(!merged
+            .required_exports
+            .contains(String::from_str(&env, "migrate")));
+    }
+
+    /// `merge_validation`'s forbidden-imports side is a union (either policy's
+    /// forbidden name is forbidden in the merged result) — the opposite of the
+    /// required-exports intersection tested above. Previously untested.
+    #[test]
+    fn test_merge_validation_forbidden_imports_union() {
+        let env = Env::default();
+        let a = forbid_imports(&env, {
+            let mut v = Vec::new(&env);
+            v.push_back(String::from_str(&env, "dangerous_fn"));
+            v
+        });
+        let b = forbid_imports(&env, {
+            let mut v = Vec::new(&env);
+            v.push_back(String::from_str(&env, "dangerous_fn")); // duplicate, must not double up
+            v.push_back(String::from_str(&env, "other_dangerous_fn"));
+            v
+        });
+        let merged = merge_validation(&env, &a, &b);
+        assert_eq!(merged.forbidden_imports.len(), 2);
+        assert!(merged
+            .forbidden_imports
+            .contains(String::from_str(&env, "dangerous_fn")));
+        assert!(merged
+            .forbidden_imports
+            .contains(String::from_str(&env, "other_dangerous_fn")));
+    }
+
+    /// A policy built with `forbid_imports` alone (no required exports, a
+    /// default size range) correctly rejects an attestation carrying that
+    /// import — exercising the builder end-to-end through the real
+    /// enforcement function, not just its own struct construction.
+    #[test]
+    fn test_forbid_imports_policy_rejects_matching_import() {
+        let env = Env::default();
+        let policy = forbid_imports(&env, {
+            let mut v = Vec::new(&env);
+            v.push_back(String::from_str(&env, "dangerous_fn"));
+            v
+        });
+        let mut imports = Vec::new(&env);
+        imports.push_back(String::from_str(&env, "dangerous_fn"));
+        let attestation = WasmAttestation {
+            wasm_size: 4096,
+            exports: Vec::new(&env),
+            imports,
+        };
+        let hash = BytesN::from_array(&env, &[1u8; 32]);
+        let result = validate_wasm_metadata(&env, &hash, &policy, &attestation);
+        assert!(matches!(result, Err(UpgradeError::ForbiddenImportDetected)));
     }
 }

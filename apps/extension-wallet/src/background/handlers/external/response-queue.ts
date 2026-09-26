@@ -28,7 +28,15 @@ function getChromeSession(): chrome['storage']['session'] | null {
 export function writeSessionEntry(entry: SessionQueueEntry): void {
   const session = getChromeSession();
   if (session) {
-    session.set({ [entry.requestId]: entry });
+    session.set({ [entry.requestId]: entry }, () => {
+      const lastError = (globalThis as { chrome?: typeof chrome }).chrome?.runtime?.lastError;
+      if (lastError) {
+        console.error(
+          `chrome.storage.session.set failed for ${entry.requestId}:`,
+          lastError.message ?? lastError
+        );
+      }
+    });
   }
 }
 
@@ -40,7 +48,16 @@ export function getSessionEntry(requestId: string): Promise<SessionQueueEntry | 
       return;
     }
     session.get(requestId, (result: Record<string, unknown>) => {
-      const entry = result[requestId];
+      const lastError = (globalThis as { chrome?: typeof chrome }).chrome?.runtime?.lastError;
+      if (lastError) {
+        console.error(
+          `chrome.storage.session.get failed for ${requestId}:`,
+          lastError.message ?? lastError
+        );
+        resolve(null);
+        return;
+      }
+      const entry = result ? result[requestId] : undefined;
       resolve((entry as SessionQueueEntry | undefined) ?? null);
     });
   });
@@ -49,9 +66,19 @@ export function getSessionEntry(requestId: string): Promise<SessionQueueEntry | 
 export function clearSessionEntry(requestId: string): void {
   const session = getChromeSession();
   if (session) {
-    session.remove(requestId);
+    session.remove(requestId, () => {
+      const lastError = (globalThis as { chrome?: typeof chrome }).chrome?.runtime?.lastError;
+      if (lastError) {
+        console.error(
+          `chrome.storage.session.remove failed for ${requestId}:`,
+          lastError.message ?? lastError
+        );
+      }
+    });
   }
 }
+
+export const DEFAULT_APPROVAL_TTL_MS = 15 * 60 * 1000;
 
 // ── Approval queue (in-memory + session-persisted) ───────────────────────────
 
@@ -68,6 +95,7 @@ export function enqueueApproval(
   method: string,
   params: unknown
 ): void {
+  sweepStaleRequests();
   const entry: ApprovalQueueEntry = {
     requestId,
     origin,
@@ -109,12 +137,15 @@ export function clearApprovals(): void {
 
 /**
  * Resolve map for async request/response pattern.
- * Stores resolve/reject functions for pending requests.
+ * Stores resolve/reject functions for pending requests with a creation timestamp.
  */
-const responseCallbacks = new Map<
-  string,
-  { resolve: (value: unknown) => void; reject: (error: Error) => void }
->();
+interface ResponseCallbackEntry {
+  resolve: (value: unknown) => void;
+  reject: (error: Error) => void;
+  timestamp: number;
+}
+
+const responseCallbacks = new Map<string, ResponseCallbackEntry>();
 
 /**
  * Register callbacks for a request.
@@ -124,7 +155,35 @@ export function registerResponseCallbacks(
   resolve: (value: unknown) => void,
   reject: (error: Error) => void
 ): void {
-  responseCallbacks.set(requestId, { resolve, reject });
+  sweepStaleRequests();
+  responseCallbacks.set(requestId, { resolve, reject, timestamp: Date.now() });
+}
+
+/**
+ * Sweeps and rejects any pending approvals or response callbacks older than ttlMs.
+ * Returns the number of stale entries cleaned up.
+ */
+export function sweepStaleRequests(ttlMs: number = DEFAULT_APPROVAL_TTL_MS): number {
+  const now = Date.now();
+  const staleIds = new Set<string>();
+
+  for (const [requestId, entry] of pendingApprovals.entries()) {
+    if (now - entry.timestamp > ttlMs) {
+      staleIds.add(requestId);
+    }
+  }
+
+  for (const [requestId, entry] of responseCallbacks.entries()) {
+    if (now - entry.timestamp > ttlMs) {
+      staleIds.add(requestId);
+    }
+  }
+
+  for (const requestId of staleIds) {
+    rejectRequest(requestId, new Error('Approval request timed out'));
+  }
+
+  return staleIds.size;
 }
 
 /**
@@ -138,6 +197,7 @@ export function resolveRequest(requestId: string, result: unknown): void {
     callbacks.resolve(result);
     responseCallbacks.delete(requestId);
   }
+  removeApproval(requestId);
   writeSessionEntry({ requestId, status: 'resolved', result });
 }
 
@@ -152,6 +212,7 @@ export function rejectRequest(requestId: string, error: Error): void {
     callbacks.reject(error);
     responseCallbacks.delete(requestId);
   }
+  removeApproval(requestId);
   writeSessionEntry({ requestId, status: 'rejected', error: error.message });
 }
 

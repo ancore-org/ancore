@@ -59,13 +59,13 @@ describe('createIdempotencyMiddleware', () => {
     expect(store.size()).toBe(0);
   });
 
-  it('caches successful 2xx responses (200, 201)', () => {
+  it('caches successful 2xx responses (200, 201)', async () => {
     const middleware = createIdempotencyMiddleware(store);
     const req = createMockReq({ 'idempotency-key': 'key-200' });
     const res = createMockRes(200);
     const next = jest.fn();
 
-    middleware(req, res, next);
+    await middleware(req, res, next);
     expect(next).toHaveBeenCalledTimes(1);
 
     // Downstream handler sends JSON response
@@ -77,7 +77,7 @@ describe('createIdempotencyMiddleware', () => {
     });
   });
 
-  it('replays cached response on subsequent requests with identical key', () => {
+  it('replays cached response on subsequent requests with identical key', async () => {
     const middleware = createIdempotencyMiddleware(store);
     store.set('replayed-key', {
       statusCode: 200,
@@ -88,20 +88,20 @@ describe('createIdempotencyMiddleware', () => {
     const res = createMockRes();
     const next = jest.fn();
 
-    middleware(req, res, next);
+    await middleware(req, res, next);
 
     expect(next).not.toHaveBeenCalled();
     expect(res.statusCalls).toEqual([200]);
     expect(res.jsonPayload).toEqual({ txId: 'abc-123' });
   });
 
-  it('does NOT cache 4xx client error responses (issue #1265)', () => {
+  it('does NOT cache 4xx client error responses (issue #1265)', async () => {
     const middleware = createIdempotencyMiddleware(store);
     const req = createMockReq({ 'idempotency-key': 'failed-400-key' });
     const res = createMockRes(400);
     const next = jest.fn();
 
-    middleware(req, res, next);
+    await middleware(req, res, next);
     expect(next).toHaveBeenCalledTimes(1);
 
     res.json({ error: 'Validation failed' });
@@ -109,7 +109,7 @@ describe('createIdempotencyMiddleware', () => {
     expect(store.get('failed-400-key')).toBeUndefined();
   });
 
-  it('does NOT cache 5xx server error responses and allows subsequent retry (issue #1265)', () => {
+  it('does NOT cache 5xx server error responses and allows subsequent retry (issue #1265)', async () => {
     const middleware = createIdempotencyMiddleware(store);
     const key = 'transient-500-key';
 
@@ -118,7 +118,7 @@ describe('createIdempotencyMiddleware', () => {
     const res1 = createMockRes(500);
     const next1 = jest.fn();
 
-    middleware(req1, res1, next1);
+    await middleware(req1, res1, next1);
     expect(next1).toHaveBeenCalledTimes(1);
 
     res1.json({ error: 'Internal server error' });
@@ -129,7 +129,7 @@ describe('createIdempotencyMiddleware', () => {
     const res2 = createMockRes(200);
     const next2 = jest.fn();
 
-    middleware(req2, res2, next2);
+    await middleware(req2, res2, next2);
     expect(next2).toHaveBeenCalledTimes(1);
 
     res2.json({ success: true, result: 'recovered' });

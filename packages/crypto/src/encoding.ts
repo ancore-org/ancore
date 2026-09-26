@@ -1,20 +1,12 @@
-/** Encodes a Uint8Array to a lowercase hex string */
-export function toHex(bytes: Uint8Array): string {
-  return Buffer.from(bytes).toString('hex');
-}
+/**
+ * Base58 codec.
+ *
+ * Hex and base64 live in signature-format.ts, which is the canonical codec for
+ * this package and the one re-exported from index.ts. They are re-exported here
+ * so importing this module directly cannot pick up a divergent implementation.
+ */
 
-/** Decodes a hex string to Uint8Array */
-export function fromHex(hex: string): Uint8Array {
-  if (hex.length % 2 !== 0 || !/^[0-9a-fA-F]*$/.test(hex)) {
-    throw new TypeError('invalid hex string');
-  }
-  return new Uint8Array(Buffer.from(hex, 'hex'));
-}
-
-/** Encodes a Uint8Array to a base64 string */
-export function toBase64(bytes: Uint8Array): string {
-  return Buffer.from(bytes).toString('base64');
-}
+export { toHex, fromHex, toBase64, fromBase64 } from './signature-format';
 
 const BASE58_ALPHABET = '123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz';
 
@@ -23,7 +15,10 @@ export function toBase58(bytes: Uint8Array): string {
   if (!(bytes instanceof Uint8Array)) {
     throw new TypeError('input must be a Uint8Array');
   }
-  let num = BigInt('0x' + (bytes.length ? Buffer.from(bytes).toString('hex') : '00'));
+  let num = 0n;
+  for (const byte of bytes) {
+    num = num * 256n + BigInt(byte);
+  }
   let result = '';
   while (num > 0n) {
     result = BASE58_ALPHABET[Number(num % 58n)] + result;
@@ -47,29 +42,20 @@ export function fromBase58(s: string): Uint8Array {
     if (idx === -1) throw new TypeError('invalid base58 string');
     num = num * 58n + BigInt(idx);
   }
-  const hex =
-    num === 0n
-      ? ''
-      : num.toString(16).padStart(num.toString(16).length + (num.toString(16).length % 2), '0');
-  const bytes = hex ? new Uint8Array(Buffer.from(hex, 'hex')) : new Uint8Array(0);
+
+  const digits: number[] = [];
+  while (num > 0n) {
+    digits.unshift(Number(num % 256n));
+    num /= 256n;
+  }
+
   let leadingZeros = 0;
   for (const ch of s) {
     if (ch !== '1') break;
     leadingZeros++;
   }
-  const result = new Uint8Array(leadingZeros + bytes.length);
-  result.set(bytes, leadingZeros);
-  return result;
-}
 
-/** Decodes a base64 string to Uint8Array */
-export function fromBase64(b64: string): Uint8Array {
-  // Normalize padding before round-trip check so unpadded inputs are accepted
-  const normalized = b64.replace(/=+$/, '');
-  const padded = normalized + '==='.slice((normalized.length + 3) % 4);
-  const decoded = Buffer.from(padded, 'base64');
-  if (decoded.toString('base64') !== padded) {
-    throw new TypeError('invalid base64 string');
-  }
-  return new Uint8Array(decoded);
+  const result = new Uint8Array(leadingZeros + digits.length);
+  result.set(digits, leadingZeros);
+  return result;
 }

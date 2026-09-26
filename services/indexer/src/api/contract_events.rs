@@ -6,6 +6,7 @@ use serde::{Deserialize, Serialize};
 use sqlx::PgPool;
 use uuid::Uuid;
 
+use crate::api::validation::validate_account_id;
 use crate::error::Result;
 use crate::repositories::contract_events::{MAX_LIMIT, MIN_LIMIT};
 use crate::schema::contract_event::{ContractEvent, ContractEventFilter};
@@ -65,22 +66,6 @@ fn validate_contract_address(id: &str) -> Result<()> {
     if id.len() != 56 || !id.starts_with('C') {
         return Err(crate::error::ApiError::InvalidFilter(
             "contract must be a valid Stellar contract address (56 characters starting with C)"
-                .to_string(),
-        ));
-    }
-    Ok(())
-}
-
-/// Validate Stellar account ID format (G-address strkey).
-fn validate_account_id(id: &str) -> Result<()> {
-    if id.is_empty() {
-        return Err(crate::error::ApiError::InvalidFilter(
-            "account cannot be empty".to_string(),
-        ));
-    }
-    if id.len() != 56 || !id.starts_with('G') {
-        return Err(crate::error::ApiError::InvalidFilter(
-            "account must be a valid Stellar public key (56 characters starting with G)"
                 .to_string(),
         ));
     }
@@ -229,8 +214,17 @@ mod tests {
 
     #[test]
     fn validate_account_id_accepts_g_strkey() {
+        let addr = "GBBM6BKZPEHWYO3E3YKREDPQXMS4VK35YLNU7NFBRI26RAN7GI5POFBB";
+        assert!(validate_account_id(addr).is_ok());
+    }
+
+    #[test]
+    fn validate_account_id_rejects_bad_checksum() {
         let addr = format!("G{}", "A".repeat(55));
-        assert!(validate_account_id(&addr).is_ok());
+        assert!(matches!(
+            validate_account_id(&addr).unwrap_err(),
+            ApiError::InvalidFilter(_)
+        ));
     }
 
     #[test]

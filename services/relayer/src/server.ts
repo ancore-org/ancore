@@ -6,8 +6,12 @@ import express, { Express, Request, Response, NextFunction } from 'express';
 import cors from 'cors';
 import rateLimit from 'express-rate-limit';
 import { z } from 'zod';
+import { Pool } from 'pg';
 import { TransferPolicySchema } from '@ancore/types';
 import { loadEnvOrExit } from './config/env';
+import { runMigrations } from './migrations';
+import { installShutdownHandlers } from './shutdown';
+
 import { RelayService } from './services/relayService';
 import { createStellarSubmitterFromEnv } from './services/stellarSubmitter';
 import { createAuthMiddleware } from './middleware/auth';
@@ -23,9 +27,15 @@ import { validateBody } from './validation/middleware';
 import { createExecuteRelayHandler } from './handlers/executeRelay';
 import { createValidateRelayHandler } from './handlers/validateRelay';
 import { createHealthHandler } from './routes/health';
-import { IdempotencyStore } from './store/idempotency';
-import { MemoryNonceStore, type NonceStore } from './store/nonceStore';
-import { JobQueue } from './queue/JobQueue';
+import {
+  IdempotencyStore,
+  PgIdempotencyStore,
+  MemoryNonceStore,
+  PgNonceStore,
+  type AnyIdempotencyStore,
+  type NonceStore,
+} from './store';
+import { JobQueue, PgJobQueue, type AnyJobQueue } from './queue';
 import { createBearerAuthService } from './services/bearerAuthService';
 import type {
   AuthServiceContract,
@@ -36,6 +46,7 @@ import type {
 import { Ed25519SignatureService } from './services/ed25519SignatureService';
 import {
   ScheduledTransferStore,
+  PgScheduledTransferStore,
   ScheduledTransferService,
   SchedulerEngine,
   createScheduledTransferSchema,
@@ -45,6 +56,7 @@ import {
   createPauseScheduledTransferHandler,
   createCancelScheduledTransferHandler,
   createListExecutionsHandler,
+  type AnyScheduledTransferStore,
 } from './scheduler';
 
 const relayRequestSchema = z.object({
@@ -80,10 +92,13 @@ const defaultSignatureService: SignatureServiceContract = new Ed25519SignatureSe
 export function createApp(
   authService?: AuthServiceContract,
   signatureService: SignatureServiceContract = defaultSignatureService,
-  idempotencyStore: IdempotencyStore = new IdempotencyStore(),
+  idempotencyStore?: AnyIdempotencyStore,
   transactionSubmitter?: TransactionSubmitterContract,
   relayOptions?: RelayServiceOptions,
-  nonceStore: NonceStore = new MemoryNonceStore()
+  nonceStore?: NonceStore,
+  jobQueue?: AnyJobQueue,
+  scheduledTransferStore?: AnyScheduledTransferStore,
+  pool?: Pool
 ): Express {
   // Fail fast on misconfiguration before any middleware or listener is wired up.
   const env = loadEnvOrExit();
@@ -95,6 +110,23 @@ export function createApp(
     console.error('RELAYER_AUTH_SECRET must be set in production to avoid stub auth');
     process.exit(1);
   }
+
+  const dbPool = pool ?? (env.DATABASE_URL ? createDatabasePool(env.DATABASE_URL) : undefined);
+
+  if (env.NODE_ENV === 'production' && !dbPool) {
+    console.error('DATABASE_URL must be set in production for persistent storage');
+    process.exit(1);
+  }
+
+  const resolvedNonceStore: NonceStore =
+    nonceStore ?? (dbPool ? new PgNonceStore(dbPool) : new MemoryNonceStore());
+  const resolvedIdempotencyStore: AnyIdempotencyStore =
+    idempotencyStore ?? (dbPool ? new PgIdempotencyStore(dbPool) : new IdempotencyStore());
+  const resolvedJobQueue: AnyJobQueue =
+    jobQueue ?? (dbPool ? new PgJobQueue(dbPool) : new JobQueue());
+  const resolvedScheduledTransferStore: AnyScheduledTransferStore =
+    scheduledTransferStore ??
+    (dbPool ? new PgScheduledTransferStore(dbPool) : new ScheduledTransferStore());
 
   const resolvedAuthService =
     authService ?? (authSecret ? createBearerAuthService(authSecret) : stubAuthService);
@@ -146,29 +178,27 @@ export function createApp(
     message: 'Too many status requests from this IP, please try again later.',
   });
 
-  const jobQueue = new JobQueue();
   const relayService = new RelayService(
     signatureService,
-    jobQueue,
-    idempotencyStore,
+    resolvedJobQueue,
+    resolvedIdempotencyStore,
     submitter,
     {
       useMockSubmission,
       ...relayOptions,
     },
-    nonceStore
+    resolvedNonceStore
   );
   const auth = createAuthMiddleware(resolvedAuthService);
   const validate = validateBody(relayRequestSchema);
-  const idempotency = createIdempotencyMiddleware(idempotencyStore);
+  const idempotency = createIdempotencyMiddleware(resolvedIdempotencyStore);
 
   const executeHandler = createExecuteRelayHandler(relayService);
   const validateHandler = createValidateRelayHandler(relayService);
   const healthHandler = createHealthHandler(relayService);
 
-  const scheduledTransferStore = new ScheduledTransferStore();
   const scheduledTransferService = new ScheduledTransferService(
-    scheduledTransferStore,
+    resolvedScheduledTransferStore,
     relayService
   );
   const schedulerEngine = new SchedulerEngine(scheduledTransferService, {
@@ -178,6 +208,12 @@ export function createApp(
   if (relayOptions?.startScheduler !== false) {
     schedulerEngine.start();
   }
+
+  // Exposed so the shutdown handler can drain the scheduler it started
+  // (#1346). `app.locals` rather than a changed return type: `createApp()`
+  // returning an Express app is relied on by every test and by supertest, and
+  // a graceful-shutdown fix has no business rewriting those call sites.
+  app.locals.schedulerEngine = schedulerEngine;
 
   const validateScheduledTransfer = validateBody(createScheduledTransferSchema);
   const contentTypeGuard = createContentTypeGuardMiddleware();
@@ -235,13 +271,51 @@ export function createApp(
   return app;
 }
 
+export function createDatabasePool(connectionString: string): Pool {
+  const pool = new Pool({
+    connectionString,
+    max: 10,
+    idleTimeoutMillis: 30_000,
+    connectionTimeoutMillis: 5_000,
+  });
+  // Idle-client errors are emitted on the Pool, not on a request promise.
+  pool.on('error', (error) => {
+    console.error('Unexpected Postgres idle-client error', error);
+  });
+  return pool;
+}
+
 if (require.main === module) {
   // Validate the whole environment before doing anything else, so a bad config
   // is a clear boot-time failure rather than a runtime surprise.
-  const { PORT } = loadEnvOrExit();
-  const app = createApp();
+  void (async () => {
+    const env = loadEnvOrExit();
+    const pool = env.DATABASE_URL ? createDatabasePool(env.DATABASE_URL) : undefined;
+    if (pool) await runMigrations(pool);
+    const app = createApp(
+      undefined,
+      undefined,
+      undefined,
+      undefined,
+      undefined,
+      undefined,
+      undefined,
+      undefined,
+      pool
+    );
+    const server = app.listen(env.PORT, () => {
+      console.log(`Relayer service listening on port ${env.PORT}`);
+    });
 
-  app.listen(PORT, () => {
-    console.log(`Relayer service listening on port ${PORT}`);
+    // Drain on SIGTERM/SIGINT instead of dying mid-flight (#1346). Installed
+    // only when this file is the entrypoint: importing `createApp` into a test
+    // or another process must not hijack that process's signal handling.
+    installShutdownHandlers({
+      server,
+      drainables: [app.locals.schedulerEngine as SchedulerEngine],
+    });
+  })().catch((error) => {
+    console.error('Relayer startup failed', error);
+    process.exit(1);
   });
 }

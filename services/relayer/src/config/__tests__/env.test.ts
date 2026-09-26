@@ -32,6 +32,7 @@ describe('relayer env schema', () => {
       // present-and-undefined, so they are asserted separately below.
       expect(env.RELAYER_AUTH_SECRET).toBeUndefined();
       expect(env.STELLAR_NETWORK_PASSPHRASE).toBeUndefined();
+      expect(env.DATABASE_URL).toBeUndefined();
 
       expect(env).toMatchObject({
         NODE_ENV: 'development',
@@ -57,6 +58,7 @@ describe('relayer env schema', () => {
         ALLOWED_ORIGINS: '',
         RPC_URL: '   ',
         RELAYER_USE_MOCK_SUBMISSION: '',
+        DATABASE_URL: '',
       });
 
       expect(env.PORT).toBe(DEFAULT_PORT);
@@ -64,6 +66,7 @@ describe('relayer env schema', () => {
       expect(env.ALLOWED_ORIGINS).toBe('*');
       expect(env.RPC_URL).toBe(DEFAULT_RPC_URL);
       expect(env.RELAYER_USE_MOCK_SUBMISSION).toBe(false);
+      expect(env.DATABASE_URL).toBeUndefined();
     });
 
     it('ignores unrelated variables', () => {
@@ -176,6 +179,14 @@ describe('relayer env schema', () => {
       expect(() => parseEnv({ ALLOWED_ORIGINS: ' , , ' })).toThrow(
         /ALLOWED_ORIGINS: must list at least one origin/
       );
+    });
+  });
+
+  describe('DATABASE_URL', () => {
+    it('accepts a valid postgres connection string', () => {
+      expect(
+        parseEnv({ DATABASE_URL: 'postgres://user:pass@localhost:5432/ancore' }).DATABASE_URL
+      ).toBe('postgres://user:pass@localhost:5432/ancore');
     });
   });
 

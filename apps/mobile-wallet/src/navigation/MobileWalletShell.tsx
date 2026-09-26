@@ -13,6 +13,7 @@ interface Props {
   children: ReactNode;
   items?: NavigationItem[];
   network?: string;
+  onNavigate?: (route: MobileWalletRoute) => void;
 }
 
 export const DEFAULT_MOBILE_WALLET_NAVIGATION: NavigationItem[] = [
@@ -40,6 +41,7 @@ export const MobileWalletShell = ({
   children,
   items = DEFAULT_MOBILE_WALLET_NAVIGATION,
   network,
+  onNavigate,
 }: Props) => {
   return (
     <main aria-label={appName}>
@@ -51,7 +53,13 @@ export const MobileWalletShell = ({
         <ul>
           {items.map((item) => (
             <li key={item.route} aria-current={item.route === activeRoute ? 'page' : undefined}>
-              {item.label}
+              {onNavigate ? (
+                <button type="button" onClick={() => onNavigate(item.route)}>
+                  {item.label}
+                </button>
+              ) : (
+                item.label
+              )}
             </li>
           ))}
         </ul>

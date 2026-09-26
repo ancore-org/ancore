@@ -30,9 +30,7 @@ export function useTransferPolicy() {
       const nextDailyLimit =
         settings.dailyLimit !== undefined ? settings.dailyLimit : dailyTransferLimit;
       const nextStepUpThreshold =
-        settings.stepUpThreshold !== undefined
-          ? settings.stepUpThreshold
-          : transferStepUpThreshold;
+        settings.stepUpThreshold !== undefined ? settings.stepUpThreshold : transferStepUpThreshold;
 
       if (
         settings.dailyLimit !== undefined &&
@@ -59,12 +57,7 @@ export function useTransferPolicy() {
         setTransferStepUpThreshold(settings.stepUpThreshold);
       }
     },
-    [
-      dailyTransferLimit,
-      transferStepUpThreshold,
-      setDailyTransferLimit,
-      setTransferStepUpThreshold,
-    ]
+    [dailyTransferLimit, transferStepUpThreshold, setDailyTransferLimit, setTransferStepUpThreshold]
   );
 
   return {

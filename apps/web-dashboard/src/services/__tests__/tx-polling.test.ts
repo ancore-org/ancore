@@ -125,6 +125,7 @@ describe('pollTransactionConfirmation', () => {
       intervalMs: 10,
       isRelayerJob: true,
       relayerBaseUrl: 'http://localhost:3000',
+      getAuthToken: () => 'test-token',
     });
 
     expect(result.status.status).toBe('confirmed');

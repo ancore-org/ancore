@@ -29,17 +29,17 @@
 
 ## Quick Reference
 
-| Item            | Value                                                                  |
-| --------------- | ---------------------------------------------------------------------- |
-| Package         | `@ancore/mobile-wallet`                                                |
-| Language        | TypeScript, React 18                                                   |
-| Node            | >= 20 (monorepo)                                                       |
-| Package Manager | pnpm 9 (workspace)                                                     |
-| Build           | `tsc` → `dist/`                                                        |
-| Testing         | Jest 29 (jsdom), colocated `__tests__/`                                |
-| Linting         | ESLint 9                                                               |
-| Host app        | **Not in repo yet** — no `ios/` / `android/` (unlike Freighter Mobile) |
-| Default Branch  | `main`                                                                 |
+| Item            | Value                                                                         |
+| --------------- | ----------------------------------------------------------------------------- |
+| Package         | `@ancore/mobile-wallet`                                                       |
+| Language        | TypeScript, React 18                                                          |
+| Node            | >= 20 (monorepo)                                                              |
+| Package Manager | pnpm 9 (workspace)                                                            |
+| Build           | `tsc` → `dist/`                                                               |
+| Testing         | Jest 29 (jsdom), colocated `__tests__/`                                       |
+| Linting         | ESLint 9                                                                      |
+| Host app        | `apps/mobile-app` — RN host with `ios/` / `android/`, Fastlane store pipeline |
+| Default Branch  | `main`                                                                        |
 
 ## Build & Test Commands
 
@@ -101,9 +101,15 @@ apps/mobile-wallet/
 **Planned (Freighter Mobile parity):**
 
 ```
-ios/ android/                  # Native host app + dual bundle IDs
-e2e/flows/                     # Maestro YAML
-fastlane/                      # Store release automation
+e2e/flows/                     # Maestro YAML (present in mobile-app)
+```
+
+**Shipped in `apps/mobile-app`:**
+
+```
+ios/ android/                  # Native host + dual bundle IDs
+fastlane/                      # TestFlight + Play internal automation
+RELEASE.md                     # Store release runbook
 ```
 
 ## Architecture
@@ -159,8 +165,8 @@ HistoryScreen → usePaginatedTransactionHistory → TransactionHistoryAdapter
 
 ## Known Complexity / Gotchas
 
-- **Not a shippable app:** No native projects, Fastlane, or Maestro — library only. README Expo instructions are outdated.
-- **Onboarding scaffold:** `WalletCreateScreen` collects display name only — does not generate keys. Wire to `@ancore/core-sdk` before any real use.
+- **Host app:** `apps/mobile-app` has native projects, Fastlane, and Maestro e2e; library code remains in this package.
+- **Onboarding:** create/import flows persist to Keychain via `persistOnboardedWallet` + `getSharedStorageManager`.
 - **WebAuthn biometrics:** `platform-adapters.ts` is web-oriented; React Native needs `react-native-biometrics` + Keychain.
 - **Read-only SDK client:** `createMobileWalletSdkClient()` — no sign/send yet.
 - **No WalletConnect:** Freighter Mobile’s primary dApp path — largest mobile gap.

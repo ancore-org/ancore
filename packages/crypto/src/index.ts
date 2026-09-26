@@ -38,6 +38,12 @@ export {
   decodeSignature,
 } from './signature-format';
 
+// Base58 encoding (hex/base64 come from signature-format above)
+export { toBase58, fromBase58 } from './encoding';
+
+// Key fingerprinting
+export { keyFingerprint } from './fingerprint';
+
 // Password Management
 export { validatePasswordStrength } from './password';
 

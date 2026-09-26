@@ -10,6 +10,18 @@ import {
 
 export const DASHBOARD_SESSION_STORAGE_KEY = 'ancore_dashboard_session';
 
+/**
+ * Thrown when a request needs an auth token but no dashboard session is
+ * present. Call sites must surface this instead of falling back to a
+ * hardcoded placeholder token.
+ */
+export class AuthRequiredError extends Error {
+  constructor(message = 'No active session; sign in to continue.') {
+    super(message);
+    this.name = 'AuthRequiredError';
+  }
+}
+
 export interface DashboardSession {
   userId: string;
   displayName: string;
@@ -122,6 +134,11 @@ export function DashboardAuthProvider({ children }: { children: ReactNode }) {
     let cancelled = false;
 
     const refresh = async () => {
+      // NOTE: This refresh implementation is an explicit client-side stub.
+      // There is no backend refresh endpoint wired up for the dashboard yet,
+      // so we MUST NOT pretend we've contacted an auth server or extend
+      // tokens silently. Treat refresh as a no-op that forces re-authentication
+      // to avoid building security assumptions on a fake refresh flow.
       if (!session.refreshToken) {
         setSession(null);
         writeDashboardSession(null);
@@ -130,22 +147,26 @@ export function DashboardAuthProvider({ children }: { children: ReactNode }) {
         return;
       }
 
-      await Promise.resolve();
-
+      // Intentionally do not attempt a network call here. Instead, make the
+      // behavior explicit: log a warning and sign the user out so callers do
+      // not rely on a non-existent refresh endpoint to extend sessions.
+      // When a real refresh endpoint exists, replace this block with a
+      // proper network request that validates the `refreshToken` server-side.
+      // Keep the early return so the cancelled flag is respected.
       if (cancelled) {
         return;
       }
 
-      const nextSession: DashboardSession = {
-        ...session,
-        accessToken: `${session.accessToken}.refreshed`,
-        accessTokenExpiresAt: Date.now() + SESSION_DURATION_MS,
-      };
+      // Emit a visible warning for developers during local/dev runs.
 
-      setSession(nextSession);
-      writeDashboardSession(nextSession);
+      console.warn(
+        '[DashboardAuthProvider] session refresh is a stub — no backend available; signing out.'
+      );
+
+      setSession(null);
+      writeDashboardSession(null);
       setRefreshQueued(false);
-      setStatus('authenticated');
+      setStatus('unauthenticated');
     };
 
     void refresh().catch(() => {

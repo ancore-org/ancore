@@ -20,6 +20,7 @@ describe('relayer server startup guard', () => {
       ...originalEnv,
       NODE_ENV: 'production',
       RELAYER_AUTH_SECRET: '',
+      DATABASE_URL: 'postgres://localhost:5432/relayer_test',
     } as NodeJS.ProcessEnv;
     process.exit = exitSpy;
     resetEnvCache();
@@ -30,6 +31,37 @@ describe('relayer server startup guard', () => {
       process.env = originalEnv;
       process.env.NODE_ENV = originalNodeEnv;
       process.env.RELAYER_AUTH_SECRET = originalRelayerAuthSecret;
+      process.exit = originalExit;
+    }
+  });
+
+  it('refuses to boot in production without DATABASE_URL or pool', () => {
+    const originalEnv = process.env;
+    const originalNodeEnv = process.env.NODE_ENV;
+    const originalRelayerAuthSecret = process.env.RELAYER_AUTH_SECRET;
+    const originalDatabaseUrl = process.env.DATABASE_URL;
+    const originalExit = process.exit;
+
+    const exitSpy = jest.fn((code?: string | number | null) => {
+      throw new Error(`process.exit:${code ?? 'undefined'}`);
+    }) as unknown as typeof process.exit;
+
+    process.env = {
+      ...originalEnv,
+      NODE_ENV: 'production',
+      RELAYER_AUTH_SECRET: 'production-secret',
+      DATABASE_URL: '',
+    } as NodeJS.ProcessEnv;
+    process.exit = exitSpy;
+    resetEnvCache();
+
+    try {
+      expect(() => createApp()).toThrow('process.exit:1');
+    } finally {
+      process.env = originalEnv;
+      process.env.NODE_ENV = originalNodeEnv;
+      process.env.RELAYER_AUTH_SECRET = originalRelayerAuthSecret;
+      process.env.DATABASE_URL = originalDatabaseUrl;
       process.exit = originalExit;
     }
   });

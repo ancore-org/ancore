@@ -36,13 +36,27 @@ export function toScAddress(publicKey: string): xdr.ScVal {
 /**
  * Encode a JavaScript number as an ScVal u64.
  *
- * @param value - Non-negative integer
+ * Values above `Number.MAX_SAFE_INTEGER` are rejected rather than encoded.
+ * `Number.isInteger` returns true for them, but the JavaScript number has
+ * already lost precision by the time it reaches this function, so encoding it
+ * would silently write a different u64 than the caller asked for. No
+ * legitimate caller hits this — the only u64 the contract takes is an
+ * expiration timestamp — so refusing is strictly better than guessing.
+ *
+ * @param value - Non-negative integer, at most `Number.MAX_SAFE_INTEGER`
  * @returns ScVal u64
- * @throws If the value is negative or not an integer
+ * @throws If the value is negative, not an integer, or beyond safe precision
  */
 export function toScU64(value: number): xdr.ScVal {
   if (!Number.isInteger(value) || value < 0) {
     throw new Error(`Invalid u64 value: expected a non-negative integer, received ${value}`);
+  }
+
+  if (value > Number.MAX_SAFE_INTEGER) {
+    throw new Error(
+      `Invalid u64 value: ${value} exceeds Number.MAX_SAFE_INTEGER and cannot be ` +
+        'represented exactly by a JavaScript number'
+    );
   }
 
   return nativeToScVal(value, { type: 'u64' });

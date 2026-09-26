@@ -13,6 +13,7 @@ export interface SplitBillParticipant {
   assetCode: string;
   status: ParticipantStatus;
   paidAt?: number;
+  txHash?: string;
   failedReason?: string;
 }
 

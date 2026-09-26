@@ -46,6 +46,7 @@ export interface AgentDraftIntentResponse {
 
 export interface AiAgentClientOptions {
   endpoint?: string;
+  apiKey?: string;
   fetcher?: typeof fetch;
 }
 
@@ -65,12 +66,19 @@ function resolveDefaultEndpoint(): string {
   return configured ?? 'http://localhost:3001';
 }
 
+function resolveDefaultApiKey(): string | undefined {
+  return typeof import.meta !== 'undefined' ? import.meta.env?.VITE_AI_AGENT_API_KEY : undefined;
+}
+
 /**
  * Creates a client for the ai-agent service. `fetcher` is injectable for
- * tests; `endpoint` defaults to VITE_AI_AGENT_URL or localhost:3001.
+ * tests; `endpoint` defaults to VITE_AI_AGENT_URL or localhost:3001;
+ * `apiKey` defaults to VITE_AI_AGENT_API_KEY and is sent as the `x-api-key`
+ * header the service requires on every request.
  */
 export function createAiAgentClient({
   endpoint = resolveDefaultEndpoint(),
+  apiKey = resolveDefaultApiKey(),
   fetcher = fetch,
 }: AiAgentClientOptions = {}) {
   return {
@@ -81,7 +89,10 @@ export function createAiAgentClient({
     }): Promise<AgentDraftIntentResponse> {
       const response = await fetcher(`${endpoint.replace(/\/$/, '')}/agent/draft-intent`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+          'Content-Type': 'application/json',
+          ...(apiKey ? { 'x-api-key': apiKey } : {}),
+        },
         body: JSON.stringify(params),
       });
 

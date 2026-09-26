@@ -141,6 +141,10 @@ export const relayerEnvSchema = z.object({
     z.string().min(1, 'must not be empty').default(DEFAULT_NETWORK_PASSPHRASE)
   ),
 
+  // Database
+  /** PostgreSQL database URL for persistent stores (JobQueue, IdempotencyStore, NonceStore, ScheduledTransfers). Required in production. */
+  DATABASE_URL: z.preprocess(emptyToUndefined, z.string().min(1, 'must not be empty').optional()),
+
   // Limits and timers
   /** Per-caller/IP requests per 15-minute window on `/relay/*`. */
   RELAY_RATE_LIMIT_MAX: intInRange(

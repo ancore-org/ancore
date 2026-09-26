@@ -316,4 +316,31 @@ describe('extension transaction history', () => {
     expect(screen.getByText('Incoming payments will appear here.')).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Reset filter' })).toBeInTheDocument();
   });
+
+  it('renders TransactionDetail when navigating to /history/:id', async () => {
+    renderUnlockedRouter('/history/tx-xyz-999');
+    await waitForAuthReady();
+
+    expect(await screen.findByText('Details')).toBeInTheDocument();
+    expect(screen.getByText('Confirmed')).toBeInTheDocument();
+    expect(screen.getByTitle('tx-xyz-999')).toBeInTheDocument();
+    expect(document.title).toBe('Transaction Detail | Ancore Extension');
+  });
+
+  it('allows clicking an entry in HistoryActivityList to trigger selection', async () => {
+    const user = userEvent.setup();
+    const onSelect = vi.fn();
+
+    render(
+      <HistoryActivityList
+        activeFilter="all"
+        entries={SAMPLE_ENTRIES}
+        onFilterChange={() => {}}
+        onSelectEntry={onSelect}
+      />
+    );
+
+    await user.click(screen.getByText('Sent to Merchant'));
+    expect(onSelect).toHaveBeenCalledWith(SAMPLE_ENTRIES[1]);
+  });
 });

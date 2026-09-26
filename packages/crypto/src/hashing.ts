@@ -1,6 +1,5 @@
 import { sha256 as nobleSha256, sha512 as nobleSha512 } from '@noble/hashes/sha2';
 import { hmac as nobleHmac } from '@noble/hashes/hmac';
-import { TextEncoder } from 'node:util';
 
 type HashInput = string | Uint8Array;
 

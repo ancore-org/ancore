@@ -1,5 +1,10 @@
 import type Anthropic from '@anthropic-ai/sdk';
 import { AnthropicProvider, LlmOutputValidationError } from '../anthropic';
+import {
+  OTHER_VALID_ADDRESS,
+  VALID_ACCOUNT_ID,
+  VALID_ADDRESS,
+} from '../../__tests__/fixtures/addresses';
 
 /** Builds a fake Anthropic client — no real SDK instance, no network calls. */
 function fakeClient(create: jest.Mock): Anthropic {
@@ -50,13 +55,16 @@ describe('AnthropicProvider', () => {
           type: 'payment',
           amount: '42',
           asset: 'USDC',
-          destination: 'GCZST3XVCDTUJ76ZAV2HA72KYPJW5YJSNXVZTSKNBPWTXGVLNPXQ4JH',
+          destination: VALID_ADDRESS,
           summary: 'Send 42 USDC',
         })
       );
       const provider = new AnthropicProvider(fakeClient(create));
 
-      const result = await provider.draftIntent({ prompt: 'send 42 usdc', accountId: 'GACC' });
+      const result = await provider.draftIntent({
+        prompt: 'send 42 usdc',
+        accountId: VALID_ACCOUNT_ID,
+      });
 
       expect(create).toHaveBeenCalledTimes(1);
       const [params, options] = create.mock.calls[0];
@@ -68,7 +76,7 @@ describe('AnthropicProvider', () => {
         type: 'payment',
         amount: '42',
         asset: 'USDC',
-        destination: 'GCZST3XVCDTUJ76ZAV2HA72KYPJW5YJSNXVZTSKNBPWTXGVLNPXQ4JH',
+        destination: VALID_ADDRESS,
       });
       expect(result.summary).toBe('Send 42 USDC');
     });
@@ -79,7 +87,7 @@ describe('AnthropicProvider', () => {
           type: 'invoice',
           amount: '15',
           asset: 'XLM',
-          recipient: 'Alice',
+          recipient: OTHER_VALID_ADDRESS,
           dueDate: '2026-12-31T00:00:00Z',
           summary: 'Invoice Alice for 15 XLM',
         })
@@ -88,14 +96,14 @@ describe('AnthropicProvider', () => {
 
       const result = await provider.draftIntent({
         prompt: 'invoice Alice for 15 XLM',
-        accountId: 'GACC',
+        accountId: VALID_ACCOUNT_ID,
       });
 
       expect(result.intent).toEqual({
         type: 'invoice',
         amount: '15',
         asset: 'XLM',
-        recipient: 'Alice',
+        recipient: OTHER_VALID_ADDRESS,
         dueDate: '2026-12-31T00:00:00Z',
       });
     });
@@ -108,14 +116,14 @@ describe('AnthropicProvider', () => {
           type: 'payment',
           amount: 'a lot',
           asset: 'XLM',
-          destination: 'GDEST',
+          destination: VALID_ADDRESS,
           summary: 'bad',
         })
       );
       const provider = new AnthropicProvider(fakeClient(create));
 
       await expect(
-        provider.draftIntent({ prompt: 'send a lot of xlm', accountId: 'GACC' })
+        provider.draftIntent({ prompt: 'send a lot of xlm', accountId: VALID_ACCOUNT_ID })
       ).rejects.toThrow(LlmOutputValidationError);
     });
 
@@ -125,9 +133,9 @@ describe('AnthropicProvider', () => {
         .mockResolvedValue({ content: [{ type: 'text', text: 'no tool call' }] });
       const provider = new AnthropicProvider(fakeClient(create));
 
-      await expect(provider.draftIntent({ prompt: 'hello', accountId: 'GACC' })).rejects.toThrow(
-        LlmOutputValidationError
-      );
+      await expect(
+        provider.draftIntent({ prompt: 'hello', accountId: VALID_ACCOUNT_ID })
+      ).rejects.toThrow(LlmOutputValidationError);
     });
 
     it('throws when required fields are missing for the intent type', async () => {
@@ -138,9 +146,9 @@ describe('AnthropicProvider', () => {
         );
       const provider = new AnthropicProvider(fakeClient(create));
 
-      await expect(provider.draftIntent({ prompt: 'send xlm', accountId: 'GACC' })).rejects.toThrow(
-        LlmOutputValidationError
-      );
+      await expect(
+        provider.draftIntent({ prompt: 'send xlm', accountId: VALID_ACCOUNT_ID })
+      ).rejects.toThrow(LlmOutputValidationError);
     });
   });
 
@@ -149,18 +157,18 @@ describe('AnthropicProvider', () => {
       const create = jest.fn().mockRejectedValue(new Error('timeout of 8000ms exceeded'));
       const provider = new AnthropicProvider(fakeClient(create));
 
-      await expect(provider.draftIntent({ prompt: 'send xlm', accountId: 'GACC' })).rejects.toThrow(
-        'timeout of 8000ms exceeded'
-      );
+      await expect(
+        provider.draftIntent({ prompt: 'send xlm', accountId: VALID_ACCOUNT_ID })
+      ).rejects.toThrow('timeout of 8000ms exceeded');
     });
 
     it('throws when the provider is unavailable', async () => {
       delete process.env['ANTHROPIC_API_KEY'];
       const provider = new AnthropicProvider();
 
-      await expect(provider.draftIntent({ prompt: 'send xlm', accountId: 'GACC' })).rejects.toThrow(
-        /unavailable/i
-      );
+      await expect(
+        provider.draftIntent({ prompt: 'send xlm', accountId: VALID_ACCOUNT_ID })
+      ).rejects.toThrow(/unavailable/i);
     });
   });
 });

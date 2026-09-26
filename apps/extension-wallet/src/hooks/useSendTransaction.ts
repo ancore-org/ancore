@@ -47,7 +47,13 @@ function createExtensionRelaySigner(): RelaySigner {
   };
 }
 export type SendStep = 'form' | 'review' | 'confirm' | 'status' | 'scheduled';
-export type TxStatus = 'idle' | 'pending' | 'confirmed' | 'failed';
+/**
+ * `'unreachable'` means the last status check itself failed — a timeout or a
+ * dead RPC endpoint — as opposed to `'pending'`, which is the network telling
+ * us the transaction is not indexed yet (#1351). Collapsing the two made an
+ * outage look like a transaction still confirming.
+ */
+export type TxStatus = 'idle' | 'pending' | 'confirmed' | 'failed' | 'unreachable';
 export type TransferPolicyAction = 'allow' | 'step_up' | 'block';
 
 export interface SendFormValues {
@@ -234,6 +240,14 @@ export function useSendTransaction(options: UseSendTransactionOptions = {}) {
   const [errors, setErrors] = useState<ValidationErrors>({});
   const [submitting, setSubmitting] = useState(false);
   const [simulation, setSimulation] = useState<SimulationState | undefined>();
+  /**
+   * How many status polls in a row failed to reach the endpoint (#1351).
+   *
+   * Surfaced so the UI can say "we cannot confirm right now" instead of
+   * showing an indefinite "pending" that is indistinguishable from a
+   * transaction still settling. Reset whenever a poll gets a real answer.
+   */
+  const [statusCheckFailures, setStatusCheckFailures] = useState(0);
 
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
@@ -494,12 +508,19 @@ export function useSendTransaction(options: UseSendTransactionOptions = {}) {
 
         setTxId(submission.txId);
         setStatus('pending');
+        setStatusCheckFailures(0);
         setStep('status');
 
         pollRef.current = setInterval(async () => {
           const raw = await service.fetchTransactionStatus(submission.txId);
           const appStatus = mapRpcStatus(raw);
           setStatus(raw); // keep TxStatus in local state for hook consumers
+
+          // Track consecutive unreachable polls rather than treating them as
+          // pending (#1351). Polling continues — the transaction may well be
+          // settling — but the caller can now tell the user that the *check*
+          // is failing, which an endless "pending" never did.
+          setStatusCheckFailures((previous) => (raw === 'unreachable' ? previous + 1 : 0));
 
           if (isTerminalStatus(appStatus)) {
             if (pollRef.current) {
@@ -548,6 +569,9 @@ export function useSendTransaction(options: UseSendTransactionOptions = {}) {
     balance,
     step,
     status,
+    statusCheckFailures,
+    /** True once status checks have failed repeatedly — show "cannot confirm", not "pending". */
+    statusUnreachable: status === 'unreachable' && statusCheckFailures >= 2,
     fee,
     tx,
     txId,

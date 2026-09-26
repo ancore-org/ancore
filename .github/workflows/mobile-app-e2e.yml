@@ -2,7 +2,7 @@ name: Mobile App E2E Tests
 
 on:
   schedule:
-    - cron: '0 0 * * *'  # Nightly at 00:00 UTC
+    - cron: '0 0 * * *'
   workflow_dispatch:
 
 concurrency:
@@ -14,22 +14,21 @@ permissions:
   checks: write
   pull-requests: write
 
+env:
+  MOBILE_APP_DIR: apps/mobile-app
+
 jobs:
   test-ios:
     name: iOS E2E Tests
     runs-on: macos-14
-    timeout-minutes: 45
+    timeout-minutes: 60
     strategy:
       fail-fast: false
       matrix:
         flow:
+          - create-wallet.yaml
+          - import-wallet.yaml
           - lock-unlock.yaml
-          - walletconnect-pair.yaml
-          - sign-xdr.yaml
-          # Commented out pending dependent issues:
-          # - create-wallet.yaml        # #783
-          # - import-wallet.yaml        # #783
-          # - send-payment.yaml         # #785
 
     steps:
       - uses: actions/checkout@v4
@@ -37,20 +36,20 @@ jobs:
       - name: Setup Xcode
         uses: maxim-lobanov/setup-xcode@v1
         with:
-          xcode-version: 15.0
+          xcode-version: '15.4'
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v2
+        with:
+          version: 9
 
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
           node-version: '20'
-          cache: 'pnpm'
+          cache: pnpm
 
-      - name: Install pnpm
-        uses: pnpm/action-setup@v2
-        with:
-          version: 9
-
-      - name: Build app dependencies
+      - name: Install dependencies
         run: corepack pnpm install --frozen-lockfile
 
       - name: Setup Maestro
@@ -61,40 +60,37 @@ jobs:
 
       - name: Build iOS app
         run: |
-          cd apps/mobile-app
-          # TODO: Wire native build when Xcode project exists
-          # For now, this is a placeholder; CI expects native build output
-          echo "⚠️  Native iOS build not yet available (host app structure pending)"
-          exit 0
-        continue-on-error: true
+          chmod +x apps/mobile-app/scripts/*.sh
+          ./apps/mobile-app/scripts/build-ios-dev.sh
 
-      - name: Start iOS Simulator
+      - name: Boot iOS Simulator
         run: |
-          xcrun simctl create iPhone14 com.apple.CoreSimulator.SimDeviceType.iPhone-14 com.apple.CoreSimulator.SimRuntime.iOS-17-0 || true
-          xcrun simctl boot iPhone14 || true
-          xcrun simctl status iPhone14
+          xcrun simctl boot "iPhone 15" || true
+          xcrun simctl bootstatus "iPhone 15" -b
+
+      - name: Install iOS app
+        run: xcrun simctl install booted "${{ env.APP_PATH }}"
 
       - name: Run Maestro flow - ${{ matrix.flow }}
-        working-directory: apps/mobile-app
+        working-directory: ${{ env.MOBILE_APP_DIR }}
         run: |
           maestro test \
             "e2e/flows/${{ matrix.flow }}" \
             --env-file e2e/common/env.yaml \
             --timeout 600
-        continue-on-error: true
 
       - name: Capture iOS screenshots on failure
         if: failure()
         run: |
-          mkdir -p e2e-artifacts/ios
-          xcrun simctl screenshot iPhone14 "e2e-artifacts/ios/screenshot-${{ matrix.flow }}.png" 2>/dev/null || true
+          mkdir -p apps/mobile-app/e2e-artifacts/ios
+          xcrun simctl io booted screenshot "apps/mobile-app/e2e-artifacts/ios/screenshot-${{ matrix.flow }}.png" || true
 
       - name: Upload iOS artifacts
         if: always()
         uses: actions/upload-artifact@v4
         with:
           name: e2e-artifacts-ios-${{ matrix.flow }}
-          path: e2e-artifacts/ios
+          path: apps/mobile-app/e2e-artifacts/ios
           retention-days: 7
 
   test-android:
@@ -105,51 +101,49 @@ jobs:
       fail-fast: false
       matrix:
         flow:
+          - create-wallet.yaml
+          - import-wallet.yaml
           - lock-unlock.yaml
-          - walletconnect-pair.yaml
-          - sign-xdr.yaml
-          # Commented out pending dependent issues:
-          # - create-wallet.yaml        # #783
-          # - import-wallet.yaml        # #783
-          # - send-payment.yaml         # #785
 
     steps:
       - uses: actions/checkout@v4
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v2
+        with:
+          version: 9
 
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
           node-version: '20'
-          cache: 'pnpm'
-
-      - name: Install pnpm
-        uses: pnpm/action-setup@v2
-        with:
-          version: 9
+          cache: pnpm
 
       - name: Setup Java
         uses: actions/setup-java@v4
         with:
-          distribution: 'temurin'
+          distribution: temurin
           java-version: '17'
 
       - name: Setup Android SDK
-        uses: android-actions/setup-android@v2
-        with:
-          api-level: 33
-          ndk: '25.2.9519653'
+        uses: android-actions/setup-android@v3
 
-      - name: Build app dependencies
+      - name: Install dependencies
         run: corepack pnpm install --frozen-lockfile
 
       - name: Setup Maestro
         run: |
-          curl -Ls "https://get.maestro.mobile" | bash
-          export PATH="$PATH:$HOME/.maestro/bin"
+          curl -Ls "https://get.maestro.mobile.dev" | bash
+          echo "$HOME/.maestro/bin" >> "$GITHUB_PATH"
           maestro --version
 
-      - name: Start Android Emulator
-        uses: reactivecircle/android-emulator-runner@v2
+      - name: Build Android app
+        run: |
+          chmod +x apps/mobile-app/scripts/*.sh
+          ./apps/mobile-app/scripts/build-android-dev.sh
+
+      - name: Start Android Emulator and run Maestro
+        uses: reactivecircuits/android-emulator-runner@v2
         with:
           api-level: 33
           target: google_apis
@@ -158,41 +152,21 @@ jobs:
           emulator-options: -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim -camera-back none
           disable-animations: true
           script: |
-            adb shell input keyevent 82  # Unlock emulator
-            sleep 2
-
-      - name: Build Android app
-        run: |
-          cd apps/mobile-app
-          # TODO: Wire native build when gradle build files exist
-          # For now, this is a placeholder; CI expects native build output
-          echo "⚠️  Native Android build not yet available (host app structure pending)"
-          exit 0
-        continue-on-error: true
-
-      - name: Run Maestro flow - ${{ matrix.flow }}
-        working-directory: apps/mobile-app
-        run: |
-          export PATH="$PATH:$HOME/.maestro/bin"
-          maestro test \
-            "e2e/flows/${{ matrix.flow }}" \
-            --env-file e2e/common/env.yaml \
-            --timeout 600
-        continue-on-error: true
-
-      - name: Pull Android emulator screenshots on failure
-        if: failure()
-        run: |
-          mkdir -p e2e-artifacts/android
-          adb pull /sdcard/screenshots "e2e-artifacts/android/" 2>/dev/null || true
-          ls -lah e2e-artifacts/android/ || true
+            adb wait-for-device
+            adb shell input keyevent 82
+            adb install -r apps/mobile-app/android/app/build/outputs/apk/dev/debug/app-dev-debug.apk
+            cd apps/mobile-app
+            maestro test \
+              "e2e/flows/${{ matrix.flow }}" \
+              --env-file e2e/common/env.yaml \
+              --timeout 600
 
       - name: Upload Android artifacts
         if: always()
         uses: actions/upload-artifact@v4
         with:
           name: e2e-artifacts-android-${{ matrix.flow }}
-          path: e2e-artifacts/android
+          path: apps/mobile-app/e2e-artifacts/android
           retention-days: 7
 
   results:

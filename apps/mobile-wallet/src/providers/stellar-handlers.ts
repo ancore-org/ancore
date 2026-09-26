@@ -1,10 +1,10 @@
 import { SessionTypes } from '@walletconnect/types';
 
-// Sign service interface - to be implemented with actual sign service from #785
-interface SignService {
-  signTransaction(_xdr: string): Promise<{ signedXdr: string }>;
+// Sign service interface — implemented by vault-backed and mock services.
+export interface SignService {
+  signTransaction(xdr: string): Promise<{ signedXdr: string }>;
   submitTransaction(xdr: string): Promise<{ txHash: string }>;
-  signMessage(_message: string): Promise<{ signature: string }>;
+  signMessage(message: string): Promise<{ signature: string }>;
   signAuthEntry(authEntry: string): Promise<{ signedAuthEntry: string }>;
 }
 

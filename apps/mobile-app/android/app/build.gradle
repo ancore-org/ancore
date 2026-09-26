@@ -3,28 +3,26 @@ apply plugin: "org.jetbrains.kotlin.android"
 apply plugin: "com.facebook.react"
 
 react {
-    // Monorepo support: the app JS is in the root of this package
     root = file("..")
     reactNativeDir = file("../../../node_modules/react-native")
     codegenDir = file("../../../node_modules/@react-native/codegen")
+    debuggableVariants = ["devDebug", "prodDebug"]
 }
 
 def enableProguardInReleaseBuilds = false
+
+def getEnv(String key, String fallback = "") {
+    return System.getenv(key) ?: fallback
+}
 
 android {
     ndkVersion rootProject.ext.ndkVersion
     buildToolsVersion rootProject.ext.buildToolsVersion
     compileSdk rootProject.ext.compileSdkVersion
 
-    namespace "org.ancore"
+    namespace "org.ancore.wallet"
 
-    defaultConfig {
-        applicationId "org.ancore.wallet"
-        minSdkVersion rootProject.ext.minSdkVersion
-        targetSdkVersion rootProject.ext.targetSdkVersion
-        versionCode 1
-        versionName "0.1.0"
-    }
+    flavorDimensions "environment"
 
     signingConfigs {
         debug {
@@ -33,17 +31,70 @@ android {
             keyAlias "androiddebugkey"
             keyPassword "android"
         }
+
+        dev {
+            def keystorePath = file("../keystores/dev-release.keystore")
+            if (keystorePath.exists()) {
+                storeFile keystorePath
+                storePassword getEnv("ANDROID_DEV_KEYSTORE_PASSWORD")
+                keyAlias getEnv("ANDROID_DEV_KEYSTORE_ALIAS", "ancore-dev")
+                keyPassword getEnv("ANDROID_DEV_KEYSTORE_PASSWORD")
+            }
+        }
+
+        prod {
+            def keystorePath = file("../keystores/prod-release.keystore")
+            if (keystorePath.exists()) {
+                storeFile keystorePath
+                storePassword getEnv("ANDROID_PROD_KEYSTORE_PASSWORD")
+                keyAlias getEnv("ANDROID_PROD_KEYSTORE_ALIAS", "ancore-prod")
+                keyPassword getEnv("ANDROID_PROD_KEYSTORE_PASSWORD")
+            }
+        }
+    }
+
+    productFlavors {
+        dev {
+            dimension "environment"
+            applicationId "org.ancore.wallet.dev"
+            resValue "string", "app_name", "Ancore Wallet Dev"
+            manifestPlaceholders = [deepLinkScheme: "ancoredev"]
+        }
+
+        prod {
+            dimension "environment"
+            applicationId "org.ancore.wallet"
+            resValue "string", "app_name", "Ancore Wallet"
+            manifestPlaceholders = [deepLinkScheme: "ancore"]
+        }
+    }
+
+    defaultConfig {
+        minSdkVersion rootProject.ext.minSdkVersion
+        targetSdkVersion rootProject.ext.targetSdkVersion
+        versionCode 1
+        versionName "0.1.0"
     }
 
     buildTypes {
         debug {
-            applicationIdSuffix ".dev"
             signingConfig signingConfigs.debug
         }
+
         release {
             minifyEnabled enableProguardInReleaseBuilds
             proguardFiles getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro"
-            signingConfig signingConfigs.debug
+        }
+    }
+
+    applicationVariants.all { variant ->
+        def flavorName = variant.flavorName
+        if (variant.buildType.name == "release") {
+            if (flavorName == "dev" && signingConfigs.dev.storeFile != null) {
+                variant.signingConfig = signingConfigs.dev
+            } else if (flavorName == "prod" && signingConfigs.prod.storeFile != null) {
+                variant.signingConfig = signingConfigs.prod
+            }
         }
     }
 }

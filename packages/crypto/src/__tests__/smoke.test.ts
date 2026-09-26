@@ -12,7 +12,9 @@ const EXPECTED_EXPORTS = [
   'STRICT_ENTROPY_THRESHOLD',
   'toHex',
   'fromHex',
+  'toBase58',
   'toBase64',
+  'fromBase58',
   'fromBase64',
   'encodeSignature',
   'decodeSignature',
@@ -23,6 +25,7 @@ const EXPECTED_EXPORTS = [
   'validateMnemonic',
   'validateMnemonicStrength',
 
+  'keyFingerprint',
   'getEnglishWordlist',
 
   'MnemonicValidationError',

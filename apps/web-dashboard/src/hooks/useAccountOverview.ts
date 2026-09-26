@@ -81,10 +81,14 @@ export function useAccountOverview(publicKey: string): UseAccountOverviewReturn 
       }
 
       const payload = await response.json();
-      const accountOverview = typeof payload === 'object' && payload !== null &&
+      const accountOverview =
+        typeof payload === 'object' &&
+        payload !== null &&
         typeof payload.balance === 'number' &&
         typeof payload.nonce === 'number' &&
-        typeof payload.status === 'string' ? payload as AccountOverview : null;
+        typeof payload.status === 'string'
+          ? (payload as AccountOverview)
+          : null;
 
       if (!accountOverview) {
         throw new AccountOverviewError('Invalid account overview response', 'FETCH_FAILED');

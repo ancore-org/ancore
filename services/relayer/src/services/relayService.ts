@@ -4,8 +4,8 @@ import { validateTransferPolicy } from '@ancore/types';
 import { getSessionKey } from '@ancore/account-abstraction';
 import { rpc } from '@stellar/stellar-sdk';
 import { getEnv } from '../config/env';
-import type { JobQueue } from '../queue/JobQueue';
-import type { IdempotencyStore } from '../store/idempotency';
+import type { JobQueueContract } from '../queue/types';
+import type { IdempotencyStoreContract } from '../store/idempotency';
 import type { NonceStore } from '../store/nonceStore';
 import type {
   RelayServiceContract,
@@ -42,8 +42,8 @@ export class RelayService implements RelayServiceContract {
 
   constructor(
     private readonly signatureService: SignatureServiceContract,
-    private readonly queue?: JobQueue,
-    private readonly store?: IdempotencyStore,
+    private readonly queue?: JobQueueContract,
+    private readonly store?: IdempotencyStoreContract,
     private readonly transactionSubmitter?: TransactionSubmitterContract,
     options?: RelayServiceOptions,
     private readonly nonceStore?: NonceStore

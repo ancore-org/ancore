@@ -27,7 +27,7 @@ export type RpcTransactionStatus =
  * Status values produced by the send-transaction polling loop
  * (TxStatus from useSendTransaction).
  */
-export type PollingTxStatus = 'idle' | 'pending' | 'confirmed' | 'failed';
+export type PollingTxStatus = 'idle' | 'pending' | 'confirmed' | 'failed' | 'unreachable';
 
 /**
  * Union of every raw status string that can arrive from any RPC source.
@@ -48,6 +48,13 @@ const RPC_TO_APP: Record<AnyRpcStatus, TransactionStatusKind> = {
   idle: 'pending',
   confirmed: 'confirmed',
   failed: 'failed',
+
+  // The status check itself failed (#1351). Rendered as pending because the
+  // transaction genuinely may still be in flight — we simply could not ask.
+  // It is deliberately non-terminal: the poller keeps trying, and the caller
+  // distinguishes it from a real `'pending'` to tell the user why the answer
+  // is late.
+  unreachable: 'pending',
 };
 
 /**

@@ -1,0 +1,10 @@
+app_identifier("org.ancore.wallet")
+package_name("org.ancore.wallet")
+
+for_platform :ios do
+  app_identifier("org.ancore.wallet")
+end
+
+for_platform :android do
+  package_name("org.ancore.wallet")
+end

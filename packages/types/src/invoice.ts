@@ -18,15 +18,20 @@ export const invoiceStatusSchema = z.enum(['draft', 'open', 'paid', 'expired', '
 
 export const invoicePaymentStatusSchema = z.enum(['pending', 'completed', 'failed']);
 
-export const createInvoiceSchema = z.object({
-  accountAddress: stellarAddressSchema,
-  recipientAddress: stellarAddressSchema,
-  amount: z.string().min(1),
-  asset: z.string().min(1).default('XLM'),
-  description: z.string().max(500).optional(),
-  dueDate: isoDateTimeSchema.optional(),
-  reference: z.string().max(100).optional(),
-});
+export const createInvoiceSchema = z
+  .object({
+    accountAddress: stellarAddressSchema,
+    recipientAddress: stellarAddressSchema,
+    amount: z.string().min(1),
+    asset: z.string().min(1).default('XLM'),
+    description: z.string().max(500).optional(),
+    dueDate: isoDateTimeSchema.optional(),
+    reference: z.string().max(100).optional(),
+  })
+  .refine((data) => !data.dueDate || new Date(data.dueDate).getTime() >= Date.now(), {
+    message: 'dueDate must not be in the past',
+    path: ['dueDate'],
+  });
 
 export interface Invoice {
   id: string;

@@ -11,6 +11,11 @@ const mockSession = {
   peer: { metadata: { name: 'Soroban dApp', url: 'https://dapp.example' } },
 } as SessionTypes.Struct;
 
+// Real base64-encoded SorobanAuthorizationEntry XDR (single invocation, no args),
+// generated with @stellar/stellar-sdk - not a synthetic ASCII byte pattern.
+const REAL_ENTRY_XDR =
+  'AAAAAAAAAAAAAAABAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEAAAAIdHJhbnNmZXIAAAAAAAAAAA==';
+
 describe('SignAuthEntryApprovalSheet', () => {
   it('renders contract and function details', () => {
     const onApprove = jest.fn();
@@ -22,15 +27,27 @@ describe('SignAuthEntryApprovalSheet', () => {
           id: 1,
           topic: 'topic-1',
           method: 'stellar_signAuthEntry',
-          params: { authEntry: 'AAAA' },
+          params: { authEntry: REAL_ENTRY_XDR },
           session: mockSession,
         }}
         parsed={{
           contractId: 'CABCDEF',
           functionName: 'transfer',
-          subInvocations: 1,
-          rootInvocationPresent: true,
-          entryXdr: 'AAAA',
+          subInvocationCount: 1,
+          invocation: {
+            contractId: 'CABCDEF',
+            functionName: 'transfer',
+            args: ['1000'],
+            subInvocations: [
+              {
+                contractId: 'CGHIJKL',
+                functionName: 'approve',
+                args: [],
+                subInvocations: [],
+              },
+            ],
+          },
+          entryXdr: REAL_ENTRY_XDR,
         }}
         onApprove={onApprove}
         onReject={onReject}
@@ -50,7 +67,7 @@ describe('parseSignAuthEntryRequest', () => {
   const validEvent = {
     id: 123,
     topic: 'topic-abc',
-    params: { authEntry: 'AAAA' },
+    params: { authEntry: REAL_ENTRY_XDR },
     session: mockSession,
   };
 
@@ -59,7 +76,7 @@ describe('parseSignAuthEntryRequest', () => {
     expect(result.request.id).toBe(123);
     expect(result.request.topic).toBe('topic-abc');
     expect(result.request.method).toBe('stellar_signAuthEntry');
-    expect(result.parsed.entryXdr).toBe('AAAA');
+    expect(result.parsed.entryXdr).toBe(REAL_ENTRY_XDR);
   });
 
   it('accepts numeric string id', () => {

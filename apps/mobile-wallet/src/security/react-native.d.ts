@@ -30,4 +30,10 @@ declare module 'react-native' {
   }
 
   export const Linking: LinkingStatic;
+
+  export interface DeviceEventEmitterStatic {
+    addListener(eventType: string, listener: (event: string) => void): { remove: () => void };
+  }
+
+  export const DeviceEventEmitter: DeviceEventEmitterStatic;
 }

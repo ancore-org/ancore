@@ -44,13 +44,13 @@ test.describe('Extension release-candidate smoke @smoke', () => {
     await seedWallet('onboarded-unlocked');
     await page.waitForURL(/\/home/, { timeout: 15_000 });
 
-    await page.getByRole('link', { name: /Send funds/i }).click();
+    await page.getByRole('main').getByRole('link', { name: 'Send' }).click();
     await expect(page).toHaveURL(/\/send/);
     await expect(page.getByLabel('To')).toBeVisible();
     await expect(page.getByRole('button', { name: /Use Max/i })).toBeVisible();
 
     await navigateTo(page, '/home');
-    await page.getByRole('link', { name: /Receive funds/i }).click();
+    await page.getByRole('main').getByRole('link', { name: 'Receive' }).click();
     await expect(page).toHaveURL(/\/receive/);
     await expect(page.getByRole('button', { name: /Copy address/i })).toBeVisible();
   });
@@ -65,8 +65,8 @@ test.describe('Extension release-candidate smoke @smoke', () => {
     await seedWallet('onboarded-unlocked');
     await navigateTo(page, '/session-keys');
 
-    await expect(page.getByRole('heading', { name: 'Session Keys', exact: true })).toBeVisible();
-    await expect(page.getByText('Active Keys')).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'Session keys' })).toBeVisible();
+    await expect(page.getByText('Active keys')).toBeVisible();
     await expect(page.getByRole('button', { name: /Add session key/i }).first()).toBeVisible();
 
     await clearWallet();

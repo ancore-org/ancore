@@ -332,7 +332,8 @@ impl InvoiceContract {
 
     // ── Pay ──────────────────────────────────────────────────────────────────
 
-    /// Pays an open invoice. The payer transfers `amount` of `asset` to the
+    /// Pays an open invoice. Only `invoice.recipient` (the documented expected
+    /// payer) may call this. The payer transfers `amount` of `asset` to the
     /// creator via the SAC token interface, then the invoice is marked Paid.
     pub fn pay(
         env: Env,
@@ -343,6 +344,10 @@ impl InvoiceContract {
         payer.require_auth();
 
         let mut invoice = Self::get_invoice(&env, &id)?;
+
+        if payer != invoice.recipient {
+            return Err(InvoiceError::Unauthorized);
+        }
 
         if invoice.status == InvoiceStatus::Paid {
             return Err(InvoiceError::AlreadyPaid);
@@ -688,6 +693,40 @@ mod test {
 
         // Once opened the payment succeeds and moves the asset.
         client.open(&id);
+        client.pay(&id, &recipient, &BytesN::from_array(&env, &[1u8; 32]));
+        assert_eq!(client.get(&id).status, InvoiceStatus::Paid);
+        assert_eq!(token::Client::new(&env, &asset).balance(&creator), 1000i128);
+    }
+
+    #[test]
+    fn test_pay_rejects_non_recipient_payer() {
+        let env = Env::default();
+        env.mock_all_auths();
+        let contract_id = env.register_contract(None, InvoiceContract);
+        let client = InvoiceContractClient::new(&env, &contract_id);
+
+        let creator = Address::generate(&env);
+        let recipient = Address::generate(&env);
+        let stranger = Address::generate(&env);
+        let asset_admin = Address::generate(&env);
+        let asset = env
+            .register_stellar_asset_contract_v2(asset_admin)
+            .address();
+        token::StellarAssetClient::new(&env, &asset).mint(&recipient, &10_000i128);
+        token::StellarAssetClient::new(&env, &asset).mint(&stranger, &10_000i128);
+
+        let id = client.create(&creator, &recipient, &1000i128, &asset, &None, &None, &None);
+        client.open(&id);
+
+        // A third party must not be able to settle the invoice, even with auth.
+        assert_eq!(
+            client.try_pay(&id, &stranger, &BytesN::from_array(&env, &[1u8; 32])),
+            Err(Ok(InvoiceError::Unauthorized))
+        );
+        assert_eq!(client.get(&id).status, InvoiceStatus::Open);
+        assert_eq!(token::Client::new(&env, &asset).balance(&creator), 0i128);
+
+        // The documented recipient can still pay.
         client.pay(&id, &recipient, &BytesN::from_array(&env, &[1u8; 32]));
         assert_eq!(client.get(&id).status, InvoiceStatus::Paid);
         assert_eq!(token::Client::new(&env, &asset).balance(&creator), 1000i128);

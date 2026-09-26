@@ -39,7 +39,10 @@ const CONTRACT_ADDRESS_KEY = 'ancore_contract_address';
 
 const signTransactionSchema = z
   .object({
-    xdr: z.string().min(1, 'xdr is required').refine((v) => v.trim().length > 0, 'xdr must not be empty'),
+    xdr: z
+      .string()
+      .min(1, 'xdr is required')
+      .refine((v) => v.trim().length > 0, 'xdr must not be empty'),
     network: z.string().optional(),
     smartAccountId: z.string().optional(),
   })
@@ -47,7 +50,10 @@ const signTransactionSchema = z
 
 const signAuthEntrySchema = z
   .object({
-    authEntry: z.string().min(1, 'authEntry is required').refine((v) => v.trim().length > 0, 'authEntry must not be empty'),
+    authEntry: z
+      .string()
+      .min(1, 'authEntry is required')
+      .refine((v) => v.trim().length > 0, 'authEntry must not be empty'),
     network: z.string().optional(),
     smartAccountId: z.string().optional(),
   })
@@ -55,7 +61,10 @@ const signAuthEntrySchema = z
 
 const signMessageSchema = z
   .object({
-    message: z.string().min(1, 'message is required').refine((v) => v.trim().length > 0, 'message must not be empty'),
+    message: z
+      .string()
+      .min(1, 'message is required')
+      .refine((v) => v.trim().length > 0, 'message must not be empty'),
     network: z.string().optional(),
     smartAccountId: z.string().optional(),
   })
@@ -71,7 +80,6 @@ const requestSessionKeySchema = z
     maxAmountPerCall: z.string().optional(),
   })
   .passthrough();
-
 
 const readFromChromeLocal = readChromeLocal;
 
@@ -312,7 +320,9 @@ export async function handleSignTransaction(
   const { origin, params, requestId } = ctx;
   const parsed = signTransactionSchema.safeParse(params);
   if (!parsed.success) {
-    throw new Error(`Invalid signTransaction params: ${parsed.error.issues.map((i) => `${i.path.join('.')}: ${i.message}`).join('; ')}`);
+    throw new Error(
+      `Invalid signTransaction params: ${parsed.error.issues.map((i) => `${i.path.join('.')}: ${i.message}`).join('; ')}`
+    );
   }
   const typedParams = parsed.data as { xdr: string; network?: string; smartAccountId?: string };
 
@@ -347,9 +357,15 @@ export async function handleSignAuthEntry(
   const { origin, params, requestId } = ctx;
   const parsed = signAuthEntrySchema.safeParse(params);
   if (!parsed.success) {
-    throw new Error(`Invalid signAuthEntry params: ${parsed.error.issues.map((i) => `${i.path.join('.')}: ${i.message}`).join('; ')}`);
+    throw new Error(
+      `Invalid signAuthEntry params: ${parsed.error.issues.map((i) => `${i.path.join('.')}: ${i.message}`).join('; ')}`
+    );
   }
-  const typedParams = parsed.data as { authEntry: string; network?: string; smartAccountId?: string };
+  const typedParams = parsed.data as {
+    authEntry: string;
+    network?: string;
+    smartAccountId?: string;
+  };
 
   // Validate the auth entry XDR before opening any UI.
   // Invalid XDR → error returned without opening the popup (AC).
@@ -401,7 +417,9 @@ export async function handleSignMessage(
   const { origin, params, requestId } = ctx;
   const parsed = signMessageSchema.safeParse(params);
   if (!parsed.success) {
-    throw new Error(`Invalid signMessage params: ${parsed.error.issues.map((i) => `${i.path.join('.')}: ${i.message}`).join('; ')}`);
+    throw new Error(
+      `Invalid signMessage params: ${parsed.error.issues.map((i) => `${i.path.join('.')}: ${i.message}`).join('; ')}`
+    );
   }
   const typedParams = parsed.data as { message: string; network?: string; smartAccountId?: string };
 
@@ -479,7 +497,9 @@ export async function handleRequestSessionKey(
   const { origin, params, requestId } = ctx;
   const parsed = requestSessionKeySchema.safeParse(params);
   if (!parsed.success) {
-    throw new Error(`Invalid session key params: ${parsed.error.issues.map((i) => `${i.path.join('.')}: ${i.message}`).join('; ')}`);
+    throw new Error(
+      `Invalid session key params: ${parsed.error.issues.map((i) => `${i.path.join('.')}: ${i.message}`).join('; ')}`
+    );
   }
   const policy = parsed.data as SessionKeyPolicy;
   if (policy.expiresAt <= Date.now()) {

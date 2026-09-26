@@ -7,6 +7,7 @@ use serde::{Deserialize, Serialize};
 use sqlx::PgPool;
 use uuid::Uuid;
 
+use crate::api::validation::validate_account_id;
 use crate::error::Result;
 use crate::repositories::account_activity::{ActivityFilter, ActivityRecord, CursorPage};
 
@@ -51,23 +52,6 @@ pub struct ActivityResponse {
 #[derive(Debug, Serialize)]
 pub struct ActivityTypesResponse {
     data: Vec<String>,
-}
-
-/// Validate Stellar account ID format (basic validation)
-fn validate_account_id(id: &str) -> Result<()> {
-    if id.is_empty() {
-        return Err(crate::error::ApiError::InvalidFilter(
-            "account_id cannot be empty".to_string(),
-        ));
-    }
-
-    // Validate with stellar-strkey
-    match stellar_strkey::Strkey::from_string(id) {
-        Ok(stellar_strkey::Strkey::PublicKeyEd25519(_)) => Ok(()),
-        _ => Err(crate::error::ApiError::InvalidFilter(
-            "account_id must be a valid Stellar public key (StrKey G-address)".to_string(),
-        )),
-    }
 }
 
 /// Parse ISO datetime string

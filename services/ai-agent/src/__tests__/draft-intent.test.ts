@@ -1,5 +1,6 @@
 import { generateDraftIntent } from '../draft-intent';
 import type { DraftIntentInput, LlmProvider, ProviderDraftResult } from '../providers/types';
+import { VALID_ACCOUNT_ID, VALID_ADDRESS } from './fixtures/addresses';
 
 function stubProvider(overrides: Partial<LlmProvider>): LlmProvider {
   return {
@@ -14,13 +15,13 @@ function stubProvider(overrides: Partial<LlmProvider>): LlmProvider {
 
 describe('generateDraftIntent', () => {
   const input: DraftIntentInput = {
-    prompt: 'Send 10 XLM to GDKRY7GNU3CJQX6FMT2BIPW5ELSZAHOV4DKRY7GNU3CJQX6FMT2BIPW5',
-    accountId: 'GACC',
+    prompt: `Send 10 XLM to ${VALID_ADDRESS}`,
+    accountId: VALID_ACCOUNT_ID,
   };
 
   it('uses the LLM provider and reports source "llm" when it succeeds', async () => {
     const llmResult: ProviderDraftResult = {
-      intent: { type: 'payment', amount: '10', asset: 'XLM', destination: 'GDEST' },
+      intent: { type: 'payment', amount: '10', asset: 'XLM', destination: VALID_ADDRESS },
       summary: 'from llm',
     };
     const provider = stubProvider({
@@ -70,5 +71,22 @@ describe('generateDraftIntent', () => {
     const result = await generateDraftIntent(input, provider);
 
     expect(result.source).toBe('deterministic');
+  });
+
+  it('throws instead of returning a deterministic draft that fails schema validation', async () => {
+    const provider = stubProvider({
+      isAvailable: () => true,
+      draftIntent: async () => {
+        throw new Error('LLM exploded');
+      },
+    });
+    const zeroAmountInput: DraftIntentInput = {
+      prompt: 'send 0 XLM to GDKRY7GNU3CJQX6FMT2BIPW5ELSZAHOV4DKRY7GNU3CJQX6FMT2BIPW5',
+      accountId: 'GACC',
+    };
+
+    await expect(generateDraftIntent(zeroAmountInput, provider)).rejects.toThrow(
+      /Unable to draft payment intent/
+    );
   });
 });

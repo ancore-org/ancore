@@ -45,6 +45,32 @@ export async function verifyVaultPassword(
   return unlocked;
 }
 
+/**
+ * Change the vault password, re-encrypting stored data under the new one.
+ *
+ * Delegates to SecureStorageManager.changePassword, which verifies
+ * `currentPassword` against the vault, rotates the master salt, and
+ * re-encrypts every vault item. Operates on the shared manager so the
+ * unlocked session stays valid afterwards.
+ *
+ * @returns true on success, false if `currentPassword` is wrong or no vault exists
+ * @throws VaultExportError if stored data cannot be re-encrypted
+ */
+export async function changeVaultPassword(
+  currentPassword: string,
+  newPassword: string
+): Promise<boolean> {
+  const storageManager = getVaultStorageManager();
+
+  try {
+    return await storageManager.changePassword(currentPassword, newPassword);
+  } catch (error) {
+    throw new VaultExportError(
+      error instanceof Error ? error.message : 'Could not change the vault password.'
+    );
+  }
+}
+
 async function ensureStorageAccess(
   storageManager: StorageManagerInstance,
   password: string,

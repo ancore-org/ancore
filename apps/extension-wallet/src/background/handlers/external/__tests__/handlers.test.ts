@@ -251,7 +251,6 @@ describe('handleGetSmartAccount', () => {
   });
 });
 
-
 // ── Signing handlers (issue #1122, #1121) ─────────────────────────────────────
 
 describe('handleSignTransaction', () => {
@@ -300,7 +299,9 @@ describe('handleSignTransaction', () => {
 
 describe('handleSignAuthEntry', () => {
   it('throws on missing authEntry', async () => {
-    await expect(handleSignAuthEntry(makeCtx('https://dapp.example', {}))).rejects.toThrow(/authEntry/);
+    await expect(handleSignAuthEntry(makeCtx('https://dapp.example', {}))).rejects.toThrow(
+      /authEntry/
+    );
   });
 
   it('throws on invalid base64 authEntry', async () => {
@@ -326,9 +327,7 @@ describe('handleSignAuthEntry', () => {
       resolve({ signedAuthEntry: 'SIGNED_ENTRY' })
     );
     const entry = Buffer.from('auth-entry-data').toString('base64');
-    const result = await handleSignAuthEntry(
-      makeCtx('https://dapp.example', { authEntry: entry })
-    );
+    const result = await handleSignAuthEntry(makeCtx('https://dapp.example', { authEntry: entry }));
     expect(enqueueApproval).toHaveBeenCalled();
     expect(openApprovalWindow).toHaveBeenCalledWith(expect.any(String), 'sign-auth-entry');
     expect(result).toEqual({ signedAuthEntry: 'SIGNED_ENTRY' });
@@ -407,9 +406,7 @@ describe('handleRequestSessionKey', () => {
 
   it('throws on missing permissions', async () => {
     await expect(
-      handleRequestSessionKey(
-        makeCtx('https://dapp.example', { expiresAt: Date.now() + 100000 })
-      )
+      handleRequestSessionKey(makeCtx('https://dapp.example', { expiresAt: Date.now() + 100000 }))
     ).rejects.toThrow(/permissions/);
   });
 

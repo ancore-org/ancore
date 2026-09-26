@@ -1,5 +1,6 @@
 import * as React from 'react';
-import { verifyVaultPassword } from '@/security/vault-export';
+import { changeVaultPassword, verifyVaultPassword } from '@/security/vault-export';
+import { validatePasswordStrength } from '@ancore/crypto';
 import { AlertTriangle, Eye, EyeOff, Check, Copy, Monitor, X } from 'lucide-react';
 import { Button, Input } from '@ancore/ui-kit';
 import {
@@ -45,19 +46,47 @@ function ChangePasswordView({ onDone }: { onDone: () => void }) {
   const [showNext, setShowNext] = React.useState(false);
   const [error, setError] = React.useState('');
   const [success, setSuccess] = React.useState(false);
+  const [submitting, setSubmitting] = React.useState(false);
 
-  function handleSubmit(e: React.FormEvent) {
+  async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     setError('');
-    if (form.next.length < 8) {
-      setError('Password must be at least 8 characters.');
+
+    if (!form.current) {
+      setError('Enter your current password.');
+      return;
+    }
+
+    // Hold a changed password to the same standard as onboarding, so this
+    // screen cannot be used to downgrade to a weaker password.
+    const strength = validatePasswordStrength(form.next);
+    if (!strength.valid) {
+      setError(strength.reasons[0] ?? 'Choose a stronger password.');
       return;
     }
     if (form.next !== form.confirm) {
       setError('Passwords do not match.');
       return;
     }
-    setSuccess(true);
+    if (form.next === form.current) {
+      setError('New password must be different from the current one.');
+      return;
+    }
+
+    setSubmitting(true);
+    try {
+      const changed = await changeVaultPassword(form.current, form.next);
+      if (!changed) {
+        setError('Current password is incorrect.');
+        return;
+      }
+      setForm({ current: '', next: '', confirm: '' });
+      setSuccess(true);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Could not change your password.');
+    } finally {
+      setSubmitting(false);
+    }
   }
 
   if (success) {
@@ -101,7 +130,7 @@ function ChangePasswordView({ onDone }: { onDone: () => void }) {
         <div className="relative">
           <Input
             type={showNext ? 'text' : 'password'}
-            placeholder="Min. 8 characters"
+            placeholder="Min. 12 chars, mixed case, digit, symbol"
             value={form.next}
             onChange={(event: React.ChangeEvent<HTMLInputElement>) =>
               setForm((formState) => ({ ...formState, next: event.target.value }))
@@ -136,8 +165,8 @@ function ChangePasswordView({ onDone }: { onDone: () => void }) {
           <p className="text-xs text-destructive">{error}</p>
         </div>
       )}
-      <Button type="submit" className="w-full mt-1">
-        Update Password
+      <Button type="submit" className="w-full mt-1" disabled={submitting}>
+        {submitting ? 'Updating…' : 'Update Password'}
       </Button>
     </form>
   );

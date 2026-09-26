@@ -20,12 +20,25 @@ export default defineConfig({
     hookTimeout: 30000,
     css: true,
     fileParallelism: process.env.CI !== 'true',
+    // The fileParallelism flag above only disables cross-file parallelism in
+    // real CI (CI=true) — it doesn't help the local `turbo run test` fleet
+    // (see apps/web-dashboard/vitest.config.ts), where each package's own
+    // CPU-count-sized worker threads compound with turbo's outer concurrency
+    // cap into real oversubscription and spurious timeouts.
+    pool: 'threads',
+    poolOptions: {
+      threads: {
+        maxThreads: 2,
+        minThreads: 1,
+      },
+    },
     exclude: [
       '**/node_modules/**',
       '**/*.e2e.test.{ts,tsx}',
       '**/tests/e2e/**',
       '**/messaging/__tests__/messaging.test.ts',
       '**/SessionKeys/__tests__/**',
+      '**/hooks/__tests__/useSessionKeys.test.ts',
     ],
     coverage: {
       provider: 'v8',

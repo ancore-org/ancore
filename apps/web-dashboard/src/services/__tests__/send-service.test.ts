@@ -1,9 +1,14 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import type { SendStrategyDeps } from '../send-service';
 import { WalletApiSendStrategy, RelayerSendStrategy, createSendStrategy } from '../send-service';
+import { AuthRequiredError } from '../../auth';
 
 const VALID_ADDRESS = 'GAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAWHF';
 const TESTNET_DEPS: SendStrategyDeps = { network: 'testnet' };
+const RELAYER_DEPS: SendStrategyDeps = {
+  network: 'testnet',
+  getAuthToken: () => 'test-session-token',
+};
 
 // ---------------------------------------------------------------------------
 // WalletApiSendStrategy
@@ -121,7 +126,7 @@ describe('RelayerSendStrategy', () => {
     );
     vi.stubGlobal('fetch', mockFetch);
 
-    const strategy = new RelayerSendStrategy(TESTNET_DEPS);
+    const strategy = new RelayerSendStrategy(RELAYER_DEPS);
     const result = await strategy.send({ recipient: VALID_ADDRESS, amount: '5.00' });
 
     expect(result.status).toBe('pending');
@@ -157,7 +162,7 @@ describe('RelayerSendStrategy', () => {
       )
     );
 
-    const strategy = new RelayerSendStrategy(TESTNET_DEPS);
+    const strategy = new RelayerSendStrategy(RELAYER_DEPS);
     await expect(strategy.send({ recipient: VALID_ADDRESS, amount: '1.00' })).rejects.toThrow(
       'Nonce replay'
     );
@@ -175,10 +180,21 @@ describe('RelayerSendStrategy', () => {
       vi.fn(() => Promise.resolve(new Response('Internal error', { status: 500 })))
     );
 
-    const strategy = new RelayerSendStrategy(TESTNET_DEPS);
+    const strategy = new RelayerSendStrategy(RELAYER_DEPS);
     await expect(strategy.send({ recipient: VALID_ADDRESS, amount: '1.00' })).rejects.toThrow(
       'Relayer request failed (500)'
     );
+  });
+
+  it('send throws AuthRequiredError instead of using a hardcoded token when no session is available', async () => {
+    const mockFetch = vi.fn();
+    vi.stubGlobal('fetch', mockFetch);
+
+    const strategy = new RelayerSendStrategy(TESTNET_DEPS);
+    await expect(
+      strategy.send({ recipient: VALID_ADDRESS, amount: '1.00' })
+    ).rejects.toBeInstanceOf(AuthRequiredError);
+    expect(mockFetch).not.toHaveBeenCalled();
   });
 });
 

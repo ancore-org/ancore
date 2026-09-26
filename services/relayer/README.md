@@ -81,13 +81,14 @@ An empty value (`FOO=`) is treated as unset and falls back to the default. Appli
 configuration through `getEnv()` rather than `process.env` — the one exception is `src/tracing.ts`,
 which owns the standard `OTEL_*` variables and must run before any other module is imported.
 
-**Server and auth**
+**Server, auth, and database**
 
 | Variable              | Default | Prod         | Description                                                                                                                                       |
 | --------------------- | ------- | ------------ | ------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `PORT`                | `3000`  | as needed    | HTTP listen port. Must be an integer in `1…65535`                                                                                                 |
 | `RELAYER_AUTH_SECRET` | _unset_ | **required** | Bearer token secret for protected `/relay` routes. **When unset the service falls back to a stub auth service that accepts any non-empty token.** |
 | `ALLOWED_ORIGINS`     | `*`     | **set it**   | Comma-separated CORS allowlist, e.g. `http://localhost:5173,https://app.example.com`                                                              |
+| `DATABASE_URL`        | _unset_ | **required** | PostgreSQL connection string for persistent storage (`PgJobQueue`, `PgIdempotencyStore`, `PgNonceStore`, `PgScheduledTransferStore`).             |
 
 **Stellar network**
 

@@ -2,7 +2,7 @@
   "name": "@ancore/relayer",
   "version": "0.1.0",
   "description": "Relayer API service for Ancore smart account operations",
-  "main": "./dist/index.js",
+  "main": "./dist/server.js",
   "scripts": {
     "build": "tsc --project tsconfig.json",
     "test": "jest --coverage",
@@ -52,8 +52,12 @@
     "typescript": "^5.3.0"
   },
   "jest": {
+    "maxWorkers": 2,
     "preset": "ts-jest",
     "testEnvironment": "node",
+    "setupFiles": [
+      "<rootDir>/tests/jest.setup.ts"
+    ],
     "testMatch": [
       "**/src/**/*.test.ts",
       "**/tests/**/*.test.ts"

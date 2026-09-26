@@ -2,6 +2,8 @@
 -- Replaces the in-memory ScheduledTransferStore with Postgres-backed tables.
 -- All lifecycle operations in ScheduledTransferService remain idempotent.
 
+CREATE EXTENSION IF NOT EXISTS pgcrypto;
+
 -- ── Scheduled transfers ────────────────────────────────────────────────────────
 
 CREATE TABLE IF NOT EXISTS scheduled_transfers (

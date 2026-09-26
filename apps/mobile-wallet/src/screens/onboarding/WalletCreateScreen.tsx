@@ -3,7 +3,7 @@ import React from 'react';
 type Props = {
   onBack?: () => void;
   onCancel?: () => void;
-  onContinue?: () => void;
+  onContinue?: (walletName: string) => void;
 };
 
 const noop = () => {};
@@ -40,7 +40,7 @@ export function WalletCreateScreen({ onBack = noop, onCancel = noop, onContinue 
         <button onClick={onCancel} type="button">
           Cancel
         </button>
-        <button disabled={!canContinue} onClick={onContinue} type="button">
+        <button disabled={!canContinue} onClick={() => onContinue(walletName.trim())} type="button">
           Continue
         </button>
       </div>

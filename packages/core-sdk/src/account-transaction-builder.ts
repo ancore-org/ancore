@@ -80,6 +80,21 @@ export class AccountTransactionBuilder {
   /** Whether setTimeout has already been applied to the inner builder. */
   private timeoutApplied = false;
 
+  /**
+   * The raw transaction produced by the inner builder, cached between
+   * `simulate()` and `build()`.
+   *
+   * `TransactionBuilder.build()` consumes a sequence number from the source
+   * account every time it is called. Without this cache, the documented flow —
+   * `simulate()` to estimate fees, then `build()` to get the transaction —
+   * burned two sequence numbers and returned a transaction numbered one higher
+   * than the account's next expected sequence, which the network rejects with
+   * `tx_bad_seq`. Every additional `simulate()` made it worse.
+   *
+   * Invalidated by anything that changes what the transaction should contain.
+   */
+  private rawTransaction: Transaction | null = null;
+
   constructor(sourceAccount: Account, options: AccountTransactionBuilderOptions) {
     const {
       server,
@@ -131,6 +146,7 @@ export class AccountTransactionBuilder {
 
     this.txBuilder.addOperation(operation);
     this.operationCount++;
+    this.rawTransaction = null;
     return this;
   }
 
@@ -147,6 +163,7 @@ export class AccountTransactionBuilder {
 
     this.txBuilder.addOperation(operation);
     this.operationCount++;
+    this.rawTransaction = null;
     return this;
   }
 
@@ -168,6 +185,7 @@ export class AccountTransactionBuilder {
 
     this.txBuilder.addOperation(operation);
     this.operationCount++;
+    this.rawTransaction = null;
     return this;
   }
 
@@ -187,6 +205,7 @@ export class AccountTransactionBuilder {
   addOperation(operation: xdr.Operation): this {
     this.txBuilder.addOperation(operation);
     this.operationCount++;
+    this.rawTransaction = null;
     return this;
   }
 
@@ -199,6 +218,7 @@ export class AccountTransactionBuilder {
    */
   addMemo(memo: Memo): this {
     this.txBuilder.addMemo(memo);
+    this.rawTransaction = null;
     return this;
   }
 
@@ -211,6 +231,8 @@ export class AccountTransactionBuilder {
    */
   setTimeout(seconds: number): this {
     this.txBuilder.setTimeout(seconds);
+    this.timeoutApplied = true;
+    this.rawTransaction = null;
     return this;
   }
 
@@ -285,11 +307,17 @@ export class AccountTransactionBuilder {
    * Ensures setTimeout is called exactly once.
    */
   private buildRawTransaction(): Transaction {
+    if (this.rawTransaction) {
+      return this.rawTransaction;
+    }
+
     if (!this.timeoutApplied) {
       this.txBuilder.setTimeout(this.timeoutSeconds);
       this.timeoutApplied = true;
     }
-    return this.txBuilder.build();
+
+    this.rawTransaction = this.txBuilder.build();
+    return this.rawTransaction;
   }
 
   /** Throw if the caller hasn't added at least one operation. */

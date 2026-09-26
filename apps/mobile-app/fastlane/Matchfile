@@ -1,0 +1,4 @@
+git_url(ENV.fetch("FASTLANE_GIT_URL", ""))
+storage_mode("git")
+type("appstore")
+app_identifier(["org.ancore.wallet", "org.ancore.wallet.dev"])

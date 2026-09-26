@@ -110,35 +110,247 @@ export function parseBulkPayoutCsv(csv: string): BulkPayoutParseResult {
   return toParseResult(rows);
 }
 
-export async function executeBulkPayoutBatch(
-  rows: BulkPayoutRow[],
-  submitPayout: PayoutSubmitter
-): Promise<BulkPayoutExecutionSummary> {
-  const results: BulkPayoutExecution[] = [];
+/**
+ * Rows submitted at once (#1349).
+ *
+ * A batch used to run strictly one row at a time, so a few hundred payouts
+ * took a few hundred sequential round trips. Four is a deliberate compromise:
+ * enough to hide per-request latency, low enough that the relayer sees a
+ * trickle rather than a burst, and low enough that a batch failing for a
+ * systemic reason does not fire hundreds of doomed requests before anyone
+ * notices.
+ */
+export const BULK_PAYOUT_CONCURRENCY = 4;
 
-  for (const row of rows) {
-    try {
-      await submitPayout({
-        recipient: row.recipient,
-        amount: row.amount,
-        signedTransactionXdr: row.signedTransactionXdr,
-        idempotencyKey: `bulk-payout-${row.id}`,
-      });
-      results.push({ row, status: 'success' });
-    } catch (error) {
-      results.push({
-        row,
-        status: 'failed',
-        error: error instanceof Error ? error.message : 'Payout execution failed',
-      });
-    }
+/** Where an in-progress batch is checkpointed. */
+export const BULK_PAYOUT_CHECKPOINT_KEY = 'ancore.bulk-payouts.checkpoint';
+
+/** Bumped when the persisted shape changes, so an old checkpoint is discarded rather than misread. */
+const CHECKPOINT_VERSION = 1;
+
+/** One row's settled outcome, as persisted. The rows themselves are re-supplied by the caller. */
+interface CheckpointEntry {
+  status: Exclude<BulkPayoutStatus, 'pending'>;
+  error?: string;
+}
+
+interface BulkPayoutCheckpoint {
+  version: number;
+  batchId: string;
+  updatedAt: number;
+  entries: Record<string, CheckpointEntry>;
+}
+
+/** The slice of `Storage` used here, so a test can pass a plain object. */
+export interface CheckpointStorage {
+  getItem(key: string): string | null;
+  setItem(key: string, value: string): void;
+  removeItem(key: string): void;
+}
+
+export interface ExecuteBulkPayoutBatchOptions {
+  /** Rows submitted concurrently. Defaults to `BULK_PAYOUT_CONCURRENCY`. */
+  concurrency?: number;
+  /**
+   * Identifies this batch across reloads. Rows that already settled under the
+   * same id are not resubmitted. Omit to disable checkpointing entirely.
+   */
+  batchId?: string;
+  /** Defaults to `localStorage` when available. */
+  storage?: CheckpointStorage | null;
+  /** Called after every row settles, for progress UI. */
+  onProgress?: (progress: { completed: number; total: number }) => void;
+}
+
+function defaultStorage(): CheckpointStorage | null {
+  try {
+    return typeof localStorage === 'undefined' ? null : localStorage;
+  } catch {
+    // Storage access throws outright in some privacy modes. A batch must
+    // still run; it just runs without resume.
+    return null;
   }
+}
+
+function readCheckpoint(
+  storage: CheckpointStorage | null,
+  batchId: string | undefined
+): Record<string, CheckpointEntry> {
+  if (!storage || !batchId) return {};
+
+  try {
+    const raw = storage.getItem(BULK_PAYOUT_CHECKPOINT_KEY);
+    if (!raw) return {};
+
+    const parsed = JSON.parse(raw) as BulkPayoutCheckpoint;
+    // A checkpoint from a different batch, or an older shape, says nothing
+    // about this one. Adopting it would report payouts that never happened.
+    if (parsed.version !== CHECKPOINT_VERSION || parsed.batchId !== batchId) {
+      return {};
+    }
+    return parsed.entries ?? {};
+  } catch {
+    return {};
+  }
+}
+
+function writeCheckpoint(
+  storage: CheckpointStorage | null,
+  batchId: string | undefined,
+  entries: Record<string, CheckpointEntry>
+): void {
+  if (!storage || !batchId) return;
+
+  try {
+    const checkpoint: BulkPayoutCheckpoint = {
+      version: CHECKPOINT_VERSION,
+      batchId,
+      updatedAt: Date.now(),
+      entries,
+    };
+    storage.setItem(BULK_PAYOUT_CHECKPOINT_KEY, JSON.stringify(checkpoint));
+  } catch {
+    // An exhausted quota must not abort a batch that is moving real money.
+    // Losing the ability to resume is bad; stopping halfway is worse.
+  }
+}
+
+/** Discard a batch's checkpoint. Call once its summary has been recorded. */
+export function clearBulkPayoutCheckpoint(
+  storage: CheckpointStorage | null = defaultStorage()
+): void {
+  try {
+    storage?.removeItem(BULK_PAYOUT_CHECKPOINT_KEY);
+  } catch {
+    // Nothing useful to do; the version and batchId guards make a stale
+    // entry inert anyway.
+  }
+}
+
+/**
+ * Read back a persisted batch without submitting anything.
+ *
+ * Lets a page that reloaded mid-batch report what already settled, instead of
+ * showing an empty summary while those payouts sit completed on-chain.
+ * Returns `null` when there is nothing recorded for this batch.
+ */
+export function loadBulkPayoutCheckpoint(
+  batchId: string,
+  rows: BulkPayoutRow[],
+  storage: CheckpointStorage | null = defaultStorage()
+): BulkPayoutExecutionSummary | null {
+  const entries = readCheckpoint(storage, batchId);
+  const settled = rows.filter((row) => entries[row.id]);
+  if (settled.length === 0) return null;
+
+  const results: BulkPayoutExecution[] = settled.map((row) => ({
+    row,
+    status: entries[row.id].status,
+    error: entries[row.id].error,
+  }));
 
   const successful = results.filter((result) => result.status === 'success').length;
   return {
     total: rows.length,
     successful,
-    failed: rows.length - successful,
+    failed: results.length - successful,
+    results,
+  };
+}
+
+/**
+ * Execute a payout batch.
+ *
+ * Two changes over the original one-row-at-a-time loop (#1349):
+ *
+ *   * **Bounded concurrency.** Rows run `concurrency` at a time. Each row is
+ *     still caught independently, so one failure never sinks its neighbours —
+ *     which is why this is a worker pool rather than `Promise.all`.
+ *   * **Checkpointing.** Every settled row is written to storage under
+ *     `batchId` as it completes. If the tab closes mid-batch the submitted
+ *     payouts are still recorded, and a resumed run skips them rather than
+ *     paying twice.
+ *
+ * Results come back in the caller's row order regardless of completion order,
+ * so the summary lines up with the table the user is looking at.
+ */
+export async function executeBulkPayoutBatch(
+  rows: BulkPayoutRow[],
+  submitPayout: PayoutSubmitter,
+  options: ExecuteBulkPayoutBatchOptions = {}
+): Promise<BulkPayoutExecutionSummary> {
+  const {
+    concurrency = BULK_PAYOUT_CONCURRENCY,
+    batchId,
+    storage = defaultStorage(),
+    onProgress,
+  } = options;
+
+  const workers = Math.max(1, Math.min(concurrency, rows.length || 1));
+  const entries = readCheckpoint(storage, batchId);
+  const settled: Array<BulkPayoutExecution | undefined> = new Array(rows.length);
+
+  let completed = 0;
+  const report = (): void => {
+    completed += 1;
+    onProgress?.({ completed, total: rows.length });
+  };
+
+  // Rows already settled in a previous run of this batch are adopted as they
+  // stand. Resubmitting one would be a second payment, which is the failure
+  // this checkpoint exists to prevent.
+  const pending: number[] = [];
+  rows.forEach((row, index) => {
+    const recorded = entries[row.id];
+    if (recorded) {
+      settled[index] = { row, status: recorded.status, error: recorded.error };
+      report();
+    } else {
+      pending.push(index);
+    }
+  });
+
+  let cursor = 0;
+  const runWorker = async (): Promise<void> => {
+    for (;;) {
+      const next = cursor;
+      cursor += 1;
+      if (next >= pending.length) return;
+
+      const index = pending[next];
+      const row = rows[index];
+
+      try {
+        await submitPayout({
+          recipient: row.recipient,
+          amount: row.amount,
+          signedTransactionXdr: row.signedTransactionXdr,
+          idempotencyKey: `bulk-payout-${row.id}`,
+        });
+        settled[index] = { row, status: 'success' };
+        entries[row.id] = { status: 'success' };
+      } catch (error) {
+        const message = error instanceof Error ? error.message : 'Payout execution failed';
+        settled[index] = { row, status: 'failed', error: message };
+        entries[row.id] = { status: 'failed', error: message };
+      }
+
+      // Written per row, not per batch: a checkpoint saved only at the end
+      // would be empty in exactly the case it exists for.
+      writeCheckpoint(storage, batchId, entries);
+      report();
+    }
+  };
+
+  await Promise.all(Array.from({ length: workers }, () => runWorker()));
+
+  const results = settled.filter((result): result is BulkPayoutExecution => result !== undefined);
+  const successful = results.filter((result) => result.status === 'success').length;
+
+  return {
+    total: rows.length,
+    successful,
+    failed: results.length - successful,
     results,
   };
 }

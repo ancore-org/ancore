@@ -40,7 +40,15 @@ const sampleExecution: ScheduledTransferExecutionLog = {
 const mockHook = vi.fn();
 
 vi.mock('../../hooks/useScheduledTransfers', () => ({
-  useScheduledTransfers: () => mockHook(),
+  useScheduledTransfers: (opts?: any) => mockHook(opts),
+}));
+
+vi.mock('../../hooks/useAccountState', () => ({
+  useAccountState: () => ({ currentAccount: { address: 'GCONNECTED123' } }),
+}));
+
+vi.mock('../../hooks/useWalletConnection', () => ({
+  useWalletConnection: () => ({ address: 'GCONNECTED123', connected: true }),
 }));
 
 vi.mock('@ancore/ui-kit', () => ({
@@ -84,6 +92,7 @@ describe('ScheduledTransfersPage', () => {
   it('renders scheduled jobs and execution history', () => {
     render(<ScheduledTransfersPage />);
 
+    expect(mockHook).toHaveBeenCalledWith({ accountAddress: 'GCONNECTED123' });
     expect(screen.getByText(/12 XLM/)).toBeInTheDocument();
     expect(screen.getByText('active')).toBeInTheDocument();
     expect(screen.getByText('Execution history')).toBeInTheDocument();

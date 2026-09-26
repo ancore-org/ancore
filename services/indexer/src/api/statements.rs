@@ -6,6 +6,7 @@ use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use sqlx::PgPool;
 
+use crate::api::validation::validate_account_id;
 use crate::error::{ApiError, Result};
 use crate::repositories::account_activity::{ActivityFilter, CursorPage};
 
@@ -32,21 +33,6 @@ pub struct StatementRow {
 pub struct StatementRowsResponse {
     rows: Vec<StatementRow>,
     next_cursor: Option<String>,
-}
-
-fn validate_account_id(id: &str) -> Result<()> {
-    if id.is_empty() {
-        return Err(ApiError::InvalidFilter(
-            "account_id cannot be empty".to_string(),
-        ));
-    }
-    if id.len() != 56 || !id.starts_with('G') {
-        return Err(ApiError::InvalidFilter(
-            "account_id must be a valid Stellar public key (56 characters starting with G)"
-                .to_string(),
-        ));
-    }
-    Ok(())
 }
 
 fn parse_iso_datetime(s: &str) -> Result<DateTime<Utc>> {

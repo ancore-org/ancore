@@ -45,10 +45,13 @@ export const test = base.extend<ExtensionFixtures>({
   seedWallet: async ({ page }, use) => {
     await use(async (state: WalletState) => {
       await page.addInitScript(
-        ([key, value]) => {
+        ([key, value, initiallyUnlocked]) => {
           localStorage.setItem(key, JSON.stringify(value));
+          if (initiallyUnlocked) {
+            window.__E2E_INITIALLY_UNLOCKED__ = true;
+          }
         },
-        [AUTH_KEY, AUTH_PRESETS[state]] as [string, object]
+        [AUTH_KEY, AUTH_PRESETS[state], state === 'onboarded-unlocked'] as [string, object, boolean]
       );
       await page.goto('/', { waitUntil: 'domcontentloaded' });
       await waitForAppReady(page);

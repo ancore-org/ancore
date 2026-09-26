@@ -1,7 +1,6 @@
-appId: com.ancore.mobile
+appId: org.ancore.wallet.dev
 ---
 # Centralized from apps/mobile-wallet/e2e/flows/import-wallet.yaml
-# TODO: requires #783 (mobile-wire-onboarding) — enable in CI after that ships
 - launchApp
 - tapOn: "Import an existing wallet"
 - assertVisible: "Import an existing wallet"

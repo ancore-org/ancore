@@ -81,6 +81,10 @@ async fn health_reports_schema_version_from_migration_ledger() {
         "test database should be migrated to the version this build expects"
     );
     assert_eq!(body["migration_status"], "up_to_date");
+    // Requires a reachable SOROBAN_RPC_URL in the test environment — see
+    // module docs for how to run this suite. When the RPC lookup succeeds,
+    // rpc_unavailable is false and status can read "ok".
+    assert_eq!(body["rpc_unavailable"], false);
     assert_eq!(body["status"], "ok");
 }
 
@@ -121,6 +125,7 @@ async fn health_keeps_reporting_ledger_lag_fields() {
         "chain_head",
         "lag_blocks",
         "lag_seconds",
+        "rpc_unavailable",
     ] {
         assert!(!body[field].is_null(), "missing /health field: {field}");
     }

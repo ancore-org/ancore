@@ -10,6 +10,7 @@ export {
   importWallet,
   restoreWallet,
   deriveContractId,
+  ACCOUNT_CONTRACT_SALT,
   type CreateWalletOptions,
   type ImportWalletOptions,
   type RestoreWalletOptions,
@@ -173,6 +174,16 @@ export {
   type SaveSessionKeysDeps,
 } from './storage/save-session-keys';
 export { getSessionKeys, type GetSessionKeysDeps } from './storage/get-session-keys';
+export {
+  AccountPersistence,
+  createAccountPersistence,
+  type AccountMetadata,
+  type AccountSecretPayload,
+  type AccountPersistenceOptions,
+  type PersistedAccountRecord,
+  type PersistAccountInput,
+  type StoredAccount,
+} from './storage/account-persistence';
 export type {
   AccountData,
   EncryptedPayload,

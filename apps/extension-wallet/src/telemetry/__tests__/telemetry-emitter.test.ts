@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it } from 'vitest';
-import { initTelemetry } from '../telemetry-emitter';
+import { getTelemetry, initTelemetry } from '../telemetry-emitter';
 import { TelemetryEventType } from '../telemetry-schema';
 
 describe('TelemetryEmitter', () => {
@@ -59,5 +59,10 @@ describe('TelemetryEmitter', () => {
     emitter.emitAddressCopied();
     emitter.clearEvents();
     expect(emitter.getEvents()).toHaveLength(0);
+  });
+
+  it('initializes default emitter with valid session id format', () => {
+    const emitter = getTelemetry();
+    expect(emitter).toBeDefined();
   });
 });

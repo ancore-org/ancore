@@ -1,3 +1,4 @@
+import '@walletconnect/react-native-compat';
 import './shim';
 import { AppRegistry } from 'react-native';
 import App from './src/App';

@@ -88,3 +88,9 @@ implementation.md
 submission_details.md
 brief.md
 checks.md
+
+# Ruby/CocoaPods vendor dir from local `bundle install` for iOS tooling
+# (fastlane, cocoapods) — never committed, but left untracked on disk it trips
+# `prettier --check`'s glob and fails the pre-push hook for anyone who has run
+# bundle install locally.
+apps/mobile-app/vendor/

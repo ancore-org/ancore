@@ -2,6 +2,49 @@ import { renderHook, waitFor } from '@testing-library/react';
 import { act } from 'react';
 import { vi } from 'vitest';
 import { useAccountState } from '../useAccountState';
+import type { WalletConnectionState } from '../useWalletConnection';
+
+// useAccountState (#1384) is driven by useWalletConnection + a fetch to
+// /api/account-overview rather than a hardcoded account list, so both are
+// mocked here to keep the hook's own logic under test deterministic.
+const mockUseWalletConnection = vi.fn<() => WalletConnectionState>();
+vi.mock('../useWalletConnection', () => ({
+  useWalletConnection: () => mockUseWalletConnection(),
+}));
+
+const CONNECTED_ADDRESS = 'GABC123DEF456GHI789JKL012MNO345PQR678STU901VWX234YZ';
+
+function connectedWalletState(
+  overrides: Partial<WalletConnectionState> = {}
+): WalletConnectionState {
+  return {
+    connected: true,
+    smartAccountId: CONNECTED_ADDRESS,
+    ownerPublicKey: null,
+    connecting: false,
+    error: null,
+    extensionInstalled: true,
+    ...overrides,
+  };
+}
+
+function disconnectedWalletState(): WalletConnectionState {
+  return {
+    connected: false,
+    smartAccountId: null,
+    ownerPublicKey: null,
+    connecting: false,
+    error: null,
+    extensionInstalled: false,
+  };
+}
+
+function mockFetchOnce(body: unknown, ok = true) {
+  return vi.fn().mockResolvedValue({
+    ok,
+    json: () => Promise.resolve(body),
+  });
+}
 
 // Mock localStorage
 const originalLocalStorage = window.localStorage;
@@ -36,6 +79,7 @@ describe('useAccountState', () => {
       delete store[key];
     });
     vi.clearAllMocks();
+    mockUseWalletConnection.mockReturnValue(connectedWalletState());
   });
 
   afterAll(() => {
@@ -46,6 +90,8 @@ describe('useAccountState', () => {
   });
 
   it('loads accounts and sets default current account on initial load', async () => {
+    vi.stubGlobal('fetch', mockFetchOnce({ balance: 1250.75, status: 'active' }));
+
     const { result } = renderHook(() => useAccountState());
 
     expect(result.current.loading).toBe(true);
@@ -54,81 +100,93 @@ describe('useAccountState', () => {
 
     await waitFor(() => {
       expect(result.current.loading).toBe(false);
-      expect(result.current.accounts).toHaveLength(4);
-      expect(result.current.currentAccount).not.toBe(null);
-      expect(result.current.currentAccount?.address).toBe(
-        'GABC123DEF456GHI789JKL012MNO345PQR678STU901VWX234YZ'
-      );
+      expect(result.current.accounts).toHaveLength(1);
+      expect(result.current.currentAccount?.address).toBe(CONNECTED_ADDRESS);
+      expect(result.current.currentAccount?.balance).toBe(1250.75);
     });
+
+    vi.unstubAllGlobals();
   });
 
-  it('loads stored account from localStorage if available', async () => {
-    const storedAccount = {
-      address: 'GDEF789GHI012JKL345MNO678PQR901STU234VWX567YZA890BCD',
-      balance: 845.2,
-      status: 'active' as const,
-      lastActivity: new Date('2026-04-23T15:30:00Z').toISOString(),
-    };
-    localStorageMock.setItem('ancore-dashboard-selected-account', JSON.stringify(storedAccount));
+  it('clears account state when no wallet is connected', async () => {
+    mockUseWalletConnection.mockReturnValue(disconnectedWalletState());
 
     const { result } = renderHook(() => useAccountState());
 
     await waitFor(() => {
       expect(result.current.loading).toBe(false);
-      expect(result.current.currentAccount?.address).toBe(
-        'GDEF789GHI012JKL345MNO678PQR901STU234VWX567YZA890BCD'
-      );
     });
+
+    expect(result.current.accounts).toEqual([]);
+    expect(result.current.currentAccount).toBe(null);
+    expect(result.current.error).toBe(null);
   });
 
-  it('handles corrupted localStorage data gracefully', async () => {
-    localStorageMock.setItem('ancore-dashboard-selected-account', 'invalid-json');
+  it('persists the fetched account to localStorage', async () => {
+    vi.stubGlobal('fetch', mockFetchOnce({ balance: 845.2, status: 'active' }));
 
     const { result } = renderHook(() => useAccountState());
 
     await waitFor(() => {
       expect(result.current.loading).toBe(false);
-      expect(result.current.currentAccount?.address).toBe(
-        'GABC123DEF456GHI789JKL012MNO345PQR678STU901VWX234YZ'
-      );
+      expect(result.current.currentAccount?.address).toBe(CONNECTED_ADDRESS);
     });
+
+    expect(localStorageMock.setItem).toHaveBeenCalledWith(
+      'ancore-dashboard-selected-account',
+      expect.stringContaining(CONNECTED_ADDRESS)
+    );
+
+    vi.unstubAllGlobals();
+  });
+
+  it('sets an error and clears accounts when the fetch response is not ok', async () => {
+    vi.stubGlobal('fetch', mockFetchOnce({}, false));
+
+    const { result } = renderHook(() => useAccountState());
+
+    await waitFor(() => {
+      expect(result.current.loading).toBe(false);
+      expect(result.current.error).not.toBe(null);
+    });
+
+    expect(result.current.accounts).toEqual([]);
+    expect(result.current.currentAccount).toBe(null);
+
+    vi.unstubAllGlobals();
   });
 
   it('updates current account and saves to localStorage', async () => {
+    vi.stubGlobal('fetch', mockFetchOnce({ balance: 1250.75, status: 'active' }));
+
     const { result } = renderHook(() => useAccountState());
 
     await waitFor(() => {
       expect(result.current.loading).toBe(false);
-      expect(result.current.accounts).toHaveLength(4);
     });
 
-    const targetAccount = result.current.accounts[1];
+    const otherAccount = {
+      address: 'GDEF789GHI012JKL345MNO678PQR901STU234VWX567YZA890BCD',
+      balance: 500,
+      status: 'active' as const,
+      lastActivity: new Date(),
+    };
+
     act(() => {
-      result.current.setCurrentAccount(targetAccount);
+      result.current.setCurrentAccount(otherAccount);
     });
 
-    await waitFor(() => {
-      expect(result.current.currentAccount?.address).toBe(targetAccount.address);
-    });
+    expect(result.current.currentAccount?.address).toBe(otherAccount.address);
     expect(localStorageMock.setItem).toHaveBeenCalledWith(
       'ancore-dashboard-selected-account',
-      expect.stringContaining(targetAccount.address)
+      expect.stringContaining(otherAccount.address)
     );
-  });
 
-  it('removes from localStorage when account is set to null', async () => {
-    const { result } = renderHook(() => useAccountState());
-
-    await waitFor(() => {
-      expect(result.current.loading).toBe(false);
-    });
-
-    // Note: The hook doesn't allow setting null, but we test the implementation
-    // This would need to be updated if the hook API changes
-    expect(typeof result.current.setCurrentAccount).toBe('function');
+    vi.unstubAllGlobals();
   });
 
   it('handles localStorage errors gracefully', async () => {
+    vi.stubGlobal('fetch', mockFetchOnce({ balance: 1250.75, status: 'active' }));
     localStorageMock.setItem.mockImplementation(() => {
       throw new Error('localStorage not available');
     });
@@ -137,61 +195,57 @@ describe('useAccountState', () => {
 
     await waitFor(() => {
       expect(result.current.loading).toBe(false);
-      expect(result.current.accounts).toHaveLength(4);
       expect(result.current.currentAccount).not.toBe(null);
     });
 
-    // Should not throw when setting account
     expect(() => {
-      result.current.setCurrentAccount(result.current.accounts[0]);
+      act(() => {
+        result.current.setCurrentAccount(result.current.currentAccount!);
+      });
     }).not.toThrow();
+
+    vi.unstubAllGlobals();
   });
 
   it('refetch function reloads account data', async () => {
+    const fetchMock = mockFetchOnce({ balance: 1250.75, status: 'active' });
+    vi.stubGlobal('fetch', fetchMock);
+
     const { result } = renderHook(() => useAccountState());
 
     await waitFor(() => {
       expect(result.current.loading).toBe(false);
-      expect(result.current.accounts).toHaveLength(4);
+      expect(result.current.accounts).toHaveLength(1);
     });
 
-    // Reset loading state
-    expect(result.current.loading).toBe(false);
-
-    // Call refetch
     act(() => {
       result.current.refetch();
     });
 
     await waitFor(() => {
       expect(result.current.loading).toBe(false);
-      expect(result.current.accounts).toHaveLength(4);
+      expect(result.current.accounts).toHaveLength(1);
     });
-  });
 
-  it('handles fetch errors gracefully', async () => {
-    // Mock a more complex scenario where the fetch might fail
-    // This would require mocking the implementation more deeply
-    const { result } = renderHook(() => useAccountState());
+    expect(fetchMock).toHaveBeenCalledTimes(2);
 
-    await waitFor(() => {
-      expect(result.current.loading).toBe(false);
-      expect(result.current.error).toBe(null);
-    });
+    vi.unstubAllGlobals();
   });
 
   it('returns correct hook interface', async () => {
+    vi.stubGlobal('fetch', mockFetchOnce({ balance: 1250.75, status: 'active' }));
+
     const { result } = renderHook(() => useAccountState());
 
     await waitFor(() => {
       expect(result.current.loading).toBe(false);
     });
 
-    expect(typeof result.current.accounts).toBe('object');
-    expect(typeof result.current.currentAccount).toBe('object');
+    expect(Array.isArray(result.current.accounts)).toBe(true);
     expect(typeof result.current.setCurrentAccount).toBe('function');
     expect(typeof result.current.loading).toBe('boolean');
-    expect(typeof result.current.error).toBe('object');
     expect(typeof result.current.refetch).toBe('function');
+
+    vi.unstubAllGlobals();
   });
 });

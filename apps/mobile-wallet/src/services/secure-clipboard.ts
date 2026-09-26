@@ -12,6 +12,7 @@
  */
 
 let clipboardModule: typeof import('@react-native-clipboard/clipboard') | null = null;
+let activeTimer: ReturnType<typeof setTimeout> | null = null;
 
 async function getClipboard() {
   if (!clipboardModule) {
@@ -38,11 +39,17 @@ async function getClipboard() {
  * @param clearAfterMs - Milliseconds before clipboard is cleared (default 60s)
  */
 export async function copySecure(value: string, clearAfterMs = 60_000): Promise<void> {
+  if (activeTimer !== null) {
+    clearTimeout(activeTimer);
+    activeTimer = null;
+  }
+
   const Clipboard = await getClipboard();
   if (!Clipboard) return;
   await Clipboard.setString(value);
 
-  setTimeout(async () => {
+  activeTimer = setTimeout(async () => {
+    activeTimer = null;
     try {
       await Clipboard.setString('');
     } catch {
@@ -55,6 +62,11 @@ export async function copySecure(value: string, clearAfterMs = 60_000): Promise<
  * Immediately clear the clipboard (e.g. on app background or navigation away).
  */
 export async function clearClipboard(): Promise<void> {
+  if (activeTimer !== null) {
+    clearTimeout(activeTimer);
+    activeTimer = null;
+  }
+
   const Clipboard = await getClipboard();
   if (!Clipboard) return;
   try {

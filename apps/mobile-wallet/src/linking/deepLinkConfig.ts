@@ -1,10 +1,12 @@
-import { parseWalletConnectDeepLink } from './walletconnect';
+import { parseWalletConnectDeepLink, getWalletConnectDeepLinkPrefixes } from './walletconnect';
 
-/** Custom URL scheme registered in the host app (see `native/` snippets). */
-export const ANCORE_URL_SCHEME = 'ancore';
+/** @deprecated Import from `./walletconnect` — kept for backward compatibility. */
+export { ANCORE_URL_SCHEME } from './walletconnect';
 
 /** Deep link prefix for React Navigation `linking.prefixes`. */
-export const ANCORE_DEEP_LINK_PREFIX = `${ANCORE_URL_SCHEME}://`;
+export const ANCORE_DEEP_LINK_PREFIX = 'ancore://';
+
+const walletConnectPrefixes = getWalletConnectDeepLinkPrefixes();
 
 /**
  * React Navigation linking config for WalletConnect pairing deep links.
@@ -17,7 +19,7 @@ export const ANCORE_DEEP_LINK_PREFIX = `${ANCORE_URL_SCHEME}://`;
  * ```
  */
 export const mobileWalletDeepLinking = {
-  prefixes: [ANCORE_DEEP_LINK_PREFIX],
+  prefixes: walletConnectPrefixes,
   config: {
     screens: {
       WCPairing: 'wc',

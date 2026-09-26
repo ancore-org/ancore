@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 
 export interface WalletConnectionState {
   /** Whether the dApp is currently connected to the extension. */
@@ -36,6 +36,18 @@ export function useWalletConnection(options: UseWalletConnectionOptions = {}) {
     extensionInstalled: false,
   });
 
+  // A dynamic import plus two awaited calls gives connect/checkConnection
+  // plenty of time to still be in flight when the component unmounts (a route
+  // change, a test's renderHook cleanup). Without this guard, the eventual
+  // setState runs against a DOM that may already be gone.
+  const mountedRef = useRef(true);
+  useEffect(() => {
+    mountedRef.current = true;
+    return () => {
+      mountedRef.current = false;
+    };
+  }, []);
+
   const checkConnection = useCallback(async () => {
     try {
       const walletApi = await import('@ancore/wallet-api');
@@ -43,6 +55,7 @@ export function useWalletConnection(options: UseWalletConnectionOptions = {}) {
 
       if (connected) {
         const addressResult = await walletApi.getAddress();
+        if (!mountedRef.current) return;
         setState({
           connected: true,
           smartAccountId: addressResult.smartAccountId,
@@ -52,6 +65,7 @@ export function useWalletConnection(options: UseWalletConnectionOptions = {}) {
           extensionInstalled: true,
         });
       } else {
+        if (!mountedRef.current) return;
         setState((prev) => ({
           ...prev,
           connected: false,
@@ -61,6 +75,7 @@ export function useWalletConnection(options: UseWalletConnectionOptions = {}) {
         }));
       }
     } catch {
+      if (!mountedRef.current) return;
       setState((prev) => ({
         ...prev,
         connected: false,
@@ -77,6 +92,7 @@ export function useWalletConnection(options: UseWalletConnectionOptions = {}) {
       const smartAccountId = await walletApi.connect();
       const addressResult = await walletApi.getAddress();
 
+      if (!mountedRef.current) return;
       setState({
         connected: true,
         smartAccountId,
@@ -87,6 +103,7 @@ export function useWalletConnection(options: UseWalletConnectionOptions = {}) {
       });
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Failed to connect to wallet';
+      if (!mountedRef.current) return;
       setState((prev) => ({
         ...prev,
         connecting: false,
