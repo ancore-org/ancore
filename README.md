@@ -240,6 +240,23 @@ See [CONTRIBUTORS.md](CONTRIBUTORS.md) for contributor expectations and maintain
 
 Major changes are proposed via RFCs in the `docs/rfcs/` directory. See [RFC.md](RFC.md) for the process.
 
+## Live on Testnet
+
+> [!WARNING]
+> Unaudited, testnet only. Do not use with real funds.
+
+|                            |                                                                                                                                                                         |
+| :------------------------- | :---------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Network                    | Stellar testnet                                                                                                                                                         |
+| Account contract WASM hash | `0f5095c3dc59aee4302aa10a272a00b9e063ed8667439aa0e397d8e377620ae3`                                                                                                      |
+| Reference account contract | [`CDIOEH26CW3LCA7L2ZTFJOQR5SW5KRAAEFAPJMRYVEDEDXGIHG37WAVE`](https://stellar.expert/explorer/testnet/contract/CDIOEH26CW3LCA7L2ZTFJOQR5SW5KRAAEFAPJMRYVEDEDXGIHG37WAVE) |
+| Deploy tx                  | [`9eeb0a26…6d30`](https://stellar.expert/explorer/testnet/tx/9eeb0a2663cc93bff58a4d80ad013fc67476cb82f38e14345a34e496ae0f6d30)                                          |
+
+The reference contract exists to prove the deploy → `initialize` → `get_owner()` round trip on
+testnet; it is not a shared account. Each user gets their own account contract, deployed by the
+extension during onboarding at a deterministic address (`deriveContractId` in `@ancore/core-sdk`).
+Details: [contracts/README.md](contracts/README.md#live-on-testnet).
+
 ## Architecture
 
 For a deep dive into Ancore's architecture, see:
