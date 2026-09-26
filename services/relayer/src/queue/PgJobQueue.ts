@@ -12,6 +12,9 @@ import { nextRetryAfter } from './backoff';
 
 const DEFAULT_MAX_ATTEMPTS = 5;
 
+/** A job claimed longer ago than this is treated as orphaned by a dead worker. */
+const VISIBILITY_TIMEOUT = '5 minutes';
+
 interface JobRow {
   id: string;
   idempotency_key: string;
@@ -134,7 +137,12 @@ export class PgJobQueue implements JobQueueContract {
    */
   async dequeue<T = unknown>(): Promise<DequeueResult<T> | null> {
     const result = await this.pool.query<JobRow>(
-      `WITH next_job AS (
+      `WITH reclaimed AS (
+         UPDATE jobs
+         SET status = 'pending', retry_after = NULL, updated_at = NOW()
+         WHERE status = 'processing' AND updated_at < NOW() - $1::INTERVAL
+       )
+       next_job AS (
          SELECT id FROM jobs
          WHERE status = 'pending'
            AND (retry_after IS NULL OR retry_after <= NOW())
@@ -147,7 +155,8 @@ export class PgJobQueue implements JobQueueContract {
            updated_at = NOW()
        FROM next_job
        WHERE j.id = next_job.id
-       RETURNING j.*`
+       RETURNING j.*`,
+      [VISIBILITY_TIMEOUT]
     );
 
     if (result.rows.length === 0) {

@@ -43,12 +43,11 @@ const SORT_LABELS: Record<TransactionSortKey, string> = {
   status: 'Status',
 };
 
-function formatAmount(amount: number): string {
-  return new Intl.NumberFormat('en-US', {
-    style: 'currency',
-    currency: 'USD',
-    minimumFractionDigits: 2,
-  }).format(amount);
+const DEFAULT_ASSET = 'XLM';
+
+function formatAmount(amount: number, asset?: string): string {
+  const code = asset ?? DEFAULT_ASSET;
+  return `${new Intl.NumberFormat('en-US', { minimumFractionDigits: 2 }).format(amount)} ${code}`;
 }
 
 function formatDate(value: string): string {
@@ -227,7 +226,7 @@ export function TransactionTable({ onExportStatement, transactions }: Transactio
                       {formatDate(transaction.occurredAt)}
                     </td>
                     <td className="px-4 py-3 text-sm text-slate-900">
-                      {formatAmount(transaction.amount)}
+                      {formatAmount(transaction.amount, transaction.asset)}
                     </td>
                     <td className="px-4 py-3 text-sm capitalize text-slate-700">
                       {transaction.type}

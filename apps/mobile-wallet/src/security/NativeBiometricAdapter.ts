@@ -54,7 +54,9 @@ export class NativeBiometricAdapter implements IBiometricAuthService {
       return { success: false, errorCode: 'USER_CANCEL' };
     } catch (err: unknown) {
       if (err instanceof Error && err.message && err.message.includes('User cancelled')) {
-        return { success: false, errorCode: 'USER_CANCEL' };
+      // A resolved `{ success: false }` is a genuinely failed match (wrong
+      // finger/face), not a voluntary cancel — it must count toward lockout.
+      return { success: false, errorCode: 'AUTHENTICATION_FAILED' };
       }
       return { success: false, errorCode: 'AUTHENTICATION_FAILED' };
     }
