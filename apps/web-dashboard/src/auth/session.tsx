@@ -36,15 +36,12 @@ interface DashboardAuthContextValue {
   session: DashboardSession | null;
   status: AuthStatus;
   isBootstrapped: boolean;
-  login: (displayName: string) => void;
+  login: () => void;
   logout: () => void;
   refreshSession: () => void;
 }
 
 const DashboardAuthContext = createContext<DashboardAuthContextValue | null>(null);
-
-const DEFAULT_DISPLAY_NAME = 'Dashboard User';
-const SESSION_DURATION_MS = 15 * 60 * 1000;
 
 function isDashboardSession(value: unknown): value is DashboardSession {
   if (!value || typeof value !== 'object') {
@@ -94,18 +91,6 @@ function writeDashboardSession(session: DashboardSession | null): void {
 
 function isExpired(session: DashboardSession): boolean {
   return session.accessTokenExpiresAt <= Date.now();
-}
-
-function createSession(displayName: string): DashboardSession {
-  const normalizedDisplayName = displayName.trim() || DEFAULT_DISPLAY_NAME;
-
-  return {
-    userId: 'demo-user',
-    displayName: normalizedDisplayName,
-    accessToken: 'demo-access-token',
-    refreshToken: 'demo-refresh-token',
-    accessTokenExpiresAt: Date.now() + SESSION_DURATION_MS,
-  };
 }
 
 export function DashboardAuthProvider({ children }: { children: ReactNode }) {
@@ -185,12 +170,13 @@ export function DashboardAuthProvider({ children }: { children: ReactNode }) {
     };
   }, [isBootstrapped, refreshQueued, session]);
 
-  const login = useCallback((displayName: string) => {
-    const nextSession = createSession(displayName);
-    setSession(nextSession);
-    writeDashboardSession(nextSession);
+  const login = useCallback(() => {
+    // Authentication must be performed by a server-backed identity provider.
+    // Do not create a browser-only session or mint a token here.
+    setSession(null);
+    writeDashboardSession(null);
     setRefreshQueued(false);
-    setStatus('authenticated');
+    setStatus('unauthenticated');
   }, []);
 
   const logout = useCallback(() => {

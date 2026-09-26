@@ -6,6 +6,7 @@ const STORAGE_KEY = 'ancore-dashboard-selected-account';
 
 interface AccountOverviewResponse {
   balance: number;
+  nonce: number;
   status: 'active' | 'inactive' | 'locked';
 }
 
@@ -73,11 +74,24 @@ export function useAccountState(): UseAccountStateReturn {
         throw new Error('Failed to fetch account overview');
       }
 
-      const payload = (await response.json()) as AccountOverviewResponse;
+      const payload: unknown = await response.json();
+      const accountOverview =
+        typeof payload === 'object' &&
+        payload !== null &&
+        typeof (payload as Partial<AccountOverviewResponse>).balance === 'number' &&
+        typeof (payload as Partial<AccountOverviewResponse>).nonce === 'number' &&
+        typeof (payload as Partial<AccountOverviewResponse>).status === 'string'
+          ? (payload as AccountOverviewResponse)
+          : null;
+
+      if (!accountOverview) {
+        throw new Error('Invalid account overview response');
+      }
+
       const account: AccountData = {
         address,
-        balance: payload.balance,
-        status: payload.status === 'active' ? 'active' : 'inactive',
+        balance: accountOverview.balance,
+        status: accountOverview.status === 'active' ? 'active' : 'inactive',
         lastActivity: new Date(),
       };
 
