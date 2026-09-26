@@ -91,7 +91,8 @@ pub async fn persist_failures(db: &PgPool, records: &[DeadLetterRecord]) -> anyh
         sqlx::query(
             "INSERT INTO ingest_dead_letters \
                 (stream, ledger_seq, tx_hash, contract_id, error_message, raw_payload, created_at) \
-             VALUES ($1, $2, $3, $4, $5, $6, $7)",
+             VALUES ($1, $2, $3, $4, $5, $6, $7) \
+             ON CONFLICT (stream, ledger_seq, tx_hash) DO NOTHING",
         )
         .bind(&record.stream)
         .bind(record.ledger_seq as i64)

@@ -26,6 +26,15 @@ describe('redactSecrets', () => {
     expect(result).toContain('[REDACTED]');
   });
 
+  it('redacts a seed phrase with a capitalized word', () => {
+    const seed =
+      'Abandon ability able about above absent absorb abstract absurd abuse access accident';
+    const text = `My recovery phrase is ${seed}.`;
+    const result = redactSecrets(text);
+    expect(result).not.toContain(seed);
+    expect(result).toContain('[REDACTED]');
+  });
+
   it('redacts an Anthropic-shaped API key', () => {
     const key = 'sk-ant-api03-abcdefghijklmnopqrstuvwxyz0123456789';
     const text = `My key is ${key}, keep it safe.`;
