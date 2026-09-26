@@ -6,7 +6,7 @@ coverage/
 target/
 *.lock
 pnpm-lock.yaml
-contracts/account/test_snapshots/
+contracts/*/test_snapshots/
 docs/
 services/indexer/README.md
 services/relayer/package.json
