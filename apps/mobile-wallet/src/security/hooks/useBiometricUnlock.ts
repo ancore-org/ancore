@@ -65,6 +65,7 @@ export function useBiometricUnlock({
   });
 
   const countdownRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const mountedRef = useRef(true);
   const stopCountdown = useCallback(() => {
     if (countdownRef.current) {
       clearInterval(countdownRef.current);
@@ -75,6 +76,7 @@ export function useBiometricUnlock({
   //Init
   useEffect(() => {
     let cancelled = false;
+    mountedRef.current = true;
 
     async function init() {
       await lockoutManager.initialize();
@@ -99,6 +101,7 @@ export function useBiometricUnlock({
     init();
     return () => {
       cancelled = true;
+      mountedRef.current = false;
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
@@ -110,7 +113,9 @@ export function useBiometricUnlock({
     countdownRef.current = setInterval(() => {
       const remaining = lockoutManager.remainingLockoutMs();
 
-      if (remaining <= 0) {
+      if (!mountedRef.current) {
+        stopCountdown();
+      } else if (remaining <= 0) {
         stopCountdown();
         lockoutManager.isLocked(); // trigger lazy expiry/reset if implemented there
         const refreshedLockout = lockoutManager.getState() as BiometricLockoutState;
@@ -156,6 +161,9 @@ export function useBiometricUnlock({
     try {
       result = await biometricService.authenticate(promptMessage);
     } catch {
+      if (!mountedRef.current) {
+        return;
+      }
       setState((prev) => ({
         ...prev,
         phase: 'idle',
@@ -165,8 +173,18 @@ export function useBiometricUnlock({
       return;
     }
 
+    if (!mountedRef.current) {
+      return;
+    }
+
     if (result.success) {
+      if (!mountedRef.current) {
+        return;
+      }
       await lockoutManager.recordSuccess();
+      if (!mountedRef.current) {
+        return;
+      }
       setState((prev) => ({
         ...prev,
         phase: 'success',
@@ -179,7 +197,13 @@ export function useBiometricUnlock({
 
     // Map error code
     const reason: BiometricFailureReason = result.errorCode ?? 'UNKNOWN';
+    if (!mountedRef.current) {
+      return;
+    }
     const newLockout = await lockoutManager.recordFailure(reason);
+    if (!mountedRef.current) {
+      return;
+    }
     const isNowLocked = lockoutManager.isLocked();
 
     if (newLockout.permanentlyLocked) {
@@ -245,6 +269,9 @@ export function useBiometricUnlock({
       try {
         ok = await passwordService.authenticate(password);
       } catch {
+        if (!mountedRef.current) {
+          return;
+        }
         setState((prev) => ({
           ...prev,
           isLoading: false,
@@ -252,9 +279,15 @@ export function useBiometricUnlock({
         }));
         return;
       }
+      if (!mountedRef.current) {
+        return;
+      }
       if (ok) {
         stopCountdown();
         await lockoutManager.recordSuccess();
+        if (!mountedRef.current) {
+          return;
+        }
         setState((prev) => ({
           ...prev,
           phase: 'success',

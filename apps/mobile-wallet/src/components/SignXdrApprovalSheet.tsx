@@ -53,8 +53,24 @@ export const SignXdrApprovalSheet: React.FC<SignXdrApprovalSheetProps> = ({
 
 export function parseSignXdrRequest(event: Record<string, unknown>): SignXdrRequest {
   const rawId = event.id;
-  const id = typeof rawId === 'number' ? rawId : Number(rawId);
-  const topic = typeof event.topic === 'string' ? event.topic : '';
+  let id: number;
+  if (typeof rawId === 'number' && Number.isSafeInteger(rawId)) {
+    id = rawId;
+  } else if (typeof rawId === 'string' && rawId.trim().length > 0) {
+    const parsedId = Number(rawId);
+    if (!Number.isSafeInteger(parsedId)) {
+      throw new Error('Invalid or missing WalletConnect request id');
+    }
+    id = parsedId;
+  } else {
+    throw new Error('Invalid or missing WalletConnect request id');
+  }
+
+  const rawTopic = event.topic;
+  if (typeof rawTopic !== 'string' || rawTopic.trim().length === 0) {
+    throw new Error('Invalid or missing WalletConnect request topic');
+  }
+  const topic = rawTopic.trim();
   const params = (event.params as SignXdrRequest['params'] | undefined) ?? {};
   const method = (event as { method?: string }).method;
   const requestMethod =

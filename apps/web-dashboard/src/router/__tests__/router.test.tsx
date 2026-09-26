@@ -1,5 +1,4 @@
-import { render, screen, waitFor } from '@testing-library/react';
-import userEvent from '@testing-library/user-event';
+import { render, screen } from '@testing-library/react';
 import { beforeEach, describe, expect, it } from 'vitest';
 
 import { DASHBOARD_SESSION_STORAGE_KEY } from '../../auth';
@@ -75,18 +74,13 @@ describe('dashboard router', () => {
     expect(await screen.findByRole('heading', { name: /sign in/i })).toBeInTheDocument();
   });
 
-  it('supports login navigation from the fallback screen', async () => {
-    const user = userEvent.setup();
+  it('does not authenticate arbitrary display names', async () => {
     render(<DashboardAppTestHarness initialEntries={['/login']} />);
 
-    await user.clear(screen.getByLabelText(/display name/i));
-    await user.type(screen.getByLabelText(/display name/i), 'Dashboard Ops');
-    await user.click(screen.getByRole('button', { name: /continue/i }));
-
-    await waitFor(() =>
-      expect(screen.getByRole('heading', { name: /overview/i })).toBeInTheDocument()
-    );
-    expect(screen.getByText(/dashboard ops/i, { selector: 'span' })).toBeInTheDocument();
+    expect(await screen.findByRole('heading', { name: /sign in/i })).toBeInTheDocument();
+    expect(screen.getByRole('alert')).toHaveTextContent(/server-backed identity provider/i);
+    expect(screen.queryByLabelText(/display name/i)).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /continue/i })).not.toBeInTheDocument();
   });
 
   it('redirects authenticated users away from the login route', async () => {

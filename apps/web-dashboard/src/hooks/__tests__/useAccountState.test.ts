@@ -90,7 +90,7 @@ describe('useAccountState', () => {
   });
 
   it('loads accounts and sets default current account on initial load', async () => {
-    vi.stubGlobal('fetch', mockFetchOnce({ balance: 1250.75, status: 'active' }));
+    vi.stubGlobal('fetch', mockFetchOnce({ balance: 1250.75, nonce: 1, status: 'active' }));
 
     const { result } = renderHook(() => useAccountState());
 
@@ -123,7 +123,7 @@ describe('useAccountState', () => {
   });
 
   it('persists the fetched account to localStorage', async () => {
-    vi.stubGlobal('fetch', mockFetchOnce({ balance: 845.2, status: 'active' }));
+    vi.stubGlobal('fetch', mockFetchOnce({ balance: 845.2, nonce: 2, status: 'active' }));
 
     const { result } = renderHook(() => useAccountState());
 
@@ -136,6 +136,22 @@ describe('useAccountState', () => {
       'ancore-dashboard-selected-account',
       expect.stringContaining(CONNECTED_ADDRESS)
     );
+
+    vi.unstubAllGlobals();
+  });
+
+  it('rejects malformed account-overview responses', async () => {
+    vi.stubGlobal('fetch', mockFetchOnce({ balance: 'not-a-number', status: 'active' }));
+
+    const { result } = renderHook(() => useAccountState());
+
+    await waitFor(() => {
+      expect(result.current.loading).toBe(false);
+      expect(result.current.error?.message).toBe('Invalid account overview response');
+    });
+
+    expect(result.current.accounts).toEqual([]);
+    expect(result.current.currentAccount).toBe(null);
 
     vi.unstubAllGlobals();
   });
@@ -157,7 +173,7 @@ describe('useAccountState', () => {
   });
 
   it('updates current account and saves to localStorage', async () => {
-    vi.stubGlobal('fetch', mockFetchOnce({ balance: 1250.75, status: 'active' }));
+    vi.stubGlobal('fetch', mockFetchOnce({ balance: 1250.75, nonce: 1, status: 'active' }));
 
     const { result } = renderHook(() => useAccountState());
 
@@ -186,7 +202,7 @@ describe('useAccountState', () => {
   });
 
   it('handles localStorage errors gracefully', async () => {
-    vi.stubGlobal('fetch', mockFetchOnce({ balance: 1250.75, status: 'active' }));
+    vi.stubGlobal('fetch', mockFetchOnce({ balance: 1250.75, nonce: 1, status: 'active' }));
     localStorageMock.setItem.mockImplementation(() => {
       throw new Error('localStorage not available');
     });
@@ -208,7 +224,7 @@ describe('useAccountState', () => {
   });
 
   it('refetch function reloads account data', async () => {
-    const fetchMock = mockFetchOnce({ balance: 1250.75, status: 'active' });
+    const fetchMock = mockFetchOnce({ balance: 1250.75, nonce: 1, status: 'active' });
     vi.stubGlobal('fetch', fetchMock);
 
     const { result } = renderHook(() => useAccountState());
@@ -233,7 +249,7 @@ describe('useAccountState', () => {
   });
 
   it('returns correct hook interface', async () => {
-    vi.stubGlobal('fetch', mockFetchOnce({ balance: 1250.75, status: 'active' }));
+    vi.stubGlobal('fetch', mockFetchOnce({ balance: 1250.75, nonce: 1, status: 'active' }));
 
     const { result } = renderHook(() => useAccountState());
 
