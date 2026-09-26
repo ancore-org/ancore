@@ -43,6 +43,7 @@ import { SendScreen as SendFlowScreen } from '../screens/Send/SendScreen';
 import { ScheduledTransfersScreen } from '../screens/ScheduledTransfers/ScheduledTransfersScreen';
 import { SessionKeysScreen } from '../screens/SessionKeys/SessionKeysScreen';
 import { TransactionDetail, type TransactionDetailData } from '../screens/TransactionDetail';
+import HomeScreenComponent from '../screens/HomeScreen';
 import type { StellarNetwork } from '../utils/explorer-links';
 import { useDashboardSettingsStore } from '../state/dashboard-settings';
 import { useTelemetrySettingsSync } from '../hooks/useTelemetrySettingsSync';
@@ -300,78 +301,7 @@ function UnlockScreen() {
 }
 
 function HomeScreen() {
-  const { authState, lockWallet } = useExtensionAuth();
-  const network = useDashboardSettingsStore((state) => state.network);
-
-  return (
-    <PageScaffold
-      eyebrow="Portfolio"
-      title="Your wallet"
-      description="Everything you need, without the noise."
-      rightAction={
-        <button
-          aria-label="Lock wallet"
-          className="wallet-icon-btn h-9 w-9 bg-card"
-          onClick={lockWallet}
-          type="button"
-        >
-          <Lock className="h-4 w-4" />
-        </button>
-      }
-    >
-      <section className="overflow-hidden rounded-[22px] border border-primary/15 bg-card p-5">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-2.5">
-            <span className="flex h-9 w-9 items-center justify-center rounded-full bg-accent text-foreground">
-              <Wallet className="h-4 w-4" />
-            </span>
-            <div>
-              <p className="text-[13px] font-medium text-foreground">{authState.walletName}</p>
-              <p className="text-[11px] text-muted-foreground">Smart account</p>
-            </div>
-          </div>
-          <span className="text-[11px] uppercase tracking-[0.12em] text-muted-foreground">
-            {network}
-          </span>
-        </div>
-        <div className="mt-8">
-          <p className="text-[11px] font-medium uppercase tracking-[0.14em] text-muted-foreground">
-            Available balance
-          </p>
-          <p className="mt-2 text-[34px] font-semibold leading-none tracking-[-0.04em] text-foreground">
-            1,245.80 <span className="text-[17px] font-medium text-muted-foreground">XLM</span>
-          </p>
-          <p className="wallet-address mt-4">{authState.accountAddress}</p>
-        </div>
-      </section>
-      <div className="grid grid-cols-2 gap-3">
-        <SecondaryLink to="/send" icon={ArrowUpRight}>
-          Send
-        </SecondaryLink>
-        <SecondaryLink to="/receive" icon={ArrowDownLeft}>
-          Receive
-        </SecondaryLink>
-        <SecondaryLink to="/scheduled" icon={Clock3}>
-          Scheduled
-        </SecondaryLink>
-        <SecondaryLink to="/history" icon={History}>
-          Activity
-        </SecondaryLink>
-        <SecondaryLink to="/session-keys" icon={KeyRound}>
-          Session keys
-        </SecondaryLink>
-      </div>
-      {import.meta.env.DEV && (
-        <button
-          className="mt-2 w-full rounded-[14px] border border-dashed border-border px-4 py-3 text-[12px] font-medium text-muted-foreground transition-colors hover:border-primary/30 hover:text-primary"
-          onClick={() => chrome.runtime.sendMessage({ type: 'DEV_OPEN_APPROVAL' })}
-          type="button"
-        >
-          Test side panel sign
-        </button>
-      )}
-    </PageScaffold>
-  );
+  return <HomeScreenComponent />;
 }
 
 function SendScreenRoute() {

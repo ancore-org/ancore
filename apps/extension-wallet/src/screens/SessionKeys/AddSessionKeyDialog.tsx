@@ -2,18 +2,13 @@ import React, { useState } from 'react';
 import { Dialog, Button, Input } from '@ancore/ui-kit';
 import { SessionPermission } from '../../hooks/useSessionKeys';
 import type { AddSessionKeyInput } from '../../hooks/useSessionKeys';
+import { PermissionSelector } from '../../components/PermissionSelector';
 
 interface AddSessionKeyDialogProps {
   open: boolean;
   onClose: () => void;
   onSave: (input: AddSessionKeyInput) => Promise<void>;
 }
-
-const PERMISSION_OPTIONS: { label: string; value: SessionPermission }[] = [
-  { label: 'Send Payment', value: SessionPermission.SEND_PAYMENT },
-  { label: 'Manage Data', value: SessionPermission.MANAGE_DATA },
-  { label: 'Invoke Contract', value: SessionPermission.INVOKE_CONTRACT },
-];
 
 function expiryDurationToMs(expiry: string): number {
   const now = Date.now();
@@ -37,24 +32,24 @@ export const AddSessionKeyDialog: React.FC<AddSessionKeyDialogProps> = ({
   onSave,
 }) => {
   const [label, setLabel] = useState('');
-  const [permissions, setPermissions] = useState<SessionPermission[]>([]);
+  const [permissionsBitmask, setPermissionsBitmask] = useState<number>(0);
   const [expiry, setExpiry] = useState('1d');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-
-  const togglePermission = (value: SessionPermission) => {
-    setPermissions((prev) =>
-      prev.includes(value) ? prev.filter((p) => p !== value) : [...prev, value]
-    );
-  };
 
   const handleSave = async (): Promise<void> => {
     setLoading(true);
     setError(null);
     try {
-      await onSave({ label, permissions, expiresAt: expiryDurationToMs(expiry) });
+      // Convert bitmask to array of permissions - this maintains compatibility with existing hook
+      const permissionsArray: SessionPermission[] = [];
+      if (permissionsBitmask & SessionPermission.SEND_PAYMENT) permissionsArray.push(SessionPermission.SEND_PAYMENT);
+      if (permissionsBitmask & SessionPermission.MANAGE_DATA) permissionsArray.push(SessionPermission.MANAGE_DATA);
+      if (permissionsBitmask & SessionPermission.INVOKE_CONTRACT) permissionsArray.push(SessionPermission.INVOKE_CONTRACT);
+      
+      await onSave({ label, permissions: permissionsArray, expiresAt: expiryDurationToMs(expiry) });
       setLabel('');
-      setPermissions([]);
+      setPermissionsBitmask(0);
       setExpiry('1d');
       onClose();
     } catch (err) {
@@ -78,19 +73,11 @@ export const AddSessionKeyDialog: React.FC<AddSessionKeyDialogProps> = ({
         />
 
         <label className="block mb-2 font-medium">Permissions</label>
-        <div className="mb-4 space-y-2">
-          {PERMISSION_OPTIONS.map(({ label: pLabel, value }) => (
-            <label key={value} className="flex items-center gap-2">
-              <input
-                type="checkbox"
-                checked={permissions.includes(value)}
-                onChange={() => togglePermission(value)}
-                aria-label={pLabel}
-              />
-              {pLabel}
-            </label>
-          ))}
-        </div>
+        <PermissionSelector 
+          value={permissionsBitmask} 
+          onChange={setPermissionsBitmask}
+          className="mb-4"
+        />
 
         <label className="block mb-2 font-medium">Expiry</label>
         <select
@@ -114,7 +101,7 @@ export const AddSessionKeyDialog: React.FC<AddSessionKeyDialogProps> = ({
           <Button
             onClick={handleSave}
             loading={loading}
-            disabled={!label || permissions.length === 0}
+            disabled={!label || permissionsBitmask === 0}
           >
             Save
           </Button>
