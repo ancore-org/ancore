@@ -316,7 +316,7 @@ impl AncoreAccount {
     ) -> Result<Val, ContractError> {
         let current_nonce: u64 = Self::get_nonce(env.clone())?;
 
-        if expected_nonce != current_nonce {
+        if !validation::nonce_matches(expected_nonce, current_nonce) {
             return Err(ContractError::InvalidNonce);
         }
 
@@ -361,7 +361,7 @@ impl AncoreAccount {
                     .ok_or(ContractError::SessionKeyNotFound)?;
 
                 // Check session key has not expired
-                if env.ledger().timestamp() >= session.expires_at {
+                if validation::session_key_is_expired(env.ledger().timestamp(), session.expires_at) {
                     return Err(ContractError::SessionKeyExpired);
                 }
 
@@ -371,10 +371,8 @@ impl AncoreAccount {
                 }
 
                 // Enforce contract allowlist if set
-                if let Some(ref allowed) = session.allowed_contracts {
-                    if !allowed.contains(&to) {
-                        return Err(ContractError::InsufficientPermission);
-                    }
+                if !validation::allowlist_permits_address(session.allowed_contracts.as_ref(), &to) {
+                    return Err(ContractError::InsufficientPermission);
                 }
 
                 // Issue #832: Enforce per-call and cumulative spend limits (check only)
@@ -502,9 +500,7 @@ impl AncoreAccount {
 
         let expires_at_secs = Self::normalize_expiry_timestamp(expires_at)?;
         let current_timestamp = env.ledger().timestamp();
-        if expires_at_secs <= current_timestamp {
-            return Err(ContractError::SessionKeyExpirationInPast);
-        }
+        validation::validate_expiry(expires_at_secs, current_timestamp)?;
 
         let session_key = SessionKey {
             public_key: public_key.clone(),
