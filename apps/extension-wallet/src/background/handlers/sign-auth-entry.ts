@@ -26,7 +26,7 @@ export interface SignAuthEntryResult {
  * 2. Checks the wallet is unlocked
  * 3. Validates the network passphrase matches the active network
  * 4. Signs the auth entry with the owner keypair
- * 5. Returns { signedAuthEntry: string } containing the full signed entry XDR
+ * 5. Returns { signedAuthEntry: string } containing the full signed entry XDR with embedded signature
  *
  * Used by both the internal popup ↔ background message path and the
  * service-worker approval resolution path.
@@ -66,16 +66,24 @@ export async function signAuthEntry(params: SignAuthEntryParams): Promise<SignAu
   const kp: Keypair = await getSigningKeypair();
 
   // Sign the hash of (networkId || authEntry bytes) — the SEP-43 signature payload.
-  // The signature bytes are base64-encoded and returned.
-  // TODO(#770): embed the signature in a fully-formed SorobanAuthorizationEntry
-  // with address credentials once the SDK XDR constructors are stabilised.
   const networkId = stellarHash(Buffer.from(expectedPassphrase));
   const entryBytes = authEntry.toXDR();
   const payload = Buffer.concat([networkId, entryBytes]);
   const signatureHash = stellarHash(payload);
   const signature = kp.sign(signatureHash);
 
-  const signedAuthEntry = Buffer.from(signature).toString('base64');
+  // Build a fully-formed SorobanAuthorizationEntry with embedded signature
+  const signatureXdr = xdr.ScVal.scvBytes(signature);
+  const addressCredentials = xdr.SorobanAddressCredentials.sorobanAddressCredentialsSignature(signatureXdr);
+  const credentials = xdr.SorobanCredentials.sorobanCredentialsAddress(addressCredentials);
+  
+  // Create new signed entry with the credentials
+  const signedEntry = new xdr.SorobanAuthorizationEntry({
+    credentials,
+    rootInvocation: authEntry.rootInvocation(),
+  });
+
+  const signedAuthEntry = signedEntry.toXDR('base64');
 
   return { signedAuthEntry };
 }
