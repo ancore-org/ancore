@@ -56,20 +56,20 @@ pub struct ContractEventTypesResponse {
     data: Vec<String>,
 }
 
-/// Validate Stellar contract address format (C-address strkey).
+/// Validate a Stellar contract address as a checksummed C-address StrKey.
 fn validate_contract_address(id: &str) -> Result<()> {
     if id.is_empty() {
         return Err(crate::error::ApiError::InvalidFilter(
             "contract cannot be empty".to_string(),
         ));
     }
-    if id.len() != 56 || !id.starts_with('C') {
-        return Err(crate::error::ApiError::InvalidFilter(
-            "contract must be a valid Stellar contract address (56 characters starting with C)"
+    match stellar_strkey::Strkey::from_string(id) {
+        Ok(stellar_strkey::Strkey::Contract(_)) => Ok(()),
+        _ => Err(crate::error::ApiError::InvalidFilter(
+            "contract must be a valid Stellar contract address (checksummed C-address StrKey)"
                 .to_string(),
-        ));
+        )),
     }
-    Ok(())
 }
 
 fn clamp_limit(limit: Option<u32>) -> Option<u32> {
@@ -182,7 +182,7 @@ mod tests {
 
     #[test]
     fn validate_contract_address_accepts_c_strkey() {
-        let addr = format!("C{}", "A".repeat(55));
+        let addr = "CAAQCAIBAEAQCAIBAEAQCAIBAEAQCAIBAEAQCAIBAEAQCAIBAEAQC526";
         assert_eq!(addr.len(), 56);
         assert!(validate_contract_address(&addr).is_ok());
     }
@@ -208,6 +208,15 @@ mod tests {
     fn validate_contract_address_rejects_wrong_length() {
         assert!(matches!(
             validate_contract_address("CSHORT").unwrap_err(),
+            ApiError::InvalidFilter(_)
+        ));
+    }
+
+    #[test]
+    fn validate_contract_address_rejects_bad_checksum() {
+        let addr = format!("C{}", "A".repeat(55));
+        assert!(matches!(
+            validate_contract_address(&addr).unwrap_err(),
             ApiError::InvalidFilter(_)
         ));
     }

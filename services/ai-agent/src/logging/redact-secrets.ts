@@ -25,9 +25,10 @@ const API_KEY_RE =
 /**
  * Seed / recovery phrases: 12 or more consecutive lowercase alphabetic words.
  * BIP-39 phrases are always 12/15/18/21/24 words, but we redact any run of
- * 12+ to stay conservative against partial or non-standard phrases.
+ * 12+ to stay conservative against partial or non-standard phrases. The
+ * case-insensitive flag handles phrases capitalized by mobile keyboards.
  */
-const SEED_PHRASE_RE = /\b(?:[a-z]{3,10}\s+){11,}[a-z]{3,10}\b/g;
+const SEED_PHRASE_RE = /\b(?:[a-z]{3,10}\s+){11,}[a-z]{3,10}\b/gi;
 
 /**
  * Redacts Stellar secret keys, seed phrases, and API-key-shaped tokens from

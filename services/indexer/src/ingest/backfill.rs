@@ -135,17 +135,19 @@ where
             for raw in raw_events {
                 stats.fetched += 1;
 
+                // Soroban RPC advances through the event stream independently
+                // of the requested range. Advance before filtering so a batch
+                // containing only later events cannot be fetched repeatedly.
+                if raw.ledger_seq > current_ledger {
+                    current_ledger = raw.ledger_seq;
+                }
+
                 // Skip events outside the requested range.
                 if raw.ledger_seq < self.config.from_ledger
                     || raw.ledger_seq > self.config.to_ledger
                 {
                     stats.out_of_range += 1;
                     continue;
-                }
-
-                // Advance cursor for next batch request.
-                if raw.ledger_seq > current_ledger {
-                    current_ledger = raw.ledger_seq;
                 }
 
                 match normalise(raw) {
@@ -258,6 +260,25 @@ mod tests {
         );
         let stats = cmd.run().await.expect("backfill should succeed");
         assert_eq!(stats.fetched, 0);
+        assert_eq!(stats.persisted, 0);
+    }
+
+    #[tokio::test]
+    async fn backfill_advances_past_later_events_outside_requested_range() {
+        let events = vec![make_raw(50_000)];
+        let cmd = BackfillCommand::new(
+            BackfillConfig {
+                from_ledger: 1_000,
+                to_ledger: 1_010,
+                batch_size: 10,
+            },
+            VecSource::new(events),
+            MemorySink::default(),
+        );
+
+        let stats = cmd.run().await.expect("backfill should terminate");
+        assert_eq!(stats.fetched, 1);
+        assert_eq!(stats.out_of_range, 1);
         assert_eq!(stats.persisted, 0);
     }
 
