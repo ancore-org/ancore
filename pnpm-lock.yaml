@@ -820,6 +820,9 @@ importers:
 
   packages/ui-kit:
     dependencies:
+      '@ancore/crypto':
+        specifier: workspace:*
+        version: link:../crypto
       '@hookform/resolvers':
         specifier: ^3.3.0
         version: 3.10.0(react-hook-form@7.76.1(react@18.3.1))

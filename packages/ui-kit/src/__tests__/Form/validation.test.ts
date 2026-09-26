@@ -131,16 +131,25 @@ describe('amountSchema', () => {
 // ---------------------------------------------------------------------------
 
 describe('passwordSchema', () => {
-  it('accepts a password of 8+ characters', () => {
-    expect(passwordSchema.parse('SecureP@ss')).toBe('SecureP@ss');
+  it('accepts a valid password meeting canonical policy (12+ chars with variety)', () => {
+    expect(passwordSchema.parse('MyS3cur3P@ssw0rd!')).toBe('MyS3cur3P@ssw0rd!');
+    expect(passwordSchema.parse('Abcdef1!ghij')).toBe('Abcdef1!ghij');
   });
 
-  it('fails for a password shorter than 8 characters', () => {
-    const result = passwordSchema.safeParse('short');
+  it('fails for a password shorter than 12 characters', () => {
+    const result = passwordSchema.safeParse('Abcde1!fGhi');
     expect(result.success).toBe(false);
     if (!result.success) {
-      expect(result.error.issues[0].message).toMatch(/8 characters/i);
+      expect(result.error.issues[0].message).toMatch(/12 characters/i);
     }
+  });
+
+  it('fails for a 12+ character password that violates canonical complexity or pattern rules', () => {
+    const noUppercase = passwordSchema.safeParse('abcdef1!ghij');
+    expect(noUppercase.success).toBe(false);
+
+    const weakPattern = passwordSchema.safeParse('adminADMIN1234!');
+    expect(weakPattern.success).toBe(false);
   });
 
   it('fails for a password longer than 128 characters', () => {
@@ -200,21 +209,29 @@ describe('getPasswordStrength', () => {
     expect(result.percent).toBe(0);
   });
 
-  it('scores a simple 8-char lowercase password as weak (1)', () => {
-    const result = getPasswordStrength('password');
-    expect(result.score).toBeLessThanOrEqual(2);
+  it('caps invalid passwords (failing canonical validation) to score 0 or 1', () => {
+    const shortResult = getPasswordStrength('password');
+    expect(shortResult.score).toBeLessThanOrEqual(1);
+    expect(['Very Weak', 'Weak']).toContain(shortResult.label);
+
+    const elevenCharResult = getPasswordStrength('Abcde1!fGhi');
+    expect(elevenCharResult.score).toBeLessThanOrEqual(1);
+
+    const weakPatternResult = getPasswordStrength('adminADMIN1234!');
+    expect(weakPatternResult.score).toBeLessThanOrEqual(1);
   });
 
-  it('gives a higher score for a complex password', () => {
-    const result = getPasswordStrength('C0mpl3x!Pass#2024');
-    expect(result.score).toBeGreaterThanOrEqual(3);
-  });
+  it('gives score 2..4 for valid passwords meeting canonical validation', () => {
+    const fairResult = getPasswordStrength('Abcdef1!ghij'); // 12 chars valid
+    expect(fairResult.score).toBeGreaterThanOrEqual(2);
 
-  it('gives score 4 and "Very Strong" for an ideal password', () => {
-    const result = getPasswordStrength('Tr0ub4dor&3-LongerPass!');
-    expect(result.score).toBe(4);
-    expect(result.label).toBe('Very Strong');
-    expect(result.percent).toBe(100);
+    const complexResult = getPasswordStrength('C0mpl3x!Pass#2024');
+    expect(complexResult.score).toBeGreaterThanOrEqual(3);
+
+    const idealResult = getPasswordStrength('Tr0ub4dor&3-LongerPass!');
+    expect(idealResult.score).toBe(4);
+    expect(idealResult.label).toBe('Very Strong');
+    expect(idealResult.percent).toBe(100);
   });
 
   it('penalises repeated characters', () => {

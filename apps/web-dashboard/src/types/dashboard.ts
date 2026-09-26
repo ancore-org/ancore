@@ -5,7 +5,7 @@ export type SignMethod = 'wallet-api' | 'relayer';
 export interface AccountData {
   address: string;
   balance: number;
-  status: 'active' | 'inactive';
+  status: 'active' | 'inactive' | 'unfunded';
   lastActivity: Date;
 }
 

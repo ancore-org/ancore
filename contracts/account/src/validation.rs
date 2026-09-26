@@ -125,10 +125,21 @@ pub fn session_key_is_expired(now: u64, expires_at: u64) -> bool {
 }
 
 /// Allowlist check: `None` permits any target; `Some` requires membership.
-pub fn allowlist_permits(allowed: Option<&[[u8; 32]]>, target: &[u8; 32]) -> bool {
+pub fn allowlist_permits<T: PartialEq>(allowed: Option<&[T]>, target: &T) -> bool {
     match allowed {
         None => true,
         Some(list) => list.iter().any(|entry| entry == target),
+    }
+}
+
+/// Allowlist check for Soroban Vec<Address>: `None` permits any target; `Some` requires membership.
+pub fn allowlist_permits_address(
+    allowed: Option<&soroban_sdk::Vec<soroban_sdk::Address>>,
+    target: &soroban_sdk::Address,
+) -> bool {
+    match allowed {
+        None => true,
+        Some(list) => list.contains(target),
     }
 }
 
