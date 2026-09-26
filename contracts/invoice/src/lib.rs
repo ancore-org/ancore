@@ -392,6 +392,32 @@ impl InvoiceContract {
         Ok(())
     }
 
+    /// Pays an open invoice with optional caller-supplied expected amount and asset verification to prevent mismatches.
+    pub fn pay_verified(
+        env: Env,
+        id: BytesN<32>,
+        payer: Address,
+        payment_tx: BytesN<32>,
+        expected_amount: Option<i128>,
+        expected_asset: Option<Address>,
+    ) -> Result<(), InvoiceError> {
+        let invoice = Self::get_invoice(&env, &id)?;
+
+        if let Some(amt) = expected_amount {
+            if amt != invoice.amount {
+                return Err(InvoiceError::AmountMismatch);
+            }
+        }
+
+        if let Some(ref ast) = expected_asset {
+            if ast != &invoice.asset {
+                return Err(InvoiceError::AssetMismatch);
+            }
+        }
+
+        Self::pay(env, id, payer, payment_tx)
+    }
+
     // ── Cancel ───────────────────────────────────────────────────────────────
 
     /// Cancels a Draft or Open invoice. Only the creator may cancel.
@@ -798,5 +824,31 @@ mod test {
 
         let id = client.create(&creator, &recipient, &1000i128, &asset, &None, &None, &None);
         assert_eq!(client.get(&id).status, InvoiceStatus::Draft);
+    }
+
+    #[test]
+    fn test_pay_verified_mismatches() {
+        let env = Env::default();
+        env.mock_all_auths();
+        let contract_id = env.register_contract(None, InvoiceContract);
+        let client = InvoiceContractClient::new(&env, &contract_id);
+
+        let creator = Address::generate(&env);
+        let recipient = Address::generate(&env);
+        let asset = env.register_stellar_asset_contract_v2(Address::generate(&env)).address();
+        let wrong_asset = Address::generate(&env);
+
+        let id = client.create(&creator, &recipient, &1000i128, &asset, &None, &None, &None);
+        client.open(&id);
+
+        let payment_tx = BytesN::from_array(&env, &[1u8; 32]);
+
+        // Amount mismatch returns AmountMismatch error
+        let res_amt = client.try_pay_verified(&id, &recipient, &payment_tx, &Some(9999i128), &None);
+        assert_eq!(res_amt, Err(Ok(InvoiceError::AmountMismatch)));
+
+        // Asset mismatch returns AssetMismatch error
+        let res_ast = client.try_pay_verified(&id, &recipient, &payment_tx, &None, &Some(wrong_asset));
+        assert_eq!(res_ast, Err(Ok(InvoiceError::AssetMismatch)));
     }
 }
