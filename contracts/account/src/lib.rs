@@ -1082,15 +1082,16 @@ impl AncoreAccount {
     }
 
     fn extract_spend_amount(env: &Env, args: &Vec<Val>) -> Option<i128> {
+        let mut max_amount: Option<i128> = None;
         for index in 0..args.len() {
             let value = args.get(index).unwrap();
             if let Ok(amount) = i128::try_from_val(env, &value) {
                 if amount > 0 {
-                    return Some(amount);
+                    max_amount = Some(max_amount.map_or(amount, |m| m.max(amount)));
                 }
             }
         }
-        None
+        max_amount
     }
 
     fn check_spend_limits(
@@ -2521,6 +2522,61 @@ mod test {
 
         assert!(matches!(result, Err(Ok(ContractError::ExceededSpendLimit))));
         assert_eq!(client.get_nonce(), 0);
+    }
+
+    #[test]
+    fn test_execute_session_key_multiple_args_decoy_prevention() {
+        let env = Env::default();
+        let contract_id = env.register_contract(None, AncoreAccount);
+        let client = AncoreAccountClient::new(&env, &contract_id);
+
+        let owner = Address::generate(&env);
+        init(&env, &client, &owner);
+        env.mock_all_auths();
+
+        env.ledger().set_timestamp(1_000);
+
+        let mut csprng = OsRng;
+        let signing_key = SigningKey::generate(&mut csprng);
+        let session_pk = BytesN::from_array(&env, &signing_key.verifying_key().to_bytes());
+
+        let expires_at = env.ledger().timestamp() + 10_000;
+        let mut permissions = Vec::new(&env);
+        permissions.push_back(PERMISSION_EXECUTE);
+
+        // Max per call limit is 50
+        client.add_session_key(
+            &session_pk,
+            &expires_at,
+            &permissions,
+            &None,
+            &Some(50i128),
+            &None,
+            &0u64,
+        );
+
+        let callee_id = env.register_contract(None, AncoreAccount);
+        let function = soroban_sdk::symbol_short!("get_nonce");
+        let mut args: Vec<Val> = Vec::new(&env);
+        // Arg 0: decoy small positive i128 (1). Arg 1: actual spend amount (100).
+        args.push_back(1i128.into_val(&env));
+        args.push_back(100i128.into_val(&env));
+
+        let (sig, payload) = sign_payload(&env, &signing_key, &callee_id, &function, &args, 0);
+
+        let result = client.try_execute(
+            &CallerIdentity::SessionKey(session_pk.clone()),
+            &callee_id,
+            &function,
+            &args,
+            &0u64,
+            &Some(session_pk),
+            &Some(sig),
+            &Some(payload),
+        );
+
+        // Must reject because max positive i128 (100) > max_amount_per_call (50)
+        assert!(matches!(result, Err(Ok(ContractError::ExceededSpendLimit))));
     }
 
     #[test]

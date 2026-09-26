@@ -19,7 +19,9 @@ export const handleResolutionRequestSchema = z.object({
 /** Successful resolver payload. */
 export const resolvedHandleSchema = z.object({
   handle: usernameHandleSchema,
-  accountAddress: z.string().regex(/^G[A-Z0-9]{55}$/, 'Must be a valid Stellar address (G...)'),
+  accountAddress: z
+    .string()
+    .regex(/^(G|C)[A-Z0-9]{55}$/, 'Must be a valid Stellar address (G... or C...)'),
   displayName: z.string().optional(),
 });
 

@@ -33,11 +33,11 @@ export function createExtensionHandleResolver({
     const payload = await response.json();
     const parsed = handleResolutionResponseSchema.safeParse(payload);
 
-    if (parsed.success) {
-      return parsed.data.status === 'found' ? parsed.data.result : null;
+    if (!parsed.success) {
+      return null;
     }
 
-    return payload?.accountAddress ? { handle: normalized, ...payload } : null;
+    return parsed.data.status === 'found' ? parsed.data.result : null;
   };
 }
 

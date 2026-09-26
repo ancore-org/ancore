@@ -421,4 +421,47 @@ mod tests {
 
         assert_ne!(id1, id2);
     }
+
+    // ── pay_verified ──────────────────────────────────────────────────────────
+
+    #[test]
+    fn pay_verified_rejects_amount_mismatch() {
+        let (env, client) = setup();
+        let creator = random_address(&env);
+        let recipient = random_address(&env);
+        let asset = mock_asset(&env);
+        let payment_tx = soroban_sdk::BytesN::<32>::from_array(&env, &[3u8; 32]);
+
+        let id = client
+            .create(&creator, &recipient, &1_000, &asset, &None, &None, &None)
+            .unwrap();
+        client.open(&id).unwrap();
+
+        let err = client
+            .try_pay_verified(&id, &recipient, &payment_tx, &Some(9_999), &None)
+            .unwrap_err()
+            .unwrap();
+        assert_eq!(err, InvoiceError::AmountMismatch);
+    }
+
+    #[test]
+    fn pay_verified_rejects_asset_mismatch() {
+        let (env, client) = setup();
+        let creator = random_address(&env);
+        let recipient = random_address(&env);
+        let asset = mock_asset(&env);
+        let wrong_asset = random_address(&env);
+        let payment_tx = soroban_sdk::BytesN::<32>::from_array(&env, &[4u8; 32]);
+
+        let id = client
+            .create(&creator, &recipient, &1_000, &asset, &None, &None, &None)
+            .unwrap();
+        client.open(&id).unwrap();
+
+        let err = client
+            .try_pay_verified(&id, &recipient, &payment_tx, &None, &Some(wrong_asset))
+            .unwrap_err()
+            .unwrap();
+        assert_eq!(err, InvoiceError::AssetMismatch);
+    }
 }

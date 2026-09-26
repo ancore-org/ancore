@@ -334,7 +334,7 @@ export function useSendTransaction(options: UseSendTransactionOptions = {}) {
           const handle = normalizeUsernameHandle(recipientInput);
           const resolved = await resolver(handle);
 
-          if (!resolved) {
+          if (!resolved || !isStellarAddress(resolved.accountAddress)) {
             setErrors((current) => ({
               ...current,
               to: HANDLE_NOT_FOUND_MESSAGE,

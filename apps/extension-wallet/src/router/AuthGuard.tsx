@@ -4,6 +4,8 @@ import { sendMessage } from '../messaging/sender';
 import { recordCurrentDevice } from '../security/device-session-recorder';
 import { useDeviceSessionsStore } from '../stores/deviceSessions';
 import { useAccountStore } from '../stores/account';
+import { useSettingsStore } from '../stores/settings';
+import { useHotkey } from '../hooks/useHotkey';
 
 export const AUTH_STORAGE_KEY = 'ancore_extension_auth';
 
@@ -261,6 +263,17 @@ export function ExtensionAuthProvider({
     }),
     [authState, unlockError, unlockVerifier, isUnlocked]
   );
+
+  const enableLockShortcut = useSettingsStore((state) => state.enableLockShortcut);
+
+  useHotkey('Meta+Shift+L', value.lockWallet, {
+    enabled: enableLockShortcut && isUnlocked,
+    ignoreInputs: true,
+  });
+  useHotkey('Ctrl+Shift+L', value.lockWallet, {
+    enabled: enableLockShortcut && isUnlocked,
+    ignoreInputs: true,
+  });
 
   return (
     <AuthContext.Provider value={value}>
