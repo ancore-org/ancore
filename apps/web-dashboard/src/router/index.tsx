@@ -26,6 +26,8 @@ import { cn } from '@ancore/ui-kit';
 
 import { DashboardAuthProvider, useDashboardAuth } from '../auth';
 import { AppErrorBoundary, RouteErrorBoundary } from '../components/AppErrorBoundary';
+import { useAccountState } from '../hooks/useAccountState';
+import { useAccountOverview } from '../hooks/useAccountOverview';
 
 /**
  * This is the app's only router. A second `BrowserRouter` lived in
@@ -211,6 +213,12 @@ function DashboardLayout() {
 
 function OverviewPage() {
   const { session } = useDashboardAuth();
+  const { currentAccount } = useAccountState();
+  const { data: overview, isLoading } = useAccountOverview(currentAccount?.address ?? '');
+
+  const balance = overview
+    ? `${new Intl.NumberFormat('en-US', { minimumFractionDigits: 2 }).format(overview.balance)} XLM`
+    : '—';
 
   return (
     <section className="space-y-8">
@@ -225,9 +233,9 @@ function OverviewPage() {
       </div>
       <div className="grid gap-4 md:grid-cols-3">
         {[
-          ['Available balance', '1,245.80 XLM'],
-          ['Pending', '0.00 XLM'],
-          ['This month', '24 payments'],
+          ['Available balance', isLoading ? 'Loading…' : balance],
+          ['Account status', overview?.status ?? '—'],
+          ['Nonce', overview ? String(overview.nonce) : '—'],
         ].map(([label, value]) => (
           <article className="dashboard-panel p-5" key={label}>
             <p className="text-xs font-medium text-muted-foreground">{label}</p>
