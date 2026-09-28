@@ -39,9 +39,11 @@ Comprehensive health check with dependency probing.
 
 ### GET /relay/status
 
-Legacy health endpoint without async dependency probing.
+Same dependency probes as `GET /health` (`checkRpcHealth` and `checkSignatureServiceHealth`).
 
-**Response:** Always returns `200 OK` with current dependency states.
+**Response Codes:**
+- `200 OK`: All critical dependencies are healthy
+- `503 Service Unavailable`: One or more dependencies are degraded
 
 ## Dependency Status
 

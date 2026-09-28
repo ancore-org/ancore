@@ -216,6 +216,19 @@ describe('GET /relay/status', () => {
     expect(res.body.dependencies.rpc.status).toBe('ok');
     expect(res.body.dependencies.storage.status).toBe('ok');
   });
+
+  it('reports a real RPC outage instead of a fabricated ok', async () => {
+    const submitter = makeMockSubmitter({
+      isHealthy: jest.fn().mockResolvedValue({ healthy: false, latencyMs: 40 }),
+    });
+    const res = await request(makeApp(true, undefined, submitter)).get('/relay/status');
+
+    expect(res.status).toBe(503);
+    expect(res.body.status).toBe('degraded');
+    expect(res.body.dependencies.rpc.status).toBe('degraded');
+    expect(res.body.dependencies.rpc.message).toBe('Soroban RPC unreachable');
+    expect(submitter.isHealthy).toHaveBeenCalled();
+  });
 });
 
 describe('POST /relay/execute — idempotency-key header', () => {
