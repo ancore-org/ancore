@@ -1,5 +1,5 @@
 import { deterministicDraftIntent } from '../deterministic';
-import { VALID_ACCOUNT_ID, VALID_ADDRESS } from '../../__tests__/fixtures/addresses';
+import { VALID_ACCOUNT_ID, VALID_ADDRESS, VALID_HANDLE } from '../../__tests__/fixtures/addresses';
 
 describe('deterministicDraftIntent', () => {
   it('drafts a payment intent by default', () => {
@@ -26,6 +26,30 @@ describe('deterministicDraftIntent', () => {
       expect(result.intent.asset).toBe('USDC');
       expect(result.intent.recipient).toBe(VALID_ACCOUNT_ID);
       expect(Date.parse(result.intent.dueDate)).not.toBeNaN();
+    }
+  });
+
+  it('bills the recipient named in an invoice prompt instead of the requester', () => {
+    const result = deterministicDraftIntent({
+      prompt: `Invoice ${VALID_HANDLE} 50 XLM for consulting`,
+      accountId: VALID_ACCOUNT_ID,
+    });
+    expect(result.intent.type).toBe('invoice');
+    if (result.intent.type === 'invoice') {
+      expect(result.intent.recipient).toBe(VALID_HANDLE);
+      expect(result.intent.amount).toBe('50');
+      expect(result.intent.asset).toBe('XLM');
+    }
+  });
+
+  it('bills a Stellar address named in an invoice prompt', () => {
+    const result = deterministicDraftIntent({
+      prompt: `Invoice ${VALID_ADDRESS} 25 XLM for consulting`,
+      accountId: VALID_ACCOUNT_ID,
+    });
+    expect(result.intent.type).toBe('invoice');
+    if (result.intent.type === 'invoice') {
+      expect(result.intent.recipient).toBe(VALID_ADDRESS);
     }
   });
 
