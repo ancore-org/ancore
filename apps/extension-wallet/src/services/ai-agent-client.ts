@@ -86,6 +86,8 @@ export function createAiAgentClient({
       prompt: string;
       accountId: string;
       context?: Record<string, unknown>;
+      /** Addresses this account has already paid. Forwarded so scoreRisk can flag a first-time recipient. */
+      knownRecipients?: string[];
     }): Promise<AgentDraftIntentResponse> {
       const response = await fetcher(`${endpoint.replace(/\/$/, '')}/agent/draft-intent`, {
         method: 'POST',

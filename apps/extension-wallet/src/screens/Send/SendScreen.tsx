@@ -54,7 +54,7 @@ export function SendScreen({
   });
 
   const send = useSendTransaction({ balance, assetDecimals, service, pollIntervalMs });
-  const { recipients, addRecipient } = useRecentRecipients();
+  const { recipients, addRecipient, isLoading: recipientsLoading } = useRecentRecipients();
   const [memoWarning, setMemoWarning] = useState<string | null>(null);
   const [showAiDraft, setShowAiDraft] = useState(false);
 
@@ -198,6 +198,9 @@ export function SendScreen({
             accountId={accountAddress}
             onAccept={handleAiDraftAccept}
             onClose={() => setShowAiDraft(false)}
+            knownRecipients={
+              recipientsLoading ? undefined : recipients.map((recipient) => recipient.address)
+            }
           />
         )}
 

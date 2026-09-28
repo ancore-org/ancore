@@ -2,7 +2,11 @@ import request from 'supertest';
 import { enforceNoAutonomousExecution } from './guardrail';
 import { createApp } from './server';
 import type { DraftIntentResponse } from './types';
-import { VALID_ACCOUNT_ID, VALID_ADDRESS } from './__tests__/fixtures/addresses';
+import {
+  OTHER_VALID_ADDRESS,
+  VALID_ACCOUNT_ID,
+  VALID_ADDRESS,
+} from './__tests__/fixtures/addresses';
 
 const TEST_API_KEY = 'test-api-key';
 process.env['AI_AGENT_API_KEY'] = TEST_API_KEY;
@@ -120,9 +124,55 @@ describe('POST /agent/draft-intent', () => {
       .send({});
     expect(res.status).toBe(400);
   });
+
+  it('flags a first-time recipient when knownRecipients does not include the destination', async () => {
+    const res = await request(app)
+      .post('/agent/draft-intent')
+      .set('x-api-key', TEST_API_KEY)
+      .send({
+        ...validBody,
+        knownRecipients: [OTHER_VALID_ADDRESS],
+      });
+    expect(res.status).toBe(200);
+    expect(res.body.risk.reasons).toEqual(
+      expect.arrayContaining([expect.stringContaining('First-time recipient')])
+    );
+  });
+
+  it('does not flag a destination the caller has already paid', async () => {
+    const res = await request(app)
+      .post('/agent/draft-intent')
+      .set('x-api-key', TEST_API_KEY)
+      .send({
+        ...validBody,
+        context: { knownRecipients: [VALID_ADDRESS] },
+      });
+    expect(res.status).toBe(200);
+    expect(res.body.risk.reasons.some((reason: string) => reason.includes('First-time'))).toBe(
+      false
+    );
+  });
 });
 
 describe('POST /v1/intents/validate', () => {
+  it('flags a first-time recipient supplied alongside a payment intent', async () => {
+    const res = await request(app)
+      .post('/v1/intents/validate')
+      .set('x-api-key', TEST_API_KEY)
+      .send({
+        type: 'payment',
+        amount: '100',
+        asset: 'XLM',
+        destination: VALID_ADDRESS,
+        knownRecipients: [OTHER_VALID_ADDRESS],
+      });
+    expect(res.status).toBe(200);
+    expect(res.body.risk.reasons).toEqual(
+      expect.arrayContaining([expect.stringContaining('First-time recipient')])
+    );
+    expect(res.body.intent.knownRecipients).toBeUndefined();
+  });
+
   it('validates a payment intent and returns confirmation false for low-value payments', async () => {
     const res = await request(app)
       .post('/v1/intents/validate')

@@ -11,6 +11,8 @@ interface AiDraftPanelProps {
   onClose?: () => void;
   endpoint?: string;
   fetcher?: typeof fetch;
+  /** Addresses this account has already paid. Omitted while that history is still loading. */
+  knownRecipients?: string[];
 }
 
 const RISK_STYLES: Record<AgentRiskLevel, string> = {
@@ -46,12 +48,14 @@ export function AiDraftPanel({
   onClose,
   endpoint,
   fetcher,
+  knownRecipients,
 }: AiDraftPanelProps) {
   const [prompt, setPrompt] = useState('');
   const { status, draft, error, submitPrompt, confirm, reject } = useAgentDraftIntent({
     accountId,
     endpoint,
     fetcher,
+    knownRecipients,
   });
 
   const handleSubmit = (event: React.FormEvent) => {
