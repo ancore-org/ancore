@@ -11,7 +11,7 @@ test.describe('Onboarding flow', () => {
   test('fresh wallet redirects to /welcome', async ({ page }) => {
     await page.goto('/');
     await page.waitForLoadState('networkidle');
-    await expect(page).toHaveURL(/\/welcome/);
+    await expect(page).toHaveURL(/\/#\/onboarding/);
     await expect(page.getByText('Meet your Ancore wallet')).toBeVisible();
   });
 
