@@ -468,3 +468,21 @@ This package depends on the following Ancore packages:
 ## License
 
 Apache-2.0
+
+## Typed Error Guards
+
+SDK consumers can narrow generic error responses by their machine-readable code:
+
+~~~
+import { isNetworkError, isRateLimitError } from '@ancore/core-sdk';
+
+try {
+  await client.sendPayment(params);
+} catch (error) {
+  if (isRateLimitError(error)) {
+    console.log('Retry after the rate limit window.');
+  } else if (isNetworkError(error)) {
+    console.log('Check the network connection.');
+  }
+}
+~~~

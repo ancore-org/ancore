@@ -429,3 +429,38 @@ export function normalizeError(error: unknown): NormalizedError {
     return { code: 'UNKNOWN', message: String(error), category: 'UNKNOWN' };
   }
 }
+
+// ---------------------------------------------------------------------------
+// Typed error guards
+// ---------------------------------------------------------------------------
+
+export type CodedError = { code?: unknown };
+
+function hasErrorCode(error: unknown, code: string): error is CodedError {
+  return (
+    typeof error === 'object' &&
+    error !== null &&
+    'code' in error &&
+    (error as { code?: unknown }).code === code
+  );
+}
+
+export function isRateLimitError(error: unknown): error is CodedError {
+  return hasErrorCode(error, 'RATE_LIMIT');
+}
+
+export function isInsufficientBalance(error: unknown): error is CodedError {
+  return hasErrorCode(error, 'INSUFFICIENT_BALANCE');
+}
+
+export function isInvalidSignature(error: unknown): error is CodedError {
+  return hasErrorCode(error, 'INVALID_SIGNATURE');
+}
+
+export function isNetworkError(error: unknown): error is CodedError {
+  return hasErrorCode(error, 'NETWORK_ERROR');
+}
+
+export function isContractFailed(error: unknown): error is CodedError {
+  return hasErrorCode(error, 'CONTRACT_FAILED');
+}

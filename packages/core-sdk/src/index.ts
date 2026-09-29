@@ -101,6 +101,12 @@ export {
   StrKeyValidationError,
   assertValidEd25519PublicKey,
   assertValidContractId,
+  isRateLimitError,
+  isInsufficientBalance,
+  isInvalidSignature,
+  isNetworkError,
+  isContractFailed,
+  type CodedError,
 } from './errors';
 
 // Normalization helpers
