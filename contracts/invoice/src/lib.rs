@@ -835,7 +835,9 @@ mod test {
 
         let creator = Address::generate(&env);
         let recipient = Address::generate(&env);
-        let asset = env.register_stellar_asset_contract_v2(Address::generate(&env)).address();
+        let asset = env
+            .register_stellar_asset_contract_v2(Address::generate(&env))
+            .address();
         let wrong_asset = Address::generate(&env);
 
         let id = client.create(&creator, &recipient, &1000i128, &asset, &None, &None, &None);
@@ -848,7 +850,8 @@ mod test {
         assert_eq!(res_amt, Err(Ok(InvoiceError::AmountMismatch)));
 
         // Asset mismatch returns AssetMismatch error
-        let res_ast = client.try_pay_verified(&id, &recipient, &payment_tx, &None, &Some(wrong_asset));
+        let res_ast =
+            client.try_pay_verified(&id, &recipient, &payment_tx, &None, &Some(wrong_asset));
         assert_eq!(res_ast, Err(Ok(InvoiceError::AssetMismatch)));
     }
 }
