@@ -37,8 +37,14 @@ import { sendMessage } from '@/messaging';
  */
 function createExtensionRelaySigner(): RelaySigner {
   return {
-    async signRelayEnvelope({ operation, nonce }) {
-      const response = await sendMessage('SIGN_RELAY_PAYLOAD', { operation, nonce });
+    async signRelayEnvelope({ operation, nonce, to, amount, asset }) {
+      const response = await sendMessage('SIGN_RELAY_PAYLOAD', {
+        operation,
+        nonce,
+        to,
+        amount,
+        asset,
+      });
       if ('error' in response) {
         throw new Error(response.error);
       }

@@ -37,6 +37,6 @@ test.describe('Ledger hardware wallet @ledger', () => {
     await expect(page.getByText('Hardware wallet')).toBeVisible();
     await page.getByText('Hardware wallet').click();
     await expect(page.getByText('Paired device')).toBeVisible();
-    await expect(page.getByText(/44'\/148'\/0'/)).toBeVisible();
+    await expect(page.getByText("44'/148'/0'", { exact: true })).toBeVisible();
   });
 });

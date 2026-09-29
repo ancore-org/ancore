@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { validatePasswordStrength } from '@ancore/crypto';
 
 /**
  * Stellar public key regex: starts with G, followed by 55 base32 chars (A-Z2-7)
@@ -80,8 +81,16 @@ export function formatAmount(value: number, decimals = 7): string {
  */
 export const passwordSchema = z
   .string()
-  .min(8, 'Password must be at least 8 characters')
-  .max(128, 'Password is too long');
+  .min(12, 'Password must be at least 12 characters')
+  .max(128, 'Password is too long')
+  .refine(
+    (val) => validatePasswordStrength(val).valid,
+    (val) => ({
+      message:
+        validatePasswordStrength(val).reasons[0] ||
+        'Password does not meet canonical strength requirements',
+    })
+  );
 
 export interface PasswordStrength {
   score: 0 | 1 | 2 | 3 | 4;
@@ -118,7 +127,7 @@ const STRENGTH_BG_CLASSES: string[] = [
 
 /**
  * Returns a password strength score (0–4) and associated metadata.
- * Uses heuristic rules aligned with the zxcvbn score scale.
+ * Uses canonical @ancore/crypto validatePasswordStrength evaluation.
  */
 export function getPasswordStrength(password: string): PasswordStrength & { bgClass: string } {
   if (!password) {
@@ -131,31 +140,31 @@ export function getPasswordStrength(password: string): PasswordStrength & { bgCl
     };
   }
 
-  let score = 0;
+  const result = validatePasswordStrength(password);
 
-  if (password.length >= 8) score++;
-  if (password.length >= 12) score++;
-  if (/[A-Z]/.test(password) && /[a-z]/.test(password)) score++;
-  if (/\d/.test(password)) score++;
-  if (/[^A-Za-z0-9]/.test(password)) score++;
+  let score: 0 | 1 | 2 | 3 | 4;
 
-  // Penalise trivial patterns
-  if (/^(.)\1+$/.test(password)) score = Math.max(0, score - 2);
-  if (
-    /^(012|123|234|345|456|567|678|789|890|abc|bcd|cde|def|efg|fgh|ghi|hij|ijk|jkl|klm|lmn|mno|nop|opq|pqr|qrs|rst|stu|tuv|uvw|vwx|wxy|xyz)/i.test(
-      password
-    )
-  ) {
-    score = Math.max(0, score - 1);
+  if (!result.valid) {
+    if (password.length < 8 || result.reasons.length >= 4) {
+      score = 0;
+    } else {
+      score = 1;
+    }
+  } else {
+    if (result.strength === 'strong') {
+      score = 4;
+    } else if (password.length >= 14) {
+      score = 3;
+    } else {
+      score = 2;
+    }
   }
 
-  const clamped = Math.min(4, score) as 0 | 1 | 2 | 3 | 4;
-
   return {
-    score: clamped,
-    label: STRENGTH_LABELS[clamped],
-    colorClass: STRENGTH_COLOR_CLASSES[clamped],
-    bgClass: STRENGTH_BG_CLASSES[clamped],
-    percent: (clamped / 4) * 100,
+    score,
+    label: STRENGTH_LABELS[score],
+    colorClass: STRENGTH_COLOR_CLASSES[score],
+    bgClass: STRENGTH_BG_CLASSES[score],
+    percent: (score / 4) * 100,
   };
 }

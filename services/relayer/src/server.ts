@@ -229,7 +229,7 @@ export function createApp(
     executeHandler
   );
   app.post('/relay/validate', auth, contentTypeGuard, relayLimiter, validate, validateHandler);
-  app.get('/relay/status', statusLimiter, (_req, res) => res.json(relayService.health()));
+  app.get('/relay/status', statusLimiter, healthHandler);
   app.get('/health', healthHandler);
   app.get('/metrics', (_req, res) => {
     res.set('Content-Type', 'text/plain; version=0.0.4; charset=utf-8');

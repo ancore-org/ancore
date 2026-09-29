@@ -15,8 +15,8 @@ export async function createWalletApiRelaySigner(): Promise<RelaySigner> {
   const walletApi = await import('@ancore/wallet-api');
 
   return {
-    async signRelayEnvelope({ operation, nonce }) {
-      return walletApi.signRelayPayload({ operation, nonce });
+    async signRelayEnvelope({ operation, nonce, to, amount, asset }) {
+      return walletApi.signRelayPayload({ operation, nonce, to, amount, asset });
     },
   };
 }

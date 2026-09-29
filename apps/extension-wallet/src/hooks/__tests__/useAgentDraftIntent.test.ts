@@ -39,6 +39,32 @@ describe('useAgentDraftIntent', () => {
     expect(result.current.error).toBeNull();
   });
 
+  it('sends known recipient addresses with the draft request', async () => {
+    const fetcher = fakeFetch(draftResponse);
+    const { result } = renderHook(() =>
+      useAgentDraftIntent({
+        accountId: 'GACC',
+        fetcher,
+        knownRecipients: ['GKNOWN'],
+      })
+    );
+
+    await act(async () => {
+      await result.current.submitPrompt('Send 10 XLM to Alice');
+    });
+
+    expect(fetcher).toHaveBeenCalledWith(
+      expect.any(String),
+      expect.objectContaining({
+        body: JSON.stringify({
+          prompt: 'Send 10 XLM to Alice',
+          accountId: 'GACC',
+          knownRecipients: ['GKNOWN'],
+        }),
+      })
+    );
+  });
+
   it('does not call the network for an empty prompt', async () => {
     const fetcher = fakeFetch(draftResponse);
     const { result } = renderHook(() => useAgentDraftIntent({ accountId: 'GACC', fetcher }));

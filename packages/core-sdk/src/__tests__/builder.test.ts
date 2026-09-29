@@ -14,6 +14,7 @@ import {
   toScU32,
   toScPermissionsVec,
   toScOperationsVec,
+  CallerIdentity,
 } from '../contract-params';
 import {
   AncoreSdkError,
@@ -293,27 +294,27 @@ describe('AccountTransactionBuilder', () => {
   describe('addSessionKey', () => {
     it('returns this for chaining', () => {
       const builder = new AccountTransactionBuilder(makeSourceAccount(), makeBuilderOptions());
-      const result = builder.addSessionKey(SESSION_PUBLIC_KEY, [0, 1], Date.now() + 60_000);
+      const result = builder.addSessionKey(SESSION_PUBLIC_KEY, Date.now() + 60_000, [0, 1]);
       expect(result).toBe(builder);
     });
 
     it('throws for invalid public key', () => {
       const builder = new AccountTransactionBuilder(makeSourceAccount(), makeBuilderOptions());
-      expect(() => builder.addSessionKey('BADKEY', [0], Date.now())).toThrow(
+      expect(() => builder.addSessionKey('BADKEY', Date.now(), [0])).toThrow(
         /Invalid Stellar public key/
       );
     });
 
     it('throws for invalid permissions', () => {
       const builder = new AccountTransactionBuilder(makeSourceAccount(), makeBuilderOptions());
-      expect(() => builder.addSessionKey(SESSION_PUBLIC_KEY, [-1], Date.now())).toThrow(
+      expect(() => builder.addSessionKey(SESSION_PUBLIC_KEY, Date.now(), [-1])).toThrow(
         /Invalid u32 value/
       );
     });
 
     it('throws for invalid expiration', () => {
       const builder = new AccountTransactionBuilder(makeSourceAccount(), makeBuilderOptions());
-      expect(() => builder.addSessionKey(SESSION_PUBLIC_KEY, [0], -100)).toThrow(
+      expect(() => builder.addSessionKey(SESSION_PUBLIC_KEY, -100, [0])).toThrow(
         /Invalid u64 value/
       );
     });
@@ -343,20 +344,35 @@ describe('AccountTransactionBuilder', () => {
   describe('execute', () => {
     it('returns this for chaining', () => {
       const builder = new AccountTransactionBuilder(makeSourceAccount(), makeBuilderOptions());
-      const op = makeValidXdrOperation();
-      const result = builder.execute(SESSION_PUBLIC_KEY, [op]);
+      const result = builder.execute(
+        CallerIdentity.SessionKey,
+        TEST_CONTRACT_ID,
+        'transfer',
+        [],
+        1,
+        SESSION_PUBLIC_KEY
+      );
       expect(result).toBe(builder);
     });
 
-    it('throws for empty operations array', () => {
+    it('throws for a SessionKey caller with no sessionPubKey', () => {
       const builder = new AccountTransactionBuilder(makeSourceAccount(), makeBuilderOptions());
-      expect(() => builder.execute(SESSION_PUBLIC_KEY, [])).toThrow(/non-empty array/);
+      expect(() =>
+        builder.execute(CallerIdentity.SessionKey, TEST_CONTRACT_ID, 'transfer', [], 1)
+      ).toThrow(/Invalid caller identity configuration/);
     });
 
     it('throws for invalid session key', () => {
       const builder = new AccountTransactionBuilder(makeSourceAccount(), makeBuilderOptions());
-      const op = makeValidXdrOperation();
-      expect(() => builder.execute('BADKEY', [op])).toThrow(/Invalid Stellar public key/);
+      expect(() =>
+        builder.execute(CallerIdentity.SessionKey, TEST_CONTRACT_ID, 'transfer', [], 1, 'BADKEY')
+      ).toThrow(/Invalid Stellar public key/);
+    });
+
+    it('accepts the Owner caller identity with no sessionPubKey', () => {
+      const builder = new AccountTransactionBuilder(makeSourceAccount(), makeBuilderOptions());
+      const result = builder.execute(CallerIdentity.Owner, TEST_CONTRACT_ID, 'transfer', [], 1);
+      expect(result).toBe(builder);
     });
   });
 
@@ -419,7 +435,7 @@ describe('AccountTransactionBuilder', () => {
         makeBuilderOptions(server)
       );
 
-      builder.addSessionKey(SESSION_PUBLIC_KEY, [0], Date.now() + 60_000);
+      builder.addSessionKey(SESSION_PUBLIC_KEY, Date.now() + 60_000, [0]);
       const response = await builder.simulate();
 
       expect(server.simulateTransaction).toHaveBeenCalledTimes(1);
@@ -462,7 +478,7 @@ describe('AccountTransactionBuilder', () => {
           makeSourceAccount(),
           makeBuilderOptions(server)
         );
-        builder.addSessionKey(SESSION_PUBLIC_KEY, [0], Date.now() + 60_000);
+        builder.addSessionKey(SESSION_PUBLIC_KEY, Date.now() + 60_000, [0]);
 
         await expect(builder.build()).rejects.toThrow(SimulationFailedError);
       } finally {
@@ -485,7 +501,7 @@ describe('AccountTransactionBuilder', () => {
           makeSourceAccount(),
           makeBuilderOptions(server)
         );
-        builder.addSessionKey(SESSION_PUBLIC_KEY, [0], Date.now() + 60_000);
+        builder.addSessionKey(SESSION_PUBLIC_KEY, Date.now() + 60_000, [0]);
 
         await expect(builder.build()).rejects.toThrow(SimulationExpiredError);
       } finally {
@@ -513,7 +529,7 @@ describe('AccountTransactionBuilder', () => {
           makeSourceAccount(),
           makeBuilderOptions(server)
         );
-        builder.addSessionKey(SESSION_PUBLIC_KEY, [0], Date.now() + 60_000);
+        builder.addSessionKey(SESSION_PUBLIC_KEY, Date.now() + 60_000, [0]);
 
         // assembleTransaction will be called with the built tx and sim result.
         // It may throw because the sim result is not a real one, but we can
@@ -548,7 +564,7 @@ describe('AccountTransactionBuilder', () => {
           makeSourceAccount(),
           makeBuilderOptions(server)
         );
-        builder.addSessionKey(SESSION_PUBLIC_KEY, [0], Date.now() + 60_000);
+        builder.addSessionKey(SESSION_PUBLIC_KEY, Date.now() + 60_000, [0]);
 
         await expect(builder.build()).rejects.toThrow(/Unexpected simulation response/);
       } finally {
@@ -570,7 +586,7 @@ describe('AccountTransactionBuilder', () => {
       const thirdKey = Keypair.random().publicKey();
 
       const result = builder
-        .addSessionKey(SESSION_PUBLIC_KEY, [0, 1], Date.now() + 60_000)
+        .addSessionKey(SESSION_PUBLIC_KEY, Date.now() + 60_000, [0, 1])
         .revokeSessionKey(thirdKey)
         .addMemo(Memo.text('chaining test'));
 
@@ -584,7 +600,7 @@ describe('AccountTransactionBuilder', () => {
       const customOp = contract.call('custom_method');
 
       const result = builder
-        .addSessionKey(SESSION_PUBLIC_KEY, [0], Date.now() + 60_000)
+        .addSessionKey(SESSION_PUBLIC_KEY, Date.now() + 60_000, [0])
         .addOperation(customOp)
         .addMemo(Memo.text('mixed'));
 

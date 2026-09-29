@@ -16,6 +16,36 @@ const MAX_ACCOUNT_ID_LENGTH = 128;
 const startTime = Date.now();
 
 /**
+ * Addresses the caller already knows this account has paid.
+ *
+ * `scoreRisk` only emits "First-time recipient" when this set is actually
+ * supplied (#1423). Both routes accept it as `knownRecipients`, or nested
+ * under the existing draft-intent `context` object. An omitted field means
+ * "no history was provided" and must not flag every payee; an empty array
+ * means the caller knows there are no prior recipients.
+ */
+function knownRecipientsFromBody(body: unknown): Set<string> | undefined {
+  if (!body || typeof body !== 'object') {
+    return undefined;
+  }
+
+  const record = body as Record<string, unknown>;
+  const nested =
+    record.context && typeof record.context === 'object'
+      ? (record.context as Record<string, unknown>).knownRecipients
+      : undefined;
+  const value = record.knownRecipients ?? nested;
+
+  if (!Array.isArray(value)) {
+    return undefined;
+  }
+
+  return new Set(
+    value.filter((item): item is string => typeof item === 'string' && item.length > 0)
+  );
+}
+
+/**
  * App factory — exported for testing.
  *
  * Creates and configures the Express application for the AI Agent service.
@@ -69,7 +99,8 @@ export function createApp(): Express {
 
       try {
         const { intent, summary, source } = await generateDraftIntent({ prompt, accountId });
-        const risk = scoreRisk(intent);
+        const knownRecipients = knownRecipientsFromBody(req.body);
+        const risk = scoreRisk(intent, knownRecipients ? { knownRecipients } : {});
 
         const response = {
           status: 'draft' as const,
@@ -141,7 +172,8 @@ export function createApp(): Express {
       requiresConfirmation = amount >= HIGH_VALUE_PAYMENT_THRESHOLD;
     }
 
-    const risk = scoreRisk(intent);
+    const knownRecipients = knownRecipientsFromBody(req.body);
+    const risk = scoreRisk(intent, knownRecipients ? { knownRecipients } : {});
 
     return res.status(200).json({
       valid: true,

@@ -97,12 +97,15 @@ jobs:
         run: pnpm turbo run build --filter=@ancore/types --filter=@ancore/crypto --filter=@ancore/stellar --filter=@ancore/core-sdk --filter=@ancore/ui-kit --filter=@ancore/account-abstraction --filter=@ancore/wallet-shared --filter=@ancore/wallet-api
         working-directory: .
 
+      - name: Install Xvfb (headed Chromium needs a virtual display)
+        run: sudo apt-get update && sudo apt-get install -y xvfb
+
       - name: Install Playwright browsers
         run: pnpm exec playwright install chromium --with-deps
 
       # tests/playwright.config.ts starts the Vite dev server internally via webServer
       - name: Run full e2e suite
-        run: pnpm test:e2e --project=chromium
+        run: xvfb-run --auto-servernum pnpm test:e2e --project=chromium
         timeout-minutes: 15
 
       - name: Upload report

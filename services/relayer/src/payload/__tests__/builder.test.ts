@@ -39,6 +39,9 @@ describe('buildCanonicalPayload', () => {
         sessionKey: '0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef',
         operation: 'relay_execute',
         nonce: 42,
+        to: 'GDXTVHXGF6DZ4YCVLXV4LEBQ4RPQBHKX5XQOQU4ONHV6BQNVJFQ4XKZ2',
+        amount: '10.0000000',
+        asset: 'XLM',
       };
       expect(buildCanonicalPayload(input)).toMatchSnapshot();
     });
@@ -48,6 +51,9 @@ describe('buildCanonicalPayload', () => {
         sessionKey: 'fedcba9876543210fedcba9876543210fedcba9876543210fedcba9876543210',
         operation: 'add_session_key',
         nonce: 0,
+        to: 'GDXTVHXGF6DZ4YCVLXV4LEBQ4RPQBHKX5XQOQU4ONHV6BQNVJFQ4XKZ2',
+        amount: '10.0000000',
+        asset: 'XLM',
       };
       expect(buildCanonicalPayload(input)).toMatchSnapshot();
     });
@@ -57,6 +63,9 @@ describe('buildCanonicalPayload', () => {
         sessionKey: 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
         operation: 'revoke_session_key',
         nonce: 999,
+        to: 'GDXTVHXGF6DZ4YCVLXV4LEBQ4RPQBHKX5XQOQU4ONHV6BQNVJFQ4XKZ2',
+        amount: '10.0000000',
+        asset: 'XLM',
       };
       expect(buildCanonicalPayload(input)).toMatchSnapshot();
     });
@@ -68,6 +77,9 @@ describe('buildCanonicalPayload', () => {
         sessionKey: 'abc123def456abc123def456abc123def456abc123def456abc123def456abc1',
         operation: 'relay_execute',
         nonce: 100,
+        to: 'GDXTVHXGF6DZ4YCVLXV4LEBQ4RPQBHKX5XQOQU4ONHV6BQNVJFQ4XKZ2',
+        amount: '10.0000000',
+        asset: 'XLM',
       };
 
       const payload1 = buildCanonicalPayload(input);
@@ -83,6 +95,9 @@ describe('buildCanonicalPayload', () => {
         sessionKey: 'abc123def456abc123def456abc123def456abc123def456abc123def456abc1',
         operation: 'relay_execute',
         nonce: 1,
+        to: 'GDXTVHXGF6DZ4YCVLXV4LEBQ4RPQBHKX5XQOQU4ONHV6BQNVJFQ4XKZ2',
+        amount: '10.0000000',
+        asset: 'XLM',
       };
 
       const payload1 = buildCanonicalPayload(base);
@@ -96,6 +111,9 @@ describe('buildCanonicalPayload', () => {
         sessionKey: 'abc123def456abc123def456abc123def456abc123def456abc123def456abc1',
         operation: 'relay_execute',
         nonce: 1,
+        to: 'GDXTVHXGF6DZ4YCVLXV4LEBQ4RPQBHKX5XQOQU4ONHV6BQNVJFQ4XKZ2',
+        amount: '10.0000000',
+        asset: 'XLM',
       };
 
       const payload1 = buildCanonicalPayload(base);
@@ -109,6 +127,9 @@ describe('buildCanonicalPayload', () => {
         sessionKey: 'abc123def456abc123def456abc123def456abc123def456abc123def456abc1',
         operation: 'relay_execute',
         nonce: 1,
+        to: 'GDXTVHXGF6DZ4YCVLXV4LEBQ4RPQBHKX5XQOQU4ONHV6BQNVJFQ4XKZ2',
+        amount: '10.0000000',
+        asset: 'XLM',
       };
 
       const payload1 = buildCanonicalPayload(base);
@@ -127,11 +148,17 @@ describe('buildCanonicalPayload', () => {
         sessionKey: 'test123test123test123test123test123test123test123test123test123te',
         operation: 'relay_execute',
         nonce: 5,
+        to: 'GDXTVHXGF6DZ4YCVLXV4LEBQ4RPQBHKX5XQOQU4ONHV6BQNVJFQ4XKZ2',
+        amount: '10.0000000',
+        asset: 'XLM',
       };
 
       const shuffled: Record<string, unknown> = {
+        amount: '10.0000000',
         nonce: 5,
+        to: 'GDXTVHXGF6DZ4YCVLXV4LEBQ4RPQBHKX5XQOQU4ONHV6BQNVJFQ4XKZ2',
         sessionKey: 'test123test123test123test123test123test123test123test123test123te',
+        asset: 'XLM',
         operation: 'relay_execute',
       };
 
@@ -179,6 +206,9 @@ describe('buildCanonicalPayload', () => {
         sessionKey: 'abc123def456abc123def456abc123def456abc123def456abc123def456abc1',
         operation: 'relay_execute',
         nonce: 42,
+        to: 'GDXTVHXGF6DZ4YCVLXV4LEBQ4RPQBHKX5XQOQU4ONHV6BQNVJFQ4XKZ2',
+        amount: '10.0000000',
+        asset: 'XLM',
       };
 
       const payload = buildCanonicalPayload(input);
@@ -190,6 +220,9 @@ describe('buildCanonicalPayload', () => {
         sessionKey: 'abc123def456abc123def456abc123def456abc123def456abc123def456abc1',
         operation: 'relay_execute',
         nonce: 42,
+        to: 'GDXTVHXGF6DZ4YCVLXV4LEBQ4RPQBHKX5XQOQU4ONHV6BQNVJFQ4XKZ2',
+        amount: '10.0000000',
+        asset: 'XLM',
       };
 
       const payload = buildCanonicalPayload(input);
@@ -201,6 +234,9 @@ describe('buildCanonicalPayload', () => {
         sessionKey: 'abc123def456abc123def456abc123def456abc123def456abc123def456abc1',
         operation: 'relay_execute',
         nonce: 42,
+        to: 'GDXTVHXGF6DZ4YCVLXV4LEBQ4RPQBHKX5XQOQU4ONHV6BQNVJFQ4XKZ2',
+        amount: '10.0000000',
+        asset: 'XLM',
       };
 
       const payload = buildCanonicalPayload(input);
@@ -210,6 +246,9 @@ describe('buildCanonicalPayload', () => {
         sessionKey: input.sessionKey,
         operation: input.operation,
         nonce: input.nonce,
+        to: input.to,
+        amount: input.amount,
+        asset: input.asset,
       });
     });
   });

@@ -82,12 +82,16 @@ export function deterministicDraftIntent({
   const asset = extractAsset(prompt);
 
   if (isInvoicePrompt(prompt)) {
+    // A recipient named in the prompt (G-address or @handle) is who gets billed.
+    // Falling back to accountId only when the prompt names nobody preserves
+    // "invoice me" drafts; hardcoding accountId dropped "Invoice @bob …" (#1424).
+    const namedRecipient = extractDestination(prompt);
     const intent = parseOrThrow(
       {
         type: 'invoice',
         amount,
         asset,
-        recipient: accountId,
+        recipient: namedRecipient ?? accountId,
         dueDate: new Date(Date.now() + DEFAULT_INVOICE_TERM_DAYS * MS_PER_DAY).toISOString(),
       },
       'invoice'

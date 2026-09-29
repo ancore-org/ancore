@@ -22,13 +22,25 @@ import {
   BASE_FEE,
   Contract,
   Memo,
+  nativeToScVal,
   rpc,
   Transaction,
   TransactionBuilder,
   xdr,
 } from '@stellar/stellar-sdk';
 
-import { toScAddress, toScOperationsVec, toScPermissionsVec, toScU64 } from './contract-params';
+import {
+  toScAddress,
+  toScBytesN32,
+  toScPermissionsVec,
+  toScU64,
+  toScOption,
+  toScAddressVec,
+  toScI128,
+  CallerIdentity,
+  toScCallerIdentity,
+  toScBytes,
+} from './contract-params';
 
 import { BuilderValidationError, SimulationExpiredError, SimulationFailedError } from './errors';
 
@@ -129,19 +141,35 @@ export class AccountTransactionBuilder {
   /**
    * Add a session key to the smart account.
    *
-   * Wraps a Soroban contract invocation for `add_session_key(address, Vec<u32>, u64)`.
+   * Wraps a Soroban contract invocation for `add_session_key(BytesN<32>, u64, Vec<u32>, Option<Vec<Address>>, Option<i128>, Option<i128>, u64)`.
    *
    * @param publicKey   - G… address of the session key
+   * @param expiresAt   - Expiration timestamp (unix seconds)
    * @param permissions - Permission enum values (see `SessionPermission`)
-   * @param expiresAt   - Expiration timestamp (unix ms)
+   * @param allowedContracts - Optional array of contract addresses (C…) that can be called
+   * @param maxAmountPerCall - Optional maximum spend per call
+   * @param cumulativeLimit - Optional maximum cumulative spend in window
+   * @param spendWindowSeconds - Spend window duration in seconds (required if cumulativeLimit is set)
    * @returns `this` for chaining
    */
-  addSessionKey(publicKey: string, permissions: number[], expiresAt: number): this {
+  addSessionKey(
+    publicKey: string,
+    expiresAt: number,
+    permissions: number[],
+    allowedContracts?: string[] | null,
+    maxAmountPerCall?: number | string | bigint | null,
+    cumulativeLimit?: number | string | bigint | null,
+    spendWindowSeconds: number = 0
+  ): this {
     const operation = this.contract.call(
       'add_session_key',
-      toScAddress(publicKey),
+      toScBytesN32(publicKey),
+      toScU64(expiresAt),
       toScPermissionsVec(permissions),
-      toScU64(expiresAt)
+      toScOption(allowedContracts, toScAddressVec),
+      toScOption(maxAmountPerCall, toScI128),
+      toScOption(cumulativeLimit, toScI128),
+      toScU64(spendWindowSeconds)
     );
 
     this.txBuilder.addOperation(operation);
@@ -153,13 +181,13 @@ export class AccountTransactionBuilder {
   /**
    * Revoke a session key from the smart account.
    *
-   * Wraps a Soroban contract invocation for `revoke_session_key(address)`.
+   * Wraps a Soroban contract invocation for `revoke_session_key(BytesN<32>)`.
    *
    * @param publicKey - G… address of the session key to revoke
    * @returns `this` for chaining
    */
   revokeSessionKey(publicKey: string): this {
-    const operation = this.contract.call('revoke_session_key', toScAddress(publicKey));
+    const operation = this.contract.call('revoke_session_key', toScBytesN32(publicKey));
 
     this.txBuilder.addOperation(operation);
     this.operationCount++;
@@ -168,19 +196,50 @@ export class AccountTransactionBuilder {
   }
 
   /**
-   * Execute operations using a session key.
+   * Execute operations using the account contract.
    *
-   * Wraps a Soroban contract invocation for `execute(address, Vec<bytes>)`.
+   * Wraps a Soroban contract invocation for `execute(CallerIdentity, Address, Symbol, Vec<Val>, u64, Option<BytesN<32>>, Option<BytesN<64>>, Option<Bytes>)`.
    *
-   * @param sessionKeyPublicKey - G… address of the session key authorising this execution
-   * @param operations          - Array of Stellar XDR operations to execute
+   * @param caller - Caller identity (Owner, SessionKey, or Quorum)
+   * @param to - Target contract address
+   * @param functionName - Function to invoke on the target contract
+   * @param args - Arguments for the function (as ScVals)
+   * @param expectedNonce - Expected nonce for replay protection
+   * @param sessionPubKey - Session key public key (for SessionKey caller only)
+   * @param signature - Signature bytes (for SessionKey caller only)
+   * @param signaturePayload - Signed payload (for SessionKey caller only)
    * @returns `this` for chaining
    */
-  execute(sessionKeyPublicKey: string, operations: xdr.Operation[]): this {
+  execute(
+    caller: CallerIdentity,
+    to: string,
+    functionName: string,
+    args: xdr.ScVal[],
+    expectedNonce: number,
+    sessionPubKey?: string | null,
+    signature?: Uint8Array | null,
+    signaturePayload?: Uint8Array | null
+  ): this {
+    // Build CallerIdentity ScVal
+    let callerScVal: xdr.ScVal;
+    if (caller === CallerIdentity.Owner) {
+      callerScVal = toScCallerIdentity(CallerIdentity.Owner);
+    } else if (caller === CallerIdentity.SessionKey && sessionPubKey) {
+      callerScVal = toScCallerIdentity(CallerIdentity.SessionKey, toScBytesN32(sessionPubKey));
+    } else {
+      throw new Error('Invalid caller identity configuration');
+    }
+
     const operation = this.contract.call(
       'execute',
-      toScAddress(sessionKeyPublicKey),
-      toScOperationsVec(operations)
+      callerScVal,
+      toScAddress(to),
+      nativeToScVal(functionName, { type: 'symbol' }),
+      xdr.ScVal.scvVec(args),
+      toScU64(expectedNonce),
+      toScOption(sessionPubKey, toScBytesN32),
+      toScOption(signature, toScBytes),
+      toScOption(signaturePayload, toScBytes)
     );
 
     this.txBuilder.addOperation(operation);

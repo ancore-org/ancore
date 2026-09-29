@@ -38,9 +38,15 @@ describe('sign-relay-payload handler', () => {
   it('throws when the wallet is locked', async () => {
     (isBackgroundSessionUnlocked as any).mockReturnValue(false);
 
-    await expect(signRelayPayload({ operation: 'relay_execute', nonce: 1 })).rejects.toThrow(
-      'Wallet is locked'
-    );
+    await expect(
+      signRelayPayload({
+        operation: 'relay_execute',
+        nonce: 1,
+        to: 'GDXTVHXGF6DZ4YCVLXV4LEBQ4RPQBHKX5XQOQU4ONHV6BQNVJFQ4XKZ2',
+        amount: '10.0000000',
+        asset: 'XLM',
+      })
+    ).rejects.toThrow('Wallet is locked');
   });
 
   it('returns a sessionKey/signature that pass the same canonical-payload verification the relayer performs', async () => {
@@ -48,7 +54,13 @@ describe('sign-relay-payload handler', () => {
     const kp = Keypair.random();
     (getSigningKeypair as any).mockResolvedValue(kp);
 
-    const result = await signRelayPayload({ operation: 'relay_execute', nonce: 42 });
+    const result = await signRelayPayload({
+      operation: 'relay_execute',
+      nonce: 42,
+      to: 'GDXTVHXGF6DZ4YCVLXV4LEBQ4RPQBHKX5XQOQU4ONHV6BQNVJFQ4XKZ2',
+      amount: '10.0000000',
+      asset: 'XLM',
+    });
 
     expect(result.sessionKey).toMatch(/^[0-9a-f]{64}$/);
     expect(result.signature).toMatch(/^[0-9a-f]{128}$/);
@@ -62,6 +74,9 @@ describe('sign-relay-payload handler', () => {
       sessionKey: result.sessionKey,
       operation: 'relay_execute',
       nonce: 42,
+      to: 'GDXTVHXGF6DZ4YCVLXV4LEBQ4RPQBHKX5XQOQU4ONHV6BQNVJFQ4XKZ2',
+      amount: '10.0000000',
+      asset: 'XLM',
     });
     const verifierKp = Keypair.fromPublicKey(kp.publicKey());
     expect(
@@ -74,11 +89,20 @@ describe('sign-relay-payload handler', () => {
     const kp = Keypair.random();
     (getSigningKeypair as any).mockResolvedValue(kp);
 
-    const result = await signRelayPayload({ operation: 'relay_execute', nonce: 1 });
+    const result = await signRelayPayload({
+      operation: 'relay_execute',
+      nonce: 1,
+      to: 'GDXTVHXGF6DZ4YCVLXV4LEBQ4RPQBHKX5XQOQU4ONHV6BQNVJFQ4XKZ2',
+      amount: '10.0000000',
+      asset: 'XLM',
+    });
     const tamperedPayload = buildRelayCanonicalPayload({
       sessionKey: result.sessionKey,
       operation: 'relay_execute',
       nonce: 2,
+      to: 'GDXTVHXGF6DZ4YCVLXV4LEBQ4RPQBHKX5XQOQU4ONHV6BQNVJFQ4XKZ2',
+      amount: '10.0000000',
+      asset: 'XLM',
     });
 
     expect(
@@ -96,7 +120,13 @@ describe('sign-relay-payload handler', () => {
 
       expect(registerHandler).toHaveBeenCalledWith('SIGN_RELAY_PAYLOAD', expect.any(Function));
       const handlerCb = (registerHandler as any).mock.calls[0][1];
-      const result = await handlerCb({ operation: 'relay_execute', nonce: 7 });
+      const result = await handlerCb({
+        operation: 'relay_execute',
+        nonce: 7,
+        to: 'GDXTVHXGF6DZ4YCVLXV4LEBQ4RPQBHKX5XQOQU4ONHV6BQNVJFQ4XKZ2',
+        amount: '10.0000000',
+        asset: 'XLM',
+      });
       expect(result.sessionKey).toMatch(/^[0-9a-f]{64}$/);
       expect(result.signature).toMatch(/^[0-9a-f]{128}$/);
     });

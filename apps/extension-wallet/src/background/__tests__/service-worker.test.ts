@@ -600,6 +600,9 @@ describe('APPROVE_SIGN_REQUEST', () => {
     enqueueApproval(requestId, 'https://dapp.example', 'signRelayPayload', {
       operation: 'relay_execute',
       nonce: 99,
+      to: 'GDXTVHXGF6DZ4YCVLXV4LEBQ4RPQBHKX5XQOQU4ONHV6BQNVJFQ4XKZ2',
+      amount: '10.0000000',
+      asset: 'XLM',
     });
     const waited = new Promise((resolve, reject) => {
       registerResponseCallbacks(requestId, resolve, reject);
@@ -618,6 +621,9 @@ describe('APPROVE_SIGN_REQUEST', () => {
       sessionKey: result.sessionKey!,
       operation: 'relay_execute',
       nonce: 99,
+      to: 'GDXTVHXGF6DZ4YCVLXV4LEBQ4RPQBHKX5XQOQU4ONHV6BQNVJFQ4XKZ2',
+      amount: '10.0000000',
+      asset: 'XLM',
     });
     expect(
       kp.verify(Buffer.from(canonicalPayload, 'utf8'), Buffer.from(result.signature!, 'hex'))

@@ -4,6 +4,7 @@ import { validateTransferPolicy } from '@ancore/types';
 import { getSessionKey } from '@ancore/account-abstraction';
 import { rpc } from '@stellar/stellar-sdk';
 import { getEnv } from '../config/env';
+import { buildCanonicalPayload } from '../payload/builder';
 import type { JobQueueContract } from '../queue/types';
 import type { IdempotencyStoreContract } from '../store/idempotency';
 import type { NonceStore } from '../store/nonceStore';
@@ -384,9 +385,20 @@ export class RelayService implements RelayServiceContract {
     return null;
   }
 
+  // Delegates to the shared builder (../payload/builder) rather than
+  // re-serializing inline, so the client (core-sdk's relay-payload.ts) and
+  // server can never drift on what's actually covered by the signature.
+  // That drift previously left `to`/`amount`/`asset` unsigned entirely — a
+  // valid signature could be replayed with substituted transfer parameters.
   private canonicalPayload(req: RelayExecuteRequest): string {
-    return Buffer.from(
-      JSON.stringify({ sessionKey: req.sessionKey, operation: req.operation, nonce: req.nonce })
-    ).toString('hex');
+    const parameters = req.parameters as { to?: unknown; amount?: unknown; asset?: unknown };
+    return buildCanonicalPayload({
+      sessionKey: req.sessionKey,
+      operation: req.operation,
+      nonce: req.nonce,
+      to: typeof parameters.to === 'string' ? parameters.to : '',
+      amount: typeof parameters.amount === 'string' ? parameters.amount : '',
+      asset: typeof parameters.asset === 'string' ? parameters.asset : '',
+    });
   }
 }

@@ -27,3 +27,17 @@ export function assertValidEd25519PublicKey(publicKey: string): void {
     );
   }
 }
+
+export function assertValidContractAddress(contractAddress: string): void {
+  if (typeof contractAddress !== 'string' || !StrKey.isValidContract(contractAddress)) {
+    const snippet =
+      typeof contractAddress === 'string'
+        ? `${contractAddress.slice(0, 8)}...`
+        : String(contractAddress);
+    throw new StrKeyValidationError(
+      'INVALID_C_KEY',
+      `Invalid contract address: expected C... format, got ${snippet}`,
+      typeof contractAddress === 'string' ? contractAddress : undefined
+    );
+  }
+}

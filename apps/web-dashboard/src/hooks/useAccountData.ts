@@ -1,39 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import type { AccountData, Transaction } from '../types/dashboard';
-
-const MOCK_ACCOUNT: AccountData = {
-  address: 'GABC...XYZ',
-  balance: 1250.75,
-  status: 'active',
-  lastActivity: new Date('2026-04-24T10:00:00Z'),
-};
-
-const MOCK_TRANSACTIONS: Transaction[] = [
-  {
-    id: 'tx1',
-    type: 'receive',
-    amount: 100,
-    timestamp: new Date('2026-04-24T09:00:00Z'),
-    status: 'confirmed',
-    counterparty: 'GDEF...ABC',
-  },
-  {
-    id: 'tx2',
-    type: 'send',
-    amount: 50,
-    timestamp: new Date('2026-04-23T15:30:00Z'),
-    status: 'confirmed',
-    counterparty: 'GHIJ...DEF',
-  },
-  {
-    id: 'tx3',
-    type: 'send',
-    amount: 25,
-    timestamp: new Date('2026-04-22T08:00:00Z'),
-    status: 'pending',
-    counterparty: 'GKLM...GHI',
-  },
-];
+import { fetchAccountData } from '../lib/horizon';
 
 export interface UseAccountDataReturn {
   account: AccountData | null;
@@ -54,11 +21,35 @@ export function useAccountData(address: string): UseAccountDataReturn {
     setLoading(true);
     setError(null);
     try {
-      await new Promise((r) => setTimeout(r, 400));
-      setAccount({ ...MOCK_ACCOUNT, address });
-      setTransactions(MOCK_TRANSACTIONS);
+      const data = await fetchAccountData(address);
+      const nativeBalance = data.balances?.find((b) => b.asset_type === 'native');
+      const balance = nativeBalance ? Number(nativeBalance.balance) : 0;
+      const lastActivity = data.last_modified_time ? new Date(data.last_modified_time) : new Date();
+
+      setAccount({
+        address,
+        balance,
+        status: 'active',
+        lastActivity,
+      });
+      setTransactions([]);
     } catch (err) {
-      setError(err instanceof Error ? err : new Error('Failed to fetch account data'));
+      if (
+        err instanceof Error &&
+        (err.message.includes('Account not found') || err.message.includes('404'))
+      ) {
+        setAccount({
+          address,
+          balance: 0,
+          status: 'unfunded',
+          lastActivity: new Date(),
+        });
+        setTransactions([]);
+        setError(null);
+      } else {
+        setError(err instanceof Error ? err : new Error('Failed to fetch account data'));
+        setAccount(null);
+      }
     } finally {
       setLoading(false);
     }

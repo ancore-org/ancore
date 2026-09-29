@@ -47,6 +47,7 @@ import {
   toScPermissionsVec,
   toScU32,
   toScU64,
+  CallerIdentity,
 } from '../contract-params';
 import { SimulationExpiredError, SimulationFailedError } from '../errors';
 
@@ -177,8 +178,13 @@ describe('contract-params encoding (#1354)', () => {
       expect(encoded.switch().name).toBe('scvAddress');
     });
 
-    it('rejects a contract address, which is not a valid session key', () => {
-      expect(() => toScAddress(CONTRACT_ID)).toThrow(/Invalid Stellar public key/);
+    it("accepts a contract address — execute()'s `to` targets a contract, not an account", () => {
+      const encoded = toScAddress(CONTRACT_ID);
+      expect(encoded.switch().name).toBe('scvAddress');
+    });
+
+    it('rejects a string that is neither a G… nor a C… address', () => {
+      expect(() => toScAddress('not-an-address')).toThrow(/Invalid Stellar public key/);
     });
   });
 });
@@ -282,12 +288,14 @@ describe('AccountTransactionBuilder contract invocations (#1354)', () => {
     jest.restoreAllMocks();
   });
 
-  it('sends add_session_key with the address, permission vec and expiry in order', async () => {
+  it("sends add_session_key with the public key, expiry, and permission vec in the contract's own arg order", async () => {
     const server = makeFailingServer();
     const { builder } = makeBuilder(server);
 
     const expiresAt = 1_900_000_000;
-    builder.addSessionKey(SESSION_KEYPAIR.publicKey(), [0, 2], expiresAt);
+    // Real contract order: (public_key: BytesN<32>, expires_at, permissions,
+    // allowed_contracts, max_amount_per_call, cumulative_limit, spend_window_seconds).
+    builder.addSessionKey(SESSION_KEYPAIR.publicKey(), expiresAt, [0, 2]);
     await builder.simulate();
 
     const tx = (server.simulateTransaction as jest.Mock).mock.calls[0][0];
@@ -296,13 +304,21 @@ describe('AccountTransactionBuilder contract invocations (#1354)', () => {
     expect(tx.operations[0].func.invokeContract().functionName().toString()).toBe(
       'add_session_key'
     );
-    expect(args[0].switch().name).toBe('scvAddress');
-    expect(args[1].vec()!.map((item: xdr.ScVal) => item.u32())).toEqual([0, 2]);
-    expect(args[2].switch().name).toBe('scvU64');
-    expect(args[2].u64().toString()).toBe(String(expiresAt));
+    // public_key is BytesN<32>, not an Address — the contract never accepts an
+    // Address for this field.
+    expect(args[0].switch().name).toBe('scvBytes');
+    expect(args[1].switch().name).toBe('scvU64');
+    expect(args[1].u64().toString()).toBe(String(expiresAt));
+    expect(args[2].vec()!.map((item: xdr.ScVal) => item.u32())).toEqual([0, 2]);
+    // Omitted optionals encode as void, and spend_window_seconds defaults to 0.
+    expect(args[3].switch().name).toBe('scvVoid');
+    expect(args[4].switch().name).toBe('scvVoid');
+    expect(args[5].switch().name).toBe('scvVoid');
+    expect(args[6].switch().name).toBe('scvU64');
+    expect(args[6].u64().toString()).toBe('0');
   });
 
-  it('sends revoke_session_key with just the address', async () => {
+  it('sends revoke_session_key with the raw public key bytes, not an Address', async () => {
     const server = makeFailingServer();
     const { builder } = makeBuilder(server);
 
@@ -314,30 +330,45 @@ describe('AccountTransactionBuilder contract invocations (#1354)', () => {
 
     expect(invocation.functionName().toString()).toBe('revoke_session_key');
     expect(invocation.args()).toHaveLength(1);
-    expect(invocation.args()[0].switch().name).toBe('scvAddress');
+    // The contract's revoke_session_key(public_key: BytesN<32>) takes raw
+    // bytes, matching add_session_key — not an Address.
+    expect(invocation.args()[0].switch().name).toBe('scvBytes');
   });
 
-  it('sends execute with the session key and the operation bytes', async () => {
+  it('sends execute with the caller identity, target contract, function, args, and nonce', async () => {
     const server = makeFailingServer();
     const { builder } = makeBuilder(server);
 
-    const operations = [makeOperation('a'), makeOperation('b')];
-    builder.execute(SESSION_KEYPAIR.publicKey(), operations);
+    builder.execute(
+      CallerIdentity.SessionKey,
+      CONTRACT_ID,
+      'transfer',
+      [],
+      7,
+      SESSION_KEYPAIR.publicKey()
+    );
     await builder.simulate();
 
     const tx = (server.simulateTransaction as jest.Mock).mock.calls[0][0];
     const invocation = tx.operations[0].func.invokeContract();
+    const args = invocation.args();
 
     expect(invocation.functionName().toString()).toBe('execute');
-    expect(invocation.args()[0].switch().name).toBe('scvAddress');
-    expect(invocation.args()[1].vec()).toHaveLength(2);
+    // caller: CallerIdentity enum — a union ScVal, not a bare address.
+    expect(args[0].switch().name).toBe('scvVec');
+    expect(args[1].switch().name).toBe('scvAddress'); // target contract
+    expect(args[2].switch().name).toBe('scvSymbol'); // function name
+    expect(args[3].vec()).toHaveLength(0); // args
+    expect(args[4].switch().name).toBe('scvU64'); // expected_nonce
+    expect(args[4].u64().toString()).toBe('7');
+    expect(args[5].switch().name).toBe('scvBytes'); // session_pub_key (Some)
   });
 
   it('rejects an invalid session key before anything is added to the transaction', async () => {
     const server = makeFailingServer();
     const { builder } = makeBuilder(server);
 
-    expect(() => builder.addSessionKey('not-an-address', [0], 1)).toThrow(
+    expect(() => builder.addSessionKey('not-an-address', 1, [0])).toThrow(
       /Invalid Stellar public key/
     );
 

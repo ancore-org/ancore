@@ -166,6 +166,9 @@ export interface GetPublicKeyResult {
 export interface SignRelayPayloadParams {
   readonly operation: string;
   readonly nonce: number;
+  readonly to: string;
+  readonly amount: string;
+  readonly asset: string;
 }
 
 /**

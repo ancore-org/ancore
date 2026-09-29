@@ -136,8 +136,8 @@ export class PgJobQueue implements JobQueueContract {
     const result = await this.pool.query<JobRow>(
       `WITH next_job AS (
          SELECT id FROM jobs
-         WHERE status = 'pending'
-           AND (retry_after IS NULL OR retry_after <= NOW())
+         WHERE (status = 'pending' AND (retry_after IS NULL OR retry_after <= NOW()))
+            OR (status = 'processing' AND updated_at <= NOW() - INTERVAL '5 minutes')
          ORDER BY created_at ASC
          LIMIT 1
          FOR UPDATE SKIP LOCKED

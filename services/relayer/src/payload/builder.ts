@@ -15,20 +15,23 @@ export interface CanonicalPayloadInput {
   sessionKey: string;
   operation: string;
   nonce: number;
+  to: string;
+  amount: string;
+  asset: string;
 }
 
 /**
  * Build a canonical hex-encoded payload from relay request fields.
  *
  * The payload is constructed as follows:
- * 1. Create a JSON object with fields in deterministic order: sessionKey, operation, nonce
+ * 1. Create a JSON object with fields in deterministic order: sessionKey, operation, nonce, to, amount, asset
  * 2. Serialize to compact JSON (no whitespace)
  * 3. Encode as UTF-8 bytes
  * 4. Convert to hex string
  *
  * This function guarantees:
  * - Same logical input produces identical byte sequence
- * - Field order is consistent (sessionKey, operation, nonce)
+ * - Field order is consistent (sessionKey, operation, nonce, to, amount, asset)
  * - No extraneous whitespace or formatting
  * - Deterministic JSON.stringify behavior
  *
@@ -40,6 +43,9 @@ export function buildCanonicalPayload(input: CanonicalPayloadInput): string {
     sessionKey: input.sessionKey,
     operation: input.operation,
     nonce: input.nonce,
+    to: input.to,
+    amount: input.amount,
+    asset: input.asset,
   };
 
   const json = JSON.stringify(ordered);

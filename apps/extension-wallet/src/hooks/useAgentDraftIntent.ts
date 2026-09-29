@@ -9,6 +9,8 @@ export type AgentDraftStatus = 'idle' | 'loading' | 'ready' | 'error';
 
 export interface UseAgentDraftIntentOptions extends AiAgentClientOptions {
   accountId: string;
+  /** Addresses this account has already paid, when the caller has that history. */
+  knownRecipients?: string[];
 }
 
 /**
@@ -22,7 +24,12 @@ export interface UseAgentDraftIntentOptions extends AiAgentClientOptions {
  * review → confirm → sign flow. There is no code path here that reaches the
  * network beyond the draft-intent request itself.
  */
-export function useAgentDraftIntent({ accountId, endpoint, fetcher }: UseAgentDraftIntentOptions) {
+export function useAgentDraftIntent({
+  accountId,
+  endpoint,
+  fetcher,
+  knownRecipients,
+}: UseAgentDraftIntentOptions) {
   const [status, setStatus] = useState<AgentDraftStatus>('idle');
   const [draft, setDraft] = useState<AgentDraftIntentResponse | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -43,7 +50,11 @@ export function useAgentDraftIntent({ accountId, endpoint, fetcher }: UseAgentDr
       setDraft(null);
 
       try {
-        const result = await client.draftIntent({ prompt: trimmed, accountId });
+        const result = await client.draftIntent({
+          prompt: trimmed,
+          accountId,
+          ...(knownRecipients ? { knownRecipients } : {}),
+        });
         setDraft(result);
         setStatus('ready');
       } catch (err) {
@@ -51,7 +62,7 @@ export function useAgentDraftIntent({ accountId, endpoint, fetcher }: UseAgentDr
         setStatus('error');
       }
     },
-    [accountId, client]
+    [accountId, client, knownRecipients]
   );
 
   /** Accepts the draft and hands it back to the caller. Never submits on-chain. */

@@ -8,25 +8,46 @@
  * all ScVal conversion logic in one place.
  */
 
-import { Address, nativeToScVal, xdr } from '@stellar/stellar-sdk';
+import { Address, nativeToScVal, xdr, StrKey } from '@stellar/stellar-sdk';
 
 // ---------------------------------------------------------------------------
 // Address helpers
 // ---------------------------------------------------------------------------
 
 /**
- * Convert a Stellar public key string (G…) to an ScVal address.
+ * Convert a Stellar address string (G… account or C… contract) to an ScVal
+ * address. Soroban's `Address` type covers both — callers like `execute()`'s
+ * `to` parameter address a target *contract* (C…), not an account, so this
+ * must not be restricted to G-only.
+ *
+ * @param address - Stellar account (G…) or contract (C…) address
+ * @returns ScVal wrapping the address
+ * @throws If the address is not a valid Stellar G… or C… address
+ */
+export function toScAddress(address: string): xdr.ScVal {
+  if (!address || !(address.startsWith('G') || address.startsWith('C'))) {
+    throw new Error(`Invalid Stellar public key: expected a G… address, received "${address}"`);
+  }
+
+  return xdr.ScVal.scvAddress(Address.fromString(address).toScAddress());
+}
+
+/**
+ * Convert a Stellar public key (G…) to BytesN<32> for contract methods.
+ * The contract expects raw 32-byte Ed25519 public keys, not Address types.
  *
  * @param publicKey - Stellar public key starting with 'G'
- * @returns ScVal wrapping the address
- * @throws If the public key is not a valid Stellar address
+ * @returns ScVal BytesN<32> containing the raw public key bytes
+ * @throws If the public key is not a valid Stellar Ed25519 public key
  */
-export function toScAddress(publicKey: string): xdr.ScVal {
+export function toScBytesN32(publicKey: string): xdr.ScVal {
   if (!publicKey || !publicKey.startsWith('G')) {
     throw new Error(`Invalid Stellar public key: expected a G… address, received "${publicKey}"`);
   }
 
-  return xdr.ScVal.scvAddress(Address.fromString(publicKey).toScAddress());
+  // Decode the G… key to get raw 32 bytes
+  const rawBytes = StrKey.decodeEd25519PublicKey(publicKey);
+  return nativeToScVal(rawBytes, { type: 'bytes' });
 }
 
 // ---------------------------------------------------------------------------
@@ -116,4 +137,95 @@ export function toScOperationsVec(operations: xdr.Operation[]): xdr.ScVal {
   });
 
   return xdr.ScVal.scvVec(items);
+}
+
+/**
+ * Encode an optional value as an ScVal Option type.
+ *
+ * @param value - The value to wrap, or null/undefined for None
+ * @param converter - Function to convert the value to ScVal if present
+ * @returns ScVal option (Some or None)
+ */
+export function toScOption<T>(
+  value: T | null | undefined,
+  converter: (v: T) => xdr.ScVal
+): xdr.ScVal {
+  if (value === null || value === undefined) {
+    return nativeToScVal(null, { type: 'option' });
+  }
+  return nativeToScVal(converter(value), { type: 'option' });
+}
+
+/**
+ * Encode an array of Stellar addresses as an ScVal Vec<Address>.
+ *
+ * @param addresses - Array of Stellar addresses (G… or C… format)
+ * @returns ScVal vec of addresses
+ */
+export function toScAddressVec(addresses: string[]): xdr.ScVal {
+  if (!Array.isArray(addresses)) {
+    throw new Error('Addresses must be an array of strings');
+  }
+
+  const items = addresses.map((addr) => {
+    const address = Address.fromString(addr);
+    return xdr.ScVal.scvAddress(address.toScAddress());
+  });
+
+  return xdr.ScVal.scvVec(items);
+}
+
+/**
+ * Encode a JavaScript number as an ScVal i128.
+ *
+ * @param value - Integer value
+ * @returns ScVal i128
+ */
+export function toScI128(value: number | string | bigint): xdr.ScVal {
+  return nativeToScVal(BigInt(value), { type: 'i128' });
+}
+
+/**
+ * CallerIdentity enum for the execute method.
+ * Maps to the contract's CallerIdentity enum.
+ */
+export enum CallerIdentity {
+  Owner = 'Owner',
+  SessionKey = 'SessionKey',
+  Quorum = 'Quorum',
+}
+
+/**
+ * Encode CallerIdentity enum for the execute method.
+ *
+ * @param identity - The caller identity type
+ * @param data - Optional data (BytesN<32> for SessionKey, Vec<Address> for Quorum)
+ * @returns ScVal enum representation
+ */
+export function toScCallerIdentity(identity: CallerIdentity, data?: xdr.ScVal): xdr.ScVal {
+  if (identity === CallerIdentity.Owner) {
+    return nativeToScVal({ tag: 'Owner', values: undefined }, { type: 'symbol' });
+  }
+
+  if (identity === CallerIdentity.SessionKey && data) {
+    const enumVariant = xdr.ScVal.scvVec([nativeToScVal('SessionKey', { type: 'symbol' }), data]);
+    return enumVariant;
+  }
+
+  if (identity === CallerIdentity.Quorum && data) {
+    const enumVariant = xdr.ScVal.scvVec([nativeToScVal('Quorum', { type: 'symbol' }), data]);
+    return enumVariant;
+  }
+
+  throw new Error(`Invalid CallerIdentity: ${identity} with data: ${data}`);
+}
+
+/**
+ * Encode bytes as an ScVal Bytes type.
+ *
+ * @param bytes - Raw bytes or Uint8Array
+ * @returns ScVal bytes
+ */
+export function toScBytes(bytes: Uint8Array | Buffer): xdr.ScVal {
+  return xdr.ScVal.scvBytes(Buffer.isBuffer(bytes) ? bytes : Buffer.from(bytes));
 }

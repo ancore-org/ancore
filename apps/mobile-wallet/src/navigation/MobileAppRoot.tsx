@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import { ReadOnlyAccountView } from '../accounts';
 import { bootstrapMobileWallet } from '../app/bootstrap';
 import { resolveMobileWalletEnv } from '../config/dev-defaults';
+import { useAppGate } from '../config/hooks/useAppGate';
 import { OnboardingNavigator } from './onboarding';
 import { MobileWalletShell } from './MobileWalletShell';
 import { WalletKitProvider } from '../providers/WalletKitProvider';
@@ -23,6 +24,10 @@ import {
 import { getSigningKeypair } from '../security/signing-key';
 import { createSecureStoreAdapter } from '../storage/secure-store-factory';
 import { UnlockScreen } from '../screens/unlock/UnlockScreen';
+import { ForceUpdateScreen } from '../screens/gate/ForceUpdateScreen';
+import { MaintenanceScreen } from '../screens/gate/MaintenanceScreen';
+import { JailbreakWarningScreen } from '../screens/JailbreakWarningScreen';
+import { isDeviceCompromised } from '../security/jailbreak';
 import { WalletConnectPanel } from '../screens/walletconnect/WalletConnectPanel';
 import { buildStellarAccountId, networkToStellarChain } from '../walletconnect/constants';
 
@@ -57,7 +62,14 @@ export function MobileAppRoot({ env = {} }: { env?: Record<string, string | unde
   const [phase, setPhase] = useState<AppPhase>('loading');
   const [mainRoute, setMainRoute] = useState<MainRoute>('account');
   const [activeAccount, setActiveAccount] = useState<string | undefined>();
+  const [isCompromised, setIsCompromised] = useState(false);
+  const [warningBypassed, setWarningBypassed] = useState(false);
   const bootstrap = useMemo(() => bootstrapMobileWallet(resolveMobileWalletEnv(env)), [env]);
+  const gate = useAppGate({
+    configUrl: bootstrap.environment.remoteConfigUrl,
+    appVersion: bootstrap.environment.appVersion,
+    bypass: bootstrap.environment.remoteConfigBypass,
+  });
   const lockoutManager = useMemo(() => new BiometricLockoutManager(createLockoutStorage()), []);
   const activeChain = useMemo(
     () => networkToStellarChain(bootstrap.environment.network),
@@ -70,6 +82,9 @@ export function MobileAppRoot({ env = {} }: { env?: Record<string, string | unde
   useEffect(() => {
     void refreshPhase();
   }, [refreshPhase]);
+  useEffect(() => {
+    setIsCompromised(isDeviceCompromised());
+  }, []);
   useEffect(() => {
     if (phase !== 'main') {
       setActiveAccount(undefined);
@@ -105,6 +120,27 @@ export function MobileAppRoot({ env = {} }: { env?: Record<string, string | unde
   );
   const walletConnectProjectId =
     bootstrap.environment.walletConnectProjectId ?? 'example-project-id';
+  // Security gate takes priority over every other screen: a jailbroken or rooted
+  // device can read the keychain, so the wallet must not render on one.
+  // JailbreakWarningScreen only surfaces the bypass control under __DEV__.
+  if (isCompromised && !warningBypassed) {
+    return <JailbreakWarningScreen onContinueAnyway={() => setWarningBypassed(true)} />;
+  }
+  if (gate.isLoading) {
+    return <p aria-live="polite">Loading…</p>;
+  }
+  if (gate.result.status === 'maintenance') {
+    return <MaintenanceScreen message={gate.result.message} />;
+  }
+  if (gate.result.status === 'force-update') {
+    return (
+      <ForceUpdateScreen
+        minimumAppVersion={gate.result.minimumAppVersion}
+        currentVersion={bootstrap.environment.appVersion}
+        updateUrl={gate.result.updateUrl}
+      />
+    );
+  }
   if (phase === 'loading') {
     return <p aria-live="polite">Loading…</p>;
   }

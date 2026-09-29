@@ -152,6 +152,7 @@ where
     ///
     /// Returns [`BatchStats`] describing what happened.
     pub async fn run_once(&mut self) -> anyhow::Result<BatchStats> {
+        let batch_started = std::time::Instant::now();
         let last_seq = self
             .checkpoint
             .load(&self.config.stream)
@@ -259,6 +260,9 @@ where
                 "batch committed"
             );
         }
+
+        let secs = batch_started.elapsed().as_secs_f64().max(1e-6);
+        metrics::record_ingest_metrics(stats.fetched as f64 / secs, stats.fetched as i64, secs);
 
         Ok(stats)
     }

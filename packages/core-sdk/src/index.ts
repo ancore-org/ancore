@@ -72,10 +72,17 @@ export {
 // Contract parameter encoding helpers
 export {
   toScAddress,
+  toScBytesN32,
   toScOperationsVec,
   toScPermissionsVec,
   toScU32,
   toScU64,
+  toScOption,
+  toScAddressVec,
+  toScI128,
+  toScCallerIdentity,
+  toScBytes,
+  CallerIdentity,
 } from './contract-params';
 
 // Error types

@@ -37,7 +37,7 @@ export interface Messages {
     response: { signature: string } | { error: string };
   };
   SIGN_RELAY_PAYLOAD: {
-    request: { operation: string; nonce: number };
+    request: { operation: string; nonce: number; to: string; amount: string; asset: string };
     response: { sessionKey: string; signature: string } | { error: string };
   };
   GET_WALLET_STATE: {

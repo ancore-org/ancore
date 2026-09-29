@@ -205,6 +205,9 @@ export async function requestSessionKey(
 export async function signRelayPayload(params: {
   operation: string;
   nonce: number;
+  to: string;
+  amount: string;
+  asset: string;
 }): Promise<{ sessionKey: string; signature: string }> {
   return sendExternalRequest(ExternalApiMethod.SIGN_RELAY_PAYLOAD, params);
 }

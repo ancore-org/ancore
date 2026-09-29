@@ -15,6 +15,9 @@ export interface CanonicalPayloadInput {
   sessionKey: string;
   operation: string;
   nonce: number;
+  to: string;
+  amount: string;
+  asset: string;
 }
 
 function bytesToHex(bytes: Uint8Array): string {
@@ -35,6 +38,9 @@ export function buildRelayCanonicalPayload(input: CanonicalPayloadInput): string
     sessionKey: input.sessionKey,
     operation: input.operation,
     nonce: input.nonce,
+    to: input.to,
+    amount: input.amount,
+    asset: input.asset,
   };
 
   const json = JSON.stringify(ordered);
@@ -43,7 +49,7 @@ export function buildRelayCanonicalPayload(input: CanonicalPayloadInput): string
 
 /**
  * A real signer capable of producing the relay envelope's `sessionKey` and
- * `signature` fields atomically for a given operation+nonce. Kept
+ * `signature` fields atomically for a given operation+nonce+parameters. Kept
  * environment-agnostic so core-sdk has no hard dependency on the
  * browser-extension bridge — the caller (e.g. the web dashboard) supplies
  * the concrete implementation. Atomic (rather than a separate
@@ -55,6 +61,9 @@ export interface RelaySigner {
   signRelayEnvelope(input: {
     operation: string;
     nonce: number;
+    to: string;
+    amount: string;
+    asset: string;
   }): Promise<{ sessionKey: string; signature: string }>;
 }
 
@@ -91,6 +100,9 @@ export async function buildSignedRelayPayload(
   const { sessionKey, signature } = await signer.signRelayEnvelope({
     operation: 'relay_execute',
     nonce,
+    to,
+    amount,
+    asset,
   });
 
   return {

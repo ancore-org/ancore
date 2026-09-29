@@ -6,6 +6,9 @@ import { getSigningKeypair } from '../signing-key';
 export interface SignRelayPayloadParams {
   operation: string;
   nonce: number;
+  to: string;
+  amount: string;
+  asset: string;
 }
 
 export interface SignRelayPayloadResult {
@@ -39,13 +42,16 @@ function bytesToHex(bytes: Uint8Array | Buffer): string {
 export async function signRelayPayload(
   params: SignRelayPayloadParams
 ): Promise<SignRelayPayloadResult> {
-  const { operation, nonce } = params;
+  const { operation, nonce, to, amount, asset } = params;
 
   if (!operation || typeof operation !== 'string') {
     throw new Error('Invalid operation');
   }
   if (typeof nonce !== 'number' || !Number.isFinite(nonce)) {
     throw new Error('Invalid nonce');
+  }
+  if (typeof to !== 'string' || typeof amount !== 'string' || typeof asset !== 'string') {
+    throw new Error('Invalid relay parameters');
   }
 
   if (!isBackgroundSessionUnlocked()) {
@@ -54,7 +60,14 @@ export async function signRelayPayload(
 
   const kp = await getSigningKeypair();
   const sessionKey = bytesToHex(kp.rawPublicKey());
-  const payloadHex = buildRelayCanonicalPayload({ sessionKey, operation, nonce });
+  const payloadHex = buildRelayCanonicalPayload({
+    sessionKey,
+    operation,
+    nonce,
+    to,
+    amount,
+    asset,
+  });
   const signature = bytesToHex(kp.sign(new TextEncoder().encode(payloadHex)));
 
   return { sessionKey, signature };

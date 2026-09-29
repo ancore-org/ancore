@@ -35,9 +35,8 @@ function stroopsToXlm(stroops: string): string {
 function readBaseFee(unsignedXdr: string, networkPassphrase: string): string {
   try {
     const tx = TransactionBuilder.fromXDR(unsignedXdr, networkPassphrase) as Transaction;
-    const perOpFee = BigInt(tx.fee ?? '100');
-    const operationCount = BigInt(tx.operations.length || 1);
-    return (perOpFee * operationCount).toString();
+    // tx.fee is the total transaction fee, not per-operation (issue #1404)
+    return tx.fee ?? '100';
   } catch {
     return '100';
   }
@@ -56,8 +55,8 @@ function requiresSorobanSimulation(transaction: Transaction): boolean {
 }
 
 function classicSimulationResult(transaction: Transaction): ParsedSimulationResult {
-  const perOpFee = BigInt(transaction.fee ?? '100');
-  const totalStroops = (perOpFee * BigInt(transaction.operations.length || 1)).toString();
+  // transaction.fee is already the total envelope fee, not per-operation (issue #1404)
+  const totalStroops = transaction.fee ?? '100';
 
   return {
     fee: stroopsToXlm(totalStroops),
