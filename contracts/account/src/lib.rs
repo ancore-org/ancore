@@ -361,7 +361,8 @@ impl AncoreAccount {
                     .ok_or(ContractError::SessionKeyNotFound)?;
 
                 // Check session key has not expired
-                if validation::session_key_is_expired(env.ledger().timestamp(), session.expires_at) {
+                if validation::session_key_is_expired(env.ledger().timestamp(), session.expires_at)
+                {
                     return Err(ContractError::SessionKeyExpired);
                 }
 
