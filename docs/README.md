@@ -8,7 +8,8 @@
 | [Integration guide](integration-guide.md) | Build on the Ancore SDK |
 | [SDK wrappers](sdk-wrappers.md) | High-level SDK usage patterns |
 | [Contract methods](contract-methods.md) | Soroban account contract API |
-| [API reference](api-reference.yaml) | OpenAPI spec for services |
+| [dApp API reference](api-reference.md) | Complete dApp message protocol and response formats |
+| [API reference (OpenAPI)](api-reference.yaml) | OpenAPI spec for services |
 
 ## Architecture
 
