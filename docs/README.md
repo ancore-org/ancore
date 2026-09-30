@@ -8,6 +8,7 @@
 | [Integration guide](integration-guide.md) | Build on the Ancore SDK |
 | [SDK wrappers](sdk-wrappers.md) | High-level SDK usage patterns |
 | [Contract methods](contract-methods.md) | Soroban account contract API |
+| [dApp API reference](api-reference.md) | Wallet extension message types, wire formats, and examples |
 | [API reference](api-reference.yaml) | OpenAPI spec for services |
 
 ## Architecture
