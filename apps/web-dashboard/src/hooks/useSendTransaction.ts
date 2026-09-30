@@ -101,7 +101,12 @@ export async function resolveSendRecipient(
     return { input: trimmed, accountAddress: trimmed };
   }
 
+  // `validateRecipientInput` above already rejected malformed handles; this
+  // null check keeps the raw-string overload honest without an unchecked cast.
   const handle = normalizeUsernameHandle(trimmed);
+  if (!handle) {
+    throw new Error('Enter a valid @username handle');
+  }
   const resolved = await resolver(handle);
 
   if (!resolved) {
