@@ -20,12 +20,19 @@ import {
   type SessionKeyRevoker,
 } from './revoke-session-key';
 
+import { withRetry, type RetryOptions } from './utils/retry';
+
 export interface AncoreClientOptions {
   accountContractId: string;
+  /**
+   * Default retry configuration for network and RPC calls.
+   */
+  retryOptions?: RetryOptions;
 }
 
 export class AncoreClient {
   private readonly accountContract: SessionKeyWriter & SessionKeyRevoker & SessionKeyTtlRefresher;
+  private readonly retryOptions?: RetryOptions;
 
   constructor(options: AncoreClientOptions) {
     if (!options.accountContractId) {
@@ -35,6 +42,20 @@ export class AncoreClient {
     }
 
     this.accountContract = new AccountContract(options.accountContractId);
+    this.retryOptions = options.retryOptions;
+  }
+
+  /**
+   * Execute an asynchronous network call with the client's configured retry policy.
+   *
+   * @param fn Function to execute
+   * @param overrideOptions Optional override for this specific invocation
+   */
+  withRetry<T>(fn: () => Promise<T>, overrideOptions?: RetryOptions): Promise<T> {
+    return withRetry(fn, {
+      ...this.retryOptions,
+      ...overrideOptions,
+    });
   }
 
   /**
@@ -67,8 +88,18 @@ export class AncoreClient {
     params: RefreshSessionKeyTtlParams,
     options?: RefreshSessionKeyTtlOptions
   ): InvocationArgs | Promise<RefreshSessionKeyTtlResult> {
-    return options
-      ? refreshSessionKeyTtl(this.accountContract, params, options)
-      : refreshSessionKeyTtl(this.accountContract, params);
+    if (!options) {
+      return refreshSessionKeyTtl(this.accountContract, params);
+    }
+
+    const mergedOptions: RefreshSessionKeyTtlOptions = {
+      ...options,
+      retryOptions: {
+        ...this.retryOptions,
+        ...options.retryOptions,
+      },
+    };
+
+    return refreshSessionKeyTtl(this.accountContract, params, mergedOptions);
   }
 }

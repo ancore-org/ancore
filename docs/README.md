@@ -70,6 +70,7 @@
 | [AI intents](ai/intents.md) | Draft intent types for the AI agent MVP |
 | [Indexer events](indexer/contract-events.md) | Contract events indexed by the indexer service |
 | [Extension E2E smoke](testing/extension-e2e-smoke.md) | Browser extension smoke test guide |
+| [Common error codes troubleshooting](troubleshooting/error-codes.md) | Common error codes, root causes, and recovery steps |
 | [Extension build troubleshooting](troubleshooting/extension-build.md) | Build failures and fixes |
 | [Privacy policy](PRIVACY_POLICY.md) | Privacy policy draft |
 | [Terms of service](TERMS_OF_SERVICE.md) | Terms of service draft |

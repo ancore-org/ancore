@@ -16,6 +16,7 @@ import {
   SimulationFailedError,
 } from './errors';
 import { getSessionKeyInactiveReason, isSessionKeyActive } from './session-key-utils';
+import { withRetry, type RetryOptions } from './utils/retry';
 
 export interface RefreshSessionKeyTtlParams {
   /** Ed25519 public key (G…) of the session key whose Soroban TTL should be extended. */
@@ -36,6 +37,8 @@ export interface RefreshSessionKeyTtlOptions extends AccountContractReadOptions 
   nowMs?: number;
   /** Maximum time to wait for the Soroban simulation RPC call. Defaults to 15 seconds. */
   simulationTimeoutMs?: number;
+  /** Optional retry policy configuration for network operations. */
+  retryOptions?: RetryOptions;
 }
 
 export interface SessionKeyTtlRefresher {
@@ -201,7 +204,10 @@ async function simulateRefreshSessionKeyTtl(
   }
 
   const operation = accountContract.buildInvokeOperation(invocation);
-  const simulation = await simulateInvocation(operation, options);
+  const simulation = await withRetry(
+    () => simulateInvocation(operation, options),
+    options.retryOptions
+  );
 
   if (rpc.Api.isSimulationError(simulation)) {
     throw mapSimulationError(

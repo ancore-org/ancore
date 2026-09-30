@@ -10,6 +10,8 @@ Use this guide when diagnosing user issues or applying wallet hardening controls
 4. Ask for exact error text and timestamp.
 5. Reproduce issue with smallest possible workflow.
 
+> For detailed error code diagnostics and SDK recovery steps, see the [Common Error Codes and Recovery Steps Guide](../troubleshooting/error-codes.md).
+
 ## Common Issues
 
 ### Extension Does Not Open

@@ -9,6 +9,16 @@ export const AA_VERSION = '0.1.0';
 export { AccountContract } from './account-contract';
 export type { AccountContractReadOptions, InvocationArgs } from './account-contract';
 
+export {
+  AccountAbstractionClient,
+  withNetworkRetry,
+  isTransientError,
+  calculateBackoff,
+  type ClientRetryOptions,
+  type AccountAbstractionClientOptions,
+  type SorobanRpcServer,
+} from './client';
+
 export { getOwner, getNonce, getVersion } from './get-owner-nonce';
 export { getSessionKey } from './get-session-key';
 
