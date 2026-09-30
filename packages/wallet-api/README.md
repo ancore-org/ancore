@@ -4,6 +4,8 @@ Browser SDK for dApps integrating with the **Ancore Wallet** extension.
 
 Production reference: [@stellar/freighter-api](https://github.com/stellar/freighter/tree/master/@stellar/freighter-api).
 
+> For the comprehensive wire-format specification, all dApp message types, Soroban-specific behavior, and error handling reference, see the [dApp API Reference](../../docs/api-reference.md).
+
 ## Status
 
 | Method              | Status                                      |
@@ -246,6 +248,8 @@ dApp page  →  wallet-api  →  content script  →  background  →  approval 
 ```
 
 Relevant `ExternalApiMethod` values: `CONNECT`, `GET_ADDRESS`, `GET_NETWORK`, `IS_CONNECTED`.
+
+For complete request/response JSON envelope formats, parameter schemas, and error codes for all message types, refer to the [dApp API Reference](../../docs/api-reference.md).
 
 ## Ancore vs Freighter
 

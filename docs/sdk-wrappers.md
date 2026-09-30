@@ -107,6 +107,7 @@ const client = new AncoreClient({ accountContractId: 'C...' });
 | Parameter | Type | Required | Description |
 |-----------|------|----------|-------------|
 | `options.accountContractId` | `string` | ✓ | Deployed contract ID (C… address) |
+| `options.retry` | `RetryPolicyOptions \| RetryPresetName` | | Default retry policy or preset for network calls |
 
 Throws `BuilderValidationError` if `accountContractId` is empty.
 
@@ -245,6 +246,7 @@ interface RefreshSessionKeyTtlParams {
 interface RefreshSessionKeyTtlOptions extends AccountContractReadOptions {
   nowMs?:               number; // Override current time in ms (useful for deterministic testing)
   simulationTimeoutMs?: number; // Maximum time in ms to wait for Soroban simulation RPC (default: 15000)
+  retry?:               RetryPolicyOptions | RetryPresetName; // Retry policy override for simulation call
 }
 
 interface RefreshSessionKeyTtlResult {
@@ -278,13 +280,49 @@ const invocation = client.refreshSessionKeyTtl({
   expiresAt: Math.floor(Date.now() / 1000) + 3600,
 });
 
-// With simulation against RPC network (asynchronous)
+// With simulation against RPC network (asynchronous, with retry)
 const result = await client.refreshSessionKeyTtl(
   {
     publicKey: 'GABC...XYZ',
     expiresAt: Math.floor(Date.now() / 1000) + 3600,
   },
-  { rpcUrl: 'https://soroban-testnet.stellar.org' }
+  {
+    server,
+    sourceAccount: ownerAddress,
+    networkPassphrase: Networks.TESTNET,
+    retry: 'RELIABLE',
+  }
+);
+```
+
+---
+
+#### `client.withRetry`
+
+Wraps an arbitrary asynchronous network operation (e.g. Soroban RPC or Horizon calls) with the client's configured retry policy or an explicit method-level override.
+
+```typescript
+withRetry<T>(
+  fn: () => Promise<T>,
+  override?: RetryPolicyOptions | RetryPresetName
+): Promise<T>
+```
+
+**Example**
+
+```typescript
+const client = new AncoreClient({
+  accountContractId: 'C...',
+  retry: 'RELIABLE',
+});
+
+// Uses client's default RELIABLE retry policy
+const account = await client.withRetry(() => server.getAccount(accountId));
+
+// Or override per-call
+const simulation = await client.withRetry(
+  () => server.simulateTransaction(tx),
+  { maxRetries: 5, baseDelayMs: 300, jitter: true }
 );
 ```
 
@@ -531,6 +569,55 @@ simulateExecute<T>(to, fn, args, nonce, options): Promise<T>
 
 ---
 
+## Retry Policy & Transient Failure Handling
+
+`@ancore/core-sdk` provides configurable exponential backoff and transient failure handling for all network operations (Soroban RPC simulations, account sequence fetches, rate limits).
+
+### `withNetworkRetry`
+
+Executes an asynchronous network call with exponential backoff retries.
+
+```typescript
+import { withNetworkRetry, RELIABLE } from '@ancore/core-sdk';
+
+const account = await withNetworkRetry(
+  () => server.getAccount(accountId),
+  RELIABLE
+);
+```
+
+### Options (`RetryPolicyOptions`)
+
+| Option | Type | Default | Description |
+|--------|------|---------|-------------|
+| `maxRetries` | `number` | `3` | Maximum number of retry attempts after the initial failure |
+| `baseDelayMs` | `number` | `500` | Initial base delay in milliseconds between retries |
+| `maxDelayMs` | `number` | `30000` | Upper bound delay ceiling in milliseconds |
+| `exponential` | `boolean` | `true` | Whether delay doubles each attempt (`baseDelay * 2^(attempt-1)`) |
+| `jitter` | `boolean` | `false` | Adds +/- 20% random jitter to prevent thundering herd spikes |
+| `isRetryable` | `(err) => boolean` | `isTransientNetworkError` | Custom predicate determining retry eligibility |
+| `onRetry` | `(attempt, err, delay) => void` | `undefined` | Callback invoked before each retry sleep |
+
+### Built-in Presets
+
+| Preset | Max Retries | Base Delay | Exponential | Recommended Use Case |
+|--------|-------------|------------|-------------|----------------------|
+| `LOW_LATENCY` | 2 | 200ms | No | Interactive UI actions where fast failure is desired |
+| `RELIABLE` | 8 | 3000ms | Yes | Critical background submissions, transaction confirmations |
+| `AGGRESSIVE` | 4 | 500ms | Yes | High-throughput batch processing |
+
+### `isTransientNetworkError`
+
+Determines if an error is transient and safe to retry automatically:
+- HTTP status 5xx (`500`, `502`, `503`, `504`)
+- HTTP status 429 (`Too Many Requests` / Rate Limiting)
+- POSIX socket errors (`ETIMEDOUT`, `ECONNRESET`, `ECONNREFUSED`, `ENOTFOUND`, etc.)
+- Abort / Timeout errors (`TimeoutError`, `AbortError`)
+- Standard fetch/network failure messages
+- Non-transient errors (4xx client errors, invalid signatures, validation errors) are never retried.
+
+---
+
 ## Version compatibility
 
 | SDK version | Contract version | Notes |
@@ -539,3 +626,4 @@ simulateExecute<T>(to, fn, args, nonce, options): Promise<T>
 
 Breaking changes to public APIs require a major version bump and RFC.
 See [`RFC.md`](../RFC.md) for the process.
+

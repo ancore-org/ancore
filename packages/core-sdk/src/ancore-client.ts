@@ -14,6 +14,8 @@ import {
   type RefreshSessionKeyTtlResult,
   type SessionKeyTtlRefresher,
 } from './refresh-session-key-ttl';
+import { withNetworkRetry, type RetryPolicyOptions } from './retry-policy';
+import type { RetryPresetName } from './retry-presets';
 import {
   revokeSessionKey,
   type RevokeSessionKeyParams,
@@ -22,10 +24,16 @@ import {
 
 export interface AncoreClientOptions {
   accountContractId: string;
+  /**
+   * Default retry policy or preset name applied to client network calls.
+   * Can be overridden per method call.
+   */
+  retry?: RetryPolicyOptions | RetryPresetName;
 }
 
 export class AncoreClient {
   private readonly accountContract: SessionKeyWriter & SessionKeyRevoker & SessionKeyTtlRefresher;
+  private readonly defaultRetry?: RetryPolicyOptions | RetryPresetName;
 
   constructor(options: AncoreClientOptions) {
     if (!options.accountContractId) {
@@ -35,6 +43,36 @@ export class AncoreClient {
     }
 
     this.accountContract = new AccountContract(options.accountContractId);
+    this.defaultRetry = options.retry;
+  }
+
+  /**
+   * Returns the globally configured retry policy or preset name for this client instance.
+   */
+  getRetryPolicy(): RetryPolicyOptions | RetryPresetName | undefined {
+    return this.defaultRetry;
+  }
+
+  /**
+   * Wraps an arbitrary asynchronous network operation (e.g. Soroban RPC / Horizon calls)
+   * with the client's configured retry policy or an explicit method-level override.
+   *
+   * @param fn - The async function to execute
+   * @param override - Optional method-level retry policy or preset override
+   * @returns The resolved value of `fn`
+   *
+   * @example
+   * ```typescript
+   * const client = new AncoreClient({ accountContractId: 'C...', retry: 'RELIABLE' });
+   * const account = await client.withRetry(() => server.getAccount(accountId));
+   * ```
+   */
+  withRetry<T>(
+    fn: () => Promise<T>,
+    override?: RetryPolicyOptions | RetryPresetName
+  ): Promise<T> {
+    const policy = override ?? this.defaultRetry;
+    return withNetworkRetry(fn, policy);
   }
 
   /**
@@ -63,12 +101,28 @@ export class AncoreClient {
     return revokeSessionKey(this.accountContract, params);
   }
 
+  /* eslint-disable no-redeclare -- TypeScript function overload signatures */
+  refreshSessionKeyTtl(
+    params: RefreshSessionKeyTtlParams
+  ): InvocationArgs;
+  refreshSessionKeyTtl(
+    params: RefreshSessionKeyTtlParams,
+    options: RefreshSessionKeyTtlOptions
+  ): Promise<RefreshSessionKeyTtlResult>;
   refreshSessionKeyTtl(
     params: RefreshSessionKeyTtlParams,
     options?: RefreshSessionKeyTtlOptions
   ): InvocationArgs | Promise<RefreshSessionKeyTtlResult> {
-    return options
-      ? refreshSessionKeyTtl(this.accountContract, params, options)
-      : refreshSessionKeyTtl(this.accountContract, params);
+    /* eslint-enable no-redeclare */
+    if (!options) {
+      return refreshSessionKeyTtl(this.accountContract, params);
+    }
+
+    const mergedOptions: RefreshSessionKeyTtlOptions = {
+      ...options,
+      retry: options.retry ?? this.defaultRetry,
+    };
+
+    return refreshSessionKeyTtl(this.accountContract, params, mergedOptions);
   }
 }
