@@ -5,7 +5,8 @@
  * Automatically retries on timeouts, connection resets, and 5xx server errors with exponential backoff and jitter.
  */
 
-import { AccountContract } from './account-contract';
+import { Address, hash, Networks, StrKey, xdr } from '@stellar/stellar-sdk';
+import { AccountContract, type InvocationArgs } from './account-contract';
 import {
   executeContract,
   simulateExecute,
@@ -13,6 +14,41 @@ import {
   type ExecuteResult,
 } from './execute';
 import type { SessionKey } from '@ancore/types';
+
+const NETWORK_PASSPHRASES: Record<string, string> = {
+  testnet: Networks.TESTNET,
+  mainnet: Networks.PUBLIC,
+  futurenet: Networks.FUTURENET,
+  local: Networks.STANDALONE,
+};
+
+export const ACCOUNT_CONTRACT_SALT: Buffer = Buffer.alloc(32, 0);
+
+/**
+ * Deterministically derive the Soroban smart account contract ID from the owner public key.
+ */
+export function deriveAccountContractId(
+  ownerPublicKey: string,
+  network: string = 'testnet'
+): string {
+  const passphrase = NETWORK_PASSPHRASES[network.toLowerCase()] ?? network;
+  const networkId = hash(Buffer.from(passphrase));
+  const deployerAddress = new Address(ownerPublicKey);
+
+  const preimage = xdr.HashIdPreimage.envelopeTypeContractId(
+    new xdr.HashIdPreimageContractId({
+      networkId,
+      contractIdPreimage: xdr.ContractIdPreimage.contractIdPreimageFromAddress(
+        new xdr.ContractIdPreimageFromAddress({
+          address: deployerAddress.toScAddress(),
+          salt: ACCOUNT_CONTRACT_SALT,
+        })
+      ),
+    })
+  );
+
+  return StrKey.encodeContract(hash(preimage.toXDR()));
+}
 
 export interface ClientRetryOptions {
   /** Maximum retry attempts (default: 3) */
@@ -180,6 +216,7 @@ export interface SorobanRpcServer {
 export interface AccountAbstractionClientOptions {
   contractId: string;
   server: SorobanRpcServer;
+  ownerPublicKey?: string;
   networkPassphrase?: string;
   retryOptions?: ClientRetryOptions;
 }
@@ -190,6 +227,7 @@ export interface AccountAbstractionClientOptions {
  */
 export class AccountAbstractionClient {
   readonly contractId: string;
+  readonly ownerPublicKey?: string;
   readonly accountContract: AccountContract;
   readonly server: SorobanRpcServer;
   readonly networkPassphrase?: string;
@@ -197,6 +235,7 @@ export class AccountAbstractionClient {
 
   constructor(options: AccountAbstractionClientOptions) {
     this.contractId = options.contractId;
+    this.ownerPublicKey = options.ownerPublicKey;
     this.accountContract = new AccountContract(options.contractId);
     this.server = options.server;
     this.networkPassphrase = options.networkPassphrase;
@@ -211,6 +250,58 @@ export class AccountAbstractionClient {
       ...this.retryOptions,
       ...overrideOptions,
     });
+  }
+
+  /**
+   * Build invocation for initialize(owner).
+   */
+  initialize(owner?: string): InvocationArgs {
+    const targetOwner = owner ?? this.ownerPublicKey;
+    if (!targetOwner) {
+      throw new Error('Owner public key is required to build initialize invocation.');
+    }
+    return this.accountContract.initialize(targetOwner);
+  }
+
+  /**
+   * Build invocation for execute(to, function, args, expected_nonce, session_pub_key?, signature?).
+   */
+  execute(
+    to: string,
+    fn: string,
+    args: xdr.ScVal[],
+    expectedNonce: number,
+    sessionPubKey?: string | Uint8Array,
+    signature?: string | Uint8Array
+  ): InvocationArgs {
+    return this.accountContract.execute(to, fn, args, expectedNonce, sessionPubKey, signature);
+  }
+
+  /**
+   * Build invocation for addSessionKey(publicKey, permissions, expiresAt).
+   */
+  addSessionKey(
+    publicKey: string | Uint8Array,
+    permissions: Parameters<AccountContract['addSessionKey']>[1],
+    expiresAt: number
+  ): InvocationArgs {
+    return this.accountContract.addSessionKey(publicKey, permissions, expiresAt);
+  }
+
+  /**
+   * Build invocation for revokeSessionKey(publicKey).
+   */
+  revokeSessionKey(publicKey: string | Uint8Array): InvocationArgs {
+    return this.accountContract.revokeSessionKey(publicKey);
+  }
+
+  /**
+   * Build invoke operation for Stellar transaction.
+   */
+  buildInvokeOperation(
+    invocation: InvocationArgs
+  ): ReturnType<AccountContract['buildInvokeOperation']> {
+    return this.accountContract.buildInvokeOperation(invocation);
   }
 
   /**
@@ -240,12 +331,13 @@ export class AccountAbstractionClient {
   /**
    * Get contract owner address with retry.
    */
-  async getOwner(sourceAccount: string, overrideOptions?: ClientRetryOptions): Promise<string> {
+  async getOwner(sourceAccount?: string, overrideOptions?: ClientRetryOptions): Promise<string> {
+    const source = sourceAccount ?? this.ownerPublicKey ?? this.contractId;
     return this.withRetry(
       () =>
         this.accountContract.getOwner({
           server: this.server,
-          sourceAccount,
+          sourceAccount: source,
           networkPassphrase: this.networkPassphrase,
         }),
       overrideOptions
@@ -255,12 +347,13 @@ export class AccountAbstractionClient {
   /**
    * Get contract nonce with retry.
    */
-  async getNonce(sourceAccount: string, overrideOptions?: ClientRetryOptions): Promise<number> {
+  async getNonce(sourceAccount?: string, overrideOptions?: ClientRetryOptions): Promise<number> {
+    const source = sourceAccount ?? this.ownerPublicKey ?? this.contractId;
     return this.withRetry(
       () =>
         this.accountContract.getNonce({
           server: this.server,
-          sourceAccount,
+          sourceAccount: source,
           networkPassphrase: this.networkPassphrase,
         }),
       overrideOptions
@@ -270,12 +363,13 @@ export class AccountAbstractionClient {
   /**
    * Get contract version with retry.
    */
-  async getVersion(sourceAccount: string, overrideOptions?: ClientRetryOptions): Promise<number> {
+  async getVersion(sourceAccount?: string, overrideOptions?: ClientRetryOptions): Promise<number> {
+    const source = sourceAccount ?? this.ownerPublicKey ?? this.contractId;
     return this.withRetry(
       () =>
         this.accountContract.getVersion({
           server: this.server,
-          sourceAccount,
+          sourceAccount: source,
           networkPassphrase: this.networkPassphrase,
         }),
       overrideOptions
@@ -287,14 +381,15 @@ export class AccountAbstractionClient {
    */
   async getSessionKey(
     publicKey: string | Uint8Array,
-    sourceAccount: string,
+    sourceAccount?: string,
     overrideOptions?: ClientRetryOptions
   ): Promise<SessionKey | null> {
+    const source = sourceAccount ?? this.ownerPublicKey ?? this.contractId;
     return this.withRetry(
       () =>
         this.accountContract.getSessionKey(publicKey, {
           server: this.server,
-          sourceAccount,
+          sourceAccount: source,
           networkPassphrase: this.networkPassphrase,
         }),
       overrideOptions
@@ -342,4 +437,82 @@ export class AccountAbstractionClient {
       overrideOptions
     );
   }
+
+  /**
+   * Convenience factory to instantiate an AccountAbstractionClient for a smart account.
+   * Automatically resolves contract ID from public key and initializes the client instance.
+   */
+  static createSmartAccount(
+    publicKeyOrOptions: string | CreateSmartAccountOptions,
+    serverParam?: SorobanRpcServer,
+    optionsParam?: Partial<CreateSmartAccountOptions>
+  ): AccountAbstractionClient {
+    if (typeof publicKeyOrOptions === 'string') {
+      return createSmartAccount(publicKeyOrOptions, serverParam as SorobanRpcServer, optionsParam);
+    }
+    return createSmartAccount(publicKeyOrOptions);
+  }
+}
+
+export interface CreateSmartAccountOptions {
+  /** Owner public key (G...) or contract ID (C...) */
+  publicKey: string;
+  /** Soroban RPC server instance */
+  server: SorobanRpcServer;
+  /** Explicit contract ID override (C...). If omitted, derived deterministically from publicKey. */
+  contractId?: string;
+  /** Network name ('testnet' | 'mainnet' | 'futurenet' | 'local') or passphrase */
+  network?: string;
+  /** Custom network passphrase (e.g. Networks.TESTNET) */
+  networkPassphrase?: string;
+  /** Client retry options */
+  retryOptions?: ClientRetryOptions;
+}
+
+/**
+ * Convenience factory function to instantiate an AccountAbstractionClient for a smart account.
+ * Automatically looks up or derives the contract address, initializes the client, and returns a ready instance.
+ *
+ * @example
+ * ```typescript
+ * const client = createSmartAccount('GB...', rpcServer);
+ * const owner = await client.getOwner();
+ * ```
+ */
+export function createSmartAccount(
+  publicKeyOrOptions: string | CreateSmartAccountOptions,
+  serverParam?: SorobanRpcServer,
+  optionsParam: Partial<CreateSmartAccountOptions> = {}
+): AccountAbstractionClient {
+  const opts: CreateSmartAccountOptions =
+    typeof publicKeyOrOptions === 'string'
+      ? {
+          publicKey: publicKeyOrOptions,
+          server: serverParam as SorobanRpcServer,
+          ...optionsParam,
+        }
+      : publicKeyOrOptions;
+
+  const network = opts.network ?? 'testnet';
+  const networkPassphrase =
+    opts.networkPassphrase ?? NETWORK_PASSPHRASES[network.toLowerCase()] ?? network;
+
+  let contractId = opts.contractId;
+  let ownerPublicKey: string | undefined = opts.publicKey;
+  if (!contractId) {
+    if (opts.publicKey.startsWith('C') && StrKey.isValidContract(opts.publicKey)) {
+      contractId = opts.publicKey;
+      ownerPublicKey = undefined;
+    } else {
+      contractId = deriveAccountContractId(opts.publicKey, network);
+    }
+  }
+
+  return new AccountAbstractionClient({
+    contractId,
+    ownerPublicKey,
+    server: opts.server,
+    networkPassphrase,
+    retryOptions: opts.retryOptions,
+  });
 }

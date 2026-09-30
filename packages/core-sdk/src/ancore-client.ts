@@ -1,4 +1,6 @@
 import { AccountContract, type InvocationArgs } from '@ancore/account-abstraction';
+import type { Network } from '@ancore/types';
+import { StrKey } from '@stellar/stellar-sdk';
 
 import { addSessionKey, type AddSessionKeyParams, type SessionKeyWriter } from './add-session-key';
 import {
@@ -19,6 +21,7 @@ import {
   type RevokeSessionKeyParams,
   type SessionKeyRevoker,
 } from './revoke-session-key';
+import { deriveContractId } from './wallet';
 
 import { withRetry, type RetryOptions } from './utils/retry';
 
@@ -30,7 +33,23 @@ export interface AncoreClientOptions {
   retryOptions?: RetryOptions;
 }
 
+export interface CreateSmartAccountClientOptions {
+  /**
+   * Network used to derive the contract ID if not explicitly provided (default: 'testnet').
+   */
+  network?: Network;
+  /**
+   * Optional explicit accountContractId override (C...).
+   */
+  accountContractId?: string;
+  /**
+   * Default retry configuration for network and RPC calls.
+   */
+  retryOptions?: RetryOptions;
+}
+
 export class AncoreClient {
+  readonly accountContractId: string;
   private readonly accountContract: SessionKeyWriter & SessionKeyRevoker & SessionKeyTtlRefresher;
   private readonly retryOptions?: RetryOptions;
 
@@ -41,8 +60,46 @@ export class AncoreClient {
       );
     }
 
+    this.accountContractId = options.accountContractId;
     this.accountContract = new AccountContract(options.accountContractId);
     this.retryOptions = options.retryOptions;
+  }
+
+  /**
+   * Convenience factory to create an initialized AncoreClient instance for a smart account.
+   * Automatically looks up or derives the deterministic contract ID from the owner's public key.
+   *
+   * @param publicKey Owner's Stellar public key (G...) or contract ID (C...)
+   * @param options Optional network and client configuration
+   *
+   * @example
+   * ```typescript
+   * const client = AncoreClient.createSmartAccount('GBRPYHIL2CI3FNQ4BXLFMNDLFJUNPU2HY3ZMFXYORECK3P4YWPOY64KB');
+   * console.log(client.accountContractId); // C...
+   * ```
+   */
+  static createSmartAccount(
+    publicKey: string,
+    options?: CreateSmartAccountClientOptions
+  ): AncoreClient {
+    if (!publicKey) {
+      throw new BuilderValidationError('publicKey is required to create a smart account client.');
+    }
+
+    let contractId = options?.accountContractId;
+    if (!contractId) {
+      if (publicKey.startsWith('C') && StrKey.isValidContract(publicKey)) {
+        contractId = publicKey;
+      } else {
+        const network = options?.network ?? 'testnet';
+        contractId = deriveContractId(publicKey, network);
+      }
+    }
+
+    return new AncoreClient({
+      accountContractId: contractId,
+      retryOptions: options?.retryOptions,
+    });
   }
 
   /**
@@ -102,4 +159,18 @@ export class AncoreClient {
 
     return refreshSessionKeyTtl(this.accountContract, params, mergedOptions);
   }
+}
+
+/**
+ * Convenience factory to create an initialized AncoreClient instance for a smart account.
+ * Automatically looks up or derives the deterministic contract ID from the owner's public key.
+ *
+ * @param publicKey Owner's Stellar public key (G...) or contract ID (C...)
+ * @param options Optional network and client configuration
+ */
+export function createSmartAccount(
+  publicKey: string,
+  options?: CreateSmartAccountClientOptions
+): AncoreClient {
+  return AncoreClient.createSmartAccount(publicKey, options);
 }

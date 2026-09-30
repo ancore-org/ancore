@@ -25,7 +25,12 @@ export {
 } from './create-wallet';
 
 // Client
-export { AncoreClient, type AncoreClientOptions } from './ancore-client';
+export {
+  AncoreClient,
+  createSmartAccount,
+  type AncoreClientOptions,
+  type CreateSmartAccountClientOptions,
+} from './ancore-client';
 
 // Session key helpers
 export { addSessionKey, type AddSessionKeyParams } from './add-session-key';
