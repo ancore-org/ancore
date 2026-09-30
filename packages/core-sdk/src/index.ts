@@ -117,6 +117,17 @@ export {
   getRetryPreset,
 } from './retry-presets';
 
+// Retry policy wrapper
+export {
+  withNetworkRetry,
+  isTransientNetworkError,
+  createRetryPolicyWrapper,
+  resolveRetryPolicy,
+  calculateRetryDelay,
+  DEFAULT_RETRY_POLICY,
+  type RetryPolicyOptions,
+} from './retry-policy';
+
 // Account sequence fetch helper — re-exported from @ancore/stellar for SDK consumers.
 // Use fetchAccountSequence to retrieve a Stellar account's current sequence number
 // before building transactions in the send flow.
