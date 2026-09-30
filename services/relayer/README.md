@@ -391,14 +391,53 @@ The service rejects negative nonces at the validation layer. Full replay trackin
 
 ### Rate Limiting
 
-Per-account rate limiting is enforced via `createAccountRateLimiterMiddleware` (default: 30 requests/minute per account session key or address, configurable via `RELAY_RATE_LIMIT_RPM`).
+The relayer employs a multi-tiered defense-in-depth rate limiting architecture:
 
-When an account exceeds its limit, the relayer returns `HTTP 429 Too Many Requests` with:
+#### 1. Global Per-IP Rate Limiting (`createIpRateLimiterMiddleware`)
 
-- **Header:** `Retry-After: 60`
-- **Body:** `{ "error": "RATE_LIMITED", "retryAfter": 60 }`
+Protects against single-client denial-of-service, brute-force, and credential-stuffing attacks across all endpoints.
 
-Note: uses in-memory store by default (unit-only unless a Redis store like `rate-limit-redis` is configured for multi-instance deployments).
+- **Default Limit:** 100 requests per minute per IP address (`DEFAULT_IP_RATE_LIMIT_RPM = 100`).
+- **Window:** 60 seconds sliding window (`DEFAULT_IP_RATE_LIMIT_WINDOW_MS = 60_000`).
+- **IP Extraction:** Automatically extracts client IP from `X-Forwarded-For` (first IP in multi-proxy chains), `X-Real-IP`, or Express `req.ip` with `trust proxy` enabled.
+- **Bypasses:** Internal monitoring endpoints (`/health`, `/metrics`) are exempt by default.
+
+When an IP exceeds its quota, the service responds with `HTTP 429 Too Many Requests`:
+
+- **Headers:**
+  - `RateLimit-Limit: 100`
+  - `RateLimit-Remaining: 0`
+  - `RateLimit-Reset: <epoch_seconds>`
+  - `Retry-After: 60`
+- **Body:**
+  ```json
+  {
+    "error": "TOO_MANY_REQUESTS",
+    "message": "Too many requests from this IP, please try again later.",
+    "retryAfter": 60
+  }
+  ```
+
+#### 2. Per-Account Rate Limiting (`createAccountRateLimiterMiddleware`)
+
+Limits requests per session key or account identity across relay execution routes.
+
+- **Default:** 30 requests/minute per account (configurable via `RELAY_RATE_LIMIT_RPM`).
+- **Response:** `HTTP 429` with `{ "error": "RATE_LIMITED", "retryAfter": 60 }`.
+
+#### 3. Per-Route Rate Limiting (`createRouteRateLimiter`)
+
+Enforces endpoint-specific limits based on sensitivity:
+
+| Route | RPM | Rationale |
+|---|---|---|
+| `/relay/execute` | 30 | Standard relay execution |
+| `/relay/validate` | 60 | Read-only simulation probe |
+| `/relay/session-key` | 10 | Sensitive: credential creation |
+| `/relay/revoke-session-key` | 10 | Sensitive: credential revocation |
+| `/relay/status` | 120 | Health / monitoring |
+
+Note: uses in-memory store by default (swap in `rate-limit-redis` for multi-instance production deployments).
 
 ### Gas Limit Enforcement
 
@@ -410,13 +449,13 @@ Deploy behind TLS termination (e.g. AWS ALB, nginx). The service itself does not
 
 ### Threat Summary
 
-| Threat              | Mitigation                                          |
-| ------------------- | --------------------------------------------------- |
-| Signature forgery   | Ed25519 verification (stub → real before prod)      |
-| Replay attacks      | Nonce validation (full tracking needed before prod) |
-| Abuse / DoS         | Rate limiting (not yet implemented)                 |
-| Gas griefing        | Gas limit enforcement (not yet implemented)         |
-| Unauthorised access | Bearer token auth on all mutating endpoints         |
+| Threat              | Mitigation                                                                                             |
+| ------------------- | ------------------------------------------------------------------------------------------------------ |
+| Signature forgery   | Ed25519 verification (stub → real before prod)                                                         |
+| Replay attacks      | Nonce validation (full tracking needed before prod)                                                    |
+| Abuse / DoS         | Multi-tier rate limiting (global per-IP throttling + per-route limits + per-account session limits)    |
+| Gas griefing        | Gas limit enforcement (not yet implemented)                                                            |
+| Unauthorised access | Bearer token auth on all mutating endpoints                                                            |
 
 ---
 
