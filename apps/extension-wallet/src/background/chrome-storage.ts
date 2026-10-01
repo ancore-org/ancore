@@ -85,3 +85,34 @@ export function removeChromeSessionStorage(key: string): Promise<void> {
     }
   });
 }
+
+export function clearChromeLocalStorage(): Promise<void> {
+  return new Promise((resolve) => {
+    const storage = getChromeStorageApi()?.local;
+    if (storage && typeof storage.clear === 'function') {
+      storage.clear(resolve);
+    } else {
+      try {
+        localStorage.clear();
+      } catch {
+        // ignore
+      }
+      resolve();
+    }
+  });
+}
+
+export function clearChromeSessionStorage(): Promise<void> {
+  return new Promise((resolve) => {
+    const storage = getChromeStorageApi()?.session;
+    if (storage && typeof storage.clear === 'function') {
+      storage.clear(resolve);
+    } else {
+      resolve();
+    }
+  });
+}
+
+export async function clearAllExtensionStorage(): Promise<void> {
+  await Promise.all([clearChromeLocalStorage(), clearChromeSessionStorage()]);
+}

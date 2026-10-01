@@ -9,7 +9,7 @@ module.exports = {
   preset: 'ts-jest',
   testEnvironment: 'node',
   testTimeout: 30000,
-  roots: ['<rootDir>/src'],
+  roots: ['<rootDir>/src', '<rootDir>/tests'],
   transform: {
     '^.+\\.ts$': ['ts-jest', { tsconfig: '<rootDir>/tsconfig.test.json' }],
   },
@@ -49,6 +49,6 @@ module.exports = {
       statements: 85,
     },
   },
-  testMatch: ['**/__tests__/**/*.test.ts'],
+  testMatch: ['**/__tests__/**/*.test.ts', '**/*.spec.ts'],
   testPathIgnorePatterns: ['/node_modules/', 'integration\\.test\\.ts$'],
 };

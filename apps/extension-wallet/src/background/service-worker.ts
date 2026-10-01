@@ -1,6 +1,11 @@
 import { installMessageDispatcher } from '@/messaging';
 import { registerInternalHandlers, probeServicesOnStartup } from './handlers';
-import { restoreUnlockSessionFromStorage, refreshSessionExpiry } from './session-state';
+import {
+  restoreUnlockSessionFromStorage,
+  refreshSessionExpiry,
+  clearUnlockSession,
+} from './session-state';
+import { clearAllExtensionStorage } from './chrome-storage';
 import {
   registerAllExternalHandlers,
   dispatchExternalRequest,
@@ -90,6 +95,20 @@ void restoreUnlockSessionFromStorage().then((restored) => {
 
 runtime?.onInstalled?.addListener((details: ChromeInstalledDetails) => {
   log.info('installed', { reason: details.reason });
+
+  if (details.reason === 'install') {
+    log.info('fresh install/reinstall: clearing orphaned storage and initializing clean state');
+    void Promise.all([
+      clearUnlockSession().catch((err) =>
+        log.warn('failed to clear unlock session on install', err)
+      ),
+      clearAllExtensionStorage().catch((err) =>
+        log.warn('failed to clear storage on install', err)
+      ),
+    ]).then(() => {
+      log.info('clean state initialized successfully');
+    });
+  }
 });
 
 runtime?.onStartup?.addListener(() => {

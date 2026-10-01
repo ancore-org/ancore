@@ -25,7 +25,12 @@ export {
 } from './create-wallet';
 
 // Client
-export { AncoreClient, type AncoreClientOptions } from './ancore-client';
+export {
+  AncoreClient,
+  createSmartAccount,
+  type AncoreClientOptions,
+  type CreateSmartAccountClientOptions,
+} from './ancore-client';
 
 // Session key helpers
 export { addSessionKey, type AddSessionKeyParams } from './add-session-key';
@@ -107,7 +112,7 @@ export {
 export type { ErrorCategory, NormalizedError } from './errors';
 export { normalizeError } from './errors';
 
-// Retry policy presets
+// Retry policy presets and exponential backoff retry wrapper
 export {
   LOW_LATENCY,
   RELIABLE,
@@ -116,6 +121,13 @@ export {
   type RetryPresetName,
   getRetryPreset,
 } from './retry-presets';
+export {
+  withRetry,
+  calculateBackoffDelay,
+  isTransientNetworkError,
+  isTransientStatusCode,
+  type RetryOptions,
+} from './utils/retry';
 
 // Account sequence fetch helper — re-exported from @ancore/stellar for SDK consumers.
 // Use fetchAccountSequence to retrieve a Stellar account's current sequence number
