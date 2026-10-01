@@ -23,6 +23,7 @@
 |----------|---------|
 | [Send payment](examples/send-payment.md) | Payment flow with the SDK |
 | [Session key lifecycle](examples/session-key-lifecycle.md) | Create, use, and revoke session keys |
+| [Batch session keys](examples/batch-session-keys.md) | Batch multiple session key requests with AncoreClient |
 | [Session key execute](examples/session-key-execute.md) | Execute with a session key |
 | [Event decoder usage](examples/event-decoder-usage.md) | Decode contract events |
 
