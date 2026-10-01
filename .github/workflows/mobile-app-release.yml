@@ -70,17 +70,17 @@ jobs:
             echo "REF_NAME=${{ github.ref_name }}" >> "$GITHUB_ENV"
           fi
 
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         with:
           ref: ${{ env.REF_NAME }}
 
       - name: Setup pnpm
-        uses: pnpm/action-setup@v2
+        uses: pnpm/action-setup@v6
         with:
           version: 9
 
       - name: Setup Node.js
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v7
         with:
           node-version: ${{ env.NODE_VERSION }}
           cache: pnpm
@@ -126,7 +126,7 @@ jobs:
 
       - name: Upload iOS artifacts
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: ios-${{ env.FASTLANE_LANE }}-${{ env.BUILD_VERSION }}
           path: /tmp/build
@@ -157,13 +157,13 @@ jobs:
             echo "REF_NAME=${{ github.ref_name }}" >> "$GITHUB_ENV"
           fi
 
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         with:
           ref: ${{ env.REF_NAME }}
 
       - name: Authenticate to Google Cloud
         if: env.GCP_WORKLOAD_IDENTITY_PROVIDER != ''
-        uses: google-github-actions/auth@v2
+        uses: google-github-actions/auth@v3
         with:
           workload_identity_provider: ${{ env.GCP_WORKLOAD_IDENTITY_PROVIDER }}
           service_account: ${{ env.GCP_SERVICE_ACCOUNT_EMAIL }}
@@ -173,18 +173,18 @@ jobs:
         run: echo "SUPPLY_JSON_KEY=$GOOGLE_APPLICATION_CREDENTIALS" >> "$GITHUB_ENV"
 
       - name: Setup pnpm
-        uses: pnpm/action-setup@v2
+        uses: pnpm/action-setup@v6
         with:
           version: 9
 
       - name: Setup Node.js
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v7
         with:
           node-version: ${{ env.NODE_VERSION }}
           cache: pnpm
 
       - name: Setup JDK
-        uses: actions/setup-java@v4
+        uses: actions/setup-java@v6
         with:
           java-version: ${{ env.JAVA_VERSION }}
           distribution: zulu
@@ -227,7 +227,7 @@ jobs:
 
       - name: Upload Android artifacts
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: android-${{ env.FASTLANE_LANE }}-${{ env.BUILD_VERSION }}
           path: apps/mobile-app/android/app/build/outputs/bundle/${{ env.ANDROID_FLAVOR }}Release/
