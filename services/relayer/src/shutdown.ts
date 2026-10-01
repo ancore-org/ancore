@@ -58,7 +58,7 @@ export interface ShutdownOptions {
   exit?: (code: number) => void;
 }
 
-export const DEFAULT_SHUTDOWN_TIMEOUT_MS = 15_000;
+export const DEFAULT_SHUTDOWN_TIMEOUT_MS = 30_000;
 
 /** Signals that mean "wind down", as opposed to "stop right now". */
 export const SHUTDOWN_SIGNALS = ['SIGTERM', 'SIGINT'] as const;

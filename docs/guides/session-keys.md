@@ -81,13 +81,14 @@ An empty permission array grants no scoped rights; the contract rejects an
 dApps can request a session key from the user's Ancore Wallet extension or mobile app via the `@ancore/wallet-api`.
 
 ```javascript
+import { SessionPermission } from '@ancore/types';
 import { requestSessionKey } from '@ancore/wallet-api';
 
 const sessionDetails = await requestSessionKey({
-  allowlist: ['CB...contractAddress'],
-  methods: ['play_game', 'mint_token'],
-  maxAmount: '100.0000000',
-  durationSeconds: 3600
+  expiresAt: Date.now() + 3600_000, // Expires in 1 hour (Unix timestamp in ms)
+  permissions: 1 << SessionPermission.INVOKE_CONTRACT,
+  allowedContracts: ['CB...contractAddress'],
+  maxAmountPerCall: '100.0000000',
 });
 
 console.log("Registered Session Key:", sessionDetails.publicKey);
