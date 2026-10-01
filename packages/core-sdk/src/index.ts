@@ -112,8 +112,6 @@ export {
   isContractNotFoundError,
   assertValidEd25519PublicKey,
   assertValidContractId,
-  isRateLimitError,
-  isInsufficientBalance,
   isInvalidSignature,
   isNetworkError,
   isContractFailed,
@@ -135,11 +133,9 @@ export {
   getRetryPreset,
 } from './retry-presets';
 export {
-  withRetry,
   calculateBackoffDelay,
   isTransientNetworkError,
   isTransientStatusCode,
-  type RetryOptions,
 } from './utils/retry';
 
 // Retry wrapper — withRetry + wrapWithRetry + wrapObjectWithRetry (#1478)
