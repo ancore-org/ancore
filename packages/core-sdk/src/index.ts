@@ -112,9 +112,6 @@ export {
   isContractNotFoundError,
   assertValidEd25519PublicKey,
   assertValidContractId,
-  isInvalidSignature,
-  isNetworkError,
-  isContractFailed,
   type CodedError,
 } from './errors';
 export type { ErrorWithCode } from './errors';
