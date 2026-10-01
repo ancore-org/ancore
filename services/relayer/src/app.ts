@@ -1,7 +1,7 @@
-import express from 'express';
+import express, { type Application } from 'express';
 import { requestIdMiddleware } from './middleware/requestId';
 
-const app = express();
+const app: Application = express();
 
 // Register request ID middleware early in the chain to ensure it's available for all subsequent middleware and routes.
 app.use(requestIdMiddleware);

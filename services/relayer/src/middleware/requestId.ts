@@ -58,5 +58,5 @@ export function createRequestIdMiddleware(): RequestHandler {
   };
 }
 
-export const requestIdMiddleware = createRequestIdMiddleware();
+export const requestIdMiddleware: RequestHandler = createRequestIdMiddleware();
 export default createRequestIdMiddleware;
