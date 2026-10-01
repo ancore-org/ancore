@@ -46,6 +46,20 @@ export function isUsernameHandle(value: string): value is UsernameHandle {
   return usernameHandleSchema.safeParse(value).success;
 }
 
-export function normalizeUsernameHandle(value: string): UsernameHandle {
-  return value.trim().toLowerCase() as UsernameHandle;
+/**
+ * Trim and lowercase a handle.
+ *
+ * The overloads keep the brand sound: a caller that already holds a
+ * `UsernameHandle` gets a non-null `UsernameHandle` back, while raw `string`
+ * input is re-validated against `usernameHandleSchema` and yields `null` when
+ * it is not a valid handle. The runtime `safeParse` is what makes the raw
+ * overload trustworthy — no unchecked cast escapes without validation.
+ */
+export function normalizeUsernameHandle(value: UsernameHandle): UsernameHandle;
+// eslint-disable-next-line no-redeclare -- TypeScript overload signature, not a redeclaration
+export function normalizeUsernameHandle(value: string): UsernameHandle | null;
+// eslint-disable-next-line no-redeclare -- implementation signature for the overloads above
+export function normalizeUsernameHandle(value: string): UsernameHandle | null {
+  const normalized = value.trim().toLowerCase();
+  return usernameHandleSchema.safeParse(normalized).success ? (normalized as UsernameHandle) : null;
 }

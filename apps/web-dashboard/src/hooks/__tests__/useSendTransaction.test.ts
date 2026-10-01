@@ -1,6 +1,7 @@
 import { renderHook, act, waitFor } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { useSendTransaction } from '../useSendTransaction';
+import type { HandleResolver } from '@ancore/types';
+import { resolveSendRecipient, useSendTransaction } from '../useSendTransaction';
 import type { SendStrategy, SendResult } from '../../services/send-service';
 
 const VALID_ADDRESS = 'GAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAWHF';
@@ -256,5 +257,35 @@ describe('useSendTransaction', () => {
     });
 
     expect(result.current.optimisticTransaction?.signMethod).toBe('relayer');
+  });
+});
+
+describe('resolveSendRecipient handle validation', () => {
+  it('rejects malformed handles instead of normalizing them into a branded handle', async () => {
+    const resolver = vi.fn();
+
+    await expect(resolveSendRecipient('@bad space', resolver)).rejects.toThrow(
+      'Enter a valid @username handle'
+    );
+    await expect(resolveSendRecipient('@', resolver)).rejects.toThrow(
+      'Enter a valid @username handle'
+    );
+    await expect(resolveSendRecipient('@' + 'a'.repeat(32), resolver)).rejects.toThrow(
+      'Enter a valid @username handle'
+    );
+
+    expect(resolver).not.toHaveBeenCalled();
+  });
+
+  it('normalizes a valid handle before resolving it', async () => {
+    const resolver: HandleResolver = vi.fn(async (handle) => ({
+      handle,
+      accountAddress: VALID_ADDRESS,
+    }));
+
+    const resolved = await resolveSendRecipient('  @Alice  ', resolver);
+
+    expect(resolver).toHaveBeenCalledWith('@alice');
+    expect(resolved.accountAddress).toBe(VALID_ADDRESS);
   });
 });

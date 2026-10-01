@@ -14,6 +14,12 @@ describe('useSendTransaction validation', () => {
     expect(validateRecipientAddress('@')).toBe('Enter a valid @username handle');
   });
 
+  it('rejects malformed handles instead of treating them as addresses', () => {
+    expect(validateRecipientAddress('@bad space')).toBe('Enter a valid @username handle');
+    expect(validateRecipientAddress('@' + 'a'.repeat(32))).toBe('Enter a valid @username handle');
+    expect(validateRecipientAddress('  @Alice  ')).toBeUndefined();
+  });
+
   it('rejects invalid amounts', () => {
     expect(validateAmount('', 100)).toBe('Amount is required');
     expect(validateAmount('0', 100)).toBe('Amount must be greater than zero');
