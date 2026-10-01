@@ -11,6 +11,12 @@ import {
   PaymentRequestValidationError,
   InvalidAmountError,
   TransactionSubmissionError,
+  isContractNotFoundError,
+  isInsufficientBalance,
+  isInvalidSignatureError,
+  isNetworkTimeoutError,
+  isRateLimitError,
+  isVaultNotFoundError,
 } from '../errors';
 
 // ---------------------------------------------------------------------------
@@ -105,6 +111,35 @@ describe('error classes', () => {
     const err = new InvalidAmountError('amount too large');
     expect(err.code).toBe('INVALID_AMOUNT');
     expect(err.name).toBe('InvalidAmountError');
+  });
+});
+
+describe('error response type guards', () => {
+  it.each([
+    [isRateLimitError, { code: 'unlock_rate_limited' }],
+    [isRateLimitError, { status: 429 }],
+    [isInsufficientBalance, { code: 'tx_insufficient_balance' }],
+    [isInsufficientBalance, { code: 'op_underfunded' }],
+    [isInvalidSignatureError, { code: 'tx_bad_auth' }],
+    [isNetworkTimeoutError, { code: 'ETIMEDOUT' }],
+    [isNetworkTimeoutError, { statusCode: 408 }],
+    [isVaultNotFoundError, { code: 'vault_not_found' }],
+    [isContractNotFoundError, { code: 'contract_missing' }],
+    [isContractNotFoundError, { statusCode: 404 }],
+  ])('recognizes matching error responses', (guard, error) => {
+    expect(guard(error)).toBe(true);
+  });
+
+  it.each([
+    isRateLimitError,
+    isInsufficientBalance,
+    isInvalidSignatureError,
+    isNetworkTimeoutError,
+  ])('rejects unrelated, malformed, and message-only values', (guard) => {
+    expect(guard({ code: 'SOMETHING_ELSE' })).toBe(false);
+    expect(guard({ code: 429 })).toBe(false);
+    expect(guard(new Error('rate limited'))).toBe(false);
+    expect(guard(null)).toBe(false);
   });
 });
 

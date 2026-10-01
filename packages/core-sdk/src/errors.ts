@@ -28,6 +28,108 @@ export class AncoreSdkError extends Error {
 }
 
 // ---------------------------------------------------------------------------
+// Error response type guards
+// ---------------------------------------------------------------------------
+
+/** An error-like value with a machine-readable code supplied by an API or SDK. */
+export interface ErrorWithCode<Code extends string = string> {
+  code?: Code;
+  message?: string;
+  statusCode?: number;
+  status?: number;
+}
+
+type ErrorCodeValue = ErrorWithCode | { statusCode?: unknown; status?: unknown };
+
+function getErrorCode(error: unknown): string | undefined {
+  if (typeof error !== 'object' || error === null || !('code' in error)) return undefined;
+  const code = (error as { code?: unknown }).code;
+  return typeof code === 'string' ? code.toUpperCase().replace(/[\s-]/g, '_') : undefined;
+}
+
+function getErrorStatus(error: unknown): number | undefined {
+  if (typeof error !== 'object' || error === null) return undefined;
+  const { status, statusCode } = error as ErrorCodeValue;
+  return typeof statusCode === 'number'
+    ? statusCode
+    : typeof status === 'number'
+      ? status
+      : undefined;
+}
+
+function hasErrorCode<Code extends string>(
+  error: unknown,
+  codes: readonly Code[],
+  status?: number
+): error is ErrorWithCode<Code> {
+  const code = getErrorCode(error);
+  return (
+    (code !== undefined && (codes as readonly string[]).includes(code)) ||
+    (status !== undefined && getErrorStatus(error) === status)
+  );
+}
+
+/** True for a 429 response or a rate-limit error code, including wallet unlock limits. */
+export function isRateLimitError(
+  error: unknown
+): error is ErrorWithCode<'RATE_LIMITED' | 'RATE_LIMIT' | 'UNLOCK_RATE_LIMITED'> {
+  return hasErrorCode(error, ['RATE_LIMITED', 'RATE_LIMIT', 'UNLOCK_RATE_LIMITED'] as const, 429);
+}
+
+/** True when a transaction cannot be funded by the account's available balance. */
+export function isInsufficientBalance(
+  error: unknown
+): error is ErrorWithCode<
+  'INSUFFICIENT_BALANCE' | 'TX_INSUFFICIENT_BALANCE' | 'OP_UNDERFUNDED' | 'TX_INSUFFICIENT_FEE'
+> {
+  return hasErrorCode(error, [
+    'INSUFFICIENT_BALANCE',
+    'TX_INSUFFICIENT_BALANCE',
+    'OP_UNDERFUNDED',
+    'TX_INSUFFICIENT_FEE',
+  ] as const);
+}
+
+/** True when a signing request or submitted transaction has an invalid signature. */
+export function isInvalidSignatureError(
+  error: unknown
+): error is ErrorWithCode<
+  'INVALID_SIGNATURE' | 'SIGNATURE_INVALID' | 'TX_BAD_AUTH' | 'OP_BAD_AUTH'
+> {
+  return hasErrorCode(error, [
+    'INVALID_SIGNATURE',
+    'SIGNATURE_INVALID',
+    'TX_BAD_AUTH',
+    'OP_BAD_AUTH',
+  ] as const);
+}
+
+/** True when a request exceeded its network timeout. */
+export function isNetworkTimeoutError(
+  error: unknown
+): error is ErrorWithCode<'NETWORK_TIMEOUT' | 'ETIMEDOUT' | 'ECONNABORTED' | 'REQUEST_TIMEOUT'> {
+  return hasErrorCode(
+    error,
+    ['NETWORK_TIMEOUT', 'ETIMEDOUT', 'ECONNABORTED', 'REQUEST_TIMEOUT'] as const,
+    408
+  );
+}
+
+/** True when the requested encrypted wallet vault is unavailable. */
+export function isVaultNotFoundError(
+  error: unknown
+): error is ErrorWithCode<'VAULT_NOT_FOUND' | 'WALLET_VAULT_NOT_FOUND'> {
+  return hasErrorCode(error, ['VAULT_NOT_FOUND', 'WALLET_VAULT_NOT_FOUND'] as const);
+}
+
+/** True when the requested Soroban contract is not deployed or cannot be located. */
+export function isContractNotFoundError(
+  error: unknown
+): error is ErrorWithCode<'CONTRACT_NOT_FOUND' | 'CONTRACT_MISSING'> {
+  return hasErrorCode(error, ['CONTRACT_NOT_FOUND', 'CONTRACT_MISSING'] as const, 404);
+}
+
+// ---------------------------------------------------------------------------
 // Simulation errors
 // ---------------------------------------------------------------------------
 

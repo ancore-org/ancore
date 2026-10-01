@@ -104,9 +104,16 @@ export {
   PaymentRequestValidationError,
   InvalidAmountError,
   StrKeyValidationError,
+  isRateLimitError,
+  isInsufficientBalance,
+  isInvalidSignatureError,
+  isNetworkTimeoutError,
+  isVaultNotFoundError,
+  isContractNotFoundError,
   assertValidEd25519PublicKey,
   assertValidContractId,
 } from './errors';
+export type { ErrorWithCode } from './errors';
 
 // Normalization helpers
 export type { ErrorCategory, NormalizedError } from './errors';
