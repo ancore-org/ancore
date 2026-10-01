@@ -25,7 +25,12 @@ export {
 } from './create-wallet';
 
 // Client
-export { AncoreClient, type AncoreClientOptions } from './ancore-client';
+export {
+  AncoreClient,
+  createSmartAccount,
+  type AncoreClientOptions,
+  type CreateSmartAccountClientOptions,
+} from './ancore-client';
 
 // Session key helpers
 export { addSessionKey, type AddSessionKeyParams } from './add-session-key';
@@ -99,9 +104,17 @@ export {
   PaymentRequestValidationError,
   InvalidAmountError,
   StrKeyValidationError,
+  isRateLimitError,
+  isInsufficientBalance,
+  isInvalidSignatureError,
+  isNetworkTimeoutError,
+  isVaultNotFoundError,
+  isContractNotFoundError,
   assertValidEd25519PublicKey,
   assertValidContractId,
+  type CodedError,
 } from './errors';
+export type { ErrorWithCode } from './errors';
 
 // Normalization helpers
 export type { ErrorCategory, NormalizedError } from './errors';

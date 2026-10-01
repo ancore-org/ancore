@@ -36,12 +36,13 @@ try {
 ### 3. Sign a Transaction
 Sign a Stellar transaction envelope (XDR):
 ```javascript
+import { Networks } from '@stellar/stellar-sdk';
 import { signTransaction } from '@ancore/wallet-api';
 
 try {
   const signedXdr = await signTransaction({
     xdr: 'AAAAAgAAAAD...',
-    network: 'TESTNET',
+    networkPassphrase: Networks.TESTNET,
   });
   console.log("Signed transaction XDR:", signedXdr);
 } catch (error) {
@@ -64,14 +65,15 @@ Ancore is a smart contract wallet (Account Abstraction).
 dApps can request a scoped session key to sign transactions in the background without prompting the user for every action.
 
 ```javascript
+import { SessionPermission } from '@ancore/types';
 import { requestSessionKey } from '@ancore/wallet-api';
 
 try {
   const session = await requestSessionKey({
-    allowlist: ['CB...contractAddress'],
-    methods: ['play_game'],
-    maxAmount: '50.0000000',
-    durationSeconds: 3600, // 1 hour session
+    expiresAt: Date.now() + 3600_000, // Expires in 1 hour (Unix timestamp in ms)
+    permissions: 1 << SessionPermission.INVOKE_CONTRACT,
+    allowedContracts: ['CB...contractAddress'],
+    maxAmountPerCall: '50.0000000',
   });
   
   console.log("Active Session Key Public Key:", session.publicKey);

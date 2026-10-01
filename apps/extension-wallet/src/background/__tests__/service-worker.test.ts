@@ -27,7 +27,10 @@ type OnMessageListener = (
 interface ChromeMock {
   runtime: {
     getManifest: ReturnType<typeof vi.fn>;
-    onInstalled: { addListener: ReturnType<typeof vi.fn> };
+    onInstalled: {
+      addListener: ReturnType<typeof vi.fn>;
+      _trigger: (details: { reason: string }) => void;
+    };
     onStartup: { addListener: ReturnType<typeof vi.fn> };
     onMessage: {
       addListener: ReturnType<typeof vi.fn>;
@@ -38,11 +41,13 @@ interface ChromeMock {
     local: {
       get: ReturnType<typeof vi.fn>;
       set: ReturnType<typeof vi.fn>;
+      clear: ReturnType<typeof vi.fn>;
     };
     session: {
       get: ReturnType<typeof vi.fn>;
       set: ReturnType<typeof vi.fn>;
       remove: ReturnType<typeof vi.fn>;
+      clear: ReturnType<typeof vi.fn>;
     };
   };
 }
@@ -53,13 +58,21 @@ interface ChromeMock {
 
 function buildChromeMock(): ChromeMock {
   const capturedListeners: OnMessageListener[] = [];
+  const capturedInstalledListeners: ((details: { reason: string }) => void)[] = [];
   const sessionStore: Record<string, unknown> = {};
   const localStore: Record<string, unknown> = {};
 
   const mock: ChromeMock = {
     runtime: {
       getManifest: vi.fn(() => ({ name: 'ancore-extension-wallet', version: '0.0.0' })),
-      onInstalled: { addListener: vi.fn() },
+      onInstalled: {
+        addListener: vi.fn((fn) => {
+          capturedInstalledListeners.push(fn);
+        }),
+        _trigger(details) {
+          for (const fn of capturedInstalledListeners) fn(details);
+        },
+      },
       onStartup: { addListener: vi.fn() },
       onMessage: {
         addListener: vi.fn((fn: OnMessageListener) => {
@@ -91,6 +104,10 @@ function buildChromeMock(): ChromeMock {
           Object.assign(localStore, items);
           cb?.();
         }),
+        clear: vi.fn((cb?: () => void) => {
+          for (const k of Object.keys(localStore)) delete localStore[k];
+          cb?.();
+        }),
       },
       session: {
         get: vi.fn((key: string, cb: (r: Record<string, unknown>) => void) =>
@@ -102,6 +119,10 @@ function buildChromeMock(): ChromeMock {
         }),
         remove: vi.fn((key: string, cb?: () => void) => {
           delete sessionStore[key];
+          cb?.();
+        }),
+        clear: vi.fn((cb?: () => void) => {
+          for (const k of Object.keys(sessionStore)) delete sessionStore[k];
           cb?.();
         }),
       },
@@ -181,7 +202,7 @@ beforeEach(() => {
   vi.resetModules();
   chromeMock = buildChromeMock();
   (globalThis as any).chrome = chromeMock;
-  localStorage.clear();
+  globalThis.localStorage?.clear();
 });
 
 afterEach(() => {
@@ -638,6 +659,26 @@ describe('APPROVE_SIGN_REQUEST', () => {
 
     expect(ack.ok).toBe(false);
     expect(ack.error).toMatch(/not found/i);
+    _resetHandlers();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// onInstalled lifecycle (fresh install / reinstall cleanup)
+// ---------------------------------------------------------------------------
+
+describe('runtime.onInstalled lifecycle', () => {
+  it('clears storage and unlock state when details.reason is "install"', async () => {
+    const { _resetHandlers } = await loadServiceWorker(makeAuthState({ hasOnboarded: true }));
+
+    // Trigger onInstalled with 'install' reason
+    chromeMock.runtime.onInstalled._trigger({ reason: 'install' });
+
+    // Allow async promises to resolve
+    await new Promise((resolve) => setTimeout(resolve, 50));
+
+    expect(chromeMock.storage.local.clear).toHaveBeenCalled();
+    expect(chromeMock.storage.session.clear).toHaveBeenCalled();
     _resetHandlers();
   });
 });

@@ -190,6 +190,7 @@ export interface AccountAbstractionClientOptions {
  */
 export class AccountAbstractionClient {
   readonly contractId: string;
+  readonly ownerPublicKey?: string;
   readonly accountContract: AccountContract;
   readonly server: SorobanRpcServer;
   readonly networkPassphrase?: string;

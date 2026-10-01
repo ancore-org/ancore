@@ -94,13 +94,57 @@ All errors expose a `.code` string for programmatic handling.
 
 ### `AncoreClient`
 
-High-level client. Instantiate once per account contract.
+High-level client. Instantiate once per account contract or instantiate directly using the convenience factory `createSmartAccount`.
 
 ```typescript
+import { AncoreClient, createSmartAccount } from '@ancore/core-sdk';
+
+// ── Convenience Factory (One-Liner) ──────────────────────────────────────────
+const client = AncoreClient.createSmartAccount('GBRPYHIL2CI3FNQ4BXLFMNDLFJUNPU2HY3ZMFXYORECK3P4YWPOY64KB');
+// Or standalone:
+// const client = createSmartAccount('GBRPYHIL2CI3FNQ4BXLFMNDLFJUNPU2HY3ZMFXYORECK3P4YWPOY64KB');
+
+// ── Manual Setup ─────────────────────────────────────────────────────────────
+// const contractId = deriveContractId(ownerPublicKey, 'testnet');
+// const client = new AncoreClient({ accountContractId: contractId });
+```
+
+#### `AncoreClient.createSmartAccount` (Static Factory)
+
+Convenience factory method that automatically looks up / derives the deterministic Soroban contract ID from the owner's Stellar public key and initializes an `AncoreClient` instance ready for use.
+
+```typescript
+AncoreClient.createSmartAccount(
+  publicKey: string,
+  options?: CreateSmartAccountClientOptions
+): AncoreClient
+```
+
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| `publicKey` | `string` | ✓ | Owner Ed25519 public key (G…) or deployed contract ID (C…) |
+| `options.network` | `Network` | | Network used for contract ID derivation (`'testnet'`, `'mainnet'`, etc. Default: `'testnet'`) |
+| `options.accountContractId` | `string` | | Explicit contract ID override (C…) |
+| `options.retryOptions` | `RetryOptions` | | Default network retry configuration |
+
+**Comparison: One-Liner vs Manual Setup**
+
+```typescript
+// ❌ Before (Manual Boilerplate):
+import { AncoreClient, deriveContractId } from '@ancore/core-sdk';
+
+const ownerPublicKey = 'GBRPYHIL2CI3FNQ4BXLFMNDLFJUNPU2HY3ZMFXYORECK3P4YWPOY64KB';
+const contractId = deriveContractId(ownerPublicKey, 'testnet');
+const client = new AncoreClient({ accountContractId: contractId });
+
+// ✅ After (One-Liner Setup):
 import { AncoreClient } from '@ancore/core-sdk';
 
-const client = new AncoreClient({ accountContractId: 'C...' });
+const client = AncoreClient.createSmartAccount('GBRPYHIL2CI3FNQ4BXLFMNDLFJUNPU2HY3ZMFXYORECK3P4YWPOY64KB');
+console.log(client.accountContractId); // C...
 ```
+
+---
 
 **Constructor**
 
@@ -475,6 +519,46 @@ const result = await refreshSessionKeyTtl(
 ---
 
 ## `@ancore/account-abstraction`
+
+### `AccountAbstractionClient` / `createSmartAccount`
+
+High-level client wrapper around `AccountContract` with built-in network retry, deterministic contract address derivation, and convenience methods.
+
+```typescript
+import { createSmartAccount, AccountAbstractionClient } from '@ancore/account-abstraction';
+
+// ── One-Liner Smart Account Client Setup ─────────────────────────────────────
+const client = createSmartAccount('GBRPYHIL2CI3FNQ4BXLFMNDLFJUNPU2HY3ZMFXYORECK3P4YWPOY64KB', rpcServer);
+
+// Read account details without passing sourceAccount repeatedly:
+const owner = await client.getOwner();
+const nonce = await client.getNonce();
+
+// Build invocations directly:
+const invocation = client.initialize();
+const executeInvocation = client.execute(targetContract, 'transfer', args, nonce);
+```
+
+#### `createSmartAccount(publicKey, server, options?)`
+
+```typescript
+function createSmartAccount(
+  publicKey: string,
+  server: SorobanRpcServer,
+  options?: Partial<CreateSmartAccountOptions>
+): AccountAbstractionClient
+```
+
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| `publicKey` | `string` | ✓ | Owner Ed25519 public key (G…) or deployed contract ID (C…) |
+| `server` | `SorobanRpcServer` | ✓ | Soroban RPC server instance |
+| `options.contractId` | `string` | | Explicit contract ID override (C…) |
+| `options.network` | `string` | | Network name (`'testnet'`, `'mainnet'`, `'futurenet'`, `'local'`) |
+| `options.networkPassphrase` | `string` | | Custom network passphrase |
+| `options.retryOptions` | `ClientRetryOptions` | | Network retry settings (maxRetries, exponential backoff, jitter) |
+
+---
 
 ### `AccountContract`
 

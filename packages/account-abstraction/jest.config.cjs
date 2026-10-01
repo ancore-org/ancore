@@ -9,7 +9,7 @@ module.exports = {
   preset: 'ts-jest',
   testEnvironment: 'node',
   testTimeout: 30000,
-  roots: ['<rootDir>/src'],
+  roots: ['<rootDir>/src', '<rootDir>/tests'],
   transform: { '^.+\\.ts$': 'ts-jest' },
   setupFilesAfterEnv: ['<rootDir>/../../packages/jest.setup.ts'],
   moduleNameMapper: {
@@ -35,7 +35,7 @@ module.exports = {
       statements: 25,
     },
   },
-  testMatch: ['**/__tests__/**/*.test.ts'],
+  testMatch: ['**/__tests__/**/*.test.ts', '<rootDir>/tests/**/*.spec.ts', '<rootDir>/tests/**/*.test.ts'],
   // Only exclude integration tests that require live network access (execute.integration).
   // revoke-session-key.integration.test.ts uses mocks and runs in CI.
   testPathIgnorePatterns: ['/node_modules/', 'execute\\.integration\\.test\\.ts$'],

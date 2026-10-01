@@ -337,7 +337,17 @@ export function useSendTransaction(options: UseSendTransactionOptions = {}) {
 
         if (isHandleInput(recipientInput)) {
           const resolver = service.resolveHandle ?? defaultResolveHandle;
+          // `validateForm` above already rejected malformed handles; this null
+          // check enforces the type contract of the raw-string overload.
           const handle = normalizeUsernameHandle(recipientInput);
+          if (!handle) {
+            setErrors((current) => ({
+              ...current,
+              to: 'Enter a valid @username handle',
+              handle: 'Enter a valid @username handle',
+            }));
+            return false;
+          }
           const resolved = await resolver(handle);
 
           if (!resolved || !isStellarAddress(resolved.accountAddress)) {
