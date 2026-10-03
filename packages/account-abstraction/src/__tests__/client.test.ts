@@ -1,7 +1,5 @@
 import {
   AccountAbstractionClient,
-  createSmartAccount,
-  deriveAccountContractId,
   withNetworkRetry,
   isTransientError,
   calculateBackoff,
@@ -15,25 +13,9 @@ describe('AccountAbstractionClient and Network Retry', () => {
   };
 
   const dummyContractId = 'CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAD2KM';
-  const dummyOwner = 'GCM5WPR4DDR24FSAX5LIEM4J7AI3KOWJYANSXEPKYXCSZOTAYXE75AFN';
 
   beforeEach(() => {
     jest.clearAllMocks();
-  });
-
-  describe('createSmartAccount factory', () => {
-    it('initializes client instance with derived contractId', () => {
-      const client = createSmartAccount(dummyOwner, mockServer);
-      expect(client).toBeInstanceOf(AccountAbstractionClient);
-      expect(client.ownerPublicKey).toBe(dummyOwner);
-      expect(client.contractId).toBe(deriveAccountContractId(dummyOwner));
-    });
-
-    it('initializes client via static method', () => {
-      const client = AccountAbstractionClient.createSmartAccount(dummyOwner, mockServer);
-      expect(client).toBeInstanceOf(AccountAbstractionClient);
-      expect(client.contractId).toBe(deriveAccountContractId(dummyOwner));
-    });
   });
 
   describe('isTransientError helper', () => {

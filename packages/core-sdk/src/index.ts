@@ -130,27 +130,12 @@ export {
   getRetryPreset,
 } from './retry-presets';
 export {
+  withRetry,
   calculateBackoffDelay,
   isTransientNetworkError,
   isTransientStatusCode,
-} from './utils/retry';
-
-// Retry wrapper — withRetry + wrapWithRetry + wrapObjectWithRetry (#1478)
-export {
-  withRetry,
-  wrapWithRetry,
-  wrapObjectWithRetry,
-  DEFAULT_CLIENT_RETRY,
   type RetryOptions,
-  RetryExhaustedError,
-} from './retry-wrapper';
-export {
-  LOW_LATENCY as RETRY_LOW_LATENCY,
-  RELIABLE as RETRY_RELIABLE,
-  AGGRESSIVE as RETRY_AGGRESSIVE,
-  type RetryPresetName as RetryPreset,
-  getRetryPreset as getRetryPresetConfig,
-} from './retry-wrapper';
+} from './utils/retry';
 
 // Account sequence fetch helper — re-exported from @ancore/stellar for SDK consumers.
 // Use fetchAccountSequence to retrieve a Stellar account's current sequence number
