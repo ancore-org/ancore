@@ -47,10 +47,6 @@ pub enum ApiError {
     #[error("Database error: {0}")]
     Database(#[from] sqlx::Error),
 
-    #[error("Query timed out: {0}")]
-    #[allow(dead_code)]
-    QueryTimeout(String),
-
     #[error("Internal server error: {0}")]
     Internal(#[from] anyhow::Error),
 }
@@ -71,9 +67,6 @@ impl IntoResponse for ApiError {
                     "Resource not found".to_string(),
                     None,
                 ),
-                ApiError::QueryTimeout(msg) => {
-                    (StatusCode::GATEWAY_TIMEOUT, codes::QUERY_TIMEOUT, msg, None)
-                }
                 ApiError::Database(err) => {
                     if matches!(err, sqlx::Error::PoolTimedOut) {
                         (
