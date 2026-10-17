@@ -24,7 +24,13 @@
  *      the current scheduler tick, and any queue jobs drain concurrently —
  *      they are independent, and running them in series would multiply the
  *      worst case by three.
- *   3. **Exit.** Zero if everything drained, non-zero if the deadline hit
+ *   3. **Release shared resources**, bounded by whatever is left of the
+ *      deadline. The Postgres pool is the reason this is a separate step and
+ *      not another drainable: `Pool#end()` refuses new queries the moment it
+ *      is called, so closing it while requests are still draining would fail
+ *      the very work shutdown exists to protect. Only once nothing can query
+ *      the database any more is it safe to close the connections.
+ *   4. **Exit.** Zero if everything drained, non-zero if the deadline hit
  *      first, so an orchestrator's logs distinguish a clean drain from a
  *      truncated one.
  *
@@ -47,18 +53,36 @@ export interface ShutdownOptions {
   /** Background components to drain alongside the HTTP server. */
   drainables?: Drainable[];
   /**
-   * Total budget for the whole drain.
+   * Resources released *after* the server and every drainable have settled.
+   *
+   * Each closer is one-way: closing a connection pool, flushing a sink, ending a
+   * session. They run concurrently and are bounded by the unused remainder of
+   * `timeoutMs`, so a slow drain cannot push the total past the budget the
+   * orchestrator gave us.
+   */
+  closers?: Array<() => Promise<void> | void>;
+  /**
+   * Whole-shutdown budget, shared by the drain phase and the closer phase.
    *
    * Must be comfortably below the orchestrator's grace period (Kubernetes
-   * defaults to 30s), or SIGKILL arrives mid-drain and the handler achieves
-   * nothing.
+   * defaults to 30s), leaving room to release resources and exit before
+   * SIGKILL. A budget equal to the grace period means the handler is killed
+   * while it is still draining — see `DEFAULT_SHUTDOWN_TIMEOUT_MS`.
    */
   timeoutMs?: number;
   log?: (message: string, detail?: unknown) => void;
   exit?: (code: number) => void;
 }
 
-export const DEFAULT_SHUTDOWN_TIMEOUT_MS = 30_000;
+/**
+ * Default whole-shutdown budget.
+ *
+ * Deliberately half of Kubernetes' 30s grace period: the handler still has to
+ * close connections and exit after draining, and a budget equal to the grace
+ * period would be killed mid-drain by SIGKILL — which is the outcome the
+ * handler exists to avoid.
+ */
+export const DEFAULT_SHUTDOWN_TIMEOUT_MS = 15_000;
 
 /** Signals that mean "wind down", as opposed to "stop right now". */
 export const SHUTDOWN_SIGNALS = ['SIGTERM', 'SIGINT'] as const;
@@ -121,11 +145,13 @@ export async function runShutdown(options: ShutdownOptions = {}): Promise<boolea
   const {
     server,
     drainables = [],
+    closers = [],
     timeoutMs = DEFAULT_SHUTDOWN_TIMEOUT_MS,
     log = (message, detail) =>
       detail === undefined ? console.log(message) : console.log(message, detail),
   } = options;
 
+  const startedAt = Date.now();
   log('[shutdown] draining', { timeoutMs, drainables: drainables.length });
 
   // Concurrent, not sequential: these do not depend on each other, and the
@@ -147,7 +173,43 @@ export async function runShutdown(options: ShutdownOptions = {}): Promise<boolea
     ),
   ]);
 
-  const clean = results.every(Boolean);
+  const drained = results.every(Boolean);
+
+  // Resources are released with whatever is left of the budget, never a fresh
+  // one: the orchestrator's grace period covers the shutdown as a whole, and a
+  // second full timeout would push the exit past SIGKILL.
+  const remainingMs = Math.max(0, timeoutMs - (Date.now() - startedAt));
+  let released = true;
+
+  if (closers.length > 0) {
+    if (remainingMs === 0) {
+      log('[shutdown] no budget left to release resources; exiting anyway');
+      released = false;
+    } else {
+      log('[shutdown] releasing resources', { timeoutMs: remainingMs, closers: closers.length });
+
+      const closerResults = await Promise.all(
+        closers.map((close) =>
+          withDeadline(
+            Promise.resolve()
+              .then(() => close())
+              .then(() => true)
+              .catch((error) => {
+                // A closer that throws has still been asked to release; record
+                // it and keep going, the way a failed drain is handled.
+                log('[shutdown] releasing resources failed', error);
+                return false;
+              }),
+            remainingMs
+          )
+        )
+      );
+
+      released = closerResults.every(Boolean);
+    }
+  }
+
+  const clean = drained && released;
   log(clean ? '[shutdown] drained cleanly' : '[shutdown] drain timed out; exiting anyway');
   return clean;
 }

@@ -320,6 +320,11 @@ if (require.main === module) {
     installShutdownHandlers({
       server,
       drainables: [app.locals.schedulerEngine as SchedulerEngine],
+      // The pool is closed last, after the HTTP server, scheduler tick and
+      // queue worker have settled (#1470). `Pool#end()` rejects new queries
+      // the moment it is called, so closing it during the drain phase would
+      // fail the in-flight submissions shutdown is meant to finish.
+      closers: pool ? [() => pool.end()] : [],
     });
   })().catch((error) => {
     console.error('Relayer startup failed', error);

@@ -142,6 +142,41 @@ accepts **any** non-empty Bearer token.
 
 ---
 
+## Graceful Shutdown
+
+The process drains on `SIGTERM` (rolling deploys, `docker compose down`, ECS task
+replacement) and `SIGINT` instead of dying mid-request (#1346). For a service that signs and
+submits transactions this is not hygiene: a relay killed after the transaction is submitted but
+before the confirmation is recorded leaves the ledger and the store disagreeing.
+
+1. **Stop taking new work.** `server.close()` stops accepting connections, the scheduler stops
+   starting new ticks, and anything arriving now is the load balancer's problem.
+2. **Finish what is in flight**, concurrently and bounded by the budget: HTTP responses, the
+   current scheduler tick, and queue jobs.
+3. **Release the Postgres pool** (#1470). `Pool#end()` refuses new queries the moment it is
+   called, so the pool is closed _after_ the drains settle, never alongside them — a pool closed
+   during the drain would fail the in-flight submissions shutdown exists to finish.
+4. **Exit.** Status `0` when everything drained and was released, `1` when the budget ran out
+   first, so a truncated shutdown is visible in the orchestrator's logs rather than looking like
+   a clean one.
+
+A second signal during shutdown exits immediately with `1`: an operator pressing Ctrl-C twice is
+asking to stop now, and appearing hung is the wrong answer to that.
+
+| Behaviour                     | Value                                                           |
+| ----------------------------- | --------------------------------------------------------------- |
+| Signals                       | `SIGTERM`, `SIGINT`                                             |
+| Budget (drain + release)      | 15s — deliberately half of Kubernetes' default 30s grace period |
+| Exit on clean shutdown        | `0`                                                             |
+| Exit when the budget is spent | `1`                                                             |
+
+The budget is not configurable through the environment on purpose: it has to stay well inside the
+orchestrator's grace period, or SIGKILL lands mid-drain and the handler achieves nothing. Handlers
+are installed only when `src/server.ts` is the process entrypoint, so importing `createApp` into a
+test or another process does not hijack that process's signal handling.
+
+---
+
 ## API
 
 All endpoints accept and return `application/json`.
