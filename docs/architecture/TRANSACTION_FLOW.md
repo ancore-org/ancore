@@ -50,5 +50,7 @@ sequenceDiagram
 | Smart account contract | Verifies authorization, nonce, and session-key permissions on-chain. | Store an unencrypted user vault. |
 
 For the implementation-level sequence, including simulation and Horizon
-submission, see the [send flow](OVERVIEW.md#send-flow). For how to create and
+submission, see the [send flow](OVERVIEW.md#send-flow). For the same path as a
+component diagram — with the session-key vs vault decision called out — see
+[architecture flow](flow.md). For how to create and
 revoke a scoped authorization, see the [session-key lifecycle example](../examples/session-key-lifecycle.md).

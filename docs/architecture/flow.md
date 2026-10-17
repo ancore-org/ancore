@@ -1,37 +1,76 @@
 # Architecture Flow: dApp → Extension → Relayer → Blockchain
 
-This diagram illustrates the transaction flow through the Ancore system, highlighting key components and their interactions.
+Component-level view of a single Ancore transaction: who talks to whom, and where the
+signing decision is made. For the message-by-message sequence — simulation, submission,
+confirmation — see [Transaction flow](TRANSACTION_FLOW.md).
 
 ```mermaid
 graph TD
-    A[dApp] -->|Request Transaction| B[Extension]
-    B -->|Session Key Request| C[Vault]
-    C -->|Sign with Session Key| B
-    B -->|Signed Transaction| D[Relayer]
-    D -->|Submit Transaction| E[Blockchain]
-    E -->|Confirmation| D
-    D -->|Response| B
-    B -->|Result| A
+    A[dApp] -->|sign + send request| B[Extension]
+    B --> C{Session key active<br/>and permitted?}
+    C -->|yes| D[Session key signs<br/>scoped authorization]
+    C -->|no| E[Vault unlocks locally<br/>owner key signs]
+    D --> F[Signed transaction<br/>+ authorization]
+    E --> F
+    F --> G[Relayer<br/>validates signature and nonce]
+    G -->|submit| H[Stellar / Soroban]
+    H --> I[Smart account contract<br/>enforces owner and session-key policy]
+    I -->|result| H
+    H -->|status| G
+    G -->|transaction id + status| B
+    B -->|result| A
 
-    style A fill:#f9f,stroke:#333
-    style B fill:#bbf,stroke:#333
-    style C fill:#f96,stroke:#333
-    style D fill:#6f9,stroke:#333
-    style E fill:#9cf,stroke:#333
+    classDef component stroke:#7f8c8d,stroke-width:1px;
+    classDef decision stroke:#d97706,stroke-width:2px;
+    class A,B,D,E,F,G,H,I component;
+    class C decision;
 ```
 
-## Key Components
-- **dApp**: Initiates transaction requests.
-- **Extension**: Manages session keys and forwards requests.
-- **Vault**: Signs transactions with session keys.
-- **Relayer**: Submits signed transactions to the blockchain.
-- **Blockchain**: Executes and confirms transactions.
+No fills, text colours or diagram background are set here on purpose: Mermaid keeps those
+from the active theme, so the diagram stays readable in light **and** dark mode. Only the
+stroke is pinned, because the default node border is the part that disappears against a
+dark background, and the decision node gets a heavier, warmer stroke so the one branch that
+changes who signs is visible at a glance.
 
-## Flow Description
-1. The dApp sends a transaction request to the Extension.
-2. The Extension requests a session key from the Vault.
-3. The Vault signs the transaction with the session key and returns it to the Extension.
-4. The Extension forwards the signed transaction to the Relayer.
-5. The Relayer submits the transaction to the Blockchain.
-6. The Blockchain processes the transaction and sends a confirmation to the Relayer.
-7. The Relayer returns the response to the Extension, which forwards it to the dApp.
+## The signing decision
+
+Everything before the decision is the same request; everything after it is the same
+submission. What differs is which key signs, and that is the branch that matters for user
+safety:
+
+| Branch | Applies when | Key material | What the relayer receives |
+| --- | --- | --- | --- |
+| **Session key** | A session key exists for the operation, has not expired, and covers the operation's permission | Session key — scoped and time-limited; the owner key stays in the vault | The session-key signature and public key |
+| **Vault (owner approval)** | No usable session key: registering a key, an out-of-scope operation, or an expired/revoked key | Owner key, unlocked locally on the user's device | A signature the contract checks against the account owner |
+
+Neither branch gives the relayer key material. The contract re-checks the authorization
+(nonce, expiry, permissions, spend limits) on-chain, so a relayer that is compromised or
+simply wrong cannot widen what the signature allows.
+
+## Key components
+
+| Component | Responsibility |
+| --- | --- |
+| **dApp** | Requests a transaction and displays the result. Never receives key material. |
+| **Extension** | Presents the request, applies wallet checks (account, network, payload), and coordinates signing. |
+| **Session key** | Signs only the actions its permissions and expiry cover. |
+| **Vault** | Stores the owner key encrypted on the user's device and signs only after a local unlock. |
+| **Relayer** | Validates the signed request and submits it to Stellar; cannot access the owner key or bypass contract policy. |
+| **Blockchain (Stellar / Soroban)** | Executes the transaction and returns its status. |
+| **Smart account contract** | Verifies the authorization, nonce and session-key permissions on-chain. |
+
+## Request flow
+
+1. The dApp asks the extension to sign and send a transaction.
+2. The extension resolves the request against the account and network, then decides whether a
+   session key can sign it or the owner has to approve it in the vault.
+3. The signed transaction and its authorization are sent to the relayer.
+4. The relayer validates the signature and nonce and submits to Stellar.
+5. Stellar executes the call; the smart account contract enforces owner and session-key policy.
+6. Confirmation travels back: contract → Stellar → relayer → extension → dApp.
+
+## Related
+
+- [Transaction flow (sequence diagram)](TRANSACTION_FLOW.md) — the same path message by message, including simulation and Horizon submission.
+- [System overview](OVERVIEW.md) — components and their subsystems.
+- [Session-key lifecycle](../examples/session-key-lifecycle.md) — creating, using and revoking a scoped authorization.

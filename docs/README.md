@@ -17,6 +17,7 @@
 |----------|---------|
 | [System overview](architecture/OVERVIEW.md) | High-level architecture |
 | [Transaction flow](architecture/TRANSACTION_FLOW.md) | dApp, extension, vault, session key, relayer, and blockchain flow |
+| [Architecture flow diagram](architecture/flow.md) | Component diagram with the session-key vs vault signing decision |
 
 ## Examples
 
