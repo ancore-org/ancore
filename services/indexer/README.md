@@ -110,6 +110,10 @@ Returns distinct activity types for the account.
 
 ## Database Schema
 
+The tables, indexes and constraints below are a summary. The canonical inventory,
+including every migration and the process for adding, applying and recovering one,
+is [SCHEMA_MIGRATION.md](SCHEMA_MIGRATION.md).
+
 ### account_activity table
 
 ```sql

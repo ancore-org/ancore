@@ -1,224 +1,250 @@
-# Schema Assumptions and Migration Path
+# Indexer schema and migration process
 
-## Current Schema (v1)
+> Canonical reference for the `services/indexer` PostgreSQL schema: the tables
+> that exist today, how a migration is applied, and what to do when a migration
+> has to be added, verified, or recovered.
+>
+> Related: [Indexer README](README.md) · [Contract event catalog](../../docs/indexer/contract-events.md) ·
+> [Backfill guide](docs/BACKFILL.md) · [Query architecture](docs/QUERY_ARCHITECTURE.md) ·
+> [Indexer backfill and dead-letter runbook](../../docs/ops/runbooks/indexer-backfill-and-dead-letter-reprocessing.md)
 
-### Table: account_activity
+## How migrations are applied
+
+Migration files live in [`migrations/`](migrations) and are plain `.sql` applied
+in filename order:
+
+```
+services/indexer/migrations/
+├── 001_create_account_activity_table.sql
+├── 002_create_ingest_checkpoints_table.sql
+├── 003_add_asset_code_issuer_to_account_activity.sql
+├── 004_create_contract_events_table.sql
+├── 005_create_schema_migrations_table.sql
+├── 006_add_account_id_to_contract_events.sql
+├── 007_add_ingest_idempotency_constraints.sql
+├── 008_create_ingest_dead_letters_table.sql
+└── 009_add_dead_letter_idempotency.sql
+```
+
+The indexer binary does **not** create or alter schema at startup. Migrations are
+applied out-of-band with `psql` (see [Applying and verifying](#applying-and-verifying)),
+which is why `/health` reports the schema version the database is serving instead
+of assuming the deployed image defines it.
+
+Each file is written to be applied **exactly once**, and the `schema_migrations`
+ledger — not the SQL itself — is what guarantees that. Several statements are
+deliberately not idempotent (`CREATE INDEX` in `001`, `ADD CONSTRAINT` in `007`
+and `009`), so re-running an already-applied file against a live database fails.
+Run migration scripts against a scratch database, not a shared one.
+
+## The `schema_migrations` ledger
+
+Migration `005` introduced the ledger that every later file writes to:
 
 ```sql
-CREATE TABLE IF NOT EXISTS account_activity (
-    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    account_id VARCHAR(56) NOT NULL,
-    activity_type VARCHAR(50) NOT NULL,
-    amount NUMERIC(20, 7),
-    asset VARCHAR(100),
-    counterparty VARCHAR(56),
-    tx_hash VARCHAR(64) NOT NULL,
-    ledger_seq BIGINT NOT NULL,
-    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-    metadata JSONB
+CREATE TABLE IF NOT EXISTS schema_migrations (
+    version    INTEGER PRIMARY KEY,
+    name       TEXT NOT NULL,
+    applied_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 ```
 
-### Schema Assumptions
-
-1. **Account ID Format**: Stellar public keys (G-prefixed, 56 characters)
-2. **Activity Types**: String-based enum values (payment, create_account, set_options, etc.)
-3. **Amount Precision**: NUMERIC(20,7) supports up to 13 digits before decimal, 7 after
-4. **Asset Format**: Either "XLM" for native or "CODE:ISSUER" for tokens
-5. **Transaction Hash**: 64-character hex string
-6. **Metadata**: Flexible JSONB for future extensibility
-7. **Timestamps**: UTC with microsecond precision
-
-### Index Strategy
-
-- Primary query: `(account_id, created_at DESC)` - Time-ordered activity feeds
-- Type filtering: `(account_id, activity_type, created_at DESC)` - Filtered feeds
-- Ledger queries: `(account_id, ledger_seq DESC)` - Ledger-based queries
-- Transaction lookup: `(tx_hash)` - Cross-account transaction details
-
-## Migration Path to Production
-
-### Phase 1: MVP (Current)
-
-- Single table schema
-- In-memory event processing
-- Basic query endpoints
-- Mock storage adapters
-
-### Phase 2: Production Hardening
-
-**Migration 002: Add Partitioning**
+It backfills the five migrations that shipped before it existed
+(`ON CONFLICT (version) DO NOTHING`, so databases created from scratch and
+databases upgraded in place end up identical). **Every migration from `005`
+onwards must end with its own ledger insert**, matching the file's sequence
+number and description:
 
 ```sql
--- Partition by account_id for better performance at scale
-CREATE TABLE account_activity_partitioned (
-    LIKE account_activity INCLUDING ALL
-) PARTITION BY HASH (account_id);
-
--- Create 8 partitions
-CREATE TABLE account_activity_part_0 PARTITION OF account_activity_partitioned
-    FOR VALUES WITH (modulus 8, remainder 0);
--- ... repeat for remainders 1-7
+INSERT INTO schema_migrations (version, name)
+VALUES (10, 'add_my_change')
+ON CONFLICT (version) DO NOTHING;
 ```
 
-**Migration 003: Add Versioning**
+`GET /health` reads the ledger through
+[`fetch_migration_state`](src/repositories/migrations.rs) and returns:
 
-```sql
-ALTER TABLE account_activity ADD COLUMN schema_version INTEGER DEFAULT 1;
-ALTER TABLE account_activity ADD COLUMN ingested_at TIMESTAMPTZ DEFAULT NOW();
-```
+| Field                     | Source                                                                  |
+| ------------------------- | ----------------------------------------------------------------------- |
+| `schema_version`          | `MAX(version)` in the ledger; `null` when the ledger is absent or empty |
+| `expected_schema_version` | `EXPECTED_SCHEMA_VERSION` compiled into this binary                     |
+| `migration_status`        | classification of the two above                                         |
+| `latest_migration`        | `name` of the highest applied migration                                 |
+| `migration_applied_at`    | `applied_at` of the highest applied migration                           |
+| `applied_migrations`      | row count in the ledger                                                 |
 
-**Migration 004: Enhanced Indexes**
+`migration_status` is `up_to_date`, `pending` (database behind), `ahead`
+(database migrated by a newer indexer) or `unknown` (ledger missing or empty).
+Only `up_to_date` is healthy — see
+[`MigrationStatus::is_healthy`](src/repositories/migrations.rs) — so a deploy
+gate that checks `migration_status` distinguishes "migrations have not finished"
+from "ledger lag", which a bare `/health` status cannot.
 
-```sql
--- Composite indexes for common query patterns
-CREATE INDEX idx_account_activity_composite
-ON account_activity (account_id, activity_type, asset, created_at DESC);
+## Current schema
 
--- Partial indexes for better performance
-CREATE INDEX idx_account_activity_payments
-ON account_activity (account_id, created_at DESC)
-WHERE activity_type = 'payment';
-```
+### `account_activity` — Horizon account operations (`001`, extended by `003`)
 
-### Phase 3: Scalability
+| Column          | Type            | Notes                                           |
+| --------------- | --------------- | ----------------------------------------------- |
+| `id`            | `UUID`          | Primary key, `gen_random_uuid()`                |
+| `account_id`    | `VARCHAR(56)`   | Stellar account (G…)                            |
+| `activity_type` | `VARCHAR(50)`   | `payment`, `create_account`, `set_options`, …   |
+| `amount`        | `NUMERIC(20,7)` | `NULL` for non-value operations                 |
+| `asset`         | `VARCHAR(100)`  | Legacy asset string (`native` or `CODE:ISSUER`) |
+| `asset_code`    | `VARCHAR(12)`   | `XLM` or credit-asset code (added in `003`)     |
+| `asset_issuer`  | `VARCHAR(56)`   | `NULL` for native XLM (added in `003`)          |
+| `counterparty`  | `VARCHAR(56)`   | Other account in the operation                  |
+| `tx_hash`       | `VARCHAR(64)`   | Transaction hash, hex                           |
+| `ledger_seq`    | `BIGINT`        | Ledger sequence                                 |
+| `created_at`    | `TIMESTAMPTZ`   | Defaults to `NOW()`                             |
+| `metadata`      | `JSONB`         | Extensible per-operation detail                 |
 
-**Migration 005: Add Event Sourcing**
+Indexes: `(account_id, created_at DESC)` — activity feeds;
+`(account_id, activity_type, created_at DESC)` — filtered feeds;
+`(account_id, ledger_seq DESC)` — ledger ranges; `(tx_hash)` — transaction lookups.
+Unique constraint `uq_account_activity_tx_type_ledger (tx_hash, activity_type, ledger_seq)`
+from `007` — the conflict target real-time ingestion and backfill both insert against.
 
-```sql
--- Separate events table for audit trail
-CREATE TABLE account_events (
-    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    account_id VARCHAR(56) NOT NULL,
-    event_type VARCHAR(50) NOT NULL,
-    event_data JSONB NOT NULL,
-    sequence_number BIGINT NOT NULL,
-    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-    processed_at TIMESTAMPTZ
-);
-```
+### `ingest_checkpoints` — ingestion cursors (`002`)
 
-**Migration 006: Add Materialized Views**
+| Column            | Type          | Notes                                         |
+| ----------------- | ------------- | --------------------------------------------- |
+| `stream`          | `VARCHAR(64)` | Primary key — one cursor per ingestion stream |
+| `last_ledger_seq` | `BIGINT`      | Last durably persisted ledger                 |
+| `updated_at`      | `TIMESTAMPTZ` | Defaults to `NOW()`                           |
 
-```sql
--- Pre-aggregated views for common queries
-CREATE MATERIALIZED VIEW account_summary AS
-SELECT
-    account_id,
-    COUNT(*) as total_transactions,
-    MAX(created_at) as last_activity,
-    COUNT(DISTINCT activity_type) as activity_types
-FROM account_activity
-GROUP BY account_id;
-```
+The worker loads this cursor on startup and advances it only after a batch is
+persisted, so a restart resumes instead of replaying.
 
-## Production Datastore Migration
+### `contract_events` — Soroban events (`004`, extended by `006`)
 
-### From Mock to PostgreSQL
+| Column             | Type          | Notes                                                                                     |
+| ------------------ | ------------- | ----------------------------------------------------------------------------------------- |
+| `id`               | `UUID`        | Primary key, `gen_random_uuid()`                                                          |
+| `contract_address` | `VARCHAR(56)` | Emitting contract (C…)                                                                    |
+| `account_id`       | `VARCHAR(56)` | Wallet-scoped lookup key; backfilled to `contract_address` (added in `006`)               |
+| `event_type`       | `VARCHAR(50)` | e.g. `session_key_added` — see the [event catalog](../../docs/indexer/contract-events.md) |
+| `ledger_seq`       | `BIGINT`      | Ledger sequence                                                                           |
+| `timestamp`        | `TIMESTAMPTZ` | Ledger close time                                                                         |
+| `tx_hash`          | `VARCHAR(64)` | Transaction hash, hex                                                                     |
+| `data`             | `JSONB`       | Decoded event payload, defaults to `{}`                                                   |
 
-1. **Data Export**: Export mock data to JSON/CSV format
-2. **Schema Validation**: Ensure data conforms to production schema
-3. **Bulk Import**: Use `COPY` command for efficient loading
-4. **Index Rebuild**: Create indexes after data import
-5. **Validation**: Run data integrity checks
+Indexes: `(contract_address)`, `(event_type)`, `(contract_address, event_type)`,
+`(ledger_seq DESC)`, `(timestamp DESC)`, plus `(account_id)` and
+`(account_id, event_type)` from `006`. Unique constraint
+`uq_contract_events_tx_event_ledger (tx_hash, event_type, ledger_seq)` from `007`.
 
-### Migration Script Template
+### `ingest_dead_letters` — failed ingest payloads (`008`, tightened by `009`)
+
+| Column           | Type          | Notes                                            |
+| ---------------- | ------------- | ------------------------------------------------ |
+| `id`             | `UUID`        | Primary key, `gen_random_uuid()`                 |
+| `stream`         | `VARCHAR(64)` | Ingestion stream the event came from             |
+| `ledger_seq`     | `BIGINT`      | Ledger of the failed event                       |
+| `tx_hash`        | `VARCHAR(64)` | Transaction hash, `''` when the failure had none |
+| `contract_id`    | `VARCHAR(56)` | Emitting contract, `''` when unknown             |
+| `error_message`  | `TEXT`        | Normalisation failure                            |
+| `raw_payload`    | `JSONB`       | Raw event, kept so the failure is recoverable    |
+| `created_at`     | `TIMESTAMPTZ` | Defaults to `NOW()`                              |
+| `reprocessed_at` | `TIMESTAMPTZ` | `NULL` until reprocessed                         |
+
+Indexes: `(stream, ledger_seq DESC)` and a partial
+`(created_at) WHERE reprocessed_at IS NULL` for the unprocessed queue. Unique
+constraint `uq_ingest_dead_letters_stream_ledger_tx (stream, ledger_seq, tx_hash)`
+from `009`, so a retried batch cannot queue the same failure twice.
+
+### Migration history
+
+| Version | File                                                | Change                                                       |
+| ------- | --------------------------------------------------- | ------------------------------------------------------------ |
+| 1       | `001_create_account_activity_table.sql`             | `account_activity` + four indexes                            |
+| 2       | `002_create_ingest_checkpoints_table.sql`           | `ingest_checkpoints`                                         |
+| 3       | `003_add_asset_code_issuer_to_account_activity.sql` | `asset_code` / `asset_issuer` + backfill from `asset`        |
+| 4       | `004_create_contract_events_table.sql`              | `contract_events` + five indexes                             |
+| 5       | `005_create_schema_migrations_table.sql`            | `schema_migrations` ledger + backfill of versions 1–5        |
+| 6       | `006_add_account_id_to_contract_events.sql`         | `contract_events.account_id` backfill (`NOT NULL`) + indexes |
+| 7       | `007_add_ingest_idempotency_constraints.sql`        | de-duplicate then add unique keys on both event tables       |
+| 8       | `008_create_ingest_dead_letters_table.sql`          | `ingest_dead_letters` + partial unprocessed index            |
+| 9       | `009_add_dead_letter_idempotency.sql`               | de-duplicate then add unique key on `ingest_dead_letters`    |
+
+`EXPECTED_SCHEMA_VERSION` in
+[`src/repositories/migrations.rs`](src/repositories/migrations.rs) tracks the
+highest version here; bump it in the same commit that adds a migration file,
+otherwise `/health` reports `ahead` for a database that is simply current.
+
+## Adding a migration
+
+1. **Pick the next sequence number.** The filename convention is enforced by
+   `pnpm indexer:lint-migrations` (`scripts/lint-migrations.mjs`):
+   `NNN_snake_case_description.sql`, exactly three zero-padded digits, unique
+   sequence. A duplicate sequence silently broke migration lint once — the
+   `006` file originally shipped as a second `005` — so run the lint, don't count
+   by hand.
+2. **Write the SQL.** Prefer `IF NOT EXISTS` / `ON CONFLICT` where the statement
+   supports it, and de-duplicate before adding a `UNIQUE` constraint (that's the
+   pattern `007` and `009` use). Never drop a column that a released API returns.
+3. **Append the ledger insert** shown above, using the same number and name as
+   the file.
+4. **Bump `EXPECTED_SCHEMA_VERSION`** to the new version.
+5. **Keep SQLx metadata in sync** — if the change affects the shape of a query the
+   crate compiles against, regenerate `.sqlx/` with `cargo sqlx prepare` so
+   offline builds keep working (see the [README](README.md#offline-build-no-database_url-required)).
+6. **Add tests** for the behaviour the migration enables, and run the checks in
+   [Before you push](../../AGENTS.md#before-you-push--run-what-ci-runs) — `cargo fmt --check`,
+   `cargo clippy -- -D warnings` and `cargo test` inside `services/indexer/`.
+
+## Applying and verifying
 
 ```bash
-#!/bin/bash
-# migration_v1_to_v2.sh
+# Apply every migration to a scratch database and smoke-test the down/up cycle
+DATABASE_URL=postgresql://postgres:postgres@localhost:5432/ancore_test \
+  bash services/indexer/scripts/check-migrations.sh
 
-set -e
+# Same, but also fail on drift against a golden schema dump
+# SCHEMA_DUMP_FILE is optional — CI runs the script without one.
+SCHEMA_DUMP_FILE=/path/to/golden_schema.sql \
+  DATABASE_URL=postgresql://postgres:postgres@localhost:5432/ancore_test \
+  bash services/indexer/scripts/check-migrations.sh
 
-echo "Starting migration from v1 to v2..."
-
-# 1. Backup current data
-pg_dump $DATABASE_URL > backup_v1_$(date +%Y%m%d_%H%M%S).sql
-
-# 2. Apply schema changes
-psql $DATABASE_URL -f migrations/002_add_partitioning.sql
-psql $DATABASE_URL -f migrations/003_add_versioning.sql
-
-# 3. Migrate data (if needed)
-# psql $DATABASE_URL -c "INSERT INTO account_activity_partitioned SELECT * FROM account_activity;"
-
-# 4. Update indexes
-psql $DATABASE_URL -f migrations/004_enhanced_indexes.sql
-
-# 5. Validate migration
-psql $DATABASE_URL -c "SELECT COUNT(*) FROM account_activity_partitioned;"
-
-echo "Migration completed successfully!"
+# Filename convention / duplicate sequence check (no database needed)
+pnpm indexer:lint-migrations
 ```
 
-## Backward Compatibility
+`check-migrations.sh` applies every file in order, optionally diffs the result
+against a golden `pg_dump`, then drops the application tables and re-applies
+everything to prove the schema is reproducible (`SKIP_DOWN=1` skips that second
+pass).
 
-### API Versioning
+After applying, verify the live state rather than trusting the console output:
 
-- `/api/v1/` - Current MVP endpoints
-- `/api/v2/` - Future production endpoints with enhanced features
-
-### Data Migration Rules
-
-1. **Never delete columns** - Add new columns with DEFAULT values
-2. **Maintain old endpoints** - Support v1 clients during transition
-3. **Feature flags** - Enable new features incrementally
-4. **Rollback strategy** - Always have a rollback path
-
-## Performance Considerations
-
-### Query Optimization
-
-- Use `EXPLAIN ANALYZE` to verify query plans
-- Monitor index usage with `pg_stat_user_indexes`
-- Consider `VACUUM ANALYZE` after large data imports
-
-### Storage Optimization
-
-- JSONB compression for metadata
-- Table partitioning for large datasets
-- Consider TimescaleDB for time-series optimization
-
-## Monitoring and Alerting
-
-### Key Metrics
-
-- Query latency by endpoint
-- Database connection pool usage
-- Event ingestion lag
-- Index hit ratios
-
-### Health Checks
-
-```sql
--- Simple health check
-SELECT 1 as health_check;
-
--- Table size monitoring
-SELECT
-    schemaname,
-    tablename,
-    pg_size_pretty(pg_total_relation_size(schemaname||'.'||tablename)) as size
-FROM pg_tables
-WHERE tablename = 'account_activity';
+```bash
+psql "$DATABASE_URL" -c "SELECT version, name, applied_at FROM schema_migrations ORDER BY version"
+curl -s localhost:8080/health | jq '{schema_version, expected_schema_version, migration_status}'
 ```
 
-## Security Considerations
+`migration_status` must be `up_to_date`. `pending` means migrations have not
+finished; `ahead` means the binary lags the database; `unknown` means the ledger
+is missing or empty.
 
-### Data Protection
+## Rollback and recovery
 
-- Row-level security for multi-tenant scenarios
-- Encryption at rest for sensitive metadata
-- Audit logging for data access
+There are no down migrations, and an applied file is never edited. Recovery is a
+new, higher-numbered migration that compensates — that is how `006` and `009`
+replaced their predecessors, and it is the procedure in
+[Indexer README § Rollback Procedure](README.md#rollback-procedure).
 
-### Access Control
+Three situations worth knowing apart:
 
-```sql
--- Read-only user for query endpoints
-CREATE USER indexer_read WITH PASSWORD 'secure_password';
-GRANT SELECT ON account_activity TO indexer_read;
+- **Bad migration, schema only** — write the compensating migration, apply it, and
+  confirm with `/health` that `migration_status` is `up_to_date` again.
+- **Bad migration, data rewritten** — restore the `pg_dump` taken before the
+  deploy and re-apply with the fixed file; do not try to reverse a `DELETE`.
+- **Ledger disagrees with the schema** — deleting a ledger row makes the file run
+  again, which only works for genuinely idempotent files (see
+  [How migrations are applied](#how-migrations-are-applied)). Check the ledger
+  before assuming a migration did not run.
 
--- Write user for ingestion
-CREATE USER indexer_write WITH PASSWORD 'secure_password';
-GRANT INSERT, UPDATE ON account_activity TO indexer_write;
-```
+Events that fail to normalise while a migration is in flight are written to
+`ingest_dead_letters` rather than dropped; the
+[backfill and dead-letter runbook](../../docs/ops/runbooks/indexer-backfill-and-dead-letter-reprocessing.md)
+covers replaying them.

@@ -73,6 +73,7 @@
 | [AGENTS.md](../AGENTS.md) | Monorepo agent guide |
 | [AI intents](ai/intents.md) | Draft intent types for the AI agent MVP |
 | [Indexer events](indexer/contract-events.md) | Contract events indexed by the indexer service |
+| [Indexer schema and migrations](../services/indexer/SCHEMA_MIGRATION.md) | Indexer tables, indexes, and the migration process |
 | [Extension E2E smoke](testing/extension-e2e-smoke.md) | Browser extension smoke test guide |
 | [Common error codes troubleshooting](troubleshooting/error-codes.md) | Common error codes, root causes, and recovery steps |
 | [Extension build troubleshooting](troubleshooting/extension-build.md) | Build failures and fixes |
