@@ -6,6 +6,7 @@ import './lib/env'; // validates VITE_* variables at startup; throws in dev on b
 import { DashboardApp } from './router';
 import { AppErrorBoundary } from './components/AppErrorBoundary';
 import { TableDensityProvider } from './contexts/TableDensityContext';
+import { NotificationProvider } from '@ancore/ui-kit';
 import './index.css';
 
 ReactDOM.createRoot(document.getElementById('root')!).render(
@@ -15,9 +16,11 @@ ReactDOM.createRoot(document.getElementById('root')!).render(
         DashboardApp installs internally (#1348). Nesting two boundaries is
         harmless — the innermost one that can catch does. */}
     <AppErrorBoundary>
-      <TableDensityProvider>
-        <DashboardApp />
-      </TableDensityProvider>
+      <NotificationProvider>
+        <TableDensityProvider>
+          <DashboardApp />
+        </TableDensityProvider>
+      </NotificationProvider>
     </AppErrorBoundary>
   </React.StrictMode>
 );

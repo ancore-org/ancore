@@ -1,7 +1,9 @@
 import React from 'react';
 import { Badge, Card, CardContent, CardHeader, CardTitle, Skeleton } from '@ancore/ui-kit';
-import { AlertCircle, Key, RefreshCw } from 'lucide-react';
+import { useToast } from '@ancore/ui-kit';
+import { AlertCircle, Copy, Key, RefreshCw, Trash2 } from 'lucide-react';
 import { isSessionKeyActive } from '@ancore/core-sdk';
+import { formatRelativeExpiry } from '../utils/time';
 import { WidgetErrorBoundary } from './WidgetErrorBoundary';
 
 export interface SessionKeySummary {
@@ -19,6 +21,7 @@ export interface SessionKeysPanelProps {
   nowMs?: number;
   className?: string;
   onRetry?: () => void;
+  onRevoke?: (publicKey: string) => void | Promise<void>;
   shouldThrowOnError?: boolean;
 }
 
@@ -42,11 +45,32 @@ export const SessionKeysPanel: React.FC<SessionKeysPanelProps> = ({
   nowMs,
   className = '',
   onRetry,
+  onRevoke,
   shouldThrowOnError = false,
 }) => {
+  const { toast } = useToast();
+
   if (error && shouldThrowOnError) {
     throw error;
   }
+
+  const copyPublicKey = async (publicKey: string) => {
+    try {
+      await navigator.clipboard.writeText(publicKey);
+      toast('Key ID copied to clipboard', 'success', 3000);
+    } catch {
+      toast('Unable to copy key ID', 'error', 3000);
+    }
+  };
+
+  const revokeSessionKey = async (publicKey: string) => {
+    try {
+      await onRevoke?.(publicKey);
+      toast('Session key revoked', 'success', 3000);
+    } catch {
+      toast('Unable to revoke session key', 'error', 3000);
+    }
+  };
 
   return (
     <Card className={`overflow-hidden ${className}`}>
@@ -97,15 +121,49 @@ export const SessionKeysPanel: React.FC<SessionKeysPanelProps> = ({
               return (
                 <li
                   key={key.publicKey}
-                  className="flex items-center justify-between py-2"
+                  className="flex items-center justify-between gap-3 py-2"
                   data-testid="session-key-row"
                 >
-                  <span className="font-mono text-xs text-foreground">
+                  <span className="min-w-0 truncate font-mono text-xs text-foreground">
                     {key.label ?? truncatePublicKey(key.publicKey)}
                   </span>
-                  <Badge variant={active ? 'default' : 'destructive'}>
-                    {active ? 'Active' : 'Expired'}
-                  </Badge>
+                  <div className="flex shrink-0 items-center gap-2">
+                    <time
+                      className="text-xs text-muted-foreground"
+                      dateTime={new Date(key.expiresAt * 1000).toISOString()}
+                      title={new Date(key.expiresAt * 1000).toISOString()}
+                    >
+                      {formatRelativeExpiry(key.expiresAt, nowMs)}
+                    </time>
+                    <Badge
+                      variant={active ? 'default' : 'secondary'}
+                      className={
+                        active ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-600'
+                      }
+                    >
+                      {active ? 'Active' : 'Expired'}
+                    </Badge>
+                    <button
+                      type="button"
+                      aria-label={`Copy ${key.label ?? 'session key'} ID`}
+                      title="Copy key ID"
+                      onClick={() => void copyPublicKey(key.publicKey)}
+                      className="text-muted-foreground hover:text-foreground"
+                    >
+                      <Copy className="h-4 w-4" aria-hidden="true" />
+                    </button>
+                    {onRevoke && (
+                      <button
+                        type="button"
+                        aria-label={`Revoke ${key.label ?? 'session key'}`}
+                        title="Revoke session key"
+                        onClick={() => void revokeSessionKey(key.publicKey)}
+                        className="text-muted-foreground hover:text-destructive"
+                      >
+                        <Trash2 className="h-4 w-4" aria-hidden="true" />
+                      </button>
+                    )}
+                  </div>
                 </li>
               );
             })}
