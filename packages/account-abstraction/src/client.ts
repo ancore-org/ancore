@@ -17,7 +17,7 @@ import type { SessionKey } from '@ancore/types';
 export interface ClientRetryOptions {
   /** Maximum retry attempts (default: 3) */
   maxRetries?: number;
-  /** Base delay in ms (default: 100) */
+  /** Base delay in ms (default: 500) */
   baseDelayMs?: number;
   /** Maximum delay in ms (default: 10000) */
   maxDelayMs?: number;
@@ -132,7 +132,7 @@ export async function withNetworkRetry<T>(
   options: ClientRetryOptions = {}
 ): Promise<T> {
   const maxRetries = options.maxRetries ?? 3;
-  const baseDelayMs = options.baseDelayMs ?? 100;
+  const baseDelayMs = options.baseDelayMs ?? 500;
   const maxDelayMs = options.maxDelayMs ?? 10_000;
   const exponential = options.exponential ?? true;
   const jitter = options.jitter ?? true;

@@ -128,3 +128,14 @@ export type {
   SignRelayPayloadOptions,
   UnsignedRelayPayload,
 } from './passkey/passkeyModule';
+
+export { validateSessionKeyPolicy } from './validation';
+export type {
+  PolicyAmount,
+  SessionKeyPolicy,
+  SessionKeyPolicyErrorCode,
+  SessionKeyPolicyValidationError,
+  ValidationResult,
+} from './validation';
+
+export { CONTRACT_EVENTS, type ContractEventTopic } from '@ancore/wallet-shared';

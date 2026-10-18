@@ -590,6 +590,9 @@ importers:
       '@ancore/types':
         specifier: workspace:*
         version: link:../types
+      '@ancore/wallet-shared':
+        specifier: workspace:*
+        version: link:../wallet-shared
       '@stellar/stellar-sdk':
         specifier: ^13.3.0
         version: 13.3.0
@@ -636,6 +639,9 @@ importers:
       '@ancore/types':
         specifier: workspace:*
         version: link:../types
+      '@ancore/wallet-shared':
+        specifier: workspace:*
+        version: link:../wallet-shared
       '@ledgerhq/hw-app-str':
         specifier: ^7.7.4
         version: 7.7.4

@@ -255,3 +255,6 @@ export {
   type ExpireInvoiceResult,
   type ListInvoicesResult,
 } from './invoice-client';
+
+// Canonical contract event topics
+export { CONTRACT_EVENTS, type ContractEventTopic } from '@ancore/wallet-shared';

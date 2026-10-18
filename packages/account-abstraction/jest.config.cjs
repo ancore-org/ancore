@@ -13,6 +13,7 @@ module.exports = {
   transform: { '^.+\\.ts$': 'ts-jest' },
   setupFilesAfterEnv: ['<rootDir>/../../packages/jest.setup.ts'],
   moduleNameMapper: {
+    '^@ancore/wallet-shared$': '<rootDir>/../wallet-shared/src/index.ts',
     '^@ancore/types$': '<rootDir>/../types/src/index.ts',
     '^@ancore/types/(.*)$': '<rootDir>/../types/src/$1',
   },
@@ -35,7 +36,11 @@ module.exports = {
       statements: 25,
     },
   },
-  testMatch: ['**/__tests__/**/*.test.ts', '<rootDir>/tests/**/*.spec.ts', '<rootDir>/tests/**/*.test.ts'],
+  testMatch: [
+    '**/__tests__/**/*.test.ts',
+    '<rootDir>/tests/**/*.spec.ts',
+    '<rootDir>/tests/**/*.test.ts',
+  ],
   // Only exclude integration tests that require live network access (execute.integration).
   // revoke-session-key.integration.test.ts uses mocks and runs in CI.
   testPathIgnorePatterns: ['/node_modules/', 'execute\\.integration\\.test\\.ts$'],

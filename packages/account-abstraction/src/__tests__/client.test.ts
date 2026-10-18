@@ -83,6 +83,58 @@ describe('AccountAbstractionClient and Network Retry', () => {
     });
   });
 
+  describe('custom retry options', () => {
+    const transient = () => new Error('read ECONNRESET');
+
+    it('respects custom maxRetries and baseDelayMs set on the client', async () => {
+      const delays: number[] = [];
+      const client = new AccountAbstractionClient({
+        contractId: dummyContractId,
+        server: mockServer,
+        retryOptions: {
+          maxRetries: 2,
+          baseDelayMs: 7,
+          jitter: false,
+          onRetry: (_attempt, _error, delayMs) => delays.push(delayMs),
+        },
+      });
+      mockServer.getAccount.mockRejectedValue(transient());
+
+      await expect(client.getAccount('GABC')).rejects.toThrow('ECONNRESET');
+
+      expect(mockServer.getAccount).toHaveBeenCalledTimes(3);
+      expect(delays).toEqual([7, 14]);
+    });
+
+    it('defaults to 3 retries with a 500ms base delay', async () => {
+      const delays: number[] = [];
+      const setTimeoutSpy = jest.spyOn(globalThis, 'setTimeout').mockImplementation(((
+        fn: () => void
+      ) => {
+        fn();
+        return 0;
+      }) as unknown as typeof setTimeout);
+      const client = new AccountAbstractionClient({
+        contractId: dummyContractId,
+        server: mockServer,
+        retryOptions: {
+          jitter: false,
+          onRetry: (_attempt, _error, delayMs) => delays.push(delayMs),
+        },
+      });
+      mockServer.getAccount.mockRejectedValue(transient());
+
+      try {
+        await expect(client.getAccount('GABC')).rejects.toThrow('ECONNRESET');
+      } finally {
+        setTimeoutSpy.mockRestore();
+      }
+
+      expect(mockServer.getAccount).toHaveBeenCalledTimes(4);
+      expect(delays).toEqual([500, 1000, 2000]);
+    });
+  });
+
   describe('AccountAbstractionClient RPC methods', () => {
     it('wraps getAccount with automatic retry', async () => {
       const client = new AccountAbstractionClient({
