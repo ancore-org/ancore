@@ -132,4 +132,30 @@ describe('AccountAbstractionClient and Network Retry', () => {
       expect(mockServer.sendTransaction).toHaveBeenCalledTimes(2);
     });
   });
+
+  describe('AncoreClient retry configuration (#1541)', () => {
+    it('should respect custom retry parameters in constructor', async () => {
+      const customClient = new AccountAbstractionClient({
+        contractId: dummyContractId,
+        server: mockServer,
+        retryOptions: {
+          maxRetries: 5,
+          baseDelayMs: 250,
+        },
+      });
+
+      expect(customClient.retryOptions.maxRetries).toBe(5);
+      expect(customClient.retryOptions.baseDelayMs).toBe(250);
+    });
+
+    it('should default to 3 retries and 500ms base delay', () => {
+      const defaultClient = new AccountAbstractionClient({
+        contractId: dummyContractId,
+        server: mockServer,
+      });
+
+      expect(defaultClient.retryOptions.maxRetries).toBe(3);
+      expect(defaultClient.retryOptions.baseDelayMs).toBe(500);
+    });
+  });
 });

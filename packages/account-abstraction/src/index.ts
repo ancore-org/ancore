@@ -11,13 +11,18 @@ export type { AccountContractReadOptions, InvocationArgs } from './account-contr
 
 export {
   AccountAbstractionClient,
+  AncoreClient,
   withNetworkRetry,
   isTransientError,
   calculateBackoff,
   type ClientRetryOptions,
   type AccountAbstractionClientOptions,
+  type AncoreClientOptions,
   type SorobanRpcServer,
 } from './client';
+
+export { CONTRACT_EVENTS, type ContractEventName } from '@ancore/wallet-shared';
+export { validateSessionKeyPolicy, type ValidationResult } from './validation';
 
 export { getOwner, getNonce, getVersion } from './get-owner-nonce';
 export { getSessionKey } from './get-session-key';

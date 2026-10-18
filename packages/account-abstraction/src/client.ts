@@ -184,6 +184,8 @@ export interface AccountAbstractionClientOptions {
   retryOptions?: ClientRetryOptions;
 }
 
+export type AncoreClientOptions = AccountAbstractionClientOptions;
+
 /**
  * High-level Account Abstraction Client that wraps contract invocations and RPC network calls
  * with built-in exponential backoff and jitter retry mechanism.
@@ -201,7 +203,11 @@ export class AccountAbstractionClient {
     this.accountContract = new AccountContract(options.contractId);
     this.server = options.server;
     this.networkPassphrase = options.networkPassphrase;
-    this.retryOptions = options.retryOptions ?? {};
+    this.retryOptions = {
+      maxRetries: 3,
+      baseDelayMs: 500,
+      ...options.retryOptions,
+    };
   }
 
   /**
@@ -344,3 +350,6 @@ export class AccountAbstractionClient {
     );
   }
 }
+
+export const AncoreClient = AccountAbstractionClient;
+export type AncoreClient = AccountAbstractionClient;

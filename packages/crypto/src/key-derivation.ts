@@ -25,8 +25,8 @@ export function deriveKeypairFromMnemonic(mnemonic: string, index: number): Keyp
     throw new Error('Invalid mnemonic phrase');
   }
 
-  if (index < 0 || !Number.isInteger(index)) {
-    throw new Error('Index must be a non-negative integer');
+  if (index < 0 || !Number.isInteger(index) || index > 0x7fffffff) {
+    throw new RangeError('Index must be a non-negative integer less than 2^31');
   }
 
   const seed = mnemonicToSeedSync(mnemonic);
