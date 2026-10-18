@@ -327,6 +327,7 @@ async fn main() -> anyhow::Result<()> {
         .route("/health", get(health::health_handler))
         .route("/metrics", get(metrics_handler))
         .route("/metrics/prometheus", get(prometheus_metrics_handler))
+        .fallback(ancore_indexer::api::not_found)
         .layer(GovernorLayer {
             config: governor_conf,
         })

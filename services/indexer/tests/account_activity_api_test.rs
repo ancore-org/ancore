@@ -501,3 +501,35 @@ async fn integration_test_invalid_ledger_range_returns_400() {
 
     assert_eq!(response.status(), StatusCode::BAD_REQUEST);
 }
+
+#[tokio::test]
+async fn unmatched_route_returns_canonical_not_found_envelope() {
+    let app = Router::new().fallback(ancore_indexer::api::not_found);
+
+    let response = app
+        .oneshot(
+            Request::builder()
+                .uri("/invalid")
+                .body(Body::empty())
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+
+    assert_eq!(response.status(), StatusCode::NOT_FOUND);
+    let content_type = response
+        .headers()
+        .get(axum::http::header::CONTENT_TYPE)
+        .and_then(|value| value.to_str().ok())
+        .unwrap_or("");
+    assert!(
+        content_type.starts_with("application/json"),
+        "expected application/json, got {content_type}"
+    );
+
+    let body = response_body_bytes(response).await;
+    let json: serde_json::Value = serde_json::from_slice(&body).unwrap();
+    assert_eq!(json["code"], "NOT_FOUND");
+    assert_eq!(json["message"], "Resource not found");
+    assert!(json.get("details").is_none());
+}

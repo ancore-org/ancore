@@ -23,6 +23,17 @@ pub struct ErrorEnvelope {
     pub details: Option<Value>,
 }
 
+impl ErrorEnvelope {
+    /// Canonical 404 body for missing resources and unmatched routes.
+    pub fn not_found() -> Self {
+        Self {
+            code: codes::NOT_FOUND,
+            message: "Resource not found".to_string(),
+            details: None,
+        }
+    }
+}
+
 /// Canonical error codes used across all indexer API routes.
 pub mod codes {
     pub const INVALID_CURSOR: &str = "INVALID_CURSOR";
@@ -61,12 +72,15 @@ impl IntoResponse for ApiError {
                 ApiError::InvalidFilter(msg) => {
                     (StatusCode::BAD_REQUEST, codes::INVALID_FILTER, msg, None)
                 }
-                ApiError::NotFound => (
-                    StatusCode::NOT_FOUND,
-                    codes::NOT_FOUND,
-                    "Resource not found".to_string(),
-                    None,
-                ),
+                ApiError::NotFound => {
+                    let envelope = ErrorEnvelope::not_found();
+                    (
+                        StatusCode::NOT_FOUND,
+                        envelope.code,
+                        envelope.message,
+                        envelope.details,
+                    )
+                }
                 ApiError::Database(err) => {
                     if matches!(err, sqlx::Error::PoolTimedOut) {
                         (
