@@ -7,7 +7,7 @@ use serde::{Deserialize, Serialize};
 use sqlx::PgPool;
 use uuid::Uuid;
 
-use crate::api::validation::validate_account_id;
+use crate::api::validation::{validate_account_id, validate_cursor};
 use crate::error::Result;
 use crate::repositories::account_activity::{ActivityFilter, ActivityRecord, CursorPage};
 
@@ -80,6 +80,13 @@ pub async fn list_handler(
         return Err(crate::error::ApiError::InvalidFilter(
             "cannot specify both cursor_after and cursor_before".to_string(),
         ));
+    }
+
+    if let Some(ref c) = params.cursor_after {
+        validate_cursor(c)?;
+    }
+    if let Some(ref c) = params.cursor_before {
+        validate_cursor(c)?;
     }
 
     // Validate ledger range

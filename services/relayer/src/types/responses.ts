@@ -50,5 +50,10 @@ export interface HealthResponse {
     rpc: DependencyStatus;
     storage: DependencyStatus;
     signatureService?: DependencyStatus;
+    database?: {
+      status: 'healthy' | 'unhealthy';
+      message?: string;
+      latencyMs?: number;
+    };
   };
 }

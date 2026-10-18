@@ -24,6 +24,7 @@ const EXPECTED_EXPORTS = [
   'generateMnemonic',
   'validateMnemonic',
   'validateMnemonicStrength',
+  'isValidMnemonicChecksum',
 
   'keyFingerprint',
   'getEnglishWordlist',

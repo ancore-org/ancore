@@ -255,3 +255,5 @@ export function validateMnemonicStrength(mnemonic: string): void {
     );
   }
 }
+
+export { isValidMnemonicChecksum } from './bip39';

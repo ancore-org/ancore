@@ -144,3 +144,20 @@ async fn migration_state_matches_the_expected_version() {
     assert_eq!(state.status(), MigrationStatus::UpToDate);
     assert!(state.applied_count >= EXPECTED_SCHEMA_VERSION as i64);
 }
+
+#[tokio::test]
+#[ignore]
+async fn health_returns_ok_when_database_pool_is_healthy() {
+    let (app, _pool) = setup().await;
+    let response = app
+        .oneshot(
+            Request::builder()
+                .uri("/health")
+                .body(Body::empty())
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+
+    assert_eq!(response.status(), StatusCode::OK);
+}

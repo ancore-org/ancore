@@ -51,6 +51,9 @@ export { validatePasswordStrength } from './password';
 export { encryptSecretKey, decryptSecretKey } from './encryption';
 export type { EncryptedSecretKeyPayload } from './encryption';
 
+// BIP39 Checksum Validation
+export { isValidMnemonicChecksum } from './bip39';
+
 // Mnemonics
 export {
   generateMnemonic,

@@ -31,6 +31,7 @@ pub mod codes {
     pub const QUERY_TIMEOUT: &str = "QUERY_TIMEOUT";
     pub const DATABASE_ERROR: &str = "DATABASE_ERROR";
     pub const INTERNAL_ERROR: &str = "INTERNAL_ERROR";
+    pub const SERVICE_UNAVAILABLE: &str = "SERVICE_UNAVAILABLE";
 }
 
 #[derive(Error, Debug)]
@@ -51,6 +52,9 @@ pub enum ApiError {
     #[allow(dead_code)]
     QueryTimeout(String),
 
+    #[error("Service unavailable: {0}")]
+    ServiceUnavailable(String),
+
     #[error("Internal server error: {0}")]
     Internal(#[from] anyhow::Error),
 }
@@ -64,6 +68,9 @@ impl IntoResponse for ApiError {
                 }
                 ApiError::InvalidFilter(msg) => {
                     (StatusCode::BAD_REQUEST, codes::INVALID_FILTER, msg, None)
+                }
+                ApiError::ServiceUnavailable(msg) => {
+                    (StatusCode::SERVICE_UNAVAILABLE, codes::SERVICE_UNAVAILABLE, msg, None)
                 }
                 ApiError::NotFound => (
                     StatusCode::NOT_FOUND,

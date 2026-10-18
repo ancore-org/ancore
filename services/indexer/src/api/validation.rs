@@ -4,6 +4,10 @@
 //! for account IDs) only needs to happen in one place instead of drifting
 //! across every handler module that duplicated its own copy.
 
+use base64::Engine;
+use chrono::DateTime;
+use uuid::Uuid;
+
 use crate::error::{ApiError, Result};
 
 /// Validate a Stellar account ID as a checksummed StrKey G-address.
@@ -26,6 +30,57 @@ pub fn validate_account_id(id: &str) -> Result<()> {
     }
 }
 
+/// Validate a pagination cursor string.
+///
+/// Validates that the cursor is non-empty, contains valid base64 encoding
+/// (supporting standard and URL-safe base64 with or without padding), decodes to
+/// valid UTF-8, and deserializes into a canonical cursor JSON object with a valid
+/// timestamp `t` and UUID `i`.
+///
+/// Returns [`ApiError::InvalidCursor`] with an actionable error description on failure.
+pub fn validate_cursor(cursor: &str) -> Result<()> {
+    if cursor.trim().is_empty() {
+        return Err(ApiError::InvalidCursor(
+            "Cursor cannot be empty".to_string(),
+        ));
+    }
+
+    let decoded = base64::engine::general_purpose::URL_SAFE_NO_PAD
+        .decode(cursor)
+        .or_else(|_| base64::engine::general_purpose::URL_SAFE.decode(cursor))
+        .or_else(|_| base64::engine::general_purpose::STANDARD_NO_PAD.decode(cursor))
+        .or_else(|_| base64::engine::general_purpose::STANDARD.decode(cursor))
+        .map_err(|_| ApiError::InvalidCursor("Invalid base64 encoding in cursor".to_string()))?;
+
+    let json_str = std::str::from_utf8(&decoded)
+        .map_err(|_| ApiError::InvalidCursor("Invalid UTF-8 sequence in cursor".to_string()))?;
+
+    #[derive(serde::Deserialize)]
+    struct DecodedCursor {
+        t: String,
+        i: String,
+    }
+
+    let cursor_obj: DecodedCursor = serde_json::from_str(json_str)
+        .map_err(|_| ApiError::InvalidCursor("Invalid JSON structure in cursor".to_string()))?;
+
+    // Validate UUID format
+    if Uuid::parse_str(&cursor_obj.i).is_err() {
+        return Err(ApiError::InvalidCursor(
+            "Invalid UUID in cursor".to_string(),
+        ));
+    }
+
+    // Validate timestamp format
+    if DateTime::parse_from_rfc3339(&cursor_obj.t).is_err() {
+        return Err(ApiError::InvalidCursor(
+            "Invalid timestamp format in cursor".to_string(),
+        ));
+    }
+
+    Ok(())
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -46,8 +101,6 @@ mod tests {
 
     #[test]
     fn rejects_naive_shape_match_with_bad_checksum() {
-        // Right length (56) and starts with 'G', but not a real checksummed
-        // StrKey — this is exactly what the naive shape-only check let through.
         let addr = format!("G{}", "A".repeat(55));
         assert!(matches!(
             validate_account_id(&addr).unwrap_err(),
@@ -57,8 +110,6 @@ mod tests {
 
     #[test]
     fn rejects_contract_address_shaped_string() {
-        // Right length and a 'C' prefix (contract StrKeys use this prefix),
-        // but not a checksummed contract address either — still must fail.
         let addr = format!("C{}", "A".repeat(55));
         assert!(matches!(
             validate_account_id(&addr).unwrap_err(),
@@ -72,5 +123,59 @@ mod tests {
             validate_account_id("GSHORT").unwrap_err(),
             ApiError::InvalidFilter(_)
         ));
+    }
+
+    #[test]
+    fn test_invalid_cursor_base64_decoding() {
+        // Empty strings and whitespace
+        assert!(matches!(
+            validate_cursor("").unwrap_err(),
+            ApiError::InvalidCursor(_)
+        ));
+        assert!(matches!(
+            validate_cursor("   ").unwrap_err(),
+            ApiError::InvalidCursor(_)
+        ));
+
+        // Invalid base64 characters
+        assert!(matches!(
+            validate_cursor("not-valid-base64!!!").unwrap_err(),
+            ApiError::InvalidCursor(_)
+        ));
+
+        // Corrupted padding / invalid symbols
+        assert!(matches!(
+            validate_cursor("===invalid===").unwrap_err(),
+            ApiError::InvalidCursor(_)
+        ));
+
+        // Valid base64, but non-UTF8 byte sequence
+        assert!(matches!(
+            validate_cursor("/v4=").unwrap_err(),
+            ApiError::InvalidCursor(_)
+        ));
+
+        // Valid base64, but not JSON
+        assert!(matches!(
+            validate_cursor("aGVsbG8=").unwrap_err(),
+            ApiError::InvalidCursor(_)
+        ));
+
+        // Valid JSON, but missing required cursor fields
+        assert!(matches!(
+            validate_cursor("e30=").unwrap_err(),
+            ApiError::InvalidCursor(_)
+        ));
+    }
+
+    #[test]
+    fn test_valid_cursor_base64_decoding() {
+        let valid_json = serde_json::json!({
+            "t": "2024-01-15T10:30:00Z",
+            "i": "a1a2a3a4-b1b2-c1c2-d1d2-d3d4d5d6d7d8"
+        });
+        let encoded = base64::engine::general_purpose::URL_SAFE_NO_PAD
+            .encode(valid_json.to_string());
+        assert!(validate_cursor(&encoded).is_ok());
     }
 }

@@ -201,7 +201,7 @@ export function createApp(
 
   const executeHandler = createExecuteRelayHandler(relayService);
   const validateHandler = createValidateRelayHandler(relayService);
-  const healthHandler = createHealthHandler(relayService);
+  const healthHandler = createHealthHandler(relayService, dbPool);
 
   const scheduledTransferService = new ScheduledTransferService(
     resolvedScheduledTransferStore,
