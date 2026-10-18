@@ -32,7 +32,7 @@ export function createValidateRelayHandler(relayService: RelayServiceContract) {
 
     const start = loggedReq.startTime ?? Date.now();
 
-    const result = await relayService.validateRelay(request);
+    const result = await relayService.validateRelay(request, { clientIp: req.ip });
     const durationMs = Date.now() - start;
 
     if (result.valid) {

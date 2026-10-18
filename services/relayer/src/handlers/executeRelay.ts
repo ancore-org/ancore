@@ -32,7 +32,7 @@ export function createExecuteRelayHandler(relayService: RelayServiceContract) {
 
     const start = loggedReq.startTime ?? Date.now();
 
-    const response = await relayService.executeRelay(request);
+    const response = await relayService.executeRelay(request, { clientIp: req.ip });
     const durationMs = Date.now() - start;
 
     if (response.success) {

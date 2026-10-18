@@ -48,6 +48,8 @@ export interface RelayExecutionOptions {
    * tracking a fresh nonce on every run (#1422).
    */
   signedNonce?: number;
+  /** Caller address for security audit logs. Not part of the signed payload. */
+  clientIp?: string;
 }
 
 export interface RelayServiceContract {

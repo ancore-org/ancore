@@ -110,6 +110,52 @@ describe('RelayService', () => {
       expect(result.error?.message).toBe('Nonce already used');
     });
 
+    it('logs a redacted NONCE_REPLAY_DETECTED warning when a nonce is replayed', async () => {
+      const warn = jest.spyOn(console, 'warn').mockImplementation(() => undefined);
+      const nonceStore = new MemoryNonceStore();
+      nonceStore.track(VALID_KEY, 1);
+      const svc = new RelayService(
+        makeSignatureService(true),
+        undefined,
+        undefined,
+        undefined,
+        { useMockSubmission: true },
+        nonceStore
+      );
+
+      const result = await svc.validateRelay(makeRequest({ nonce: 1 }), {
+        clientIp: '203.0.113.10',
+      });
+
+      expect(result.valid).toBe(false);
+      expect(result.error?.code).toBe('NONCE_REPLAY');
+
+      const audit = warn.mock.calls
+        .map(
+          (call) =>
+            call[0] as {
+              event?: string;
+              sessionKey?: string;
+              nonce?: number;
+              clientIp?: string;
+            }
+        )
+        .find((entry) => entry?.event === 'NONCE_REPLAY_DETECTED');
+
+      expect(audit).toEqual(
+        expect.objectContaining({
+          event: 'NONCE_REPLAY_DETECTED',
+          sessionKey: 'aaaa\u2026aaaa',
+          nonce: 1,
+          clientIp: '203.0.113.10',
+        })
+      );
+      expect(audit?.sessionKey).not.toBe(VALID_KEY);
+      expect(JSON.stringify(audit)).not.toContain(VALID_KEY);
+
+      warn.mockRestore();
+    });
+
     it('rejects a step-up amount until the caller confirms it', async () => {
       const svc = new RelayService(makeSignatureService(true));
       const result = await svc.validateRelay(
