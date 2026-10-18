@@ -3,6 +3,7 @@ import type { RelayServiceContract } from '../types';
 import type { RelayValidateRequest } from '../types';
 import { redactSessionKey, type Logger } from '../logging';
 import type { LoggedRequest } from '../middleware/requestLogger';
+import { sanitizeErrorMessage } from '../utils/errorSanitizer';
 
 const noopLogger: Logger = {
   debug: () => undefined,
@@ -32,7 +33,17 @@ export function createValidateRelayHandler(relayService: RelayServiceContract) {
 
     const start = loggedReq.startTime ?? Date.now();
 
-    const result = await relayService.validateRelay(request, { clientIp: req.ip });
+    let result = await relayService.validateRelay(request, { clientIp: req.ip });
+    if (!result.valid && result.error) {
+      const sanitized = sanitizeErrorMessage(result.error.message);
+      if (sanitized !== result.error.message) {
+        log.error({ error: result.error.message, outcome: 'error' }, 'internal_storage_error');
+        result = {
+          ...result,
+          error: { ...result.error, message: sanitized },
+        };
+      }
+    }
     const durationMs = Date.now() - start;
 
     if (result.valid) {
