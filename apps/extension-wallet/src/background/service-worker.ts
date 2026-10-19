@@ -1,5 +1,6 @@
 import { installMessageDispatcher } from '@/messaging';
 import { registerInternalHandlers, probeServicesOnStartup } from './handlers';
+import { executeLockWallet } from './handlers/lock-unlock';
 import {
   restoreUnlockSessionFromStorage,
   refreshSessionExpiry,
@@ -53,6 +54,12 @@ declare const chrome: {
       ): void;
     };
     getURL(path: string): string;
+    sendMessage?(message: unknown): void;
+  };
+  commands?: {
+    onCommand: {
+      addListener(callback: (command: string) => void): void;
+    };
   };
   tabs: {
     query(queryInfo: {
@@ -371,4 +378,17 @@ chrome.runtime.onMessage.addListener((message: unknown, _sender, sendResponse) =
     return true;
   }
   return false;
+});
+
+// Handle Chrome extension keyboard commands (Issue #1511)
+chrome.commands?.onCommand?.addListener(async (command: string) => {
+  if (command === 'lock-wallet') {
+    log.info('lock-wallet command received from shortcut');
+    await executeLockWallet();
+    try {
+      chrome.runtime?.sendMessage?.({ type: 'WALLET_LOCKED_BY_SHORTCUT' });
+    } catch {
+      // Ignored if popup is not currently open
+    }
+  }
 });

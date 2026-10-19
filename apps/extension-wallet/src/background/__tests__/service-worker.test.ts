@@ -36,6 +36,13 @@ interface ChromeMock {
       addListener: ReturnType<typeof vi.fn>;
       _trigger: (msg: unknown, sender: object, respond: (r: ResponseEnvelope) => void) => void;
     };
+    sendMessage?: ReturnType<typeof vi.fn>;
+  };
+  commands: {
+    onCommand: {
+      addListener: ReturnType<typeof vi.fn>;
+      _trigger: (command: string) => void;
+    };
   };
   storage: {
     local: {
@@ -59,6 +66,7 @@ interface ChromeMock {
 function buildChromeMock(): ChromeMock {
   const capturedListeners: OnMessageListener[] = [];
   const capturedInstalledListeners: ((details: { reason: string }) => void)[] = [];
+  const capturedCommandListeners: ((command: string) => void)[] = [];
   const sessionStore: Record<string, unknown> = {};
   const localStore: Record<string, unknown> = {};
 
@@ -84,6 +92,17 @@ function buildChromeMock(): ChromeMock {
             const result = listener(msg, sender, respond);
             if (result === true) break;
           }
+        },
+      },
+      sendMessage: vi.fn(),
+    },
+    commands: {
+      onCommand: {
+        addListener: vi.fn((fn) => {
+          capturedCommandListeners.push(fn);
+        }),
+        _trigger(command) {
+          for (const fn of capturedCommandListeners) fn(command);
         },
       },
     },
@@ -679,6 +698,35 @@ describe('runtime.onInstalled lifecycle', () => {
 
     expect(chromeMock.storage.local.clear).toHaveBeenCalled();
     expect(chromeMock.storage.session.clear).toHaveBeenCalled();
+    _resetHandlers();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// commands.onCommand (keyboard shortcut lock-wallet — issue #1511)
+// ---------------------------------------------------------------------------
+
+describe('commands.onCommand (keyboard shortcut lock-wallet)', () => {
+  it('locks the active wallet session when lock-wallet shortcut is triggered', async () => {
+    const { _resetHandlers } = await loadServiceWorker(makeAuthState({ hasOnboarded: true }));
+
+    // Unlock wallet first
+    await dispatch(chromeMock, 'UNLOCK_WALLET', { password: 'test-password' });
+    let stateResp = await dispatch(chromeMock, 'GET_WALLET_STATE');
+    expect((stateResp.payload as any).state).toBe('unlocked');
+
+    // Trigger the lock-wallet shortcut command
+    chromeMock.commands.onCommand._trigger('lock-wallet');
+
+    // Allow async lock execution to finish
+    await new Promise((resolve) => setTimeout(resolve, 50));
+
+    // Verify session state is now locked
+    stateResp = await dispatch(chromeMock, 'GET_WALLET_STATE');
+    expect((stateResp.payload as any).state).toBe('locked');
+
+    // Verify storage was updated with isUnlocked: false
+    expect(chromeMock.storage.local.set).toHaveBeenCalled();
     _resetHandlers();
   });
 });
