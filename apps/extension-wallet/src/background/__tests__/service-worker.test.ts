@@ -32,10 +32,15 @@ interface ChromeMock {
       _trigger: (details: { reason: string }) => void;
     };
     onStartup: { addListener: ReturnType<typeof vi.fn> };
+    onSuspend?: {
+      addListener: ReturnType<typeof vi.fn>;
+      _trigger: () => void;
+    };
     onMessage: {
       addListener: ReturnType<typeof vi.fn>;
       _trigger: (msg: unknown, sender: object, respond: (r: ResponseEnvelope) => void) => void;
     };
+    setUninstallURL?: ReturnType<typeof vi.fn>;
   };
   storage: {
     local: {
@@ -59,6 +64,7 @@ interface ChromeMock {
 function buildChromeMock(): ChromeMock {
   const capturedListeners: OnMessageListener[] = [];
   const capturedInstalledListeners: ((details: { reason: string }) => void)[] = [];
+  const capturedSuspendListeners: (() => void)[] = [];
   const sessionStore: Record<string, unknown> = {};
   const localStore: Record<string, unknown> = {};
 
@@ -74,6 +80,14 @@ function buildChromeMock(): ChromeMock {
         },
       },
       onStartup: { addListener: vi.fn() },
+      onSuspend: {
+        addListener: vi.fn((fn) => {
+          capturedSuspendListeners.push(fn);
+        }),
+        _trigger() {
+          for (const fn of capturedSuspendListeners) fn();
+        },
+      },
       onMessage: {
         addListener: vi.fn((fn: OnMessageListener) => {
           capturedListeners.push(fn);
@@ -86,6 +100,7 @@ function buildChromeMock(): ChromeMock {
           }
         },
       },
+      setUninstallURL: vi.fn(),
     },
     storage: {
       local: {
@@ -679,6 +694,20 @@ describe('runtime.onInstalled lifecycle', () => {
 
     expect(chromeMock.storage.local.clear).toHaveBeenCalled();
     expect(chromeMock.storage.session.clear).toHaveBeenCalled();
+    _resetHandlers();
+  });
+
+  it('clears session on runtime.onSuspend to prevent orphaned unlocked vault state', async () => {
+    const { _resetHandlers } = await loadServiceWorker(makeAuthState({ hasOnboarded: true }));
+
+    // Unlock wallet first
+    await dispatch(chromeMock, 'UNLOCK_WALLET', { password: 'test-password' });
+
+    // Trigger suspend event
+    chromeMock.runtime.onSuspend?._trigger();
+
+    await new Promise((resolve) => setTimeout(resolve, 50));
+    expect(chromeMock.storage.session.remove).toHaveBeenCalled();
     _resetHandlers();
   });
 });
