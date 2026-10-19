@@ -78,7 +78,7 @@ export function clearSessionEntry(requestId: string): void {
   }
 }
 
-export const DEFAULT_APPROVAL_TTL_MS = 15 * 60 * 1000;
+export const DEFAULT_APPROVAL_TTL_MS = 5 * 60 * 1000;
 
 // ── Approval queue (in-memory + session-persisted) ───────────────────────────
 
@@ -180,7 +180,7 @@ export function sweepStaleRequests(ttlMs: number = DEFAULT_APPROVAL_TTL_MS): num
   }
 
   for (const requestId of staleIds) {
-    rejectRequest(requestId, new Error('Approval request timed out'));
+    rejectRequest(requestId, new Error('Request timed out'));
   }
 
   return staleIds.size;

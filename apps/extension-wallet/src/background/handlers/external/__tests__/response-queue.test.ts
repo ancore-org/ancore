@@ -18,6 +18,7 @@ import {
   writeSessionEntry,
   clearSessionEntry,
   sweepStaleRequests,
+  DEFAULT_APPROVAL_TTL_MS,
 } from '../response-queue';
 
 // ── chrome.storage.session mock ───────────────────────────────────────────────
@@ -367,12 +368,44 @@ describe('response queue', () => {
       const now = Date.now();
       const spy = vi.spyOn(Date, 'now').mockReturnValue(now + 20 * 60 * 1000);
 
-      const sweptCount = sweepStaleRequests(15 * 60 * 1000);
+      const sweptCount = sweepStaleRequests();
       expect(sweptCount).toBe(1);
       expect(getApproval('stale-1')).toBeUndefined();
       expect(rejectedError).toBeInstanceOf(Error);
-      expect((rejectedError as unknown as Error).message).toBe('Approval request timed out');
+      expect((rejectedError as unknown as Error).message).toBe('Request timed out');
 
+      spy.mockRestore();
+    });
+
+    it('uses a 5 minute default TTL', () => {
+      expect(DEFAULT_APPROVAL_TTL_MS).toBe(5 * 60 * 1000);
+    });
+
+    it('evicts entries older than 5 minutes and keeps fresh ones when a new request is enqueued', () => {
+      const rejections: string[] = [];
+      enqueueApproval('old', 'https://a.example', 'signTransaction', {});
+      registerResponseCallbacks(
+        'old',
+        () => {},
+        (err) => rejections.push(err.message)
+      );
+
+      const now = Date.now();
+      const spy = vi.spyOn(Date, 'now').mockReturnValue(now + 5 * 60 * 1000 + 1);
+      enqueueApproval('fresh', 'https://b.example', 'signTransaction', {});
+
+      expect(getApproval('old')).toBeUndefined();
+      expect(getApproval('fresh')).toBeDefined();
+      expect(rejections).toEqual(['Request timed out']);
+
+      spy.mockRestore();
+    });
+
+    it('does not evict entries at or under 5 minutes', () => {
+      enqueueApproval('edge', 'https://a.example', 'signTransaction', {});
+      const spy = vi.spyOn(Date, 'now').mockReturnValue(Date.now() + 5 * 60 * 1000);
+      expect(sweepStaleRequests()).toBe(0);
+      expect(getApproval('edge')).toBeDefined();
       spy.mockRestore();
     });
 

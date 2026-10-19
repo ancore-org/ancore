@@ -214,6 +214,8 @@ describe('GET /health route rate limit', () => {
     const first = await request(app).get('/health');
     expect(first.status).not.toBe(429);
     expect(String(first.headers['ratelimit-limit'])).toBe('120');
+    expect(String(first.headers['ratelimit-remaining'])).toBe('119');
+    expect(Number(first.headers['ratelimit-reset'])).toBeGreaterThan(0);
 
     for (let i = 0; i < 119; i++) {
       const res = await request(app).get('/health');

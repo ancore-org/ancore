@@ -237,7 +237,7 @@ export function createApp(
   );
   app.post('/relay/validate', auth, contentTypeGuard, relayLimiter, validate, validateHandler);
   app.get('/relay/status', statusLimiter, healthHandler);
-  app.get('/health', healthHandler);
+  app.get('/health', healthRouteLimiter, healthHandler);
   app.get('/metrics', (_req, res) => {
     res.set('Content-Type', 'text/plain; version=0.0.4; charset=utf-8');
     res.send(renderPrometheusMetrics());

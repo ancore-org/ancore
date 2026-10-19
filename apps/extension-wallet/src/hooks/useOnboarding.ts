@@ -149,7 +149,8 @@ export function useOnboarding(options: UseOnboardingOptions = {}) {
     setState((prev: OnboardingState) => {
       const currentIndex = steps.indexOf(prev.step);
       if (currentIndex > 0) {
-        return { ...prev, step: steps[currentIndex - 1], error: null };
+        const step = steps[currentIndex - 1];
+        return step === 'welcome' ? { ...DEFAULT_STATE } : { ...prev, step, error: null };
       }
       return prev;
     });
@@ -159,7 +160,9 @@ export function useOnboarding(options: UseOnboardingOptions = {}) {
    * Go to a specific step
    */
   const goToStep = useCallback((step: OnboardingStep) => {
-    setState((prev: OnboardingState) => ({ ...prev, step, error: null }));
+    setState((prev: OnboardingState) =>
+      step === 'welcome' ? { ...DEFAULT_STATE } : { ...prev, step, error: null }
+    );
   }, []);
 
   /**
