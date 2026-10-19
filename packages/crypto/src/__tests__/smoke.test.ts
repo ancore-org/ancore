@@ -37,6 +37,17 @@ const EXPECTED_EXPORTS = [
   'signTransaction',
   'verifySignature',
   'timingSafeEqual',
+
+  'BIP32PathError',
+  'BIP44_PURPOSE',
+  'STELLAR_COIN_TYPE',
+  'MAX_BIP32_INDEX',
+  'isValidBIP32Path',
+  'isStandardStellarPath',
+  'parseBIP32Path',
+  'deriveMainAccountPath',
+  'deriveSessionKeyPath',
+  'formatBIP32Path',
 ] as const;
 
 describe('@ancore/crypto smoke test', () => {

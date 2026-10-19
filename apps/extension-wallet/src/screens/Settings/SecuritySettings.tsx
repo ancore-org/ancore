@@ -237,11 +237,35 @@ export function AutoLockView({
   onDone: () => void;
 }) {
   const countdown = useAutoLockCountdown(value);
+  const [customMinutes, setCustomMinutes] = React.useState(
+    TIMEOUT_OPTIONS.some((opt) => opt.value === value) ? '' : value > 0 ? String(value) : ''
+  );
+  const [error, setError] = React.useState('');
+
+  function handleCustomSave(e: React.FormEvent) {
+    e.preventDefault();
+    setError('');
+
+    const parsed = Number(customMinutes.trim());
+    if (
+      !customMinutes.trim() ||
+      isNaN(parsed) ||
+      !Number.isInteger(parsed) ||
+      parsed < 1 ||
+      parsed > 1440
+    ) {
+      setError('Duration must be a whole number between 1 and 1440 minutes.');
+      return;
+    }
+
+    onChange(parsed);
+    onDone();
+  }
 
   return (
-    <div className="flex flex-col gap-2 p-4">
+    <div className="flex flex-col gap-3 p-4">
       {value > 0 && (
-        <div className="mb-2 rounded-xl bg-accent/40 border border-border/50 p-3 flex items-center justify-between text-xs">
+        <div className="mb-1 rounded-xl bg-accent/40 border border-border/50 p-3 flex items-center justify-between text-xs">
           <span className="text-muted-foreground font-medium">Session Status</span>
           <span data-testid="auto-lock-countdown" className="font-semibold text-primary">
             {countdown}
@@ -251,10 +275,12 @@ export function AutoLockView({
       <p className="text-xs text-muted-foreground mb-1">
         Wallet will lock automatically after the selected period of inactivity.
       </p>
+
       <div className="rounded-xl border border-border bg-card overflow-hidden divide-y divide-border">
         {TIMEOUT_OPTIONS.map((opt) => (
           <button
             key={opt.value}
+            type="button"
             className="flex w-full items-center justify-between px-4 py-3.5 text-sm hover:bg-accent/50 transition-colors"
             onClick={() => {
               onChange(opt.value);
@@ -269,6 +295,36 @@ export function AutoLockView({
             )}
           </button>
         ))}
+      </div>
+
+      <div className="mt-2 rounded-xl border border-border bg-card p-4">
+        <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wider block mb-2">
+          Custom Duration (Minutes)
+        </label>
+        <form noValidate onSubmit={handleCustomSave} className="flex flex-col gap-2">
+          <div className="flex gap-2">
+            <Input
+              type="number"
+              min="1"
+              max="1440"
+              step="1"
+              placeholder="e.g. 60"
+              value={customMinutes}
+              onChange={(e: React.ChangeEvent<HTMLInputElement>) => {
+                setCustomMinutes(e.target.value);
+                setError('');
+              }}
+              className="flex-1"
+            />
+            <Button type="submit" size="sm">
+              Save
+            </Button>
+          </div>
+          {error && <p className="text-xs text-destructive mt-1">{error}</p>}
+          <p className="text-[11px] text-muted-foreground">
+            Enter any duration from 1 minute up to 1440 minutes (24 hours).
+          </p>
+        </form>
       </div>
     </div>
   );
