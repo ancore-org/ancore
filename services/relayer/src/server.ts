@@ -313,6 +313,10 @@ if (require.main === module) {
     const server = app.listen(env.PORT, () => {
       console.log(`Relayer service listening on port ${env.PORT}`);
     });
+    // Avoid 502 Bad Gateway behind AWS ALB / Cloudflare (both use 60s+
+    // keepalive). headersTimeout must exceed keepAliveTimeout.
+    server.keepAliveTimeout = 65_000;
+    server.headersTimeout = 66_000;
 
     // Drain on SIGTERM/SIGINT instead of dying mid-flight (#1346). Installed
     // only when this file is the entrypoint: importing `createApp` into a test

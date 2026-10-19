@@ -209,6 +209,26 @@ export function validateMnemonic(mnemonic: string): boolean {
  * Unit vectors are maintained in
  * `src/__tests__/vectors/mnemonic-strength-vectors.json`.
  */
+/**
+ * Returns true if every word in `phrase` is a valid BIP39 English word AND the
+ * BIP39 checksum bits are correct. Returns false for any other input including
+ * wrong word counts, unknown words, or a corrupted final word.
+ *
+ * @param phrase - The mnemonic phrase to check (12 or 24 space-separated words)
+ */
+export function isValidMnemonicChecksum(phrase: string): boolean {
+  if (!phrase || typeof phrase !== 'string') return false;
+  const words = phrase.trim().split(/\s+/);
+  if (words.length !== 12 && words.length !== 24) return false;
+  const normalized = words.join(' ');
+  try {
+    assertEnglishMnemonic(normalized);
+  } catch {
+    return false;
+  }
+  return bip39.validateMnemonic(normalized);
+}
+
 export function validateMnemonicStrength(mnemonic: string): void {
   if (!mnemonic || typeof mnemonic !== 'string') {
     throw new MnemonicValidationError('INVALID_TYPE', 'Mnemonic must be a non-empty string');

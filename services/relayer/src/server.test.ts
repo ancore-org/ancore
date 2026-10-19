@@ -1,3 +1,4 @@
+import http from 'http';
 import { createApp } from './server';
 import { resetEnvCache } from './config/env';
 
@@ -64,5 +65,23 @@ describe('relayer server startup guard', () => {
       process.env.DATABASE_URL = originalDatabaseUrl;
       process.exit = originalExit;
     }
+  });
+});
+
+describe('HTTP server keep-alive timeouts', () => {
+  afterEach(() => {
+    resetEnvCache();
+  });
+
+  it('sets keepAliveTimeout >= 65000ms and headersTimeout > keepAliveTimeout', (done) => {
+    const app = createApp();
+    const server = http.createServer(app);
+    server.keepAliveTimeout = 65_000;
+    server.headersTimeout = 66_000;
+
+    expect(server.keepAliveTimeout).toBeGreaterThanOrEqual(65_000);
+    expect(server.headersTimeout).toBeGreaterThan(server.keepAliveTimeout);
+
+    server.close(done);
   });
 });
