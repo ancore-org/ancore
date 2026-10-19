@@ -18,28 +18,33 @@ import { createLogger } from '../logger';
 
 const log = createLogger('[ancore-extension/handlers/lock-unlock]');
 
+export async function executeLockWallet(): Promise<boolean> {
+  try {
+    setBackgroundSessionUnlocked(false);
+    getSharedStorageManager().lock();
+    await clearUnlockSession();
+
+    const authState = readAuthState();
+    await setChromeLocalStorage(
+      'ancore_extension_auth',
+      JSON.stringify({
+        ...authState,
+        isUnlocked: false,
+      })
+    );
+
+    log.info('wallet locked');
+    return true;
+  } catch (err) {
+    log.error('lock failed', err);
+    return false;
+  }
+}
+
 export function registerLockUnlockHandlers(): void {
   registerHandler('LOCK_WALLET', async () => {
-    try {
-      setBackgroundSessionUnlocked(false);
-      getSharedStorageManager().lock();
-      await clearUnlockSession();
-
-      const authState = readAuthState();
-      await setChromeLocalStorage(
-        'ancore_extension_auth',
-        JSON.stringify({
-          ...authState,
-          isUnlocked: false,
-        })
-      );
-
-      log.info('wallet locked');
-      return { success: true };
-    } catch (err) {
-      log.error('lock failed', err);
-      return { success: false };
-    }
+    const success = await executeLockWallet();
+    return { success };
   });
 
   registerHandler('UNLOCK_WALLET', async ({ password }) => {

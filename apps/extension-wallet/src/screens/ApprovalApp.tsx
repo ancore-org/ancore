@@ -1,4 +1,5 @@
 import { SignTransactionApprovalScreen } from './SignTransactionApprovalScreen';
+import { GrantAccessScreen } from './GrantAccess/GrantAccessScreen';
 
 type ApprovalRoute =
   | 'grant-access'
@@ -52,6 +53,18 @@ export function ApprovalApp() {
       <div className="flex min-h-screen items-center justify-center p-4 text-center text-sm text-muted-foreground">
         No approval request found.
       </div>
+    );
+  }
+
+  if (route === 'grant-access') {
+    return (
+      <GrantAccessScreen
+        requestId={requestId}
+        dappName={params.get('dappName') || undefined}
+        origin={params.get('origin') || undefined}
+        iconUrl={params.get('iconUrl') || undefined}
+        description={params.get('description') || undefined}
+      />
     );
   }
 
