@@ -1,224 +1,259 @@
-# Schema Assumptions and Migration Path
+# Ancore Indexer Schema & Migration Guide
 
-## Current Schema (v1)
+Comprehensive reference guide for the PostgreSQL database schema, data models, idempotency guarantees, and SQLx migration workflow powering the Ancore Indexer service.
 
-### Table: account_activity
+---
 
-```sql
-CREATE TABLE IF NOT EXISTS account_activity (
-    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    account_id VARCHAR(56) NOT NULL,
-    activity_type VARCHAR(50) NOT NULL,
-    amount NUMERIC(20, 7),
-    asset VARCHAR(100),
-    counterparty VARCHAR(56),
-    tx_hash VARCHAR(64) NOT NULL,
-    ledger_seq BIGINT NOT NULL,
-    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-    metadata JSONB
-);
+## 1. Architecture & Entity-Relationship Model
+
+The Ancore Indexer ingests ledger transactions and contract events from the Stellar/Soroban network, parses and normalizes user operations, and stores them in PostgreSQL to provide low-latency query APIs for wallet clients, account dashboards, and activity feeds.
+
+```mermaid
+erDiagram
+    account_activity {
+        uuid id PK
+        varchar account_id
+        varchar activity_type
+        numeric amount
+        varchar asset
+        varchar asset_code
+        varchar asset_issuer
+        varchar counterparty
+        varchar tx_hash
+        bigint ledger_seq
+        timestamptz created_at
+        jsonb metadata
+    }
+
+    contract_events {
+        uuid id PK
+        varchar contract_address
+        varchar account_id
+        varchar event_type
+        bigint ledger_seq
+        timestamptz timestamp
+        varchar tx_hash
+        jsonb data
+    }
+
+    ingest_checkpoints {
+        varchar stream PK
+        bigint last_ledger_seq
+        timestamptz updated_at
+    }
+
+    ingest_dead_letters {
+        uuid id PK
+        varchar stream
+        bigint ledger_seq
+        varchar tx_hash
+        varchar contract_id
+        text error_message
+        jsonb raw_payload
+        timestamptz created_at
+        timestamptz reprocessed_at
+    }
+
+    schema_migrations {
+        integer version PK
+        text name
+        timestamptz applied_at
+    }
 ```
 
-### Schema Assumptions
+---
 
-1. **Account ID Format**: Stellar public keys (G-prefixed, 56 characters)
-2. **Activity Types**: String-based enum values (payment, create_account, set_options, etc.)
-3. **Amount Precision**: NUMERIC(20,7) supports up to 13 digits before decimal, 7 after
-4. **Asset Format**: Either "XLM" for native or "CODE:ISSUER" for tokens
-5. **Transaction Hash**: 64-character hex string
-6. **Metadata**: Flexible JSONB for future extensibility
-7. **Timestamps**: UTC with microsecond precision
+## 2. Table Specifications
 
-### Index Strategy
+### 2.1 `account_activity`
 
-- Primary query: `(account_id, created_at DESC)` - Time-ordered activity feeds
-- Type filtering: `(account_id, activity_type, created_at DESC)` - Filtered feeds
-- Ledger queries: `(account_id, ledger_seq DESC)` - Ledger-based queries
-- Transaction lookup: `(tx_hash)` - Cross-account transaction details
+Stores normalized account activities (payments, contract calls, account creation, trustline changes) for wallet transaction history feeds.
 
-## Migration Path to Production
+| Column          | Type            | Constraints                             | Description                                                    |
+| :-------------- | :-------------- | :-------------------------------------- | :------------------------------------------------------------- |
+| `id`            | `UUID`          | `PRIMARY KEY DEFAULT gen_random_uuid()` | Unique activity identifier                                     |
+| `account_id`    | `VARCHAR(56)`   | `NOT NULL`                              | Stellar public key (`G...`) of the affected account            |
+| `activity_type` | `VARCHAR(50)`   | `NOT NULL`                              | Activity enum (`payment`, `invoke`, `create_account`, etc.)    |
+| `amount`        | `NUMERIC(20,7)` | `NULL`                                  | Amount in decimal units (7 decimal precision matching Stroops) |
+| `asset`         | `VARCHAR(100)`  | `NULL`                                  | Legacy/raw asset representation (`native` or `CODE:ISSUER`)    |
+| `asset_code`    | `VARCHAR(12)`   | `NULL`                                  | Normalized asset code (`XLM`, `USDC`, etc.)                    |
+| `asset_issuer`  | `VARCHAR(56)`   | `NULL`                                  | Stellar public key of the credit asset issuer (`NULL` for XLM) |
+| `counterparty`  | `VARCHAR(56)`   | `NULL`                                  | Destination or source public key involved in the activity      |
+| `tx_hash`       | `VARCHAR(64)`   | `NOT NULL`                              | 64-character lowercase hex Stellar transaction hash            |
+| `ledger_seq`    | `BIGINT`        | `NOT NULL`                              | Ledger sequence number in which the transaction finalized      |
+| `created_at`    | `TIMESTAMPTZ`   | `NOT NULL DEFAULT NOW()`                | UTC ledger close timestamp                                     |
+| `metadata`      | `JSONB`         | `NULL`                                  | Extensible JSON payload with additional transaction details    |
 
-### Phase 1: MVP (Current)
+**Idempotency & Indexes:**
 
-- Single table schema
-- In-memory event processing
-- Basic query endpoints
-- Mock storage adapters
+- Constraint `uq_account_activity_tx_account_type_ledger`: `UNIQUE (tx_hash, account_id, activity_type, ledger_seq)`
+- Index `idx_account_activity_account_created`: `(account_id, created_at DESC)` for chronological activity feeds.
+- Index `idx_account_activity_account_ledger`: `(account_id, ledger_seq DESC)` for range and pagination scans.
+- Index `idx_account_activity_tx_hash`: `(tx_hash)` for point lookups.
 
-### Phase 2: Production Hardening
+---
 
-**Migration 002: Add Partitioning**
+### 2.2 `contract_events`
 
-```sql
--- Partition by account_id for better performance at scale
-CREATE TABLE account_activity_partitioned (
-    LIKE account_activity INCLUDING ALL
-) PARTITION BY HASH (account_id);
+Stores raw and decoded Soroban smart contract events emitted during ledger execution.
 
--- Create 8 partitions
-CREATE TABLE account_activity_part_0 PARTITION OF account_activity_partitioned
-    FOR VALUES WITH (modulus 8, remainder 0);
--- ... repeat for remainders 1-7
-```
+| Column             | Type          | Constraints                             | Description                                               |
+| :----------------- | :------------ | :-------------------------------------- | :-------------------------------------------------------- |
+| `id`               | `UUID`        | `PRIMARY KEY DEFAULT gen_random_uuid()` | Unique event identifier                                   |
+| `contract_address` | `VARCHAR(56)` | `NOT NULL`                              | Soroban contract ID (`C...`)                              |
+| `account_id`       | `VARCHAR(56)` | `NOT NULL`                              | Associated smart account or user identity address         |
+| `event_type`       | `VARCHAR(50)` | `NOT NULL`                              | Event topic symbol (e.g. `session_key_added`, `transfer`) |
+| `ledger_seq`       | `BIGINT`      | `NOT NULL`                              | Ledger sequence number                                    |
+| `timestamp`        | `TIMESTAMPTZ` | `NOT NULL`                              | UTC timestamp of event emission                           |
+| `tx_hash`          | `VARCHAR(64)` | `NOT NULL`                              | Transaction hash                                          |
+| `data`             | `JSONB`       | `NOT NULL DEFAULT '{}'::jsonb`          | Decoded event payload parameters                          |
 
-**Migration 003: Add Versioning**
+**Idempotency & Indexes:**
 
-```sql
-ALTER TABLE account_activity ADD COLUMN schema_version INTEGER DEFAULT 1;
-ALTER TABLE account_activity ADD COLUMN ingested_at TIMESTAMPTZ DEFAULT NOW();
-```
+- Constraint `uq_contract_events_tx_event_ledger`: `UNIQUE (tx_hash, event_type, ledger_seq)`
+- Index `idx_contract_events_contract_address`: `(contract_address)`
+- Index `idx_contract_events_account_id`: `(account_id)`
+- Index `idx_contract_events_account_id_event_type`: `(account_id, event_type)`
+- Index `idx_contract_events_ledger_seq`: `(ledger_seq DESC)`
+- Index `idx_contract_events_timestamp`: `(timestamp DESC)`
 
-**Migration 004: Enhanced Indexes**
+---
 
-```sql
--- Composite indexes for common query patterns
-CREATE INDEX idx_account_activity_composite
-ON account_activity (account_id, activity_type, asset, created_at DESC);
+### 2.3 `ingest_checkpoints`
 
--- Partial indexes for better performance
-CREATE INDEX idx_account_activity_payments
-ON account_activity (account_id, created_at DESC)
-WHERE activity_type = 'payment';
-```
+Tracks stream progress and watermark positions to ensure crash recovery and resumable stream ingestion.
 
-### Phase 3: Scalability
+| Column            | Type          | Constraints              | Description                                                            |
+| :---------------- | :------------ | :----------------------- | :--------------------------------------------------------------------- |
+| `stream`          | `VARCHAR(64)` | `PRIMARY KEY`            | Ingestion stream identifier (e.g. `mainnet_ledgers`, `testnet_events`) |
+| `last_ledger_seq` | `BIGINT`      | `NOT NULL`               | Highest continuous ledger sequence committed to the database           |
+| `updated_at`      | `TIMESTAMPTZ` | `NOT NULL DEFAULT NOW()` | Timestamp of last watermark update                                     |
 
-**Migration 005: Add Event Sourcing**
+---
 
-```sql
--- Separate events table for audit trail
-CREATE TABLE account_events (
-    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    account_id VARCHAR(56) NOT NULL,
-    event_type VARCHAR(50) NOT NULL,
-    event_data JSONB NOT NULL,
-    sequence_number BIGINT NOT NULL,
-    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-    processed_at TIMESTAMPTZ
-);
-```
+### 2.4 `ingest_dead_letters`
 
-**Migration 006: Add Materialized Views**
+Dead-letter queue (DLQ) storing unparseable or rejected events so that ingestion continues without dropping malformed records.
 
-```sql
--- Pre-aggregated views for common queries
-CREATE MATERIALIZED VIEW account_summary AS
-SELECT
-    account_id,
-    COUNT(*) as total_transactions,
-    MAX(created_at) as last_activity,
-    COUNT(DISTINCT activity_type) as activity_types
-FROM account_activity
-GROUP BY account_id;
-```
+| Column           | Type          | Constraints                             | Description                                         |
+| :--------------- | :------------ | :-------------------------------------- | :-------------------------------------------------- |
+| `id`             | `UUID`        | `PRIMARY KEY DEFAULT gen_random_uuid()` | Unique dead letter record ID                        |
+| `stream`         | `VARCHAR(64)` | `NOT NULL`                              | Source stream name                                  |
+| `ledger_seq`     | `BIGINT`      | `NOT NULL`                              | Ledger sequence where failure occurred              |
+| `tx_hash`        | `VARCHAR(64)` | `NOT NULL DEFAULT ''`                   | Transaction hash if known                           |
+| `contract_id`    | `VARCHAR(56)` | `NOT NULL DEFAULT ''`                   | Contract ID if known                                |
+| `error_message`  | `TEXT`        | `NOT NULL`                              | Stack trace or failure description                  |
+| `raw_payload`    | `JSONB`       | `NOT NULL`                              | Unprocessed raw payload                             |
+| `created_at`     | `TIMESTAMPTZ` | `NOT NULL DEFAULT NOW()`                | Time failure was caught                             |
+| `reprocessed_at` | `TIMESTAMPTZ` | `NULL`                                  | Populated when dead letter is replayed and resolved |
 
-## Production Datastore Migration
+**Idempotency & Indexes:**
 
-### From Mock to PostgreSQL
+- Constraint `uq_ingest_dead_letters_stream_ledger_tx`: `UNIQUE (stream, ledger_seq, tx_hash)`
+- Index `idx_ingest_dead_letters_stream_ledger`: `(stream, ledger_seq DESC)`
+- Partial Index `idx_ingest_dead_letters_unprocessed`: `(created_at) WHERE reprocessed_at IS NULL`
 
-1. **Data Export**: Export mock data to JSON/CSV format
-2. **Schema Validation**: Ensure data conforms to production schema
-3. **Bulk Import**: Use `COPY` command for efficient loading
-4. **Index Rebuild**: Create indexes after data import
-5. **Validation**: Run data integrity checks
+---
 
-### Migration Script Template
+### 2.5 `schema_migrations`
+
+Internal ledger tracking applied migrations. Queried by the `/health` endpoint to report database readiness and schema versions.
+
+| Column       | Type          | Constraints              | Description                                  |
+| :----------- | :------------ | :----------------------- | :------------------------------------------- |
+| `version`    | `INTEGER`     | `PRIMARY KEY`            | Migration sequence number (1, 2, 3...)       |
+| `name`       | `TEXT`        | `NOT NULL`               | Description matching the migration file name |
+| `applied_at` | `TIMESTAMPTZ` | `NOT NULL DEFAULT NOW()` | When the migration was executed              |
+
+---
+
+## 3. Migration Catalog (001 - 009)
+
+Every migration file resides in `services/indexer/migrations/` and follows strict sequence numbering.
+
+1. **`001_create_account_activity_table.sql`**: Initial schema defining `account_activity` and core query indexes (`account_id`, `ledger_seq`, `tx_hash`).
+2. **`002_create_ingest_checkpoints_table.sql`**: Creates `ingest_checkpoints` watermark table to enable checkpoint resumption.
+3. **`003_add_asset_code_issuer_to_account_activity.sql`**: Adds normalized `asset_code` and `asset_issuer` columns and backfills existing rows from `asset`.
+4. **`004_create_contract_events_table.sql`**: Creates `contract_events` table for Soroban contract event ingestion.
+5. **`005_create_schema_migrations_table.sql`**: Creates `schema_migrations` audit ledger and backfills versions 1–5.
+6. **`006_add_account_id_to_contract_events.sql`**: Adds `account_id` to `contract_events` with indexing and backfill.
+7. **`007_add_ingest_idempotency_constraints.sql`**: Adds unique constraints to `contract_events` and `account_activity` to guarantee idempotent replay and deduplication.
+8. **`008_create_ingest_dead_letters_table.sql`**: Creates `ingest_dead_letters` table for recording unparseable events.
+9. **`009_add_dead_letter_idempotency.sql`**: Adds unique constraint `uq_ingest_dead_letters_stream_ledger_tx` to prevent duplicate dead-letter entries upon retries.
+
+---
+
+## 4. Local Setup & Docker Development Workflow
+
+### Step 1: Start PostgreSQL via Docker
 
 ```bash
-#!/bin/bash
-# migration_v1_to_v2.sh
-
-set -e
-
-echo "Starting migration from v1 to v2..."
-
-# 1. Backup current data
-pg_dump $DATABASE_URL > backup_v1_$(date +%Y%m%d_%H%M%S).sql
-
-# 2. Apply schema changes
-psql $DATABASE_URL -f migrations/002_add_partitioning.sql
-psql $DATABASE_URL -f migrations/003_add_versioning.sql
-
-# 3. Migrate data (if needed)
-# psql $DATABASE_URL -c "INSERT INTO account_activity_partitioned SELECT * FROM account_activity;"
-
-# 4. Update indexes
-psql $DATABASE_URL -f migrations/004_enhanced_indexes.sql
-
-# 5. Validate migration
-psql $DATABASE_URL -c "SELECT COUNT(*) FROM account_activity_partitioned;"
-
-echo "Migration completed successfully!"
+docker run -d \
+  --name ancore-postgres \
+  -e POSTGRES_USER=postgres \
+  -e POSTGRES_PASSWORD=postgres \
+  -e POSTGRES_DB=ancore_indexer \
+  -p 5432:5432 \
+  postgres:16-alpine
 ```
 
-## Backward Compatibility
+### Step 2: Configure Environment Variable
 
-### API Versioning
-
-- `/api/v1/` - Current MVP endpoints
-- `/api/v2/` - Future production endpoints with enhanced features
-
-### Data Migration Rules
-
-1. **Never delete columns** - Add new columns with DEFAULT values
-2. **Maintain old endpoints** - Support v1 clients during transition
-3. **Feature flags** - Enable new features incrementally
-4. **Rollback strategy** - Always have a rollback path
-
-## Performance Considerations
-
-### Query Optimization
-
-- Use `EXPLAIN ANALYZE` to verify query plans
-- Monitor index usage with `pg_stat_user_indexes`
-- Consider `VACUUM ANALYZE` after large data imports
-
-### Storage Optimization
-
-- JSONB compression for metadata
-- Table partitioning for large datasets
-- Consider TimescaleDB for time-series optimization
-
-## Monitoring and Alerting
-
-### Key Metrics
-
-- Query latency by endpoint
-- Database connection pool usage
-- Event ingestion lag
-- Index hit ratios
-
-### Health Checks
-
-```sql
--- Simple health check
-SELECT 1 as health_check;
-
--- Table size monitoring
-SELECT
-    schemaname,
-    tablename,
-    pg_size_pretty(pg_total_relation_size(schemaname||'.'||tablename)) as size
-FROM pg_tables
-WHERE tablename = 'account_activity';
+```bash
+export DATABASE_URL="postgres://postgres:postgres@localhost:5432/ancore_indexer"
 ```
 
-## Security Considerations
+### Step 3: Run SQLx Migrations
 
-### Data Protection
+Apply all migrations in order:
 
-- Row-level security for multi-tenant scenarios
-- Encryption at rest for sensitive metadata
-- Audit logging for data access
-
-### Access Control
-
-```sql
--- Read-only user for query endpoints
-CREATE USER indexer_read WITH PASSWORD 'secure_password';
-GRANT SELECT ON account_activity TO indexer_read;
-
--- Write user for ingestion
-CREATE USER indexer_write WITH PASSWORD 'secure_password';
-GRANT INSERT, UPDATE ON account_activity TO indexer_write;
+```bash
+sqlx migrate run --source services/indexer/migrations
 ```
+
+Revert the last migration (if needed during testing):
+
+```bash
+sqlx migrate revert --source services/indexer/migrations
+```
+
+### Step 4: Validate Offline Query Metadata (SQLx Prepare)
+
+The Ancore Indexer uses SQLx compile-time query verification. In CI, queries are validated against cached metadata in `.sqlx/`:
+
+```bash
+cd services/indexer
+cargo sqlx prepare --check
+```
+
+To update the `.sqlx` query cache after modifying SQL queries:
+
+```bash
+cd services/indexer
+cargo sqlx prepare
+```
+
+---
+
+## 5. Migration Linting Conventions
+
+All migration files are automatically verified by CI using `services/indexer/scripts/lint-migrations.mjs`.
+
+### Conventions:
+
+- **Filename Pattern**: `^\\d{3}_[a-z][a-z0-9_]*\\.sql$` (e.g. `010_add_user_preferences_table.sql`).
+- **Sequencing**: Exactly 3 zero-padded digits with strictly ascending, non-duplicate sequence numbers.
+- **Ledger Ingestion**: Every migration starting from 005 must include:
+  ```sql
+  INSERT INTO schema_migrations (version, name)
+  VALUES (10, 'add_user_preferences_table')
+  ON CONFLICT (version) DO NOTHING;
+  ```
+
+### Running the Linter:
+
+```bash
+node services/indexer/scripts/lint-migrations.mjs
+```
+
+Exits `0` on success and `1` on any duplicate sequence or invalid filename.

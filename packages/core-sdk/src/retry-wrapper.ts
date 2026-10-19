@@ -12,7 +12,13 @@ export { withRetry, type RetryOptions } from '@ancore/stellar';
 export { RetryExhaustedError } from '@ancore/stellar';
 
 import { withRetry, type RetryOptions } from '@ancore/stellar';
-import { LOW_LATENCY, RELIABLE, AGGRESSIVE, getRetryPreset, type RetryPresetName } from './retry-presets';
+import {
+  LOW_LATENCY,
+  RELIABLE,
+  AGGRESSIVE,
+  getRetryPreset,
+  type RetryPresetName,
+} from './retry-presets';
 
 /**
  * Default retry options for AncoreClient network calls.
@@ -37,12 +43,10 @@ export const DEFAULT_CLIENT_RETRY: RetryOptions = AGGRESSIVE;
  */
 export function wrapWithRetry<T extends (...args: any[]) => Promise<any>>(
   fn: T,
-  options?: RetryOptions | RetryPresetName,
+  options?: RetryOptions | RetryPresetName
 ): T {
   const opts: RetryOptions =
-    typeof options === 'string'
-      ? getRetryPreset(options)
-      : options ?? DEFAULT_CLIENT_RETRY;
+    typeof options === 'string' ? getRetryPreset(options) : (options ?? DEFAULT_CLIENT_RETRY);
 
   return ((...args: Parameters<T>) => withRetry(() => fn(...args), opts)) as T;
 }
@@ -68,25 +72,30 @@ export function wrapWithRetry<T extends (...args: any[]) => Promise<any>>(
  */
 export function wrapObjectWithRetry<T extends Record<string, any>>(
   obj: T,
-  options?: RetryOptions | RetryPresetName,
+  options?: RetryOptions | RetryPresetName
 ): T {
   const opts: RetryOptions =
-    typeof options === 'string'
-      ? getRetryPreset(options)
-      : options ?? DEFAULT_CLIENT_RETRY;
+    typeof options === 'string' ? getRetryPreset(options) : (options ?? DEFAULT_CLIENT_RETRY);
 
   const result: Record<string, any> = {};
   for (const key of Object.keys(obj)) {
     const value = obj[key];
     if (typeof value === 'function') {
-      // Check if it's async (returns a Promise)
-      result[key] = (...args: any[]) => {
-        const ret = value.apply(obj, args);
-        if (ret && typeof ret.then === 'function') {
-          return withRetry(() => ret, opts);
-        }
-        return ret;
-      };
+      const isAsync =
+        value.constructor?.name === 'AsyncFunction' ||
+        (value as any)[Symbol.toStringTag] === 'AsyncFunction';
+
+      if (isAsync) {
+        result[key] = (...args: any[]) => withRetry(() => value.apply(obj, args), opts);
+      } else {
+        result[key] = (...args: any[]) => {
+          const ret = value.apply(obj, args);
+          if (ret && typeof ret.then === 'function') {
+            return ret.catch(() => withRetry(() => value.apply(obj, args), opts));
+          }
+          return ret;
+        };
+      }
     } else {
       result[key] = value;
     }

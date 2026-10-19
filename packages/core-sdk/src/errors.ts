@@ -91,7 +91,7 @@ export function isInsufficientBalance(
 }
 
 /** True when a signing request or submitted transaction has an invalid signature. */
-export function isInvalidSignatureError(
+export function isInvalidSignature(
   error: unknown
 ): error is ErrorWithCode<
   'INVALID_SIGNATURE' | 'SIGNATURE_INVALID' | 'TX_BAD_AUTH' | 'OP_BAD_AUTH'
@@ -102,6 +102,29 @@ export function isInvalidSignatureError(
     'TX_BAD_AUTH',
     'OP_BAD_AUTH',
   ] as const);
+}
+export const isInvalidSignatureError = isInvalidSignature;
+
+/** True when a network error occurred. */
+export function isNetworkError(
+  error: unknown
+): error is ErrorWithCode<
+  'NETWORK_ERROR' | 'NETWORK_TIMEOUT' | 'ETIMEDOUT' | 'ECONNRESET' | 'ECONNREFUSED'
+> {
+  return hasErrorCode(error, [
+    'NETWORK_ERROR',
+    'NETWORK_TIMEOUT',
+    'ETIMEDOUT',
+    'ECONNRESET',
+    'ECONNREFUSED',
+  ] as const);
+}
+
+/** True when a contract execution failed. */
+export function isContractFailed(
+  error: unknown
+): error is ErrorWithCode<'CONTRACT_FAILED' | 'CONTRACT_ERROR' | 'TX_FAILED'> {
+  return hasErrorCode(error, ['CONTRACT_FAILED', 'CONTRACT_ERROR', 'TX_FAILED'] as const);
 }
 
 /** True when a request exceeded its network timeout. */

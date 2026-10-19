@@ -70,3 +70,6 @@ export { signPayload, signTransaction, verifySignature } from './signing';
 
 // Constant-time comparison
 export { timingSafeEqual } from './timing-safe';
+
+// Raw Seed Import
+export { importRawEd25519Seed } from './keys';

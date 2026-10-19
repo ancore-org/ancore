@@ -25,13 +25,17 @@ import { deriveContractId } from './wallet';
 
 import { withRetry, type RetryOptions } from './utils/retry';
 
-import { withRetry, type RetryOptions } from './utils/retry';
-
 export interface AncoreClientOptions {
   accountContractId: string;
   /**
    * Default retry configuration for network and RPC calls.
    */
+  retryOptions?: RetryOptions;
+}
+
+export interface CreateSmartAccountClientOptions {
+  network?: Network;
+  accountContractId?: string;
   retryOptions?: RetryOptions;
 }
 
@@ -50,6 +54,37 @@ export class AncoreClient {
     this.accountContractId = options.accountContractId;
     this.accountContract = new AccountContract(options.accountContractId);
     this.retryOptions = options.retryOptions;
+  }
+
+  /**
+   * Creates an initialized AncoreClient instance for a smart account.
+   * If a contract ID (C...) is provided or explicitly configured, it is used directly.
+   * Otherwise, derives the deterministic contract ID from the public key and network.
+   *
+   * @param publicKey Owner's Stellar public key (G...) or contract ID (C...)
+   * @param options Optional network and client configuration
+   */
+  static createSmartAccount(
+    publicKey: string,
+    options?: CreateSmartAccountClientOptions
+  ): AncoreClient {
+    if (!publicKey) {
+      throw new BuilderValidationError('publicKey is required');
+    }
+
+    let accountContractId: string;
+    if (options?.accountContractId) {
+      accountContractId = options.accountContractId;
+    } else if (StrKey.isValidContract(publicKey)) {
+      accountContractId = publicKey;
+    } else {
+      accountContractId = deriveContractId(publicKey, options?.network ?? 'testnet');
+    }
+
+    return new AncoreClient({
+      accountContractId,
+      retryOptions: options?.retryOptions,
+    });
   }
 
   /**

@@ -36,6 +36,7 @@ const EXPECTED_EXPORTS = [
   'signTransaction',
   'verifySignature',
   'timingSafeEqual',
+  'importRawEd25519Seed',
 ] as const;
 
 describe('@ancore/crypto smoke test', () => {
