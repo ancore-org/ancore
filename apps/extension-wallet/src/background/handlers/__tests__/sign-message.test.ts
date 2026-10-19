@@ -9,9 +9,13 @@ vi.mock('@/messaging', () => ({
   registerHandler: vi.fn(),
 }));
 
-vi.mock('../../session-state', () => ({
-  isBackgroundSessionUnlocked: vi.fn(),
-}));
+vi.mock('../../session-state', () => {
+  const isBackgroundSessionUnlocked = vi.fn();
+  return {
+    isBackgroundSessionUnlocked,
+    isBackgroundSessionUnlockedAsync: vi.fn(async () => isBackgroundSessionUnlocked()),
+  };
+});
 
 vi.mock('../../signing-key', () => ({
   getSigningKeypair: vi.fn(),
