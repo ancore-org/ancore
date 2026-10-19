@@ -133,6 +133,30 @@ async fn health_keeps_reporting_ledger_lag_fields() {
 
 #[tokio::test]
 #[ignore]
+async fn health_returns_200_when_db_pool_is_reachable() {
+    // #1545 — health_handler now pings the pool before doing anything else.
+    // When the pool is healthy the endpoint must still return 200.
+    let (app, _pool) = setup().await;
+    let response = app
+        .clone()
+        .oneshot(
+            Request::builder()
+                .uri("/health")
+                .body(Body::empty())
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+
+    assert_eq!(
+        response.status(),
+        StatusCode::OK,
+        "/health must return 200 when the DB pool is reachable"
+    );
+}
+
+#[tokio::test]
+#[ignore]
 async fn migration_state_matches_the_expected_version() {
     let (_app, pool) = setup().await;
 

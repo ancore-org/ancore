@@ -192,4 +192,44 @@ describe('QueueWorker', () => {
     expect(receivedJob?.payload).toEqual({ amount: 42 });
     expect(receivedJob?.type).toBe('relay_execute');
   });
+
+  it('preserves requestId from enqueue options on the job (#1530)', async () => {
+    const TEST_REQUEST_ID = 'test-req-abc-123';
+    let receivedJob: Job | undefined;
+
+    const handler = jest.fn().mockImplementation(async (job: Job) => {
+      receivedJob = job;
+    });
+
+    const worker = new QueueWorker(queue, { relay_execute: handler }, { pollIntervalMs: 10 });
+    queue.enqueue({
+      idempotencyKey: 'req-id-test',
+      type: 'relay_execute',
+      payload: { op: 'relay' },
+      requestId: TEST_REQUEST_ID,
+    });
+
+    worker.start();
+    await delay(100);
+    await worker.stop();
+
+    expect(receivedJob?.requestId).toBe(TEST_REQUEST_ID);
+  });
+
+  it('leaves requestId undefined when not supplied', async () => {
+    let receivedJob: Job | undefined;
+
+    const handler = jest.fn().mockImplementation(async (job: Job) => {
+      receivedJob = job;
+    });
+
+    const worker = new QueueWorker(queue, { relay_execute: handler }, { pollIntervalMs: 10 });
+    queue.enqueue({ idempotencyKey: 'no-req-id', type: 'relay_execute', payload: {} });
+
+    worker.start();
+    await delay(100);
+    await worker.stop();
+
+    expect(receivedJob?.requestId).toBeUndefined();
+  });
 });

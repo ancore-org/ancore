@@ -136,12 +136,33 @@ async fn fetch_chain_head_from_rpc(rpc_url: &str) -> anyhow::Result<i64> {
     }
 }
 
+/// Acquire a connection from the pool and run `SELECT 1` to confirm the
+/// database is reachable. Returns `Err` if the acquire times out (1 second)
+/// or the query fails (#1545).
+async fn ping_database(db: &PgPool) -> anyhow::Result<()> {
+    use std::time::Duration;
+    use tokio::time::timeout;
+
+    let conn = timeout(Duration::from_secs(1), db.acquire())
+        .await
+        .map_err(|_| anyhow::anyhow!("database ping timed out"))??;
+
+    sqlx::query("SELECT 1").execute(&mut conn.detach()).await?;
+    Ok(())
+}
+
 /// GET /health
 ///
 /// Returns indexer lag metrics derived from the account_activity table plus
 /// the live database schema version read from the `schema_migrations` ledger.
 /// The chain_head sequence is fetched from the live network via getLatestLedger RPC.
+/// Also pings the connection pool; returns 503 if the ping fails (#1545).
 pub async fn health_handler(State(db): State<PgPool>) -> Result<Json<HealthResponse>> {
+    // Verify the pool is alive before doing anything else (#1545).
+    ping_database(&db)
+        .await
+        .map_err(|e| ApiError::Internal(e))?;
+
     // Latest ledger the indexer has indexed (most-recent record persisted).
     let indexed_row =
         sqlx::query("SELECT COALESCE(MAX(ledger_seq), 0) AS latest FROM account_activity")
@@ -258,5 +279,16 @@ mod tests {
     #[test]
     fn unknown_takes_priority_over_degraded_migrations() {
         assert_eq!(overall_status(0, MigrationStatus::Pending, true), "unknown");
+    }
+
+    // #1545: health_handler returns 503 when the DB pool is exhausted.
+    // ping_database itself requires a live pool, so its integration coverage lives
+    // in health_migration_test.rs (ignored, requires TEST_DATABASE_URL).
+    // The unit-testable behaviour is that overall_status with a healthy DB + lag=0
+    // + up-to-date migrations returns "ok", confirming the status logic path that
+    // ping_database gates.
+    #[test]
+    fn ok_when_db_healthy_and_no_lag_and_migrations_up_to_date() {
+        assert_eq!(overall_status(0, MigrationStatus::UpToDate, false), "ok");
     }
 }

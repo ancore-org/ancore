@@ -1,8 +1,11 @@
+import request from 'supertest';
+import express from 'express';
 import { RelayService } from '../../src/services/relayService';
 import type { SignatureServiceContract, TransactionSubmitterContract } from '../../src/types';
 import { IdempotencyStore } from '../../src/store/idempotency';
 import { JobQueue } from '../../src/queue/JobQueue';
 import { resetEnvCache } from '../../src/config/env';
+import { createHealthHandler } from '../../src/routes/health';
 
 describe('RelayService health check with signature service', () => {
   let mockSignatureService: SignatureServiceContract;
@@ -178,4 +181,78 @@ describe('RelayService health check with signature service', () => {
       expect(health.uptime).toBeGreaterThanOrEqual(0);
     });
   });
+});
+
+describe('createHealthHandler — database probe (#1528)', () => {
+  let mockSignatureService: SignatureServiceContract;
+  let mockSubmitter: TransactionSubmitterContract;
+
+  beforeEach(() => {
+    mockSignatureService = {
+      verify: jest.fn().mockReturnValue(true),
+      isHealthy: jest.fn().mockResolvedValue({ healthy: true, latencyMs: 5 }),
+    };
+    mockSubmitter = {
+      submitSignedTransaction: jest.fn(),
+      simulateAndAssembleTransaction: jest.fn().mockResolvedValue({ assembledXdr: 'xdr', gasUsed: 0 }),
+      isHealthy: jest.fn().mockResolvedValue({ healthy: true, latencyMs: 5 }),
+    };
+  });
+
+  afterEach(() => {
+    resetEnvCache();
+  });
+
+  function makeApp(dbPool?: object) {
+    const service = new RelayService(
+      mockSignatureService,
+      new JobQueue(),
+      new IdempotencyStore(),
+      mockSubmitter,
+      { useMockSubmission: true }
+    );
+    const app = express();
+    app.get('/health', createHealthHandler(service, dbPool as any));
+    return app;
+  }
+
+  it('returns 200 and omits database key when no pool is provided', async () => {
+    const res = await request(makeApp()).get('/health');
+    expect(res.status).toBe(200);
+    expect(res.body.dependencies).not.toHaveProperty('database');
+  });
+
+  it('returns 200 and database status ok when pool SELECT 1 succeeds', async () => {
+    const mockClient = { query: jest.fn().mockResolvedValue({}), release: jest.fn() };
+    const mockPool = { connect: jest.fn().mockResolvedValue(mockClient) };
+
+    const res = await request(makeApp(mockPool)).get('/health');
+    expect(res.status).toBe(200);
+    expect(res.body.dependencies.database.status).toBe('ok');
+    expect(mockClient.query).toHaveBeenCalledWith('SELECT 1');
+    expect(mockClient.release).toHaveBeenCalled();
+  });
+
+  it('returns 503 and database status degraded when pool connect fails', async () => {
+    const mockPool = { connect: jest.fn().mockRejectedValue(new Error('Connection refused')) };
+
+    const res = await request(makeApp(mockPool)).get('/health');
+    expect(res.status).toBe(503);
+    expect(res.body.dependencies.database.status).toBe('degraded');
+    expect(res.body.dependencies.database.message).toContain('Connection refused');
+  });
+
+  it('returns 503 and database status degraded when SELECT 1 times out', async () => {
+    const mockClient = {
+      query: jest.fn().mockImplementation(
+        () => new Promise((_, reject) => setTimeout(() => reject(new Error('DB ping timed out')), 50))
+      ),
+      release: jest.fn(),
+    };
+    const mockPool = { connect: jest.fn().mockResolvedValue(mockClient) };
+
+    const res = await request(makeApp(mockPool)).get('/health');
+    expect(res.status).toBe(503);
+    expect(res.body.dependencies.database.status).toBe('degraded');
+  }, 10_000);
 });

@@ -48,6 +48,8 @@ export interface RelayExecutionOptions {
    * tracking a fresh nonce on every run (#1422).
    */
   signedNonce?: number;
+  /** Originating HTTP request ID forwarded into async queue jobs for trace correlation (#1530). */
+  requestId?: string;
 }
 
 export interface RelayServiceContract {

@@ -107,6 +107,11 @@ export class QueueWorker {
       const handler = this.handlers[job.type];
 
       const finish = async (): Promise<void> => {
+        const logContext: Record<string, unknown> = {
+          jobId: job.id,
+          jobType: job.type,
+          ...(job.requestId ? { requestId: job.requestId } : {}),
+        };
         try {
           if (!handler) {
             throw new Error(`No handler registered for job type "${job.type}"`);
@@ -114,15 +119,18 @@ export class QueueWorker {
           await handler(job);
           await ack();
           this.stats.succeeded++;
+          rootLogger.debug(logContext, 'job completed');
         } catch (err) {
           const error = err instanceof Error ? err : new Error(String(err));
           await nack(error);
           this.stats.failed++;
+          rootLogger.warn({ ...logContext, error: error.message }, 'job failed');
 
           // Check if the job was moved to dead-letter after nack
           const updated = await this.queue.getById(job.id);
           if (updated?.status === 'dead') {
             this.stats.deadLettered++;
+            rootLogger.error(logContext, 'job dead-lettered');
           }
         } finally {
           this.activeJobs--;
