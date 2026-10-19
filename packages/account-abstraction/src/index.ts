@@ -11,11 +11,15 @@ export type { AccountContractReadOptions, InvocationArgs } from './account-contr
 
 export {
   AccountAbstractionClient,
+  createSmartAccount,
+  deriveAccountContractId,
+  ACCOUNT_CONTRACT_SALT,
   withNetworkRetry,
   isTransientError,
   calculateBackoff,
   type ClientRetryOptions,
   type AccountAbstractionClientOptions,
+  type CreateSmartAccountOptions,
   type SorobanRpcServer,
 } from './client';
 
@@ -32,6 +36,7 @@ export {
   SessionKeyExpiredError,
   InsufficientPermissionError,
   ContractInvocationError,
+  NetworkError,
   NotImplementedError,
   mapContractError,
   CONTRACT_ERROR_MESSAGES,

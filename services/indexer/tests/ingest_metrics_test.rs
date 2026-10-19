@@ -54,3 +54,36 @@ fn test_record_metrics_with_high_throughput() {
     init_prometheus_metrics();
     record_ingest_metrics(1000.0, 50, 2.0);
 }
+
+#[test]
+fn test_checkpoint_ingest_duration_metrics() {
+    init_prometheus_metrics();
+    ancore_indexer::metrics::record_checkpoint_ingest_duration(0.025);
+    ancore_indexer::metrics::record_checkpoint_ingest_duration(0.5);
+    ancore_indexer::metrics::record_checkpoint_ingest_duration(1.2);
+
+    assert_eq!(
+        ancore_indexer::metrics::CHECKPOINT_INGEST_DURATION,
+        "checkpoint_ingest_duration_seconds"
+    );
+    assert_eq!(
+        ancore_indexer::metrics::CHECKPOINT_INGEST_DURATION_BUCKETS,
+        &[0.01, 0.05, 0.1, 0.5, 1.0, 5.0]
+    );
+}
+
+#[tokio::test]
+async fn test_checkpoint_ingest_duration_recorded_in_worker_run() {
+    init_prometheus_metrics();
+
+    let events = vec![create_sample_event(10), create_sample_event(11)];
+    let source = VecSource::new(events);
+    let sink = MemorySink::default();
+    let mut worker = IngestWorker::new(WorkerConfig::default(), source, sink);
+
+    let stats = worker.run_once().await.unwrap();
+    assert_eq!(stats.persisted, 2);
+
+    let checkpoint = worker.current_checkpoint().await.unwrap();
+    assert_eq!(checkpoint.last_ledger_seq, 11);
+}

@@ -11,13 +11,18 @@ use crate::api::validation::validate_account_id;
 use crate::error::Result;
 use crate::repositories::account_activity::{ActivityFilter, ActivityRecord, CursorPage};
 
+/// Allowlist of supported operation types for activity filtering
+pub const ALLOWED_OPERATION_TYPES: &[&str] = &["payment", "invoke", "create_account"];
+
 /// Query parameters for activity list endpoint
 #[derive(Debug, Deserialize)]
 pub struct ListActivityQuery {
     cursor_after: Option<String>,
     cursor_before: Option<String>,
     limit: Option<u32>,
+    #[serde(alias = "type")]
     activity_type: Option<String>,
+    operation_type: Option<String>,
     asset: Option<String>,
     counterparty: Option<String>,
     ledger_min: Option<i64>,
@@ -104,9 +109,21 @@ pub async fn list_handler(
         None
     };
 
+    // Validate operation type against allowlist
+    let resolved_type = params.operation_type.or(params.activity_type);
+    if let Some(ref op_type) = resolved_type {
+        if !ALLOWED_OPERATION_TYPES.contains(&op_type.as_str()) {
+            return Err(crate::error::ApiError::InvalidFilter(format!(
+                "Invalid operation type '{}'. Allowed values are: payment, invoke, create_account",
+                op_type
+            )));
+        }
+    }
+
     // Build filter
     let filter = ActivityFilter {
-        activity_type: params.activity_type,
+        activity_type: resolved_type.clone(),
+        operation_type: resolved_type,
         asset: params.asset,
         counterparty: params.counterparty,
         ledger_min: params.ledger_min,

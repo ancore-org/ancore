@@ -109,6 +109,7 @@ pub async fn insert_activity(db: &PgPool, params: &InsertActivity) -> Result<Opt
 #[derive(Debug, Clone, Default)]
 pub struct ActivityFilter {
     pub activity_type: Option<String>,
+    pub operation_type: Option<String>,
     pub asset: Option<String>,
     pub counterparty: Option<String>,
     pub ledger_min: Option<i64>,
@@ -250,7 +251,8 @@ pub async fn get_account_activity(
     }
 
     // Apply filters
-    if let Some(ref activity_type) = filter.activity_type {
+    let op_type_filter = filter.operation_type.as_ref().or(filter.activity_type.as_ref());
+    if let Some(activity_type) = op_type_filter {
         query.push(" AND activity_type = ");
         query.push_bind(activity_type);
     }

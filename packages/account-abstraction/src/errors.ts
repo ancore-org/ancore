@@ -130,6 +130,20 @@ export class ContractInvocationError extends AccountContractError {
   }
 }
 
+/**
+ * Thrown when a network request fails or times out.
+ */
+export class NetworkError extends AccountContractError {
+  readonly cause?: unknown;
+
+  constructor(message: string, cause?: unknown) {
+    super(message, 'NETWORK_ERROR');
+    this.name = 'NetworkError';
+    this.cause = cause;
+    Object.setPrototypeOf(this, NetworkError.prototype);
+  }
+}
+
 /** Known contract panic messages for mapping host errors to typed errors */
 export const CONTRACT_ERROR_MESSAGES = {
   ALREADY_INITIALIZED: 'Already initialized',

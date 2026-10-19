@@ -5,13 +5,15 @@
  * Automatically retries on timeouts, connection resets, and 5xx server errors with exponential backoff and jitter.
  */
 
-import { AccountContract } from './account-contract';
+import { Address, hash, Networks, StrKey, xdr } from '@stellar/stellar-sdk';
+import { AccountContract, type InvocationArgs } from './account-contract';
 import {
   executeContract,
   simulateExecute,
   type ExecuteOptions,
   type ExecuteResult,
 } from './execute';
+import { NetworkError } from './errors';
 import type { SessionKey } from '@ancore/types';
 
 export interface ClientRetryOptions {
@@ -171,17 +173,146 @@ export async function withNetworkRetry<T>(
   throw lastError;
 }
 
+export const ACCOUNT_CONTRACT_SALT: Buffer = Buffer.alloc(32, 0);
+
+const NETWORK_PASSPHRASES: Record<string, string> = {
+  testnet: Networks.TESTNET,
+  mainnet: Networks.PUBLIC,
+  futurenet: Networks.FUTURENET,
+  local: Networks.STANDALONE,
+  standalone: Networks.STANDALONE,
+};
+
+/**
+ * Deterministically derives the C... contract address for an owner public key.
+ */
+export function deriveAccountContractId(
+  ownerPublicKey: string,
+  network: string = 'testnet'
+): string {
+  const passphrase = NETWORK_PASSPHRASES[network.toLowerCase()] ?? Networks.TESTNET;
+  const networkId = hash(Buffer.from(passphrase));
+  const deployerAddress = new Address(ownerPublicKey);
+
+  const preimage = xdr.HashIdPreimage.envelopeTypeContractId(
+    new xdr.HashIdPreimageContractId({
+      networkId,
+      contractIdPreimage: xdr.ContractIdPreimage.contractIdPreimageFromAddress(
+        new xdr.ContractIdPreimageFromAddress({
+          address: deployerAddress.toScAddress(),
+          salt: ACCOUNT_CONTRACT_SALT,
+        })
+      ),
+    })
+  );
+
+  return StrKey.encodeContract(hash(preimage.toXDR()));
+}
+
 export interface SorobanRpcServer {
   getAccount(accountId: string): Promise<{ id: string; sequence: string }>;
   simulateTransaction(tx: unknown): Promise<unknown>;
   sendTransaction(tx: unknown): Promise<unknown>;
+  getContractData?(...args: unknown[]): Promise<unknown>;
+  getLedgerEntries?(...args: unknown[]): Promise<unknown>;
 }
 
 export interface AccountAbstractionClientOptions {
   contractId: string;
+  ownerPublicKey?: string;
   server: SorobanRpcServer;
   networkPassphrase?: string;
   retryOptions?: ClientRetryOptions;
+}
+
+export interface CreateSmartAccountOptions {
+  publicKey?: string;
+  server: SorobanRpcServer;
+  network?: string;
+  contractId?: string;
+  networkPassphrase?: string;
+  retryOptions?: ClientRetryOptions;
+}
+
+/**
+ * Convenience factory function to create an initialized AccountAbstractionClient.
+ */
+export function createSmartAccount(
+  publicKeyOrOptions: string | CreateSmartAccountOptions,
+  server?: SorobanRpcServer
+): AccountAbstractionClient {
+  let publicKey: string | undefined;
+  let resolvedServer: SorobanRpcServer;
+  let contractId: string | undefined;
+  let network: string = 'testnet';
+  let networkPassphrase: string | undefined;
+  let retryOptions: ClientRetryOptions | undefined;
+
+  if (typeof publicKeyOrOptions === 'string') {
+    if (!server) {
+      throw new Error('server is required when providing publicKey as first argument');
+    }
+    publicKey = publicKeyOrOptions;
+    resolvedServer = server;
+  } else {
+    publicKey = publicKeyOrOptions.publicKey;
+    resolvedServer = publicKeyOrOptions.server;
+    contractId = publicKeyOrOptions.contractId;
+    network = publicKeyOrOptions.network ?? 'testnet';
+    networkPassphrase = publicKeyOrOptions.networkPassphrase;
+    retryOptions = publicKeyOrOptions.retryOptions;
+  }
+
+  let resolvedContractId = contractId;
+  let resolvedOwnerPublicKey = publicKey;
+
+  if (!resolvedContractId && publicKey) {
+    if (publicKey.startsWith('C') && StrKey.isValidContract(publicKey)) {
+      resolvedContractId = publicKey;
+      resolvedOwnerPublicKey = undefined;
+    } else {
+      resolvedContractId = deriveAccountContractId(publicKey, network);
+    }
+  }
+
+  if (!resolvedContractId) {
+    throw new Error('Either contractId or valid publicKey must be provided to createSmartAccount');
+  }
+
+  return new AccountAbstractionClient({
+    contractId: resolvedContractId,
+    ownerPublicKey: resolvedOwnerPublicKey,
+    server: resolvedServer,
+    networkPassphrase,
+    retryOptions,
+  });
+}
+
+function isNotFoundError(err: unknown): boolean {
+  if (!err) return false;
+  if (typeof err === 'object') {
+    const candidate = err as {
+      status?: unknown;
+      statusCode?: unknown;
+      response?: { status?: unknown; statusCode?: unknown };
+      message?: unknown;
+    };
+    if (
+      candidate.status === 404 ||
+      candidate.statusCode === 404 ||
+      candidate.response?.status === 404 ||
+      candidate.response?.statusCode === 404
+    ) {
+      return true;
+    }
+    if (typeof candidate.message === 'string') {
+      return /not\s*found|absent|entry\s*not\s*found/i.test(candidate.message);
+    }
+  }
+  if (typeof err === 'string') {
+    return /not\s*found|absent|entry\s*not\s*found/i.test(err);
+  }
+  return false;
 }
 
 /**
@@ -198,10 +329,144 @@ export class AccountAbstractionClient {
 
   constructor(options: AccountAbstractionClientOptions) {
     this.contractId = options.contractId;
+    this.ownerPublicKey = options.ownerPublicKey;
     this.accountContract = new AccountContract(options.contractId);
     this.server = options.server;
     this.networkPassphrase = options.networkPassphrase;
     this.retryOptions = options.retryOptions ?? {};
+  }
+
+  static createSmartAccount(
+    publicKeyOrOptions: string | CreateSmartAccountOptions,
+    server?: SorobanRpcServer
+  ): AccountAbstractionClient {
+    return createSmartAccount(publicKeyOrOptions, server);
+  }
+
+  /**
+   * Check whether the smart account contract is deployed on-chain by querying Soroban RPC.
+   * Returns true if contract instance exists; returns false if 404 / absent entry.
+   * Throws NetworkError on network timeouts or unrecoverable network failures.
+   */
+  async isAccountDeployed(
+    contractId?: string,
+    overrideOptions?: ClientRetryOptions
+  ): Promise<boolean> {
+    const targetContractId = contractId ?? this.contractId;
+    if (!targetContractId) {
+      throw new Error('Contract ID is required to check deployment');
+    }
+
+    try {
+      return await this.withRetry(async () => {
+        const s = this.server;
+        if (typeof s.getContractData === 'function') {
+          try {
+            const res = await s.getContractData(
+              targetContractId,
+              xdr.ScVal.scvLedgerKeyContractInstance(),
+              xdr.ContractDataDurability.persistent()
+            );
+            return res !== null && res !== undefined;
+          } catch (err: unknown) {
+            if (isNotFoundError(err)) {
+              return false;
+            }
+            throw err;
+          }
+        }
+
+        if (typeof s.getLedgerEntries === 'function') {
+          try {
+            const key = xdr.LedgerKey.contractData(
+              new xdr.LedgerKeyContractData({
+                contract: new Address(targetContractId).toScAddress(),
+                key: xdr.ScVal.scvLedgerKeyContractInstance(),
+                durability: xdr.ContractDataDurability.persistent(),
+              })
+            );
+            const res = (await s.getLedgerEntries(key)) as
+              | { entries?: unknown[] }
+              | null
+              | undefined;
+            if (res && Array.isArray(res.entries)) {
+              return res.entries.length > 0;
+            }
+            if (res && res.entries !== undefined && res.entries !== null) {
+              return Boolean(res.entries);
+            }
+            return false;
+          } catch (err: unknown) {
+            if (isNotFoundError(err)) {
+              return false;
+            }
+            throw err;
+          }
+        }
+
+        if (typeof s.getAccount === 'function') {
+          try {
+            const acc = await s.getAccount(targetContractId);
+            return acc !== null && acc !== undefined;
+          } catch (err: unknown) {
+            if (isNotFoundError(err)) {
+              return false;
+            }
+            throw err;
+          }
+        }
+
+        return false;
+      }, overrideOptions);
+    } catch (error: unknown) {
+      if (isNotFoundError(error)) {
+        return false;
+      }
+      const errName =
+        typeof error === 'object' && error !== null && 'name' in error
+          ? (error as { name?: string }).name
+          : '';
+      const errMsg = error instanceof Error ? error.message : String(error);
+
+      if (isTransientError(error) || /timeout/i.test(errMsg) || errName === 'NetworkError') {
+        throw new NetworkError(
+          `Network timeout or failure while checking account deployment: ${errMsg}`,
+          error
+        );
+      }
+      throw error;
+    }
+  }
+
+  initialize(owner?: string): InvocationArgs {
+    return this.accountContract.initialize(owner ?? this.ownerPublicKey ?? this.contractId);
+  }
+
+  execute(
+    to: string,
+    fn: string,
+    args: xdr.ScVal[],
+    expectedNonce: number,
+    sessionPubKey?: string | Uint8Array,
+    signature?: string | Uint8Array
+  ): InvocationArgs {
+    return this.accountContract.execute(to, fn, args, expectedNonce, sessionPubKey, signature);
+  }
+
+  addSessionKey(
+    publicKey: string | Uint8Array,
+    permissions: number[],
+    expiresAt: number
+  ): InvocationArgs {
+    return this.accountContract.addSessionKey(publicKey, permissions, expiresAt);
+  }
+
+  revokeSessionKey(publicKey: string | Uint8Array): InvocationArgs {
+    return this.accountContract.revokeSessionKey(publicKey);
+  }
+
+  buildInvokeOperation(invocation: InvocationArgs) {
+    return this.accountContract.buildInvokeOperation(invocation);
   }
 
   /**
@@ -241,12 +506,13 @@ export class AccountAbstractionClient {
   /**
    * Get contract owner address with retry.
    */
-  async getOwner(sourceAccount: string, overrideOptions?: ClientRetryOptions): Promise<string> {
+  async getOwner(sourceAccount?: string, overrideOptions?: ClientRetryOptions): Promise<string> {
+    const resolvedSource = sourceAccount ?? this.ownerPublicKey ?? this.contractId;
     return this.withRetry(
       () =>
         this.accountContract.getOwner({
           server: this.server,
-          sourceAccount,
+          sourceAccount: resolvedSource,
           networkPassphrase: this.networkPassphrase,
         }),
       overrideOptions
@@ -256,12 +522,13 @@ export class AccountAbstractionClient {
   /**
    * Get contract nonce with retry.
    */
-  async getNonce(sourceAccount: string, overrideOptions?: ClientRetryOptions): Promise<number> {
+  async getNonce(sourceAccount?: string, overrideOptions?: ClientRetryOptions): Promise<number> {
+    const resolvedSource = sourceAccount ?? this.ownerPublicKey ?? this.contractId;
     return this.withRetry(
       () =>
         this.accountContract.getNonce({
           server: this.server,
-          sourceAccount,
+          sourceAccount: resolvedSource,
           networkPassphrase: this.networkPassphrase,
         }),
       overrideOptions

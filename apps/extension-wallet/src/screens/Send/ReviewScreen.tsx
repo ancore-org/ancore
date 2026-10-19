@@ -13,6 +13,7 @@ import {
 } from 'lucide-react';
 import type { ScheduleConfig, TransferTiming } from '@/screens/Send/ScheduleControls';
 import { SimulationPreview, type SimulationState } from './SimulationPreview';
+import { formatFeeWithStroops } from '@/utils/formatters';
 
 interface ReviewScreenProps {
   transaction: SendTransactionDraft;
@@ -168,7 +169,7 @@ export function ReviewScreen({
               {simulation?.status === 'success' ? 'Simulated Network Fee' : 'Base Network Fee'}
             </span>
             <span className="text-slate-300 font-mono" data-testid="review-network-fee">
-              {simulatedFee} XLM
+              {formatFeeWithStroops(simulatedFee)}
             </span>
           </div>
           <Separator className="bg-white/5" />

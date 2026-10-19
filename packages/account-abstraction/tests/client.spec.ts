@@ -170,4 +170,101 @@ describe('createSmartAccount factory & AccountAbstractionClient', () => {
       );
     });
   });
+
+  describe('isAccountDeployed helper', () => {
+    it('returns true when contract data entry exists via getContractData', async () => {
+      const server = {
+        ...mockServer,
+        getContractData: jest.fn().mockResolvedValue({ val: 'contract-instance' }),
+      };
+      const client = createSmartAccount(mockOwner, server);
+      const deployed = await client.isAccountDeployed();
+      expect(deployed).toBe(true);
+      expect(server.getContractData).toHaveBeenCalled();
+    });
+
+    it('returns false when getContractData throws not found / 404', async () => {
+      const notFoundErr = new Error('Entry not found: 404');
+      (notFoundErr as any).status = 404;
+      const server = {
+        ...mockServer,
+        getContractData: jest.fn().mockRejectedValue(notFoundErr),
+      };
+      const client = createSmartAccount(mockOwner, server);
+      const deployed = await client.isAccountDeployed();
+      expect(deployed).toBe(false);
+    });
+
+    it('returns true when contract entry exists via getLedgerEntries', async () => {
+      const server = {
+        ...mockServer,
+        getLedgerEntries: jest.fn().mockResolvedValue({ entries: [{ xdr: 'instance-entry' }] }),
+      };
+      const client = createSmartAccount(mockOwner, server);
+      const deployed = await client.isAccountDeployed();
+      expect(deployed).toBe(true);
+      expect(server.getLedgerEntries).toHaveBeenCalled();
+    });
+
+    it('returns false when getLedgerEntries returns empty entries', async () => {
+      const server = {
+        ...mockServer,
+        getLedgerEntries: jest.fn().mockResolvedValue({ entries: [] }),
+      };
+      const client = createSmartAccount(mockOwner, server);
+      const deployed = await client.isAccountDeployed();
+      expect(deployed).toBe(false);
+    });
+
+    it('returns false when getLedgerEntries throws not found', async () => {
+      const notFoundErr = new Error('entry not found');
+      const server = {
+        ...mockServer,
+        getLedgerEntries: jest.fn().mockRejectedValue(notFoundErr),
+      };
+      const client = createSmartAccount(mockOwner, server);
+      const deployed = await client.isAccountDeployed();
+      expect(deployed).toBe(false);
+    });
+
+    it('falls back to getAccount when neither getContractData nor getLedgerEntries exists', async () => {
+      const server = {
+        getAccount: jest.fn().mockResolvedValue({ id: 'C...', sequence: '0' }),
+        simulateTransaction: jest.fn(),
+        sendTransaction: jest.fn(),
+      };
+      const client = createSmartAccount(mockOwner, server);
+      const deployed = await client.isAccountDeployed();
+      expect(deployed).toBe(true);
+    });
+
+    it('handles explicit contractId override', async () => {
+      const customContract = 'CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAD2KM';
+      const server = {
+        ...mockServer,
+        getContractData: jest.fn().mockResolvedValue({ val: 'ok' }),
+      };
+      const client = createSmartAccount(mockOwner, server);
+      const deployed = await client.isAccountDeployed(customContract);
+      expect(deployed).toBe(true);
+      expect(server.getContractData).toHaveBeenCalledWith(
+        customContract,
+        expect.anything(),
+        expect.anything()
+      );
+    });
+
+    it('throws NetworkError when Soroban RPC request times out', async () => {
+      const timeoutErr = new Error('ETIMEDOUT: Connection timed out');
+      (timeoutErr as any).code = 'ETIMEDOUT';
+      const server = {
+        ...mockServer,
+        getContractData: jest.fn().mockRejectedValue(timeoutErr),
+      };
+      const client = createSmartAccount(mockOwner, server, {
+        retryOptions: { maxRetries: 0 },
+      });
+      await expect(client.isAccountDeployed()).rejects.toThrow('Network timeout or failure');
+    });
+  });
 });

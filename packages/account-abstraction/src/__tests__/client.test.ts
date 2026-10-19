@@ -131,5 +131,31 @@ describe('AccountAbstractionClient and Network Retry', () => {
       expect(res).toEqual({ hash: '0xabc' });
       expect(mockServer.sendTransaction).toHaveBeenCalledTimes(2);
     });
+
+    it('wraps getVersion and getSessionKey with automatic retry', async () => {
+      const client = new AccountAbstractionClient({
+        contractId: dummyContractId,
+        server: mockServer,
+      });
+
+      jest.spyOn(client.accountContract, 'getVersion').mockResolvedValueOnce(2);
+      jest.spyOn(client.accountContract, 'getSessionKey').mockResolvedValueOnce(null);
+
+      await expect(client.getVersion('GB...')).resolves.toBe(2);
+      await expect(client.getSessionKey('GB...', 'GB...')).resolves.toBeNull();
+    });
+
+    it('wraps isAccountDeployed on AccountAbstractionClient directly', async () => {
+      const server = {
+        ...mockServer,
+        getContractData: jest.fn().mockResolvedValue({ val: 'ok' }),
+      };
+      const client = new AccountAbstractionClient({
+        contractId: dummyContractId,
+        server,
+      });
+
+      expect(await client.isAccountDeployed()).toBe(true);
+    });
   });
 });

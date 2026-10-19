@@ -10,6 +10,7 @@
 
 import { Loader2, CheckCircle2, AlertTriangle } from 'lucide-react';
 import type { SorobanResourceLimits } from '@/services/simulation-service';
+import { formatFeeWithStroops } from '@/utils/formatters';
 
 export type SimulationState =
   | { status: 'loading' }
@@ -87,7 +88,7 @@ export function SimulationPreview({ simulation }: SimulationPreviewProps) {
           Simulated Fee
         </span>
         <span className="font-mono text-slate-300" data-testid="simulated-fee">
-          {simulation.simulatedFee} XLM
+          {formatFeeWithStroops(simulation.simulatedFee)}
         </span>
       </div>
       <div className="flex justify-between text-xs">
