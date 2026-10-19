@@ -104,3 +104,37 @@ export async function refreshSessionExpiry(): Promise<void> {
   const ttlMs = await getAutoLockTtlMs();
   await persistUnlockSession(ttlMs);
 }
+
+/**
+ * Computes remaining unlock session time in milliseconds from chrome.storage.session.
+ */
+export async function getRemainingUnlockSessionMs(): Promise<number> {
+  try {
+    const raw = await getChromeSessionStorage(UNLOCK_SESSION_STORAGE_KEY);
+    if (!raw || typeof raw !== 'object') {
+      return 0;
+    }
+    const record = raw as UnlockSessionRecord;
+    if (!isUnlockSessionValid(record)) {
+      return 0;
+    }
+    const remaining = record.expiresAt - Date.now();
+    return Math.max(0, remaining);
+  } catch {
+    return 0;
+  }
+}
+
+/**
+ * Formats milliseconds remaining into a user-facing string ('Locks in X minutes').
+ */
+export function formatRemainingLockTime(remainingMs: number): string {
+  if (remainingMs <= 0) {
+    return 'Locks in 0 minutes';
+  }
+  const totalMinutes = Math.max(1, Math.ceil(remainingMs / 60_000));
+  if (totalMinutes === 1) {
+    return 'Locks in 1 minute';
+  }
+  return `Locks in ${totalMinutes} minutes`;
+}

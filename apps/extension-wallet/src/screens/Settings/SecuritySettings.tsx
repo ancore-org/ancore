@@ -11,6 +11,8 @@ import {
 import { useTransferPolicy } from '../../hooks/useTransferPolicy';
 import { ScreenHeader } from './NetworkSettings';
 import { useDeviceSessionsStore, type DeviceSession } from '../../stores/deviceSessions';
+import { formatRemainingLockTime } from '@/background/session-state';
+import { UNLOCK_SESSION_STORAGE_KEY } from '@ancore/wallet-shared';
 
 type SecurityView =
   | 'menu'
@@ -174,7 +176,58 @@ function ChangePasswordView({ onDone }: { onDone: () => void }) {
 
 // ── Auto-lock ────────────────────────────────────────────────────────────────
 
-function AutoLockView({
+export function useAutoLockCountdown(autoLockMinutes: number): string {
+  const [countdown, setCountdown] = React.useState<string>(() => {
+    if (autoLockMinutes === 0) return 'Disabled (Never)';
+    return formatRemainingLockTime(autoLockMinutes * 60_000);
+  });
+
+  React.useEffect(() => {
+    if (autoLockMinutes === 0) {
+      setCountdown('Disabled (Never)');
+      return;
+    }
+
+    let isMounted = true;
+
+    async function updateCountdown() {
+      try {
+        if (typeof chrome !== 'undefined' && chrome.storage?.session) {
+          const res = await new Promise<Record<string, unknown>>((resolve) => {
+            chrome.storage.session.get(UNLOCK_SESSION_STORAGE_KEY, resolve);
+          });
+          const session = res?.[UNLOCK_SESSION_STORAGE_KEY] as { expiresAt?: number } | undefined;
+          if (session && typeof session.expiresAt === 'number') {
+            const remainingMs = Math.max(0, session.expiresAt - Date.now());
+            if (isMounted) {
+              setCountdown(formatRemainingLockTime(remainingMs));
+            }
+            return;
+          }
+        }
+      } catch {
+        // Fallback to configured duration
+      }
+      if (isMounted) {
+        setCountdown(formatRemainingLockTime(autoLockMinutes * 60_000));
+      }
+    }
+
+    void updateCountdown();
+    const timer = setInterval(() => {
+      void updateCountdown();
+    }, 30_000);
+
+    return () => {
+      isMounted = false;
+      clearInterval(timer);
+    };
+  }, [autoLockMinutes]);
+
+  return countdown;
+}
+
+export function AutoLockView({
   value,
   onChange,
   onDone,
@@ -183,8 +236,18 @@ function AutoLockView({
   onChange: (v: number) => void;
   onDone: () => void;
 }) {
+  const countdown = useAutoLockCountdown(value);
+
   return (
     <div className="flex flex-col gap-2 p-4">
+      {value > 0 && (
+        <div className="mb-2 rounded-xl bg-accent/40 border border-border/50 p-3 flex items-center justify-between text-xs">
+          <span className="text-muted-foreground font-medium">Session Status</span>
+          <span data-testid="auto-lock-countdown" className="font-semibold text-primary">
+            {countdown}
+          </span>
+        </div>
+      )}
       <p className="text-xs text-muted-foreground mb-1">
         Wallet will lock automatically after the selected period of inactivity.
       </p>
@@ -636,6 +699,7 @@ function SecurityMenu({
 }) {
   const { policy } = useTransferPolicy();
   const timeoutLabel = TIMEOUT_OPTIONS.find((o) => o.value === autoLockTimeout)?.label ?? 'Custom';
+  const countdown = useAutoLockCountdown(autoLockTimeout);
 
   return (
     <div className="flex flex-col gap-4 p-4">
@@ -652,7 +716,9 @@ function SecurityMenu({
         />
         <MenuItem
           label="Auto-lock Timeout"
-          description="Lock after inactivity"
+          description={
+            autoLockTimeout > 0 ? `${countdown} • Lock after inactivity` : 'Lock after inactivity'
+          }
           value={timeoutLabel}
           onClick={() => onNavigate('auto-lock')}
         />
