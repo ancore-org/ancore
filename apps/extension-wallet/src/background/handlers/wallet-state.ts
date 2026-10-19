@@ -1,6 +1,6 @@
 import { registerHandler } from '@/messaging';
 import { readAuthState } from '@/router/AuthGuard';
-import { isBackgroundSessionUnlocked } from '../session-state';
+import { isBackgroundSessionUnlockedAsync } from '../session-state';
 import { createLogger } from '../logger';
 
 const log = createLogger('[ancore-extension/handlers/wallet-state]');
@@ -13,7 +13,8 @@ export function registerWalletStateHandlers(): void {
       return { state: 'uninitialized' as const };
     }
 
-    if (!isBackgroundSessionUnlocked()) {
+    const unlocked = await isBackgroundSessionUnlockedAsync();
+    if (!unlocked) {
       return { state: 'locked' as const };
     }
 

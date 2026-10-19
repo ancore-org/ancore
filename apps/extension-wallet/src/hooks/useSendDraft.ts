@@ -3,9 +3,10 @@ import { useState, useCallback } from 'react';
 export interface SendDraft {
   recipient: string;
   amount: string;
+  note?: string;
 }
 
-const EMPTY_DRAFT: SendDraft = { recipient: '', amount: '' };
+const EMPTY_DRAFT: SendDraft = { recipient: '', amount: '', note: '' };
 
 /**
  * useSendDraft — persists send form fields so a failed transaction

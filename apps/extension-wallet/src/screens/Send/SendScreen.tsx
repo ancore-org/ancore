@@ -9,6 +9,7 @@ import {
 } from '@/hooks/useSendTransaction';
 import { useRecentRecipients } from '@/hooks/useRecentRecipients';
 import { useAccountStore } from '@/stores/account';
+import { useSettingsStore } from '@/stores/settings';
 import { useExtensionAuth } from '@/router/AuthGuard';
 import { ConfirmDialog } from '@/screens/Send/ConfirmDialog';
 import { ReviewScreen } from '@/screens/Send/ReviewScreen';
@@ -80,13 +81,14 @@ export function SendScreen({
     setShowAiDraft(false);
   };
 
-  const isMainnet = send.tx?.fee?.network === 'mainnet' || !send.tx;
+  const activeNetwork = useSettingsStore((state) => state.network);
+  const isMainnet = activeNetwork === 'mainnet' || send.tx?.fee?.network === 'mainnet';
 
   useEffect(() => {
     setMemoWarning(null);
     if (!form.to || !isMainnet) return;
     isMemoRequired(form.to).then((required) => {
-      if (required && !form.note) {
+      if (required && !form.note?.trim()) {
         setMemoWarning(
           'This exchange requires a memo. Without it, your payment may not be credited to your account.'
         );
@@ -104,6 +106,15 @@ export function SendScreen({
 
   const handleReview = async () => {
     if (memoWarning) return;
+    if (isMainnet && !form.note?.trim() && form.to) {
+      const required = await isMemoRequired(form.to);
+      if (required) {
+        setMemoWarning(
+          'This exchange requires a memo. Without it, your payment may not be credited to your account.'
+        );
+        return;
+      }
+    }
     const success = await send.goToReview(form);
     if (success) {
       await addRecipient({ address: send.tx?.to ?? form.to });

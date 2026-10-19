@@ -2,6 +2,8 @@ import React, { useState, useCallback } from 'react';
 import { SendForm } from './SendForm';
 import { StatusScreen } from './StatusScreen';
 import { useSendDraft, type SendDraft } from '@/hooks/useSendDraft';
+import { isMemoRequired } from '@/utils/memoCheck';
+import { useSettingsStore } from '@/stores/settings';
 
 type FlowStep = 'form' | 'status';
 
@@ -49,9 +51,24 @@ export function SendFlow({ onClose, sendTransaction = defaultSendTransaction }: 
   // ---------- handlers ----------
 
   const handleFormSubmit = useCallback(async () => {
-    setState({ step: 'status', txId: '', txStatus: 'pending', formError: null });
-
     try {
+      const activeNetwork = useSettingsStore.getState().network;
+      if (activeNetwork === 'mainnet') {
+        const requiresMemo = await isMemoRequired(draft.recipient);
+        if (requiresMemo && !draft.note?.trim()) {
+          setState((prev) => ({
+            ...prev,
+            step: 'form',
+            txStatus: 'idle',
+            formError:
+              'This destination requires a memo on mainnet. Without it, your payment may not be credited.',
+          }));
+          return;
+        }
+      }
+
+      setState({ step: 'status', txId: '', txStatus: 'pending', formError: null });
+
       const { txId } = await sendTransaction(draft);
       setState({ step: 'status', txId, txStatus: 'confirmed', formError: null });
       // Draft is no longer needed after a successful send.

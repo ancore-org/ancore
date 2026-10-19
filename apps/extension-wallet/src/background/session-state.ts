@@ -26,6 +26,19 @@ export function isBackgroundSessionUnlocked(): boolean {
   return _sessionUnlocked;
 }
 
+/**
+ * Asynchronously checks if the background session is unlocked.
+ * Returns true immediately if the in-memory flag is set.
+ * Otherwise attempts to restore the session from chrome.storage.session
+ * if a valid unexpired record exists.
+ */
+export async function isBackgroundSessionUnlockedAsync(): Promise<boolean> {
+  if (_sessionUnlocked) {
+    return true;
+  }
+  return restoreUnlockSessionFromStorage();
+}
+
 export function setBackgroundSessionUnlocked(unlocked: boolean): void {
   _sessionUnlocked = unlocked;
 }

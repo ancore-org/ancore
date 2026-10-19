@@ -45,6 +45,10 @@ function getApprovalRoute(params: URLSearchParams): ApprovalRoute {
 export function ApprovalApp() {
   const params = new URLSearchParams(window.location.search);
   const requestId = params.get('requestId');
+  const origin = params.get('origin') ?? undefined;
+  const dAppName = params.get('dAppName') ?? undefined;
+  const contractId = params.get('contractId') ?? undefined;
+  const methodName = params.get('methodName') ?? undefined;
   const route = getApprovalRoute(params);
   const copy = routeCopy[route];
 
@@ -71,6 +75,10 @@ export function ApprovalApp() {
   return (
     <SignTransactionApprovalScreen
       requestId={requestId}
+      origin={origin}
+      dAppName={dAppName}
+      contractId={contractId}
+      methodName={methodName}
       requestType={route === 'sign-auth-entry' ? 'sign-auth-entry' : 'sign-transaction'}
       {...copy}
     />

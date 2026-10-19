@@ -241,3 +241,63 @@ describe('session expiry refresh', () => {
     expect(record.expiresAt).toBe(record.unlockedAt + 5 * 60 * 1000);
   });
 });
+
+describe('isBackgroundSessionUnlockedAsync', () => {
+  it('returns true immediately when in-memory flag is true', async () => {
+    setBackgroundSessionUnlocked(true);
+    const result = await (await import('../session-state')).isBackgroundSessionUnlockedAsync();
+    expect(result).toBe(true);
+    expect(chromeStorage.getChromeSessionStorage).not.toHaveBeenCalled();
+  });
+
+  it('restores from storage and returns true when in-memory flag is false but valid session in storage', async () => {
+    setBackgroundSessionUnlocked(false);
+    mockSessionStorage['ancore_unlock_session'] = {
+      unlockedAt: Date.now(),
+      expiresAt: Date.now() + 60000,
+    };
+
+    const { isBackgroundSessionUnlockedAsync, isBackgroundSessionUnlocked } =
+      await import('../session-state');
+    const result = await isBackgroundSessionUnlockedAsync();
+    expect(result).toBe(true);
+    expect(isBackgroundSessionUnlocked()).toBe(true);
+  });
+
+  it('returns false when in-memory flag is false and no session in storage', async () => {
+    setBackgroundSessionUnlocked(false);
+
+    const { isBackgroundSessionUnlockedAsync } = await import('../session-state');
+    const result = await isBackgroundSessionUnlockedAsync();
+    expect(result).toBe(false);
+  });
+});
+
+describe('getRemainingUnlockSessionMs and formatRemainingLockTime', () => {
+  it('computes remaining milliseconds from session storage', async () => {
+    const now = Date.now();
+    mockSessionStorage['ancore_unlock_session'] = {
+      unlockedAt: now,
+      expiresAt: now + 120_000,
+    };
+
+    const { getRemainingUnlockSessionMs } = await import('../session-state');
+    const remaining = await getRemainingUnlockSessionMs();
+    expect(remaining).toBeGreaterThan(0);
+    expect(remaining).toBeLessThanOrEqual(120_000);
+  });
+
+  it('returns 0 if session is expired or missing', async () => {
+    const { getRemainingUnlockSessionMs } = await import('../session-state');
+    expect(await getRemainingUnlockSessionMs()).toBe(0);
+  });
+
+  it('formats remaining lock time correctly', async () => {
+    const { formatRemainingLockTime } = await import('../session-state');
+    expect(formatRemainingLockTime(0)).toBe('Locks in 0 minutes');
+    expect(formatRemainingLockTime(-5000)).toBe('Locks in 0 minutes');
+    expect(formatRemainingLockTime(45_000)).toBe('Locks in 1 minute');
+    expect(formatRemainingLockTime(120_000)).toBe('Locks in 2 minutes');
+    expect(formatRemainingLockTime(300_000)).toBe('Locks in 5 minutes');
+  });
+});
