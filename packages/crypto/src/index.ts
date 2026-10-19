@@ -73,3 +73,19 @@ export { signPayload, signTransaction, verifySignature } from './signing';
 
 // Constant-time comparison
 export { timingSafeEqual } from './timing-safe';
+
+// BIP32 Derivation Path Validation & Helpers
+export {
+  isValidBIP32Path,
+  isStandardStellarPath,
+  parseBIP32Path,
+  deriveMainAccountPath,
+  deriveSessionKeyPath,
+  formatBIP32Path,
+  BIP32PathError,
+  STELLAR_COIN_TYPE,
+  BIP44_PURPOSE,
+  MAX_BIP32_INDEX,
+  type BIP32PathSegment,
+  type ParsedBIP32Path,
+} from './bip32';
