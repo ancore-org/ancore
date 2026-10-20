@@ -1,9 +1,6 @@
 import express from 'express';
 import request from 'supertest';
-import {
-  createIpRateLimiterMiddleware,
-  extractClientIp,
-} from '../ipRateLimiter';
+import { createIpRateLimiterMiddleware, extractClientIp } from '../ipRateLimiter';
 
 describe('extractClientIp', () => {
   it('extracts first IP from X-Forwarded-For comma-separated string', () => {
@@ -73,17 +70,13 @@ describe('createIpRateLimiterMiddleware', () => {
     const clientIp = '198.51.100.10';
 
     for (let i = 0; i < RPM; i++) {
-      const res = await request(app)
-        .get('/api/test')
-        .set('X-Forwarded-For', clientIp);
+      const res = await request(app).get('/api/test').set('X-Forwarded-For', clientIp);
       expect(res.status).toBe(200);
       expect(res.headers['ratelimit-limit']).toBe(String(RPM));
       expect(res.headers['ratelimit-remaining']).toBe(String(RPM - 1 - i));
     }
 
-    const limited = await request(app)
-      .get('/api/test')
-      .set('X-Forwarded-For', clientIp);
+    const limited = await request(app).get('/api/test').set('X-Forwarded-For', clientIp);
 
     expect(limited.status).toBe(429);
     expect(limited.body).toEqual({
@@ -104,15 +97,11 @@ describe('createIpRateLimiterMiddleware', () => {
     for (let i = 0; i < RPM; i++) {
       await request(app).get('/api/test').set('X-Forwarded-For', ipA);
     }
-    const limitedA = await request(app)
-      .get('/api/test')
-      .set('X-Forwarded-For', ipA);
+    const limitedA = await request(app).get('/api/test').set('X-Forwarded-For', ipA);
     expect(limitedA.status).toBe(429);
 
     // IP B is not affected
-    const resB = await request(app)
-      .get('/api/test')
-      .set('X-Forwarded-For', ipB);
+    const resB = await request(app).get('/api/test').set('X-Forwarded-For', ipB);
     expect(resB.status).toBe(200);
   });
 
@@ -125,20 +114,14 @@ describe('createIpRateLimiterMiddleware', () => {
     await request(app).get('/api/test').set('X-Forwarded-For', clientIp);
 
     // Second request on /api/test is rate-limited
-    const limited = await request(app)
-      .get('/api/test')
-      .set('X-Forwarded-For', clientIp);
+    const limited = await request(app).get('/api/test').set('X-Forwarded-For', clientIp);
     expect(limited.status).toBe(429);
 
     // /health requests are skipped and succeed
-    const health1 = await request(app)
-      .get('/health')
-      .set('X-Forwarded-For', clientIp);
+    const health1 = await request(app).get('/health').set('X-Forwarded-For', clientIp);
     expect(health1.status).toBe(200);
 
-    const health2 = await request(app)
-      .get('/health')
-      .set('X-Forwarded-For', clientIp);
+    const health2 = await request(app).get('/health').set('X-Forwarded-For', clientIp);
     expect(health2.status).toBe(200);
   });
 });

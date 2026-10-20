@@ -306,13 +306,29 @@ new AncoreClient(options: AncoreClientOptions)
 ```
 
 - `options.accountContractId`: The C... contract ID of the deployed Ancore account contract.
+- `options.retry`: Optional default retry policy (`RetryPolicyOptions`) or preset name (`LOW_LATENCY`, `RELIABLE`, `AGGRESSIVE`).
 
 #### Methods
 
+- `withRetry<T>(fn: () => Promise<T>, override?: RetryPolicyOptions | RetryPresetName): Promise<T>`
+  Executes an arbitrary async network call with exponential backoff retries using the client's configured retry policy or method override.
 - `addSessionKey(params: AddSessionKeyParams): InvocationArgs`
   Generates invocation arguments to add a session key to the smart account.
 - `revokeSessionKey(params: RevokeSessionKeyParams): InvocationArgs`
   Generates invocation arguments to revoke a session key from the smart account.
+- `refreshSessionKeyTtl(params: RefreshSessionKeyTtlParams, options?: RefreshSessionKeyTtlOptions): InvocationArgs | Promise<RefreshSessionKeyTtlResult>`
+  Generates invocation args or simulates/refreshes the Soroban persistent storage TTL for an active session key. Supports `options.retry`.
+
+---
+
+### Retry Policy & Transient Failure Handling
+
+- `withNetworkRetry(fn, policy)`: Executes async network calls with configurable exponential backoff and transient failure handling.
+- `isTransientNetworkError(error)`: Determines if an error is transient (HTTP 5xx, 429 rate limits, network timeouts, ECONNRESET, etc.) versus non-retryable 4xx client errors.
+- `createRetryPolicyWrapper(defaultPolicy)`: Returns a reusable wrapper with pre-configured retry settings.
+- `resolveRetryPolicy(policy)`: Resolves preset names or custom options into normalized retry options.
+- `calculateRetryDelay(attempt, baseDelayMs, exponential, maxDelayMs, jitter)`: Calculates delay with exponential backoff and optional jitter.
+- `LOW_LATENCY`, `RELIABLE`, `AGGRESSIVE`: Built-in retry presets.
 
 ---
 

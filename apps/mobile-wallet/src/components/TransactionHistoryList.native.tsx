@@ -172,11 +172,7 @@ export const TransactionHistoryList = ({
       ListFooterComponent={renderFooter}
       ListEmptyComponent={renderEmpty}
       refreshControl={
-        <RefreshControl
-          refreshing={isRefreshing}
-          onRefresh={onRefresh}
-          enabled={!isOffline}
-        />
+        <RefreshControl refreshing={isRefreshing} onRefresh={onRefresh} enabled={!isOffline} />
       }
       onEndReached={() => {
         if (hasMore && !isLoadingMore && !error) {

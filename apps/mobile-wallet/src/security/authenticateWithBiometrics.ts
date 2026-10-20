@@ -15,23 +15,23 @@ export type AuthenticateWithBiometricsOptions = {
 
 /**
  * Unified helper for biometric authentication with automatic fallback handling.
- * 
+ *
  * Wraps biometric prompts with fallback to device PIN when:
  * - Hardware is unavailable
  * - User cancels authentication
  * - Authentication fails
- * 
+ *
  * @param biometricService - The biometric service adapter
  * @param options - Configuration options
  * @returns Authentication result with success status and error details
- * 
+ *
  * @example
  * ```ts
  * const result = await authenticateWithBiometrics(biometricService, {
  *   promptMessage: 'Unlock wallet',
  *   fallbackToPin: true
  * });
- * 
+ *
  * if (result.success) {
  *   // Proceed with authenticated action
  * } else if (result.fallbackToPin) {
@@ -45,14 +45,11 @@ export async function authenticateWithBiometrics(
   biometricService: IBiometricAuthService,
   options: AuthenticateWithBiometricsOptions = {}
 ): Promise<AuthenticationResult> {
-  const {
-    promptMessage = 'Authenticate to continue',
-    fallbackToPin = true,
-  } = options;
+  const { promptMessage = 'Authenticate to continue', fallbackToPin = true } = options;
 
   // Check if biometrics are available
   const isAvailable = await biometricService.isAvailable();
-  
+
   if (!isAvailable) {
     if (fallbackToPin) {
       return {
@@ -62,7 +59,7 @@ export async function authenticateWithBiometrics(
         fallbackToPin: true,
       };
     }
-    
+
     return {
       success: false,
       errorCode: 'BIOMETRIC_NOT_AVAILABLE',
@@ -80,11 +77,11 @@ export async function authenticateWithBiometrics(
   }
 
   // Handle authentication failure
-  const shouldFallback = fallbackToPin && (
-    authResult.errorCode === 'USER_CANCEL' ||
-    authResult.errorCode === 'AUTHENTICATION_FAILED' ||
-    authResult.errorCode === 'BIOMETRIC_NOT_AVAILABLE'
-  );
+  const shouldFallback =
+    fallbackToPin &&
+    (authResult.errorCode === 'USER_CANCEL' ||
+      authResult.errorCode === 'AUTHENTICATION_FAILED' ||
+      authResult.errorCode === 'BIOMETRIC_NOT_AVAILABLE');
 
   return {
     success: false,

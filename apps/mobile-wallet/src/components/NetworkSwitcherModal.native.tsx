@@ -76,11 +76,7 @@ export const NetworkSwitcherModal = ({
       accessibilityViewIsModal
     >
       <View style={styles.overlay}>
-        <TouchableOpacity
-          style={styles.backdrop}
-          activeOpacity={1}
-          onPress={onClose}
-        />
+        <TouchableOpacity style={styles.backdrop} activeOpacity={1} onPress={onClose} />
         <View style={styles.container}>
           <View style={styles.header}>
             <Text style={styles.title} accessibilityRole="header">
@@ -108,10 +104,7 @@ export const NetworkSwitcherModal = ({
                     accessibilityRole="radio"
                     accessibilityState={{ checked: isSelected }}
                     onPress={() => handleNetworkSelect(option.value)}
-                    style={[
-                      styles.networkOption,
-                      isSelected && styles.networkOptionSelected,
-                    ]}
+                    style={[styles.networkOption, isSelected && styles.networkOptionSelected]}
                   >
                     <View style={styles.networkOptionContent}>
                       <View style={{ flex: 1 }}>
@@ -123,16 +116,9 @@ export const NetworkSwitcherModal = ({
                             </View>
                           )}
                         </View>
-                        <Text style={styles.networkDescription}>
-                          {option.description}
-                        </Text>
+                        <Text style={styles.networkDescription}>{option.description}</Text>
                       </View>
-                      <View
-                        style={[
-                          styles.radioButton,
-                          isSelected && styles.radioButtonSelected,
-                        ]}
-                      >
+                      <View style={[styles.radioButton, isSelected && styles.radioButtonSelected]}>
                         {isSelected && <View style={styles.radioButtonInner} />}
                       </View>
                     </View>
@@ -142,14 +128,10 @@ export const NetworkSwitcherModal = ({
             </View>
 
             {selectedNetwork !== currentNetwork && (
-              <View
-                style={styles.warningContainer}
-                accessibilityRole="alert"
-              >
+              <View style={styles.warningContainer} accessibilityRole="alert">
                 <Text style={styles.warningText}>
-                  <Text style={{ fontWeight: '600' }}>Warning:</Text> Switching networks
-                  will reload your wallet data. Make sure you have saved any pending
-                  transactions.
+                  <Text style={{ fontWeight: '600' }}>Warning:</Text> Switching networks will reload
+                  your wallet data. Make sure you have saved any pending transactions.
                 </Text>
               </View>
             )}
@@ -160,11 +142,7 @@ export const NetworkSwitcherModal = ({
               onPress={onClose}
               disabled={isChanging}
               accessibilityRole="button"
-              style={[
-                styles.button,
-                styles.cancelButton,
-                isChanging && styles.buttonDisabled,
-              ]}
+              style={[styles.button, styles.cancelButton, isChanging && styles.buttonDisabled]}
             >
               <Text style={styles.cancelButtonText}>Cancel</Text>
             </TouchableOpacity>
@@ -175,8 +153,7 @@ export const NetworkSwitcherModal = ({
               style={[
                 styles.button,
                 styles.confirmButton,
-                (isChanging || selectedNetwork === currentNetwork) &&
-                  styles.confirmButtonDisabled,
+                (isChanging || selectedNetwork === currentNetwork) && styles.confirmButtonDisabled,
               ]}
             >
               {isChanging ? (

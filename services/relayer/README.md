@@ -464,13 +464,13 @@ Limits requests per session key or account identity across relay execution route
 
 Enforces endpoint-specific limits based on sensitivity:
 
-| Route | RPM | Rationale |
-|---|---|---|
-| `/relay/execute` | 30 | Standard relay execution |
-| `/relay/validate` | 60 | Read-only simulation probe |
-| `/relay/session-key` | 10 | Sensitive: credential creation |
-| `/relay/revoke-session-key` | 10 | Sensitive: credential revocation |
-| `/relay/status` | 120 | Health / monitoring |
+| Route                       | RPM | Rationale                        |
+| --------------------------- | --- | -------------------------------- |
+| `/relay/execute`            | 30  | Standard relay execution         |
+| `/relay/validate`           | 60  | Read-only simulation probe       |
+| `/relay/session-key`        | 10  | Sensitive: credential creation   |
+| `/relay/revoke-session-key` | 10  | Sensitive: credential revocation |
+| `/relay/status`             | 120 | Health / monitoring              |
 
 Note: uses in-memory store by default (swap in `rate-limit-redis` for multi-instance production deployments).
 
@@ -484,13 +484,13 @@ Deploy behind TLS termination (e.g. AWS ALB, nginx). The service itself does not
 
 ### Threat Summary
 
-| Threat              | Mitigation                                                                                             |
-| ------------------- | ------------------------------------------------------------------------------------------------------ |
-| Signature forgery   | Ed25519 verification (stub → real before prod)                                                         |
-| Replay attacks      | Nonce validation (full tracking needed before prod)                                                    |
-| Abuse / DoS         | Multi-tier rate limiting (global per-IP throttling + per-route limits + per-account session limits)    |
-| Gas griefing        | Gas limit enforcement (not yet implemented)                                                            |
-| Unauthorised access | Bearer token auth on all mutating endpoints                                                            |
+| Threat              | Mitigation                                                                                          |
+| ------------------- | --------------------------------------------------------------------------------------------------- |
+| Signature forgery   | Ed25519 verification (stub → real before prod)                                                      |
+| Replay attacks      | Nonce validation (full tracking needed before prod)                                                 |
+| Abuse / DoS         | Multi-tier rate limiting (global per-IP throttling + per-route limits + per-account session limits) |
+| Gas griefing        | Gas limit enforcement (not yet implemented)                                                         |
+| Unauthorised access | Bearer token auth on all mutating endpoints                                                         |
 
 ---
 

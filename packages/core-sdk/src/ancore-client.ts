@@ -16,6 +16,8 @@ import {
   type RefreshSessionKeyTtlResult,
   type SessionKeyTtlRefresher,
 } from './refresh-session-key-ttl';
+import { withNetworkRetry, type RetryPolicyOptions } from './retry-policy';
+import type { RetryPresetName } from './retry-presets';
 import {
   revokeSessionKey,
   type RevokeSessionKeyParams,
@@ -27,6 +29,11 @@ import { withRetry, type RetryOptions } from './utils/retry';
 
 export interface AncoreClientOptions {
   accountContractId: string;
+  /**
+   * Default retry policy or preset name applied to client network calls.
+   * Can be overridden per method call.
+   */
+  retry?: RetryPolicyOptions | RetryPresetName;
   /**
    * Default retry configuration for network and RPC calls.
    */
@@ -51,6 +58,7 @@ export interface CreateSmartAccountClientOptions {
 export class AncoreClient {
   readonly accountContractId: string;
   private readonly accountContract: SessionKeyWriter & SessionKeyRevoker & SessionKeyTtlRefresher;
+  private readonly defaultRetry?: RetryPolicyOptions | RetryPresetName;
   private readonly retryOptions?: RetryOptions;
 
   constructor(options: AncoreClientOptions) {
@@ -62,7 +70,42 @@ export class AncoreClient {
 
     this.accountContractId = options.accountContractId;
     this.accountContract = new AccountContract(options.accountContractId);
+    this.defaultRetry = options.retry;
     this.retryOptions = options.retryOptions;
+  }
+
+  /**
+   * Returns the globally configured retry policy or preset name for this client instance.
+   */
+  getRetryPolicy(): RetryPolicyOptions | RetryPresetName | undefined {
+    return this.defaultRetry;
+  }
+
+  /**
+   * Wraps an arbitrary asynchronous network operation (e.g. Soroban RPC / Horizon calls)
+   * with the client's configured retry policy or an explicit method-level override.
+   *
+   * @param fn - The async function to execute
+   * @param override - Optional method-level retry policy or preset override
+   * @returns The resolved value of `fn`
+   */
+  withRetry<T>(
+    fn: () => Promise<T>,
+    override?: RetryOptions | RetryPolicyOptions | RetryPresetName
+  ): Promise<T> {
+    if (typeof override === 'string' || typeof this.defaultRetry === 'string') {
+      const policy =
+        (override as RetryPolicyOptions | RetryPresetName | undefined) ?? this.defaultRetry;
+      return withNetworkRetry(fn, policy);
+    }
+    if (this.defaultRetry !== undefined) {
+      const policy = (override as RetryPolicyOptions | undefined) ?? this.defaultRetry;
+      return withNetworkRetry(fn, policy);
+    }
+    return withRetry(fn, {
+      ...this.retryOptions,
+      ...(override as RetryOptions | undefined),
+    });
   }
 
   /**
@@ -103,19 +146,6 @@ export class AncoreClient {
   }
 
   /**
-   * Execute an asynchronous network call with the client's configured retry policy.
-   *
-   * @param fn Function to execute
-   * @param overrideOptions Optional override for this specific invocation
-   */
-  withRetry<T>(fn: () => Promise<T>, overrideOptions?: RetryOptions): Promise<T> {
-    return withRetry(fn, {
-      ...this.retryOptions,
-      ...overrideOptions,
-    });
-  }
-
-  /**
    * Creates a new Ancore wallet by generating a fresh BIP39 mnemonic, deriving
    * an Ed25519 keypair via BIP-44 HD derivation, and optionally encrypting the
    * mnemonic with the provided password.
@@ -141,6 +171,11 @@ export class AncoreClient {
     return revokeSessionKey(this.accountContract, params);
   }
 
+  refreshSessionKeyTtl(params: RefreshSessionKeyTtlParams): InvocationArgs;
+  refreshSessionKeyTtl(
+    params: RefreshSessionKeyTtlParams,
+    options: RefreshSessionKeyTtlOptions
+  ): Promise<RefreshSessionKeyTtlResult>;
   refreshSessionKeyTtl(
     params: RefreshSessionKeyTtlParams,
     options?: RefreshSessionKeyTtlOptions
@@ -151,6 +186,7 @@ export class AncoreClient {
 
     const mergedOptions: RefreshSessionKeyTtlOptions = {
       ...options,
+      retry: options.retry ?? this.defaultRetry,
       retryOptions: {
         ...this.retryOptions,
         ...options.retryOptions,
