@@ -2,8 +2,8 @@ import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { NetworkSwitcherModal } from '../NetworkSwitcherModal';
 
 describe('NetworkSwitcherModal', () => {
-  const mockOnClose = vi.fn();
-  const mockOnNetworkChange = vi.fn();
+  const mockOnClose = jest.fn();
+  const mockOnNetworkChange = jest.fn();
 
   beforeEach(() => {
     mockOnClose.mockClear();
@@ -34,7 +34,7 @@ describe('NetworkSwitcherModal', () => {
     );
 
     expect(screen.getByRole('dialog')).toBeInTheDocument();
-    expect(screen.getByText('Switch Network')).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: 'Switch Network' })).toBeInTheDocument();
   });
 
   it('displays all network options', () => {
@@ -152,7 +152,7 @@ describe('NetworkSwitcherModal', () => {
     const futurenetOption = screen.getByRole('radio', { name: /Futurenet/i });
     fireEvent.click(futurenetOption);
 
-    const switchButton = screen.getByText('Switch Network');
+    const switchButton = screen.getByRole('button', { name: 'Switch Network' });
     fireEvent.click(switchButton);
 
     await waitFor(() => {
@@ -180,7 +180,7 @@ describe('NetworkSwitcherModal', () => {
     const futurenetOption = screen.getByRole('radio', { name: /Futurenet/i });
     fireEvent.click(futurenetOption);
 
-    const switchButton = screen.getByText('Switch Network');
+    const switchButton = screen.getByRole('button', { name: 'Switch Network' });
     fireEvent.click(switchButton);
 
     expect(screen.getByText('Switching...')).toBeInTheDocument();
@@ -210,7 +210,7 @@ describe('NetworkSwitcherModal', () => {
     const futurenetOption = screen.getByRole('radio', { name: /Futurenet/i });
     fireEvent.click(futurenetOption);
 
-    const switchButton = screen.getByText('Switch Network');
+    const switchButton = screen.getByRole('button', { name: 'Switch Network' });
     fireEvent.click(switchButton);
 
     const cancelButton = screen.getByText('Cancel');
@@ -233,7 +233,7 @@ describe('NetworkSwitcherModal', () => {
       />
     );
 
-    const switchButton = screen.getByText('Switch Network');
+    const switchButton = screen.getByRole('button', { name: 'Switch Network' });
     expect(switchButton).toBeDisabled();
 
     fireEvent.click(switchButton);

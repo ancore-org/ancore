@@ -3,15 +3,15 @@ import type { IBiometricAuthService } from '../hooks/useBiometricUnlock';
 
 describe('authenticateWithBiometrics', () => {
   const createMockService = (): IBiometricAuthService => ({
-    isAvailable: vi.fn(),
-    authenticate: vi.fn(),
+    isAvailable: jest.fn(),
+    authenticate: jest.fn(),
   });
 
   describe('when biometrics are available', () => {
     it('returns success when authentication succeeds', async () => {
       const service = createMockService();
-      (service.isAvailable as ReturnType<typeof vi.fn>).mockResolvedValue(true);
-      (service.authenticate as ReturnType<typeof vi.fn>).mockResolvedValue({ success: true });
+      (service.isAvailable as ReturnType<typeof jest.fn>).mockResolvedValue(true);
+      (service.authenticate as ReturnType<typeof jest.fn>).mockResolvedValue({ success: true });
 
       const result = await authenticateWithBiometrics(service, {
         promptMessage: 'Unlock wallet',
@@ -24,8 +24,8 @@ describe('authenticateWithBiometrics', () => {
 
     it('uses default prompt message when none provided', async () => {
       const service = createMockService();
-      (service.isAvailable as ReturnType<typeof vi.fn>).mockResolvedValue(true);
-      (service.authenticate as ReturnType<typeof vi.fn>).mockResolvedValue({ success: true });
+      (service.isAvailable as ReturnType<typeof jest.fn>).mockResolvedValue(true);
+      (service.authenticate as ReturnType<typeof jest.fn>).mockResolvedValue({ success: true });
 
       await authenticateWithBiometrics(service);
 
@@ -34,8 +34,8 @@ describe('authenticateWithBiometrics', () => {
 
     it('returns failure with fallback when user cancels', async () => {
       const service = createMockService();
-      (service.isAvailable as ReturnType<typeof vi.fn>).mockResolvedValue(true);
-      (service.authenticate as ReturnType<typeof vi.fn>).mockResolvedValue({
+      (service.isAvailable as ReturnType<typeof jest.fn>).mockResolvedValue(true);
+      (service.authenticate as ReturnType<typeof jest.fn>).mockResolvedValue({
         success: false,
         errorCode: 'USER_CANCEL',
       });
@@ -49,8 +49,8 @@ describe('authenticateWithBiometrics', () => {
 
     it('returns failure with fallback when authentication fails', async () => {
       const service = createMockService();
-      (service.isAvailable as ReturnType<typeof vi.fn>).mockResolvedValue(true);
-      (service.authenticate as ReturnType<typeof vi.fn>).mockResolvedValue({
+      (service.isAvailable as ReturnType<typeof jest.fn>).mockResolvedValue(true);
+      (service.authenticate as ReturnType<typeof jest.fn>).mockResolvedValue({
         success: false,
         errorCode: 'AUTHENTICATION_FAILED',
         error: 'Biometric not recognized',
@@ -66,8 +66,8 @@ describe('authenticateWithBiometrics', () => {
 
     it('does not fallback when fallbackToPin is false', async () => {
       const service = createMockService();
-      (service.isAvailable as ReturnType<typeof vi.fn>).mockResolvedValue(true);
-      (service.authenticate as ReturnType<typeof vi.fn>).mockResolvedValue({
+      (service.isAvailable as ReturnType<typeof jest.fn>).mockResolvedValue(true);
+      (service.authenticate as ReturnType<typeof jest.fn>).mockResolvedValue({
         success: false,
         errorCode: 'USER_CANCEL',
       });
@@ -81,8 +81,8 @@ describe('authenticateWithBiometrics', () => {
 
     it('does not fallback for permanent lockout', async () => {
       const service = createMockService();
-      (service.isAvailable as ReturnType<typeof vi.fn>).mockResolvedValue(true);
-      (service.authenticate as ReturnType<typeof vi.fn>).mockResolvedValue({
+      (service.isAvailable as ReturnType<typeof jest.fn>).mockResolvedValue(true);
+      (service.authenticate as ReturnType<typeof jest.fn>).mockResolvedValue({
         success: false,
         errorCode: 'LOCKOUT_PERMANENT',
       });
@@ -98,7 +98,7 @@ describe('authenticateWithBiometrics', () => {
   describe('when biometrics are not available', () => {
     it('returns failure with fallback when fallbackToPin is true', async () => {
       const service = createMockService();
-      (service.isAvailable as ReturnType<typeof vi.fn>).mockResolvedValue(false);
+      (service.isAvailable as ReturnType<typeof jest.fn>).mockResolvedValue(false);
 
       const result = await authenticateWithBiometrics(service, { fallbackToPin: true });
 
@@ -110,7 +110,7 @@ describe('authenticateWithBiometrics', () => {
 
     it('returns failure without fallback when fallbackToPin is false', async () => {
       const service = createMockService();
-      (service.isAvailable as ReturnType<typeof vi.fn>).mockResolvedValue(false);
+      (service.isAvailable as ReturnType<typeof jest.fn>).mockResolvedValue(false);
 
       const result = await authenticateWithBiometrics(service, { fallbackToPin: false });
 

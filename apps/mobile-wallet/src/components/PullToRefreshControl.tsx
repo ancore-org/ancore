@@ -1,4 +1,6 @@
-import { type ReactNode, type TouchEvent, useRef, useState } from 'react';
+import { type ReactNode, useRef, useState } from 'react';
+import { View, Text, StyleSheet } from 'react-native';
+import type { GestureResponderEvent } from 'react-native';
 
 type Props = {
   isRefreshing: boolean;
@@ -14,9 +16,9 @@ type Props = {
 
 const PULL_THRESHOLD_PX = 48;
 
-export const PullToRefreshControl = ({ 
-  isRefreshing, 
-  onRefresh, 
+export const PullToRefreshControl = ({
+  isRefreshing,
+  onRefresh,
   children,
   platform = 'web',
 }: Props) => {
@@ -32,16 +34,28 @@ export const PullToRefreshControl = ({
   const isPulling = pullDistance > 0 && !isRefreshing;
   const shouldShowIndicator = isPulling || isRefreshing;
 
-  const handleTouchStart = (event: TouchEvent<HTMLElement>) => {
-    startYRef.current = event.touches[0]?.clientY ?? null;
+  const handleTouchStart = (event: GestureResponderEvent) => {
+    const anyEvent = event as any;
+    const nativeEvent = anyEvent?.nativeEvent ?? anyEvent;
+    startYRef.current =
+      nativeEvent?.pageY ??
+      anyEvent?.touches?.[0]?.clientY ??
+      nativeEvent?.touches?.[0]?.clientY ??
+      null;
   };
 
-  const handleTouchMove = (event: TouchEvent<HTMLElement>) => {
+  const handleTouchMove = (event: GestureResponderEvent) => {
     if (startYRef.current === null || isRefreshing) {
       return;
     }
 
-    const nextY = event.touches[0]?.clientY ?? startYRef.current;
+    const anyEvent = event as any;
+    const nativeEvent = anyEvent?.nativeEvent ?? anyEvent;
+    const nextY =
+      nativeEvent?.pageY ??
+      anyEvent?.touches?.[0]?.clientY ??
+      nativeEvent?.touches?.[0]?.clientY ??
+      startYRef.current;
     setPullDistance(Math.max(0, Math.min(nextY - startYRef.current, PULL_THRESHOLD_PX)));
   };
 
@@ -57,18 +71,27 @@ export const PullToRefreshControl = ({
   };
 
   return (
-    <section
-      data-testid="pull-to-refresh"
+    <View
+      testID="pull-to-refresh"
       onTouchStart={handleTouchStart}
       onTouchMove={handleTouchMove}
       onTouchEnd={handleTouchEnd}
     >
       {shouldShowIndicator ? (
-        <p aria-live="polite" role="status">
+        <Text style={styles.indicator} accessibilityLiveRegion="polite" accessibilityRole="status">
           {isRefreshing ? 'Refreshing transactions...' : 'Release to refresh'}
-        </p>
+        </Text>
       ) : null}
       {children}
-    </section>
+    </View>
   );
 };
+
+const styles = StyleSheet.create({
+  indicator: {
+    padding: 12,
+    textAlign: 'center',
+    fontSize: 14,
+    color: '#64748b',
+  },
+});

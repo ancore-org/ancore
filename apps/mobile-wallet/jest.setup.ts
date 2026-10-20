@@ -18,12 +18,18 @@ jest.mock(
         children,
         onChangeText,
         onPress,
+        style,
         ...rest
       } = props;
+      const flatStyle = Array.isArray(style)
+        ? Object.assign({}, ...style.filter(Boolean))
+        : ((style as Record<string, unknown>) ?? {});
       return React.createElement(
         tag,
         {
           ...rest,
+          style: flatStyle,
+          'data-testid': rest.testID ?? rest['data-testid'],
           'aria-label': accessibilityLabel,
           'aria-disabled':
             accessibilityState && (accessibilityState as { disabled?: boolean }).disabled,
@@ -31,19 +37,105 @@ jest.mock(
             ? (event: React.ChangeEvent<HTMLInputElement>) => onChangeText(event.target.value)
             : undefined,
           onClick: onPress,
-          role: accessibilityRole === 'header' ? 'heading' : accessibilityRole,
+          role:
+            accessibilityRole === 'header'
+              ? 'heading'
+              : accessibilityRole === 'image'
+                ? 'img'
+                : accessibilityRole,
         },
-        children
+        typeof children === 'function' ? children({ pressed: false }) : children
       );
     };
 
     return {
       View: (props: Record<string, unknown>) => element('div', props),
+      ScrollView: (props: Record<string, unknown>) => element('div', props),
       Text: (props: Record<string, unknown>) =>
         element(props.accessibilityRole === 'header' ? 'h1' : 'span', props),
       TextInput: (props: Record<string, unknown>) => element('input', props),
       Pressable: (props: Record<string, unknown>) => element('button', props),
-      StyleSheet: { create: (styles: Record<string, unknown>) => styles },
+      TouchableOpacity: (props: Record<string, unknown>) => element('button', props),
+      Modal: (props: Record<string, unknown>) =>
+        props.visible === false ? null : element('div', props),
+      ActivityIndicator: (props: Record<string, unknown>) => element('div', props),
+      RefreshControl: (props: Record<string, unknown>) => element('div', props),
+      FlatList: (props: Record<string, unknown>) => {
+        const data = (props.data as unknown[]) ?? [];
+        const renderItem = props.renderItem as
+          | ((info: {
+              item: unknown;
+              index: number;
+              separators: Record<string, unknown>;
+            }) => React.ReactNode)
+          | undefined;
+        const keyExtractor = props.keyExtractor as
+          | ((item: unknown, index: number) => string)
+          | undefined;
+        const empty = props.ListEmptyComponent as
+          | React.ComponentType
+          | React.ReactElement
+          | null
+          | undefined;
+        const header = props.ListHeaderComponent as
+          | React.ComponentType
+          | React.ReactElement
+          | null
+          | undefined;
+        const footer = props.ListFooterComponent as
+          | React.ComponentType
+          | React.ReactElement
+          | null
+          | undefined;
+        const renderNode = (node: unknown) => {
+          if (!node) return null;
+          if (React.isValidElement(node)) return node;
+          if (typeof node === 'function') return React.createElement(node as React.ComponentType);
+          return null;
+        };
+        return React.createElement(
+          'div',
+          {
+            'data-testid': props.testID as string | undefined,
+            'aria-label': props.accessibilityLabel as string | undefined,
+          },
+          renderNode(header),
+          React.createElement(
+            'ul',
+            { 'aria-label': (props.accessibilityLabel as string | undefined) ?? 'list' },
+            data.length === 0
+              ? renderNode(empty)
+              : data.map((item, index) =>
+                  React.createElement(
+                    'li',
+                    { key: keyExtractor ? keyExtractor(item, index) : String(index) },
+                    renderItem ? renderItem({ item, index, separators: {} }) : null
+                  )
+                )
+          ),
+          renderNode(footer)
+        );
+      },
+      Alert: {
+        alert: jest.fn(),
+      },
+      Clipboard: {
+        setString: jest.fn(),
+        getString: jest.fn().mockResolvedValue(''),
+      },
+      Platform: {
+        OS: 'ios',
+        select: (obj: Record<string, unknown>) => obj.ios ?? obj.default,
+      },
+      AppState: {
+        currentState: 'active',
+        addEventListener: jest.fn(() => ({ remove: jest.fn() })),
+      },
+      StyleSheet: {
+        create: (styles: Record<string, unknown>) => styles,
+        flatten: (style: unknown) =>
+          Array.isArray(style) ? Object.assign({}, ...style.filter(Boolean)) : (style ?? {}),
+      },
       Linking: {
         getInitialURL: jest.fn().mockResolvedValue(null),
         addEventListener: jest.fn(() => ({ remove: jest.fn() })),
@@ -53,6 +145,31 @@ jest.mock(
       },
     };
   },
+  { virtual: true }
+);
+
+jest.mock(
+  'react-native-haptic-feedback',
+  () => ({
+    __esModule: true,
+    default: {
+      trigger: jest.fn(),
+    },
+    trigger: jest.fn(),
+  }),
+  { virtual: true }
+);
+
+jest.mock(
+  'react-native-qrcode-svg',
+  () => ({
+    __esModule: true,
+    default: (props: Record<string, unknown>) =>
+      React.createElement('div', {
+        'data-testid': (props.testID as string | undefined) ?? 'qr-code-svg',
+        'data-value': props.value,
+      }),
+  }),
   { virtual: true }
 );
 

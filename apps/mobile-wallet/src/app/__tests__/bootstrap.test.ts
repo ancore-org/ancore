@@ -1,17 +1,6 @@
 import { bootstrapMobileWallet } from '../bootstrap';
 
 jest.mock(
-  'react-native',
-  () => ({
-    AppState: {
-      currentState: 'active',
-      addEventListener: jest.fn(),
-    },
-  }),
-  { virtual: true }
-);
-
-jest.mock(
   'react-native-keychain',
   () => ({
     getGenericPassword: jest.fn(),
