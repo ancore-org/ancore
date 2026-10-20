@@ -11,7 +11,7 @@
 ## How migrations are applied
 
 Migration files live in [`migrations/`](migrations) and are plain `.sql` applied
-in filename order:
+in filename order via `psql`:
 
 ```
 services/indexer/migrations/
@@ -24,6 +24,18 @@ services/indexer/migrations/
 ├── 007_add_ingest_idempotency_constraints.sql
 ├── 008_create_ingest_dead_letters_table.sql
 └── 009_add_dead_letter_idempotency.sql
+```
+
+Apply migrations with:
+
+```bash
+# Apply all migrations in order
+for f in services/indexer/migrations/*.sql; do 
+  psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f "$f"
+done
+
+# Or apply a single migration file
+psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f services/indexer/migrations/001_create_account_activity_table.sql
 ```
 
 The indexer binary does **not** create or alter schema at startup. Migrations are
@@ -193,6 +205,78 @@ otherwise `/health` reports `ahead` for a database that is simply current.
    [Before you push](../../AGENTS.md#before-you-push--run-what-ci-runs) — `cargo fmt --check`,
    `cargo clippy -- -D warnings` and `cargo test` inside `services/indexer/`.
 
+## Local development setup
+
+### 1. Start a local PostgreSQL database
+
+Using Docker:
+
+```bash
+docker run -d --name ancore-indexer-db \
+  -e POSTGRES_USER=postgres \
+  -e POSTGRES_PASSWORD=postgres \
+  -e POSTGRES_DB=ancore_dev \
+  -p 5432:5432 \
+  postgres:16
+```
+
+Or via Docker Compose (from repo root):
+
+```bash
+docker-compose up -d postgres
+```
+
+### 2. Set DATABASE\_URL environment variable
+
+```bash
+export DATABASE_URL="postgresql://postgres:postgres@localhost:5432/ancore_dev"
+```
+
+### 3. Apply all migrations
+
+```bash
+# From repo root
+for f in services/indexer/migrations/*.sql; do 
+  psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f "$f"
+done
+```
+
+### 4. Verify migration state
+
+```bash
+psql "$DATABASE_URL" -c "SELECT version, name, applied_at FROM schema_migrations ORDER BY version;"
+```
+
+Expected output:
+
+```
+ version |                  name                  |         applied_at
+---------+----------------------------------------+----------------------------
+       1 | create_account_activity_table          | 2024-01-15 10:00:00.000000
+       2 | create_ingest_checkpoints_table        | 2024-01-15 10:00:00.000000
+       3 | add_asset_code_issuer_to_account_activity | 2024-01-15 10:00:00.000000
+       4 | create_contract_events_table           | 2024-01-15 10:00:00.000000
+       5 | create_schema_migrations_table         | 2024-01-15 10:00:00.000000
+       6 | add_account_id_to_contract_events      | 2024-01-15 10:00:00.000000
+       7 | add_ingest_idempotency_constraints     | 2024-01-15 10:00:00.000000
+       8 | create_ingest_dead_letters_table       | 2024-01-15 10:00:00.000000
+       9 | add_dead_letter_idempotency            | 2024-01-15 10:00:00.000000
+(9 rows)
+```
+
+### 5. Regenerate SQLx offline cache (if queries changed)
+
+When adding or modifying queries in the Rust codebase:
+
+```bash
+cd services/indexer
+cargo sqlx prepare -- --lib
+git add .sqlx/
+```
+
+This step is only needed when SQL queries in the Rust code are added or modified. See
+[README § Offline Build](README.md#offline-build-no-database_url-required) for details.
+
 ## Applying and verifying
 
 ```bash
@@ -248,3 +332,110 @@ Events that fail to normalise while a migration is in flight are written to
 `ingest_dead_letters` rather than dropped; the
 [backfill and dead-letter runbook](../../docs/ops/runbooks/indexer-backfill-and-dead-letter-reprocessing.md)
 covers replaying them.
+
+## Schema entity-relationship diagram
+
+```
+┌─────────────────────────┐
+│   account_activity      │
+├─────────────────────────┤
+│ id (PK)                 │
+│ account_id              │◄─── indexed for account queries
+│ activity_type           │
+│ amount                  │
+│ asset                   │
+│ asset_code              │
+│ asset_issuer            │
+│ counterparty            │
+│ tx_hash                 │◄─── indexed, idempotency key with activity_type + ledger_seq
+│ ledger_seq              │
+│ created_at              │
+│ metadata (JSONB)        │
+└─────────────────────────┘
+
+┌─────────────────────────┐
+│   contract_events       │
+├─────────────────────────┤
+│ id (PK)                 │
+│ contract_address        │◄─── indexed
+│ account_id              │◄─── indexed for wallet lookups
+│ event_type              │◄─── indexed
+│ ledger_seq              │◄─── indexed DESC
+│ timestamp               │◄─── indexed DESC
+│ tx_hash                 │◄─── idempotency key with event_type + ledger_seq
+│ data (JSONB)            │
+└─────────────────────────┘
+
+┌─────────────────────────┐
+│  ingest_checkpoints     │
+├─────────────────────────┤
+│ stream (PK)             │
+│ last_ledger_seq         │
+│ updated_at              │
+└─────────────────────────┘
+
+┌─────────────────────────┐
+│  ingest_dead_letters    │
+├─────────────────────────┤
+│ id (PK)                 │
+│ stream                  │◄─┐
+│ ledger_seq              │◄─┼── composite idempotency key
+│ tx_hash                 │◄─┘
+│ contract_id             │
+│ error_message           │
+│ raw_payload (JSONB)     │
+│ created_at              │
+│ reprocessed_at          │◄─── partial index WHERE NULL
+└─────────────────────────┘
+
+┌─────────────────────────┐
+│  schema_migrations      │
+├─────────────────────────┤
+│ version (PK)            │
+│ name                    │
+│ applied_at              │
+└─────────────────────────┘
+```
+
+**Key relationships:**
+
+- `account_activity` and `contract_events` are independent event logs with their own idempotency constraints
+- `ingest_checkpoints` tracks ingestion progress; one row per stream
+- `ingest_dead_letters` stores normalisation failures for replay
+- `schema_migrations` is the migration ledger read by `/health`
+
+## SQLx commands reference
+
+The indexer uses SQLx for compile-time query verification. When working with migrations
+that change query shapes, regenerate the offline cache:
+
+### Install sqlx-cli
+
+```bash
+cargo install sqlx-cli --no-default-features --features postgres
+```
+
+### Regenerate query metadata
+
+```bash
+cd services/indexer
+DATABASE_URL="postgresql://postgres:postgres@localhost:5432/ancore_dev" \
+  cargo sqlx prepare -- --lib
+```
+
+This writes JSON metadata to `.sqlx/` that describes each query's parameters and result columns.
+Commit these files alongside query changes.
+
+### Run migrations with sqlx-cli (alternative to psql)
+
+```bash
+# Run all pending migrations
+cd services/indexer
+sqlx migrate run
+
+# Revert last migration (not recommended in production)
+sqlx migrate revert
+```
+
+**Note:** The project convention is to apply migrations with `psql` rather than `sqlx migrate`,
+so every migration file is written as plain SQL without SQLx-specific syntax.
