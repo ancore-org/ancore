@@ -87,7 +87,7 @@ describe('BIP32 Path Validation & Derivation Helpers (#1451, #1453)', () => {
   });
 
   describe('deriveMainAccountPath', () => {
-    it('returns canonical m/44\'/148\'/{index}\'', () => {
+    it("returns canonical m/44'/148'/{index}'", () => {
       expect(deriveMainAccountPath(0)).toBe("m/44'/148'/0'");
       expect(deriveMainAccountPath(1)).toBe("m/44'/148'/1'");
       expect(deriveMainAccountPath(42)).toBe("m/44'/148'/42'");
@@ -101,7 +101,7 @@ describe('BIP32 Path Validation & Derivation Helpers (#1451, #1453)', () => {
   });
 
   describe('deriveSessionKeyPath', () => {
-    it('returns canonical m/44\'/148\'/{account}\'/2\'/{session}\'', () => {
+    it("returns canonical m/44'/148'/{account}'/2'/{session}'", () => {
       expect(deriveSessionKeyPath(0, 0)).toBe("m/44'/148'/0'/2'/0'");
       expect(deriveSessionKeyPath(5, 1)).toBe("m/44'/148'/1'/2'/5'");
     });
@@ -120,7 +120,7 @@ describe('BIP32 Path Validation & Derivation Helpers (#1451, #1453)', () => {
           { index: 44, hardened: true },
           { index: 148, hardened: true },
           { index: 0, hardened: true },
-        ]),
+        ])
       ).toBe("m/44'/148'/0'");
 
       expect(
@@ -128,7 +128,7 @@ describe('BIP32 Path Validation & Derivation Helpers (#1451, #1453)', () => {
           { index: 44, hardened: true },
           { index: 148, hardened: true },
           { index: 0, hardened: false },
-        ]),
+        ])
       ).toBe("m/44'/148'/0");
     });
   });

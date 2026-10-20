@@ -130,7 +130,7 @@ export function isStandardStellarPath(path: string): boolean {
 export function deriveMainAccountPath(accountIndex = 0): string {
   if (accountIndex < 0 || !Number.isInteger(accountIndex) || accountIndex > MAX_BIP32_INDEX) {
     throw new BIP32PathError(
-      `Account index must be an integer between 0 and ${MAX_BIP32_INDEX}, got ${accountIndex}`,
+      `Account index must be an integer between 0 and ${MAX_BIP32_INDEX}, got ${accountIndex}`
     );
   }
   return `m/44'/148'/${accountIndex}'`;
@@ -147,12 +147,12 @@ export function deriveMainAccountPath(accountIndex = 0): string {
 export function deriveSessionKeyPath(sessionIndex = 0, accountIndex = 0): string {
   if (sessionIndex < 0 || !Number.isInteger(sessionIndex) || sessionIndex > MAX_BIP32_INDEX) {
     throw new BIP32PathError(
-      `Session index must be an integer between 0 and ${MAX_BIP32_INDEX}, got ${sessionIndex}`,
+      `Session index must be an integer between 0 and ${MAX_BIP32_INDEX}, got ${sessionIndex}`
     );
   }
   if (accountIndex < 0 || !Number.isInteger(accountIndex) || accountIndex > MAX_BIP32_INDEX) {
     throw new BIP32PathError(
-      `Account index must be an integer between 0 and ${MAX_BIP32_INDEX}, got ${accountIndex}`,
+      `Account index must be an integer between 0 and ${MAX_BIP32_INDEX}, got ${accountIndex}`
     );
   }
   return `m/44'/148'/${accountIndex}'/2'/${sessionIndex}'`;

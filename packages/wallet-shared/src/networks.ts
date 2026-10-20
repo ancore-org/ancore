@@ -76,7 +76,7 @@ export function getNetworkConfig(network: StellarNetwork): NetworkConfig {
 export function resolveNetworkEndpoint(
   network: StellarNetwork,
   service: 'horizon' | 'rpc',
-  overrideUrl?: string,
+  overrideUrl?: string
 ): string {
   if (overrideUrl && overrideUrl.trim()) {
     return overrideUrl.trim();

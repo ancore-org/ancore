@@ -30,7 +30,7 @@ Apply migrations with:
 
 ```bash
 # Apply all migrations in order
-for f in services/indexer/migrations/*.sql; do 
+for f in services/indexer/migrations/*.sql; do
   psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f "$f"
 done
 
@@ -226,7 +226,7 @@ Or via Docker Compose (from repo root):
 docker-compose up -d postgres
 ```
 
-### 2. Set DATABASE\_URL environment variable
+### 2. Set DATABASE_URL environment variable
 
 ```bash
 export DATABASE_URL="postgresql://postgres:postgres@localhost:5432/ancore_dev"
@@ -236,7 +236,7 @@ export DATABASE_URL="postgresql://postgres:postgres@localhost:5432/ancore_dev"
 
 ```bash
 # From repo root
-for f in services/indexer/migrations/*.sql; do 
+for f in services/indexer/migrations/*.sql; do
   psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f "$f"
 done
 ```

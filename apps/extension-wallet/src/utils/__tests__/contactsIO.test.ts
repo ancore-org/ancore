@@ -106,16 +106,14 @@ describe('contactsIO (#1453, #1455)', () => {
 
     it('rejects contact missing alias or address', () => {
       expect(() => parseContactsJSON(JSON.stringify([{ address: ADDR_1 }]))).toThrow(
-        ContactsIOError,
+        ContactsIOError
       );
-      expect(() => parseContactsJSON(JSON.stringify([{ alias: 'Test' }]))).toThrow(
-        ContactsIOError,
-      );
+      expect(() => parseContactsJSON(JSON.stringify([{ alias: 'Test' }]))).toThrow(ContactsIOError);
     });
 
     it('rejects invalid Stellar address format', () => {
       expect(() =>
-        parseContactsJSON(JSON.stringify([{ alias: 'BadAddress', address: 'not-a-stellar-key' }])),
+        parseContactsJSON(JSON.stringify([{ alias: 'BadAddress', address: 'not-a-stellar-key' }]))
       ).toThrow(ContactsIOError);
     });
   });

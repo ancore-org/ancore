@@ -16,5 +16,5 @@ export function importFromRawEd25519Seed(seed: Buffer | Uint8Array): Keypair {
     throw new TypeError('Seed must be exactly 32 bytes');
   }
 
-  return Keypair.fromRawEd25519Seed(seed);
+  return Keypair.fromRawEd25519Seed(Buffer.from(seed));
 }

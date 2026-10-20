@@ -33,6 +33,7 @@ const EXPECTED_EXPORTS = [
   'UnsupportedMnemonicLanguageError',
   'SUPPORTED_MNEMONIC_LANGUAGE',
   'deriveKeypairFromMnemonic',
+  'importFromRawEd25519Seed',
   'signPayload',
   'signTransaction',
   'verifySignature',

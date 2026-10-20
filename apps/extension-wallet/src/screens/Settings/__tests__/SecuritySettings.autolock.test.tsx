@@ -47,7 +47,7 @@ describe('SecuritySettings — custom auto-lock duration validator (#1452, #1454
     await userEvent.click(screen.getByRole('button', { name: 'Save' }));
 
     expect(
-      screen.getByText(/Duration must be a whole number between 1 and 1440 minutes/i),
+      screen.getByText(/Duration must be a whole number between 1 and 1440 minutes/i)
     ).toBeInTheDocument();
     expect(onAutoLockChange).not.toHaveBeenCalled();
 
@@ -57,7 +57,7 @@ describe('SecuritySettings — custom auto-lock duration validator (#1452, #1454
     await userEvent.click(screen.getByRole('button', { name: 'Save' }));
 
     expect(
-      screen.getByText(/Duration must be a whole number between 1 and 1440 minutes/i),
+      screen.getByText(/Duration must be a whole number between 1 and 1440 minutes/i)
     ).toBeInTheDocument();
     expect(onAutoLockChange).not.toHaveBeenCalled();
   });

@@ -43,16 +43,22 @@ describe('importFromRawEd25519Seed', () => {
 
   it('throws TypeError for null seed', () => {
     expect(() => importFromRawEd25519Seed(null as any)).toThrow(TypeError);
-    expect(() => importFromRawEd25519Seed(null as any)).toThrow('Seed must be a Buffer or Uint8Array');
+    expect(() => importFromRawEd25519Seed(null as any)).toThrow(
+      'Seed must be a Buffer or Uint8Array'
+    );
   });
 
   it('throws TypeError for undefined seed', () => {
     expect(() => importFromRawEd25519Seed(undefined as any)).toThrow(TypeError);
-    expect(() => importFromRawEd25519Seed(undefined as any)).toThrow('Seed must be a Buffer or Uint8Array');
+    expect(() => importFromRawEd25519Seed(undefined as any)).toThrow(
+      'Seed must be a Buffer or Uint8Array'
+    );
   });
 
   it('throws TypeError for string seed', () => {
     expect(() => importFromRawEd25519Seed('not a buffer' as any)).toThrow(TypeError);
-    expect(() => importFromRawEd25519Seed('not a buffer' as any)).toThrow('Seed must be a Buffer or Uint8Array');
+    expect(() => importFromRawEd25519Seed('not a buffer' as any)).toThrow(
+      'Seed must be a Buffer or Uint8Array'
+    );
   });
 });

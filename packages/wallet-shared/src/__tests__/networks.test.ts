@@ -45,14 +45,18 @@ describe('wallet-shared / networks (#1450, #1452)', () => {
     expect(testnetConfig.horizonUrl).toBe('https://horizon-testnet.stellar.org');
     expect(testnetConfig.sorobanRpcUrl).toBe('https://soroban-testnet.stellar.org');
 
-    expect(() => getNetworkConfig('unknown-network' as StellarNetwork)).toThrow('Unknown network: unknown-network');
+    expect(() => getNetworkConfig('unknown-network' as StellarNetwork)).toThrow(
+      'Unknown network: unknown-network'
+    );
   });
 
   it('resolves endpoints via resolveNetworkEndpoint with override support', () => {
     // Default resolution
     expect(resolveNetworkEndpoint('mainnet', 'horizon')).toBe('https://horizon.stellar.org');
     expect(resolveNetworkEndpoint('mainnet', 'rpc')).toBe('https://soroban-mainnet.stellar.org');
-    expect(resolveNetworkEndpoint('testnet', 'horizon')).toBe('https://horizon-testnet.stellar.org');
+    expect(resolveNetworkEndpoint('testnet', 'horizon')).toBe(
+      'https://horizon-testnet.stellar.org'
+    );
     expect(resolveNetworkEndpoint('testnet', 'rpc')).toBe('https://soroban-testnet.stellar.org');
 
     // Override resolution

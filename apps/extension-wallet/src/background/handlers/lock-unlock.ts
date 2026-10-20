@@ -105,6 +105,7 @@ export function registerLockUnlockHandlers(): void {
     } catch (err) {
       log.error('unlock failed', err);
       setBackgroundSessionUnlocked(false);
+      await clearUnlockSession().catch(() => {});
       return { success: false };
     }
   });

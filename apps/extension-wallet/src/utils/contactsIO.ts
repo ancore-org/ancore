@@ -64,7 +64,7 @@ export function exportContactsAsJSON(contacts?: Contact[]): string {
  */
 export function downloadContactsBackup(
   contacts?: Contact[],
-  filename = 'ancore-contacts-backup.json',
+  filename = 'ancore-contacts-backup.json'
 ): void {
   const json = exportContactsAsJSON(contacts);
   const blob = new Blob([json], { type: 'application/json' });
@@ -107,7 +107,7 @@ export function parseContactsJSON(raw: string): ContactPayload[] {
     rawList = (parsed as { contacts: unknown[] }).contacts;
   } else {
     throw new ContactsIOError(
-      'Invalid contacts backup format: must be an array or contain a "contacts" array',
+      'Invalid contacts backup format: must be an array or contain a "contacts" array'
     );
   }
 
@@ -132,9 +132,7 @@ export function parseContactsJSON(raw: string): ContactPayload[] {
     try {
       assertValidEd25519PublicKey(address.trim());
     } catch {
-      throw new ContactsIOError(
-        `Contact "${alias}" has an invalid Stellar address: "${address}"`,
-      );
+      throw new ContactsIOError(`Contact "${alias}" has an invalid Stellar address: "${address}"`);
     }
 
     validPayloads.push({
@@ -152,7 +150,7 @@ export function parseContactsJSON(raw: string): ContactPayload[] {
  */
 export function importContacts(
   rawJson: string,
-  options: { mode?: 'merge' | 'replace' } = {},
+  options: { mode?: 'merge' | 'replace' } = {}
 ): ImportContactsResult {
   const mode = options.mode ?? 'merge';
   const incoming = parseContactsJSON(rawJson);
@@ -176,7 +174,7 @@ export function importContacts(
     // Merge mode: update existing by alias, or add new
     for (const item of incoming) {
       const existing = store.contacts.find(
-        (c) => c.alias.toLowerCase() === item.alias.toLowerCase(),
+        (c) => c.alias.toLowerCase() === item.alias.toLowerCase()
       );
 
       if (existing) {
