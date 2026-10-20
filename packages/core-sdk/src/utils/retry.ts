@@ -245,14 +245,14 @@ export async function withRetry<T>(fn: () => Promise<T>, options: RetryOptions =
     } catch (error) {
       lastError = error;
 
-      // Exhausted all retries -> break and throw
-      if (attempt >= maxRetries) {
-        break;
-      }
-
       // Check if error qualifies for retry
       if (!isRetryable(error)) {
         throw error;
+      }
+
+      // Exhausted all retries -> break and throw
+      if (attempt >= maxRetries) {
+        break;
       }
 
       // Compute backoff delay
