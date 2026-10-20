@@ -16,6 +16,7 @@ import { RelayService } from './services/relayService';
 import { createStellarSubmitterFromEnv } from './services/stellarSubmitter';
 import { createAuthMiddleware } from './middleware/auth';
 import { createAccountRateLimiterMiddleware } from './middleware/accountRateLimiter';
+import { createIpRateLimiterMiddleware } from './middleware/ipRateLimiter';
 import { createRouteRateLimiter } from './middleware/routeRateLimiter';
 import { createIdempotencyMiddleware } from './middleware/idempotency';
 import { createPayloadGuardMiddleware } from './middleware/payloadGuard';
@@ -133,6 +134,7 @@ export function createApp(
   const resolvedAuthService =
     authService ?? (authSecret ? createBearerAuthService(authSecret) : stubAuthService);
   const app = express();
+  app.set('trust proxy', 1);
 
   app.use(
     cors({
@@ -149,6 +151,12 @@ export function createApp(
   app.use(createRequestIdMiddleware());
 
   app.use(createRequestLoggerMiddleware());
+
+  app.use(
+    createIpRateLimiterMiddleware({
+      skip: (req) => req.path === '/health' || req.path === '/metrics',
+    })
+  );
 
   const useMockSubmission =
     relayOptions?.useMockSubmission === true || env.RELAYER_USE_MOCK_SUBMISSION;
