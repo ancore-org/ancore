@@ -15,7 +15,6 @@ interface Props {
   onContinueAnyway?: () => void;
 }
 
-// eslint-disable-next-line no-undef
 const IS_DEV = typeof __DEV__ !== 'undefined' ? __DEV__ : false;
 
 export function JailbreakWarningScreen({ onContinueAnyway }: Props) {

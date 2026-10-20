@@ -38,6 +38,7 @@
 | [FAQ](user-guide/FAQ.md) | Frequently asked questions |
 | [Troubleshooting](user-guide/TROUBLESHOOTING.md) | Common issues and fixes |
 | [Error-code troubleshooting](troubleshooting.md) | Recovery steps for common wallet and transaction errors |
+| [Simulation errors](troubleshooting/simulation-errors.md) | Common Soroban RPC simulation errors and fixes |
 
 ## Security
 
