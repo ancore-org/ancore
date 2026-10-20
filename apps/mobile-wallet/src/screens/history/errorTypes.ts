@@ -46,7 +46,8 @@ export const detectErrorKind = (error: unknown): HistoryError => {
     }
 
     // Server errors (4xx/5xx)
-    const statusMatch = message.match(/(\d{3})/);
+    // Anchor regex to word boundaries to prevent matching amounts like '100 XLM'
+    const statusMatch = message.match(/\b(\d{3})\b/);
     if (statusMatch) {
       const statusCode = parseInt(statusMatch[1], 10);
       if (statusCode >= 400) {

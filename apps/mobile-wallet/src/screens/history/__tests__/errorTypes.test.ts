@@ -155,5 +155,29 @@ describe('detectErrorKind', () => {
 
       expect(result.statusCode).toBe(429);
     });
+
+    it('does not misclassify 3-digit amounts as HTTP status codes', () => {
+      const error = new Error('Insufficient funds: 100 XLM required');
+      const result = detectErrorKind(error);
+
+      expect(result.kind).toBe('unknown');
+      expect(result.statusCode).toBeUndefined();
+    });
+
+    it('does not misclassify 3-digit numbers in addresses', () => {
+      const error = new Error('Account 123 not found');
+      const result = detectErrorKind(error);
+
+      expect(result.kind).toBe('unknown');
+      expect(result.statusCode).toBeUndefined();
+    });
+
+    it('correctly detects HTTP status when preceded by text', () => {
+      const error = new Error('Server returned 404');
+      const result = detectErrorKind(error);
+
+      expect(result.kind).toBe('server');
+      expect(result.statusCode).toBe(404);
+    });
   });
 });

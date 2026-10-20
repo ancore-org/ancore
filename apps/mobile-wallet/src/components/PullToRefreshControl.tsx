@@ -4,13 +4,30 @@ type Props = {
   isRefreshing: boolean;
   onRefresh: () => void | Promise<void>;
   children: ReactNode;
+  /**
+   * Platform identifier for conditional rendering.
+   * - 'web': uses touch events for pull-to-refresh
+   * - 'native': consumer should use RefreshControl directly with FlatList
+   */
+  platform?: 'web' | 'native';
 };
 
 const PULL_THRESHOLD_PX = 48;
 
-export const PullToRefreshControl = ({ isRefreshing, onRefresh, children }: Props) => {
+export const PullToRefreshControl = ({ 
+  isRefreshing, 
+  onRefresh, 
+  children,
+  platform = 'web',
+}: Props) => {
   const startYRef = useRef<number | null>(null);
   const [pullDistance, setPullDistance] = useState(0);
+
+  // On React Native, the parent should use RefreshControl directly with FlatList
+  // This component only provides the web touch implementation
+  if (platform === 'native') {
+    return <>{children}</>;
+  }
 
   const isPulling = pullDistance > 0 && !isRefreshing;
   const shouldShowIndicator = isPulling || isRefreshing;
