@@ -1,4 +1,7 @@
+/* global jest */
+
 import '@testing-library/jest-dom';
+import React from 'react';
 import { TextEncoder, TextDecoder } from 'util';
 
 globalThis.TextEncoder = TextEncoder;
@@ -6,15 +9,50 @@ globalThis.TextDecoder = TextDecoder as typeof globalThis.TextDecoder;
 
 jest.mock(
   'react-native',
-  () => ({
-    Linking: {
-      getInitialURL: jest.fn().mockResolvedValue(null),
-      addEventListener: jest.fn(() => ({ remove: jest.fn() })),
-    },
-    DeviceEventEmitter: {
-      addListener: jest.fn(() => ({ remove: jest.fn() })),
-    },
-  }),
+  () => {
+    const element = (tag: string, props: Record<string, unknown> = {}) => {
+      const {
+        accessibilityLabel,
+        accessibilityRole,
+        accessibilityState,
+        children,
+        onChangeText,
+        onPress,
+        ...rest
+      } = props;
+      return React.createElement(
+        tag,
+        {
+          ...rest,
+          'aria-label': accessibilityLabel,
+          'aria-disabled':
+            accessibilityState && (accessibilityState as { disabled?: boolean }).disabled,
+          onChange: onChangeText
+            ? (event: React.ChangeEvent<HTMLInputElement>) => onChangeText(event.target.value)
+            : undefined,
+          onClick: onPress,
+          role: accessibilityRole === 'header' ? 'heading' : accessibilityRole,
+        },
+        children
+      );
+    };
+
+    return {
+      View: (props: Record<string, unknown>) => element('div', props),
+      Text: (props: Record<string, unknown>) =>
+        element(props.accessibilityRole === 'header' ? 'h1' : 'span', props),
+      TextInput: (props: Record<string, unknown>) => element('input', props),
+      Pressable: (props: Record<string, unknown>) => element('button', props),
+      StyleSheet: { create: (styles: Record<string, unknown>) => styles },
+      Linking: {
+        getInitialURL: jest.fn().mockResolvedValue(null),
+        addEventListener: jest.fn(() => ({ remove: jest.fn() })),
+      },
+      DeviceEventEmitter: {
+        addListener: jest.fn(() => ({ remove: jest.fn() })),
+      },
+    };
+  },
   { virtual: true }
 );
 

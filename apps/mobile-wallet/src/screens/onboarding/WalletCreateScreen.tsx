@@ -1,4 +1,5 @@
 import React from 'react';
+import { Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 
 type Props = {
   onBack?: () => void;
@@ -10,40 +11,69 @@ const noop = () => {};
 
 export function WalletCreateScreen({ onBack = noop, onCancel = noop, onContinue = noop }: Props) {
   const [walletName, setWalletName] = React.useState('');
-
   const canContinue = walletName.trim().length > 0;
 
   return (
-    <section aria-label="Create wallet" className="space-y-4">
-      <header className="space-y-2">
-        <p className="text-sm uppercase tracking-wide text-slate-500">Create</p>
-        <h1 className="text-2xl font-semibold text-slate-950">Create a new wallet</h1>
-        <p className="text-sm text-slate-600">
+    <View accessible accessibilityLabel="Create wallet" style={styles.container}>
+      <View style={styles.header}>
+        <Text style={styles.eyebrow}>Create</Text>
+        <Text accessibilityRole="header" style={styles.title}>
+          Create a new wallet
+        </Text>
+        <Text style={styles.description}>
           Enter a name for your wallet. You will be guided through creating a recovery phrase.
-        </p>
-      </header>
+        </Text>
+      </View>
 
-      <label className="block space-y-2 text-sm text-slate-700">
-        <span>Wallet name</span>
-        <input
-          aria-label="Wallet name"
-          onChange={(event) => setWalletName(event.target.value)}
+      <View style={styles.field}>
+        <Text style={styles.label}>Wallet name</Text>
+        <TextInput
+          accessibilityLabel="Wallet name"
+          onChangeText={setWalletName}
           placeholder="My wallet"
+          style={styles.input}
           value={walletName}
         />
-      </label>
+      </View>
 
-      <div className="flex gap-3">
-        <button onClick={onBack} type="button">
-          Back
-        </button>
-        <button onClick={onCancel} type="button">
-          Cancel
-        </button>
-        <button disabled={!canContinue} onClick={() => onContinue(walletName.trim())} type="button">
-          Continue
-        </button>
-      </div>
-    </section>
+      <View style={styles.actions}>
+        <Pressable accessibilityRole="button" onPress={onBack} style={styles.button}>
+          <Text>Back</Text>
+        </Pressable>
+        <Pressable accessibilityRole="button" onPress={onCancel} style={styles.button}>
+          <Text>Cancel</Text>
+        </Pressable>
+        <Pressable
+          accessibilityRole="button"
+          accessibilityState={{ disabled: !canContinue }}
+          disabled={!canContinue}
+          onPress={() => onContinue(walletName.trim())}
+          style={[styles.button, !canContinue && styles.disabledButton]}
+        >
+          <Text>Continue</Text>
+        </Pressable>
+      </View>
+    </View>
   );
 }
+
+const styles = StyleSheet.create({
+  container: { gap: 16, padding: 24 },
+  header: { gap: 8 },
+  eyebrow: { color: '#64748b', fontSize: 12, letterSpacing: 1, textTransform: 'uppercase' },
+  title: { color: '#020617', fontSize: 24, fontWeight: '600' },
+  description: { color: '#475569', fontSize: 14 },
+  field: { gap: 8 },
+  label: { color: '#334155', fontSize: 14 },
+  input: { borderColor: '#cbd5e1', borderRadius: 6, borderWidth: 1, padding: 12 },
+  actions: { flexDirection: 'row', gap: 12 },
+  button: {
+    alignItems: 'center',
+    borderColor: '#cbd5e1',
+    borderRadius: 6,
+    borderWidth: 1,
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+  },
+  disabledButton: { opacity: 0.5 },
+});

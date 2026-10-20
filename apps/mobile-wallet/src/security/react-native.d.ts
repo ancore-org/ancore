@@ -1,9 +1,31 @@
+import type * as React from 'react';
+
 /**
  * Minimal ambient declaration for the subset of `react-native` used by
  * {@link MobileSecureVault} and WalletConnect deep link handling.
  */
 
 declare module 'react-native' {
+  export interface NativeComponentProps {
+    accessible?: boolean;
+    accessibilityLabel?: string;
+    accessibilityRole?: string;
+    accessibilityState?: { disabled?: boolean };
+    children?: React.ReactNode;
+    disabled?: boolean;
+    onChangeText?: (value: string) => void;
+    onPress?: () => void;
+    placeholder?: string;
+    style?: unknown;
+    value?: string;
+  }
+  export const View: React.ComponentType<NativeComponentProps>;
+  export const Text: React.ComponentType<NativeComponentProps>;
+  export const TextInput: React.ComponentType<NativeComponentProps>;
+  export const Pressable: React.ComponentType<NativeComponentProps>;
+  export const StyleSheet: {
+    create<T extends Record<string, unknown>>(styles: T): T;
+  };
   export type AppStateEvent = 'change' | 'focus' | 'blur';
   export type AppStatus = 'active' | 'background' | 'inactive' | 'unknown' | 'extension';
 
