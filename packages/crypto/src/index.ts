@@ -68,6 +68,9 @@ export {
 // Key Derivation
 export { deriveKeypairFromMnemonic } from './key-derivation';
 
+// Raw Key Import
+export { importFromRawEd25519Seed } from './keys';
+
 // Signing & Verification
 export { signPayload, signTransaction, verifySignature } from './signing';
 
