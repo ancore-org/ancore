@@ -5,6 +5,7 @@ import {
   isNetworkError,
   isRateLimitError,
 } from '../errors';
+import { describe, expect, it } from '@jest/globals';
 
 describe('typed error guards', () => {
   const cases = [
