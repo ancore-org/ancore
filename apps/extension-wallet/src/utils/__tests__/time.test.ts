@@ -35,4 +35,29 @@ describe('formatRelativeExpiry', () => {
       tone: 'green',
     });
   });
+
+  it('switches tone and unit exactly on the thresholds', () => {
+    expect(formatRelativeExpiry(NOW + 1, NOW).tone).toBe('amber');
+    expect(formatRelativeExpiry(NOW + DAY - 1, NOW)).toEqual({
+      label: 'Expires in 23h',
+      tone: 'green',
+    });
+    expect(formatRelativeExpiry(NOW + DAY, NOW)).toEqual({
+      label: 'Expires in 1d',
+      tone: 'green',
+    });
+  });
+
+  it('does not depend on the process timezone', () => {
+    const original = process.env.TZ;
+    try {
+      for (const tz of ['UTC', 'Asia/Tokyo', 'America/Los_Angeles']) {
+        process.env.TZ = tz;
+        expect(formatRelativeExpiry(NOW + 45 * MIN, NOW).label).toBe('Expires in 45m');
+      }
+    } finally {
+      if (original === undefined) delete process.env.TZ;
+      else process.env.TZ = original;
+    }
+  });
 });

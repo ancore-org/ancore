@@ -466,7 +466,8 @@ Before starting:
 
 1. Comment on the issue that you want to work on it.
 2. Confirm scope and acceptance criteria with a maintainer.
-3. Link your PR to the issue (`Closes #<id>`).
+3. Once assigned, begin your implementation. (See [Contributor Issue Assignment Guide](docs/guides/contributor-assignment.md) for maintainer assignment procedures and requirements).
+4. Link your PR to the issue (`Closes #<id>`).
 
 ### Good First Issues
 

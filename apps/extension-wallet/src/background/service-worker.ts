@@ -1,11 +1,14 @@
 import { installMessageDispatcher } from '@/messaging';
 import { registerInternalHandlers, probeServicesOnStartup } from './handlers';
+import { executeLockWallet } from './handlers/lock-unlock';
 import {
   restoreUnlockSessionFromStorage,
   refreshSessionExpiry,
   clearUnlockSession,
+  setBackgroundSessionUnlocked,
 } from './session-state';
 import { clearAllExtensionStorage } from './chrome-storage';
+import { getSharedStorageManager } from '@/security/storage-manager';
 import {
   registerAllExternalHandlers,
   dispatchExternalRequest,
@@ -43,6 +46,9 @@ declare const chrome: {
     onStartup: {
       addListener(callback: () => void): void;
     };
+    onSuspend?: {
+      addListener(callback: () => void): void;
+    };
     onMessage: {
       addListener(
         callback: (
@@ -53,6 +59,13 @@ declare const chrome: {
       ): void;
     };
     getURL(path: string): string;
+    sendMessage?(message: unknown): void;
+    setUninstallURL?(url: string, callback?: () => void): void;
+  };
+  commands?: {
+    onCommand: {
+      addListener(callback: (command: string) => void): void;
+    };
   };
   tabs: {
     query(queryInfo: {
@@ -87,6 +100,23 @@ log.info('booted', {
   version: manifest.version,
 });
 
+/**
+ * Wipes sensitive in-memory vault session and storage state upon fresh install,
+ * reinstall, or uninstall cleanup to prevent orphaned vault state.
+ */
+export async function wipeSensitiveDataOnUninstallOrFreshInstall(): Promise<void> {
+  setBackgroundSessionUnlocked(false);
+  try {
+    getSharedStorageManager().lock();
+  } catch {
+    // ignore
+  }
+  await Promise.all([
+    clearUnlockSession().catch((err) => log.warn('failed to clear unlock session on cleanup', err)),
+    clearAllExtensionStorage().catch((err) => log.warn('failed to clear storage on cleanup', err)),
+  ]);
+}
+
 void restoreUnlockSessionFromStorage().then((restored) => {
   if (restored) {
     log.info('unlock session restored from chrome.storage.session');
@@ -98,17 +128,24 @@ runtime?.onInstalled?.addListener((details: ChromeInstalledDetails) => {
 
   if (details.reason === 'install') {
     log.info('fresh install/reinstall: clearing orphaned storage and initializing clean state');
-    void Promise.all([
-      clearUnlockSession().catch((err) =>
-        log.warn('failed to clear unlock session on install', err)
-      ),
-      clearAllExtensionStorage().catch((err) =>
-        log.warn('failed to clear storage on install', err)
-      ),
-    ]).then(() => {
+    void wipeSensitiveDataOnUninstallOrFreshInstall().then(() => {
       log.info('clean state initialized successfully');
     });
   }
+});
+
+// Clean up sensitive in-memory state on suspend/disable/unload
+runtime?.onSuspend?.addListener(() => {
+  log.info('suspend: clearing in-memory sensitive keys and locking session');
+  setBackgroundSessionUnlocked(false);
+  try {
+    getSharedStorageManager().lock();
+  } catch {
+    // ignore
+  }
+  void clearUnlockSession().catch((err) =>
+    log.warn('failed to clear unlock session on suspend', err)
+  );
 });
 
 runtime?.onStartup?.addListener(() => {
@@ -371,4 +408,17 @@ chrome.runtime.onMessage.addListener((message: unknown, _sender, sendResponse) =
     return true;
   }
   return false;
+});
+
+// Handle Chrome extension keyboard commands (Issue #1511)
+chrome.commands?.onCommand?.addListener(async (command: string) => {
+  if (command === 'lock-wallet') {
+    log.info('lock-wallet command received from shortcut');
+    await executeLockWallet();
+    try {
+      chrome.runtime?.sendMessage?.({ type: 'WALLET_LOCKED_BY_SHORTCUT' });
+    } catch {
+      // Ignored if popup is not currently open
+    }
+  }
 });

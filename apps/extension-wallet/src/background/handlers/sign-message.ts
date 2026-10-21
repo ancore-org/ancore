@@ -1,6 +1,5 @@
 import { registerHandler } from '@/messaging';
-import { clearUnlockSession, isBackgroundSessionUnlocked } from '../session-state';
-import { getSharedStorageManager } from '@/security/storage-manager';
+import { isBackgroundSessionUnlockedAsync } from '../session-state';
 import { getSigningKeypair } from '../signing-key';
 
 // Buffer is provided by the extension polyfill (see polyfills.ts).
@@ -34,11 +33,7 @@ export async function signMessage(params: SignMessageParams): Promise<SignMessag
     throw new Error('Invalid message');
   }
 
-  const storageManager = getSharedStorageManager();
-  if (!isBackgroundSessionUnlocked() || !storageManager.isUnlocked) {
-    if (isBackgroundSessionUnlocked() && !storageManager.isUnlocked) {
-      void clearUnlockSession();
-    }
+  if (!(await isBackgroundSessionUnlockedAsync())) {
     throw new Error('Wallet is locked');
   }
 

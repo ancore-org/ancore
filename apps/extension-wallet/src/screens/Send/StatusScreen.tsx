@@ -145,7 +145,7 @@ export function StatusScreen({ txId, status, failedDraft, onClose, onRetry }: St
             <div className="flex justify-between items-center text-[10px] font-bold">
               <span className="text-slate-500 uppercase tracking-widest">Transaction Hash</span>
               <div className="flex items-center gap-2">
-                <CopyButton text={txId} />
+                <CopyButton text={txId} label="Copy" testId="copy-tx-hash-btn" />
                 <a
                   href={`https://stellar.expert/explorer/testnet/tx/${txId}`}
                   target="_blank"

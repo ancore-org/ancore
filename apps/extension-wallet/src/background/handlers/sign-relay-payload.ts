@@ -1,7 +1,6 @@
 import { buildRelayCanonicalPayload } from '@ancore/core-sdk';
 import { registerHandler } from '@/messaging';
-import { clearUnlockSession, isBackgroundSessionUnlocked } from '../session-state';
-import { getSharedStorageManager } from '@/security/storage-manager';
+import { isBackgroundSessionUnlockedAsync } from '../session-state';
 import { getSigningKeypair } from '../signing-key';
 
 export interface SignRelayPayloadParams {
@@ -55,11 +54,7 @@ export async function signRelayPayload(
     throw new Error('Invalid relay parameters');
   }
 
-  const storageManager = getSharedStorageManager();
-  if (!isBackgroundSessionUnlocked() || !storageManager.isUnlocked) {
-    if (isBackgroundSessionUnlocked() && !storageManager.isUnlocked) {
-      void clearUnlockSession();
-    }
+  if (!(await isBackgroundSessionUnlockedAsync())) {
     throw new Error('Wallet is locked');
   }
 

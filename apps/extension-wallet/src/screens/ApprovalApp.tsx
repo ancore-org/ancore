@@ -1,4 +1,5 @@
 import { SignTransactionApprovalScreen } from './SignTransactionApprovalScreen';
+import { GrantAccessScreen } from './GrantAccess/GrantAccessScreen';
 
 type ApprovalRoute =
   | 'grant-access'
@@ -44,6 +45,10 @@ function getApprovalRoute(params: URLSearchParams): ApprovalRoute {
 export function ApprovalApp() {
   const params = new URLSearchParams(window.location.search);
   const requestId = params.get('requestId');
+  const origin = params.get('origin') ?? undefined;
+  const dAppName = params.get('dAppName') ?? undefined;
+  const contractId = params.get('contractId') ?? undefined;
+  const methodName = params.get('methodName') ?? undefined;
   const route = getApprovalRoute(params);
   const copy = routeCopy[route];
 
@@ -55,9 +60,25 @@ export function ApprovalApp() {
     );
   }
 
+  if (route === 'grant-access') {
+    return (
+      <GrantAccessScreen
+        requestId={requestId}
+        dappName={params.get('dappName') || undefined}
+        origin={params.get('origin') || undefined}
+        iconUrl={params.get('iconUrl') || undefined}
+        description={params.get('description') || undefined}
+      />
+    );
+  }
+
   return (
     <SignTransactionApprovalScreen
       requestId={requestId}
+      origin={origin}
+      dAppName={dAppName}
+      contractId={contractId}
+      methodName={methodName}
       requestType={route === 'sign-auth-entry' ? 'sign-auth-entry' : 'sign-transaction'}
       {...copy}
     />

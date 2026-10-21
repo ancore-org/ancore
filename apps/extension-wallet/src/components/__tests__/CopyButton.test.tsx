@@ -1,157 +1,57 @@
-import React from 'react';
-import { render, screen, fireEvent, act } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+import { render, screen, fireEvent, act } from '@testing-library/react';
+import React from 'react';
 import { CopyButton } from '../CopyButton';
 
 describe('CopyButton', () => {
-  const originalClipboard = navigator.clipboard;
-
   beforeEach(() => {
     vi.useFakeTimers();
+    Object.assign(navigator, {
+      clipboard: {
+        writeText: vi.fn().mockResolvedValue(undefined),
+      },
+    });
   });
 
   afterEach(() => {
     vi.useRealTimers();
     vi.restoreAllMocks();
-    delete (document as any).execCommand;
-    Object.defineProperty(navigator, 'clipboard', {
-      value: originalClipboard,
-      writable: true,
-      configurable: true,
-    });
   });
 
-  it('renders with copy button and default aria-label', () => {
-    render(<CopyButton text="0x1234567890abcdef" />);
-    const button = screen.getByTestId('copy-btn');
-    expect(button).toBeInTheDocument();
-    expect(button).toHaveAttribute('aria-label', 'Copy to clipboard');
-  });
-
-  it('copies text via navigator.clipboard and displays "Copied!" for 2 seconds', async () => {
-    const writeTextMock = vi.fn().mockResolvedValue(undefined);
-    Object.defineProperty(navigator, 'clipboard', {
-      value: { writeText: writeTextMock },
-      writable: true,
-      configurable: true,
-    });
-
-    const onCopySuccess = vi.fn();
-    render(
-      <CopyButton
-        text="stellar-tx-hash-12345"
-        onCopySuccess={onCopySuccess}
-      />
-    );
+  it('copies text to clipboard and displays tooltip on click', async () => {
+    const txHash = '4b9a2c3d4e5f6a7b8c9d0e1f2a3b4c5d6e7f8a9b0c1d2e3f4a5b6c7d8e9f0a1b';
+    render(<CopyButton text={txHash} label="Copy Hash" />);
 
     const button = screen.getByTestId('copy-btn');
+    expect(button).toBeDefined();
+
     await act(async () => {
       fireEvent.click(button);
     });
 
-    expect(writeTextMock).toHaveBeenCalledWith('stellar-tx-hash-12345');
-    expect(onCopySuccess).toHaveBeenCalled();
+    expect(navigator.clipboard.writeText).toHaveBeenCalledWith(txHash);
 
-    // Tooltip should be visible
-    expect(screen.getByTestId('copy-tooltip')).toBeInTheDocument();
-    expect(screen.getByText('Copied!')).toBeInTheDocument();
-    expect(button).toHaveAttribute('aria-label', 'Copied!');
+    const tooltip = screen.getByTestId('copy-tooltip');
+    expect(tooltip).toBeDefined();
+    expect(tooltip.textContent).toBe('Copied!');
 
-    // Advance 1999ms - tooltip still visible
+    // Advance timers by 2 seconds
     act(() => {
-      vi.advanceTimersByTime(1999);
+      vi.advanceTimersByTime(2000);
     });
-    expect(screen.queryByTestId('copy-tooltip')).toBeInTheDocument();
 
-    // Advance 1ms more (2000ms total) - tooltip disappears
-    act(() => {
-      vi.advanceTimersByTime(1);
-    });
-    expect(screen.queryByTestId('copy-tooltip')).not.toBeInTheDocument();
-    expect(button).toHaveAttribute('aria-label', 'Copy to clipboard');
+    expect(screen.queryByTestId('copy-tooltip')).toBeNull();
   });
 
-  it('falls back to document.execCommand when navigator.clipboard fails', async () => {
-    Object.defineProperty(navigator, 'clipboard', {
-      value: {
-        writeText: vi.fn().mockRejectedValue(new Error('Permission denied')),
-      },
-      writable: true,
-      configurable: true,
-    });
-
-    const execCommandMock = vi.fn().mockReturnValue(true);
-    document.execCommand = execCommandMock;
-    const onCopySuccess = vi.fn();
-
-    render(
-      <CopyButton
-        text="fallback-tx-hash"
-        onCopySuccess={onCopySuccess}
-      />
-    );
+  it('handles clipboard write failure gracefully', async () => {
+    (navigator.clipboard.writeText as any).mockRejectedValueOnce(new Error('Permission denied'));
+    render(<CopyButton text="error-test" />);
 
     const button = screen.getByTestId('copy-btn');
     await act(async () => {
       fireEvent.click(button);
     });
 
-    expect(execCommandMock).toHaveBeenCalledWith('copy');
-    expect(onCopySuccess).toHaveBeenCalled();
-    expect(screen.getByTestId('copy-tooltip')).toBeInTheDocument();
-  });
-
-  it('calls onCopyError when both clipboard API and fallback fail', async () => {
-    Object.defineProperty(navigator, 'clipboard', {
-      value: {
-        writeText: vi.fn().mockRejectedValue(new Error('Permission denied')),
-      },
-      writable: true,
-      configurable: true,
-    });
-
-    document.execCommand = vi.fn().mockImplementation(() => {
-      throw new Error('execCommand error');
-    });
-    const onCopyError = vi.fn();
-
-    render(
-      <CopyButton
-        text="failed-copy"
-        onCopyError={onCopyError}
-      />
-    );
-
-    const button = screen.getByTestId('copy-btn');
-    await act(async () => {
-      fireEvent.click(button);
-    });
-
-    expect(onCopyError).toHaveBeenCalledWith(expect.any(Error));
-    expect(screen.queryByTestId('copy-tooltip')).not.toBeInTheDocument();
-  });
-
-  it('supports custom tooltipDurationMs prop', async () => {
-    const writeTextMock = vi.fn().mockResolvedValue(undefined);
-    Object.defineProperty(navigator, 'clipboard', {
-      value: { writeText: writeTextMock },
-      writable: true,
-      configurable: true,
-    });
-
-    render(<CopyButton text="custom-duration" tooltipDurationMs={1000} />);
-    const button = screen.getByTestId('copy-btn');
-
-    await act(async () => {
-      fireEvent.click(button);
-    });
-
-    expect(screen.getByTestId('copy-tooltip')).toBeInTheDocument();
-
-    act(() => {
-      vi.advanceTimersByTime(1000);
-    });
-
-    expect(screen.queryByTestId('copy-tooltip')).not.toBeInTheDocument();
+    expect(screen.queryByTestId('copy-tooltip')).toBeNull();
   });
 });

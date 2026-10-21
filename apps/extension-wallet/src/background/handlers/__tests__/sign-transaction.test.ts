@@ -2,8 +2,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { Keypair, TransactionBuilder, Networks, Account } from '@stellar/stellar-sdk';
 import { registerSignTransactionHandlers } from '../sign-transaction';
 import { registerHandler } from '@/messaging';
-import { clearUnlockSession, isBackgroundSessionUnlocked } from '../../session-state';
-import { getSharedStorageManager } from '@/security/storage-manager';
+import { isBackgroundSessionUnlocked } from '../../session-state';
 import { getSigningKeypair } from '../../signing-key';
 import { getSettingsState } from '@/stores/settings';
 
@@ -11,16 +10,13 @@ vi.mock('@/messaging', () => ({
   registerHandler: vi.fn(),
 }));
 
-vi.mock('../../session-state', () => ({
-  isBackgroundSessionUnlocked: vi.fn(),
-  clearUnlockSession: vi.fn(),
-}));
-
-vi.mock('@/security/storage-manager', () => ({
-  getSharedStorageManager: vi.fn(() => ({
-    isUnlocked: true,
-  })),
-}));
+vi.mock('../../session-state', () => {
+  const isBackgroundSessionUnlocked = vi.fn();
+  return {
+    isBackgroundSessionUnlocked,
+    isBackgroundSessionUnlockedAsync: vi.fn(async () => isBackgroundSessionUnlocked()),
+  };
+});
 
 vi.mock('../../signing-key', () => ({
   getSigningKeypair: vi.fn(),
@@ -36,7 +32,6 @@ describe('sign-transaction handler', () => {
   beforeEach(() => {
     vi.resetAllMocks();
     (getSettingsState as any).mockReturnValue({ network: 'testnet' });
-    (getSharedStorageManager as any).mockReturnValue({ isUnlocked: true });
 
     registerSignTransactionHandlers();
     handlerCb = (registerHandler as any).mock.calls[0][1];
@@ -46,14 +41,6 @@ describe('sign-transaction handler', () => {
     (isBackgroundSessionUnlocked as any).mockReturnValue(false);
 
     await expect(handlerCb({ xdr: 'xdr-string' })).rejects.toThrow('Wallet is locked');
-  });
-
-  it('should throw error if session flag is true but storage manager is locked (stale session after worker restart)', async () => {
-    (isBackgroundSessionUnlocked as any).mockReturnValue(true);
-    (getSharedStorageManager as any).mockReturnValue({ isUnlocked: false });
-
-    await expect(handlerCb({ xdr: 'xdr-string' })).rejects.toThrow('Wallet is locked');
-    expect(clearUnlockSession).toHaveBeenCalled();
   });
 
   it('should throw error on network mismatch', async () => {

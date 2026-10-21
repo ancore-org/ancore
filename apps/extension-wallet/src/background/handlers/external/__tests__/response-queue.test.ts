@@ -402,8 +402,10 @@ describe('response queue', () => {
     });
 
     it('does not evict entries at or under 5 minutes', () => {
+      const now = Date.now();
+      const spy = vi.spyOn(Date, 'now').mockReturnValue(now);
       enqueueApproval('edge', 'https://a.example', 'signTransaction', {});
-      const spy = vi.spyOn(Date, 'now').mockReturnValue(Date.now() + 5 * 60 * 1000);
+      spy.mockReturnValue(now + 5 * 60 * 1000);
       expect(sweepStaleRequests()).toBe(0);
       expect(getApproval('edge')).toBeDefined();
       spy.mockRestore();

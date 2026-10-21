@@ -1,7 +1,6 @@
 import { xdr, Keypair, authorizeEntry } from '@stellar/stellar-sdk';
 import { registerHandler } from '@/messaging';
-import { clearUnlockSession, isBackgroundSessionUnlocked } from '../session-state';
-import { getSharedStorageManager } from '@/security/storage-manager';
+import { isBackgroundSessionUnlockedAsync } from '../session-state';
 import { getSigningKeypair } from '../signing-key';
 import { getSettingsState } from '@/stores/settings';
 import { NETWORK_PASSPHRASES, type StellarNetwork } from '@ancore/wallet-shared';
@@ -37,11 +36,7 @@ export async function signAuthEntry(params: SignAuthEntryParams): Promise<SignAu
   }
 
   // 2. Check wallet unlocked
-  const storageManager = getSharedStorageManager();
-  if (!isBackgroundSessionUnlocked() || !storageManager.isUnlocked) {
-    if (isBackgroundSessionUnlocked() && !storageManager.isUnlocked) {
-      void clearUnlockSession();
-    }
+  if (!(await isBackgroundSessionUnlockedAsync())) {
     throw new Error('Wallet is locked');
   }
 

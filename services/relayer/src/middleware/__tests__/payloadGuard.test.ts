@@ -237,4 +237,31 @@ describe('/relay/validate payload guard', () => {
 
     expect(res.status).not.toBe(413);
   });
+
+  it('accepts a body exactly at the limit', async () => {
+    const app = createApp();
+    const body = JSON.stringify({ padding: 'x'.repeat(1024 - '{"padding":""}'.length) });
+    expect(Buffer.byteLength(body)).toBe(1024);
+
+    const res = await request(app)
+      .post('/relay/validate')
+      .set('Content-Type', 'application/json')
+      .send(body);
+
+    expect(res.status).not.toBe(413);
+  });
+
+  it('rejects a body one byte over the limit', async () => {
+    const app = createApp();
+    const body = JSON.stringify({ padding: 'x'.repeat(1025 - '{"padding":""}'.length) });
+    expect(Buffer.byteLength(body)).toBe(1025);
+
+    const res = await request(app)
+      .post('/relay/validate')
+      .set('Content-Type', 'application/json')
+      .send(body);
+
+    expect(res.status).toBe(413);
+    expect(res.body.error).toBe(PAYLOAD_TOO_LARGE_REASON);
+  });
 });

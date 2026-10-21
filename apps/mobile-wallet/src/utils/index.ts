@@ -1,0 +1,1 @@
+export { copyToClipboardWithHaptic } from './clipboard';

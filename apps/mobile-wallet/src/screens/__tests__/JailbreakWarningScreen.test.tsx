@@ -20,14 +20,22 @@ describe('JailbreakWarningScreen', () => {
     render(<JailbreakWarningScreen />);
 
     expect(screen.queryByRole('button', { name: /continue anyway/i })).toBeNull();
+    expect(screen.queryByRole('checkbox')).toBeNull();
   });
 
-  it('calls onContinueAnyway when provided and acknowledged', () => {
+  it('displays warning about keychain and secure storage risks', () => {
+    render(<JailbreakWarningScreen />);
+
+    expect(screen.getByText(/Keychain/i)).toBeDefined();
+    expect(screen.getByText(/secure storage/i)).toBeDefined();
+  });
+
+  it('accepts onContinueAnyway callback without error', () => {
     const onContinue = jest.fn();
     render(<JailbreakWarningScreen onContinueAnyway={onContinue} />);
 
-    // In the test environment, __DEV__ is not set so the button won't render.
-    // This test verifies the prop is accepted without error.
+    // In production mode (default in tests), the button won't render,
+    // but the component should accept the prop without error
     expect(onContinue).not.toHaveBeenCalled();
   });
 });

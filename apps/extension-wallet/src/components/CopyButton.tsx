@@ -1,61 +1,29 @@
-import React, { useState, useRef, useEffect } from 'react';
+import React from 'react';
 import { Copy, Check } from 'lucide-react';
-import { cn } from '@ancore/ui-kit';
 
 export interface CopyButtonProps {
   text: string;
-  className?: string;
   label?: string;
-  tooltipDurationMs?: number;
-  onCopySuccess?: () => void;
-  onCopyError?: (error: unknown) => void;
-}
-
-async function copyTextToClipboard(text: string): Promise<boolean> {
-  if (typeof navigator !== 'undefined' && navigator.clipboard && typeof navigator.clipboard.writeText === 'function') {
-    try {
-      await navigator.clipboard.writeText(text);
-      return true;
-    } catch {
-      // Fall through to fallback
-    }
-  }
-
-  // Fallback for environments where clipboard API is unavailable or denied
-  if (typeof document !== 'undefined') {
-    try {
-      const textArea = document.createElement('textarea');
-      textArea.value = text;
-      textArea.style.top = '0';
-      textArea.style.left = '0';
-      textArea.style.position = 'fixed';
-      textArea.style.opacity = '0';
-      document.body.appendChild(textArea);
-      textArea.focus();
-      textArea.select();
-      const successful = document.execCommand('copy');
-      document.body.removeChild(textArea);
-      return successful;
-    } catch {
-      return false;
-    }
-  }
-
-  return false;
+  copiedLabel?: string;
+  className?: string;
+  iconClassName?: string;
+  testId?: string;
+  children?: React.ReactNode;
 }
 
 export function CopyButton({
   text,
-  className,
-  label,
-  tooltipDurationMs = 2000,
-  onCopySuccess,
-  onCopyError,
+  label = 'Copy',
+  copiedLabel = 'Copied!',
+  className = '',
+  iconClassName = 'w-3.5 h-3.5',
+  testId = 'copy-btn',
+  children,
 }: CopyButtonProps) {
-  const [copied, setCopied] = useState(false);
-  const timeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const [copied, setCopied] = React.useState(false);
+  const timeoutRef = React.useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  useEffect(() => {
+  React.useEffect(() => {
     return () => {
       if (timeoutRef.current) {
         clearTimeout(timeoutRef.current);
@@ -64,22 +32,36 @@ export function CopyButton({
   }, []);
 
   const handleCopy = async (e: React.MouseEvent) => {
-    e.preventDefault();
     e.stopPropagation();
 
-    const success = await copyTextToClipboard(text);
-    if (success) {
+    try {
+      if (navigator.clipboard?.writeText) {
+        await navigator.clipboard.writeText(text);
+      } else {
+        // Fallback for older browser/testing environments
+        const textArea = document.createElement('textarea');
+        textArea.value = text;
+        textArea.style.position = 'fixed';
+        textArea.style.opacity = '0';
+        document.body.appendChild(textArea);
+        textArea.focus();
+        textArea.select();
+        document.execCommand('copy');
+        document.body.removeChild(textArea);
+      }
+
       setCopied(true);
-      onCopySuccess?.();
 
       if (timeoutRef.current) {
         clearTimeout(timeoutRef.current);
       }
+
       timeoutRef.current = setTimeout(() => {
         setCopied(false);
-      }, tooltipDurationMs);
-    } else {
-      onCopyError?.(new Error('Failed to copy to clipboard'));
+      }, 2000);
+    } catch {
+      // Gracefully handle permission rejection
+      setCopied(false);
     }
   };
 
@@ -87,33 +69,35 @@ export function CopyButton({
     <div className="relative inline-flex items-center">
       <button
         type="button"
+        data-testid={testId}
+        aria-label={copied ? copiedLabel : label}
         onClick={handleCopy}
-        data-testid="copy-btn"
-        aria-label={label || (copied ? 'Copied!' : 'Copy to clipboard')}
-        title={copied ? 'Copied!' : 'Copy to clipboard'}
-        className={cn(
-          'inline-flex items-center justify-center p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-white/10 transition-colors focus:outline-none focus:ring-1 focus:ring-cyan-400',
-          className
-        )}
+        className={`inline-flex items-center gap-1.5 rounded-lg px-2 py-1 text-xs font-medium transition-colors ${
+          copied
+            ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/30'
+            : 'text-slate-400 hover:text-white hover:bg-white/10'
+        } ${className}`}
       >
         {copied ? (
-          <Check className="w-3.5 h-3.5 text-emerald-400" />
+          <Check
+            className={`${iconClassName} text-emerald-400 animate-in zoom-in-50 duration-200`}
+          />
         ) : (
-          <Copy className="w-3.5 h-3.5" />
+          <Copy className={iconClassName} />
         )}
+        {children || <span>{copied ? copiedLabel : label}</span>}
       </button>
 
+      {/* Floating tooltip feedback */}
       {copied && (
         <span
           role="status"
           data-testid="copy-tooltip"
-          className="absolute -top-7 left-1/2 -translate-x-1/2 px-2 py-0.5 text-[10px] font-medium text-white bg-slate-800 border border-white/10 rounded shadow-md pointer-events-none whitespace-nowrap animate-in fade-in zoom-in-95 duration-150 z-50"
+          className="absolute -top-7 left-1/2 -translate-x-1/2 rounded bg-slate-900 border border-white/10 px-2 py-0.5 text-[10px] font-semibold text-emerald-400 shadow-lg pointer-events-none whitespace-nowrap animate-in fade-in slide-in-from-bottom-1 duration-200"
         >
-          Copied!
+          {copiedLabel}
         </span>
       )}
     </div>
   );
 }
-
-export default CopyButton;

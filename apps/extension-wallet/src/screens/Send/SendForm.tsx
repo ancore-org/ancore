@@ -100,6 +100,25 @@ export function SendForm({ draft, onChange, onSubmit, error }: SendFormProps) {
         </div>
       </div>
 
+      <div className="space-y-2">
+        <label
+          htmlFor="send-memo"
+          className="text-[11px] uppercase tracking-widest text-slate-500 font-bold"
+        >
+          Memo (Required for Exchanges)
+        </label>
+        <input
+          id="send-memo"
+          data-testid="send-memo"
+          placeholder="Memo text or ID"
+          value={draft.note || ''}
+          onChange={(e) => onChange({ note: e.target.value })}
+          className="w-full bg-white/5 border border-white/10 rounded-2xl px-5 py-4 text-white focus:border-cyan-400 focus:outline-none transition-all placeholder:text-slate-600"
+          autoComplete="off"
+          spellCheck={false}
+        />
+      </div>
+
       <button
         type="submit"
         data-testid="send-review-btn"

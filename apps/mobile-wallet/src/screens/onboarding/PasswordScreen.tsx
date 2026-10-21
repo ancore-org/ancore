@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { View, Text, TextInput, Pressable, StyleSheet } from 'react-native';
 import { validatePasswordStrength } from '@ancore/crypto';
 
 type Props = {
@@ -11,9 +12,9 @@ type Props = {
 const noop = () => {};
 
 const STRENGTH_COLORS: Record<string, string> = {
-  weak: 'bg-red-500',
-  medium: 'bg-yellow-500',
-  strong: 'bg-green-500',
+  weak: '#ef4444',
+  medium: '#eab308',
+  strong: '#22c55e',
 };
 
 const STRENGTH_LABELS: Record<string, string> = {
@@ -51,83 +52,216 @@ export function PasswordScreen({ flow, onBack = noop, onCancel = noop, onComplet
   };
 
   return (
-    <section aria-label={flow === 'create' ? 'Set password' : 'Set password'} className="space-y-4">
-      <header className="space-y-2">
-        <p className="text-sm uppercase tracking-wide text-slate-500">
-          {flow === 'create' ? 'Create' : 'Import'}
-        </p>
-        <h1 className="text-2xl font-semibold text-slate-950">Set a password</h1>
-        <p className="text-sm text-slate-600">This password unlocks your wallet on this device.</p>
-      </header>
+    <View
+      style={styles.container}
+      accessibilityLabel={flow === 'create' ? 'Set password' : 'Set password'}
+    >
+      <View style={styles.header}>
+        <Text style={styles.subtitle}>{flow === 'create' ? 'Create' : 'Import'}</Text>
+        <Text accessibilityRole="header" style={styles.title}>
+          Set a password
+        </Text>
+        <Text style={styles.description}>This password unlocks your wallet on this device.</Text>
+      </View>
 
-      <label className="block space-y-2 text-sm text-slate-700">
-        <span>Password</span>
-        <input
-          aria-label="Password"
-          onChange={(event) => setPassword(event.target.value)}
+      <View style={styles.inputContainer}>
+        <Text style={styles.label}>Password</Text>
+        <TextInput
+          accessibilityLabel="Password"
+          onChangeText={setPassword}
           placeholder="Enter a strong password"
-          type="password"
+          secureTextEntry
           value={password}
+          style={styles.input}
+          autoCapitalize="none"
+          autoCorrect={false}
         />
-      </label>
+      </View>
 
       {strength && (
-        <div aria-label={`Password strength: ${strength}`} className="space-y-1">
-          <div className="h-1.5 w-full overflow-hidden rounded-full bg-slate-200">
-            <div
-              className={`h-full ${STRENGTH_COLORS[strength]}`}
-              style={{
-                width: strength === 'weak' ? '33%' : strength === 'medium' ? '66%' : '100%',
-              }}
+        <View
+          style={styles.strengthContainer}
+          accessibilityLabel={`Password strength: ${strength}`}
+        >
+          <View style={styles.strengthBarBackground}>
+            <View
+              style={[
+                styles.strengthBar,
+                {
+                  backgroundColor: STRENGTH_COLORS[strength],
+                  width: strength === 'weak' ? '33%' : strength === 'medium' ? '66%' : '100%',
+                },
+              ]}
             />
-          </div>
-          <p className="text-xs text-slate-500">{STRENGTH_LABELS[strength]}</p>
-        </div>
+          </View>
+          <Text style={styles.strengthLabel}>{STRENGTH_LABELS[strength]}</Text>
+        </View>
       )}
 
       {password.length > 0 && !passwordResult.valid && (
-        <ul
-          aria-label="Password requirements"
-          className="list-disc space-y-1 pl-5 text-xs text-red-600"
-        >
+        <View accessibilityLabel="Password requirements" style={styles.errorList}>
           {passwordResult.reasons.map((reason: string, index: number) => (
-            <li key={index}>{reason}</li>
+            <Text key={index} style={styles.errorItem}>
+              • {reason}
+            </Text>
           ))}
-        </ul>
+        </View>
       )}
 
-      <label className="block space-y-2 text-sm text-slate-700">
-        <span>Confirm password</span>
-        <input
-          aria-label="Confirm password"
-          onChange={(event) => setConfirmPassword(event.target.value)}
+      <View style={styles.inputContainer}>
+        <Text style={styles.label}>Confirm password</Text>
+        <TextInput
+          accessibilityLabel="Confirm password"
+          onChangeText={setConfirmPassword}
           placeholder="Re-enter your password"
-          type="password"
+          secureTextEntry
           value={confirmPassword}
+          style={styles.input}
+          autoCapitalize="none"
+          autoCorrect={false}
         />
-      </label>
+      </View>
 
       {confirmPassword.length > 0 && !passwordsMatch && (
-        <p className="text-xs text-red-600">Passwords do not match.</p>
+        <Text style={styles.errorText}>Passwords do not match.</Text>
       )}
 
       {submitError && (
-        <p aria-live="polite" className="text-sm text-red-600" role="alert">
+        <Text accessibilityLiveRegion="polite" style={styles.submitError} accessibilityRole="alert">
           {submitError}
-        </p>
+        </Text>
       )}
 
-      <div className="flex gap-3">
-        <button onClick={onBack} type="button">
-          Back
-        </button>
-        <button onClick={onCancel} type="button">
-          Cancel
-        </button>
-        <button disabled={!canContinue} onClick={handleContinue} type="button">
-          {submitting ? 'Setting up...' : 'Continue'}
-        </button>
-      </div>
-    </section>
+      <View style={styles.buttonContainer}>
+        <Pressable onPress={onBack} style={styles.button}>
+          {({ pressed }) => (
+            <Text style={[styles.buttonText, pressed && styles.buttonPressed]}>Back</Text>
+          )}
+        </Pressable>
+        <Pressable onPress={onCancel} style={styles.button}>
+          {({ pressed }) => (
+            <Text style={[styles.buttonText, pressed && styles.buttonPressed]}>Cancel</Text>
+          )}
+        </Pressable>
+        <Pressable
+          disabled={!canContinue}
+          onPress={handleContinue}
+          style={[styles.button, styles.primaryButton, !canContinue && styles.buttonDisabled]}
+        >
+          {({ pressed }) => (
+            <Text
+              style={[styles.buttonText, styles.primaryButtonText, pressed && styles.buttonPressed]}
+            >
+              {submitting ? 'Setting up...' : 'Continue'}
+            </Text>
+          )}
+        </Pressable>
+      </View>
+    </View>
   );
 }
+
+const styles = StyleSheet.create({
+  container: {
+    padding: 16,
+    gap: 16,
+  },
+  header: {
+    gap: 8,
+  },
+  subtitle: {
+    fontSize: 12,
+    textTransform: 'uppercase',
+    letterSpacing: 1,
+    color: '#64748b',
+  },
+  title: {
+    fontSize: 24,
+    fontWeight: '600',
+    color: '#0f172a',
+  },
+  description: {
+    fontSize: 14,
+    color: '#475569',
+  },
+  inputContainer: {
+    gap: 8,
+  },
+  label: {
+    fontSize: 14,
+    color: '#334155',
+  },
+  input: {
+    borderWidth: 1,
+    borderColor: '#cbd5e1',
+    borderRadius: 6,
+    padding: 12,
+    fontSize: 16,
+    backgroundColor: '#ffffff',
+  },
+  strengthContainer: {
+    gap: 4,
+  },
+  strengthBarBackground: {
+    height: 6,
+    width: '100%',
+    backgroundColor: '#e2e8f0',
+    borderRadius: 3,
+    overflow: 'hidden',
+  },
+  strengthBar: {
+    height: '100%',
+  },
+  strengthLabel: {
+    fontSize: 12,
+    color: '#64748b',
+  },
+  errorList: {
+    paddingLeft: 20,
+    gap: 4,
+  },
+  errorItem: {
+    fontSize: 12,
+    color: '#dc2626',
+  },
+  errorText: {
+    fontSize: 12,
+    color: '#dc2626',
+  },
+  submitError: {
+    fontSize: 14,
+    color: '#dc2626',
+  },
+  buttonContainer: {
+    flexDirection: 'row',
+    gap: 12,
+  },
+  button: {
+    flex: 1,
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+    borderRadius: 6,
+    borderWidth: 1,
+    borderColor: '#cbd5e1',
+    backgroundColor: '#ffffff',
+    alignItems: 'center',
+  },
+  primaryButton: {
+    backgroundColor: '#3b82f6',
+    borderColor: '#3b82f6',
+  },
+  buttonDisabled: {
+    opacity: 0.5,
+  },
+  buttonText: {
+    fontSize: 16,
+    fontWeight: '500',
+    color: '#334155',
+  },
+  primaryButtonText: {
+    color: '#ffffff',
+  },
+  buttonPressed: {
+    opacity: 0.7,
+  },
+});

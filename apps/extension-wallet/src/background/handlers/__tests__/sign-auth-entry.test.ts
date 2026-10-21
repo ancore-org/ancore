@@ -2,8 +2,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { Address, Keypair, xdr, Networks } from '@stellar/stellar-sdk';
 import { signAuthEntry, registerSignAuthEntryHandlers } from '../sign-auth-entry';
 import { registerHandler } from '@/messaging';
-import { clearUnlockSession, isBackgroundSessionUnlocked } from '../../session-state';
-import { getSharedStorageManager } from '@/security/storage-manager';
+import { isBackgroundSessionUnlocked } from '../../session-state';
 import { getSigningKeypair } from '../../signing-key';
 import { getSettingsState } from '@/stores/settings';
 
@@ -11,16 +10,13 @@ vi.mock('@/messaging', () => ({
   registerHandler: vi.fn(),
 }));
 
-vi.mock('../../session-state', () => ({
-  isBackgroundSessionUnlocked: vi.fn(),
-  clearUnlockSession: vi.fn(),
-}));
-
-vi.mock('@/security/storage-manager', () => ({
-  getSharedStorageManager: vi.fn(() => ({
-    isUnlocked: true,
-  })),
-}));
+vi.mock('../../session-state', () => {
+  const isBackgroundSessionUnlocked = vi.fn();
+  return {
+    isBackgroundSessionUnlocked,
+    isBackgroundSessionUnlockedAsync: vi.fn(async () => isBackgroundSessionUnlocked()),
+  };
+});
 
 vi.mock('../../signing-key', () => ({
   getSigningKeypair: vi.fn(),
@@ -127,14 +123,16 @@ describe('sign-auth-entry handler', () => {
       );
     });
 
-    it('should throw error and clear unlock session if session flag is true but storage manager is locked', async () => {
-      (isBackgroundSessionUnlocked as any).mockReturnValue(true);
-      (getSharedStorageManager as any).mockReturnValue({ isUnlocked: false });
+    it('should succeed when session is restored asynchronously after SW restart', async () => {
+      (isBackgroundSessionUnlocked as any).mockReturnValue(false);
+      const { isBackgroundSessionUnlockedAsync } = await import('../../session-state');
+      (isBackgroundSessionUnlockedAsync as any).mockResolvedValueOnce(true);
 
-      await expect(signAuthEntry({ authEntryXdr: 'any-xdr-string' })).rejects.toThrow(
-        'Wallet is locked'
-      );
-      expect(clearUnlockSession).toHaveBeenCalled();
+      const unsignedEntry = makeUnsignedAuthEntry(testKp);
+      const result = await signAuthEntry({
+        authEntryXdr: unsignedEntry.toXDR('base64'),
+      });
+      expect(result.signedAuthEntry).toBeDefined();
     });
 
     it('should throw error on network mismatch', async () => {

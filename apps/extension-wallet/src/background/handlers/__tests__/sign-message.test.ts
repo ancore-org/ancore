@@ -2,24 +2,20 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { Keypair } from '@stellar/stellar-sdk';
 import { signMessage, registerSignMessageHandlers } from '../sign-message';
 import { registerHandler } from '@/messaging';
-import { clearUnlockSession, isBackgroundSessionUnlocked } from '../../session-state';
-import { getSharedStorageManager } from '@/security/storage-manager';
+import { isBackgroundSessionUnlocked } from '../../session-state';
 import { getSigningKeypair } from '../../signing-key';
 
 vi.mock('@/messaging', () => ({
   registerHandler: vi.fn(),
 }));
 
-vi.mock('../../session-state', () => ({
-  isBackgroundSessionUnlocked: vi.fn(),
-  clearUnlockSession: vi.fn(),
-}));
-
-vi.mock('@/security/storage-manager', () => ({
-  getSharedStorageManager: vi.fn(() => ({
-    isUnlocked: true,
-  })),
-}));
+vi.mock('../../session-state', () => {
+  const isBackgroundSessionUnlocked = vi.fn();
+  return {
+    isBackgroundSessionUnlocked,
+    isBackgroundSessionUnlockedAsync: vi.fn(async () => isBackgroundSessionUnlocked()),
+  };
+});
 
 vi.mock('../../signing-key', () => ({
   getSigningKeypair: vi.fn(),
@@ -28,7 +24,6 @@ vi.mock('../../signing-key', () => ({
 describe('sign-message handler', () => {
   beforeEach(() => {
     vi.resetAllMocks();
-    (getSharedStorageManager as any).mockReturnValue({ isUnlocked: true });
   });
 
   it('rejects an empty message', async () => {
@@ -39,14 +34,6 @@ describe('sign-message handler', () => {
     (isBackgroundSessionUnlocked as any).mockReturnValue(false);
 
     await expect(signMessage({ message: 'hello' })).rejects.toThrow('Wallet is locked');
-  });
-
-  it('throws and clears unlock session if session flag is true but storage manager is locked', async () => {
-    (isBackgroundSessionUnlocked as any).mockReturnValue(true);
-    (getSharedStorageManager as any).mockReturnValue({ isUnlocked: false });
-
-    await expect(signMessage({ message: 'hello' })).rejects.toThrow('Wallet is locked');
-    expect(clearUnlockSession).toHaveBeenCalled();
   });
 
   it('returns a real, verifiable Ed25519 signature over the raw message bytes', async () => {

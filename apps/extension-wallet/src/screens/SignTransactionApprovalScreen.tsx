@@ -2,6 +2,13 @@ import React from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { useHardwareWalletStore } from '@/stores/hardware-wallet';
 import { ShieldCheck, X } from 'lucide-react';
+import {
+  sanitizeString,
+  sanitizeOrigin,
+  sanitizeContractId,
+  sanitizeMethodName,
+  sanitizePermissions,
+} from '@/utils/sanitize';
 
 function useRequestId(propsRequestId?: string): string | null {
   const [searchParams] = useSearchParams();
@@ -13,21 +20,42 @@ function useRequestId(propsRequestId?: string): string | null {
   return fromWindow;
 }
 
+export interface SignTransactionApprovalScreenProps {
+  requestId?: string;
+  title?: string;
+  subtitle?: string;
+  description?: string;
+  origin?: string;
+  dAppName?: string;
+  contractId?: string;
+  methodName?: string;
+  requestedScopes?: string[];
+  /** Determines which message types to send to the background on approve/reject. */
+  requestType?: 'sign-transaction' | 'sign-auth-entry';
+}
+
 export function SignTransactionApprovalScreen({
   requestId: propRequestId,
   title = 'Sign Transaction',
   subtitle = 'Review and approve the transaction',
   description = 'A dApp is requesting to sign a transaction. Approve only if you trust the source.',
+  origin,
+  dAppName,
+  contractId,
+  methodName,
+  requestedScopes,
   requestType = 'sign-transaction',
-}: {
-  requestId?: string;
-  title?: string;
-  subtitle?: string;
-  description?: string;
-  /** Determines which message types to send to the background on approve/reject. */
-  requestType?: 'sign-transaction' | 'sign-auth-entry';
-}) {
-  const requestId = useRequestId(propRequestId);
+}: SignTransactionApprovalScreenProps) {
+  const rawRequestId = useRequestId(propRequestId);
+  const requestId = rawRequestId ? sanitizeString(rawRequestId, 64) : null;
+  const safeTitle = sanitizeString(title, 80);
+  const safeSubtitle = sanitizeString(subtitle, 120);
+  const safeDescription = sanitizeString(description, 300);
+  const safeDAppName = dAppName ? sanitizeString(dAppName, 80) : undefined;
+  const safeOrigin = origin ? sanitizeOrigin(origin) : undefined;
+  const safeContractId = contractId ? sanitizeContractId(contractId) : undefined;
+  const safeMethodName = methodName ? sanitizeMethodName(methodName) : undefined;
+  const safeScopes = requestedScopes ? sanitizePermissions(requestedScopes) : undefined;
   const [done, setDone] = React.useState(false);
   const [submitting, setSubmitting] = React.useState(false);
   const [devicePrompt, setDevicePrompt] = React.useState(false);
@@ -59,8 +87,12 @@ export function SignTransactionApprovalScreen({
     if (action === 'approve' && hardwarePreferred) {
       setDevicePrompt(true);
     }
+    const approveType =
+      requestType === 'sign-auth-entry' ? 'APPROVE_AUTH_ENTRY_REQUEST' : 'APPROVE_SIGN_REQUEST';
+    const rejectType =
+      requestType === 'sign-auth-entry' ? 'REJECT_AUTH_ENTRY_REQUEST' : 'REJECT_SIGN_REQUEST';
     chrome.runtime.sendMessage(
-      { type: action === 'approve' ? 'APPROVE_SIGN_REQUEST' : 'REJECT_SIGN_REQUEST', requestId },
+      { type: action === 'approve' ? approveType : rejectType, requestId },
       () => {
         setSubmitting(false);
         setDevicePrompt(false);
@@ -96,7 +128,7 @@ export function SignTransactionApprovalScreen({
       <header className="wallet-header">
         <div>
           <p className="wallet-kicker">Approval request</p>
-          <h1 className="wallet-title mt-1">{title}</h1>
+          <h1 className="wallet-title mt-1">{safeTitle}</h1>
         </div>
         <button
           aria-label="Reject request"
@@ -114,14 +146,14 @@ export function SignTransactionApprovalScreen({
         </div>
         <div className="mt-6 text-center">
           <h2 className="text-[22px] font-semibold tracking-[-0.03em] text-foreground">
-            {subtitle}
+            {safeSubtitle}
           </h2>
           <p className="mx-auto mt-2 max-w-[290px] text-[13px] leading-5 text-muted-foreground">
-            {description}
+            {safeDescription}
           </p>
         </div>
 
-        <section className="wallet-card mt-8">
+        <section className="wallet-card mt-8 space-y-3">
           <div className="flex items-center justify-between gap-4">
             <span className="text-[11px] uppercase tracking-[0.14em] text-muted-foreground">
               Request
@@ -130,6 +162,58 @@ export function SignTransactionApprovalScreen({
               {requestId}
             </span>
           </div>
+
+          {(safeDAppName || safeOrigin) && (
+            <div className="flex items-center justify-between gap-4 border-t border-border/40 pt-3">
+              <span className="text-[11px] uppercase tracking-[0.14em] text-muted-foreground">
+                dApp Origin
+              </span>
+              <span className="max-w-[210px] overflow-hidden text-ellipsis whitespace-nowrap font-mono text-[11px] text-foreground">
+                {safeDAppName ? `${safeDAppName} (${safeOrigin})` : safeOrigin}
+              </span>
+            </div>
+          )}
+
+          {safeContractId && (
+            <div className="flex items-center justify-between gap-4 border-t border-border/40 pt-3">
+              <span className="text-[11px] uppercase tracking-[0.14em] text-muted-foreground">
+                Contract
+              </span>
+              <span className="max-w-[210px] overflow-hidden text-ellipsis whitespace-nowrap font-mono text-[11px] text-foreground">
+                {safeContractId}
+              </span>
+            </div>
+          )}
+
+          {safeMethodName && (
+            <div className="flex items-center justify-between gap-4 border-t border-border/40 pt-3">
+              <span className="text-[11px] uppercase tracking-[0.14em] text-muted-foreground">
+                Method
+              </span>
+              <span className="max-w-[210px] overflow-hidden text-ellipsis whitespace-nowrap font-mono text-[11px] text-foreground">
+                {safeMethodName}
+              </span>
+            </div>
+          )}
+
+          {safeScopes && safeScopes.length > 0 && (
+            <div className="border-t border-border/40 pt-3">
+              <span className="text-[11px] uppercase tracking-[0.14em] text-muted-foreground block mb-1">
+                Requested Scopes
+              </span>
+              <div className="flex flex-wrap gap-1">
+                {safeScopes.map((scope) => (
+                  <span
+                    key={scope}
+                    className="inline-block rounded-md bg-white/5 px-2 py-0.5 text-[10px] font-mono text-cyan-300"
+                  >
+                    {scope}
+                  </span>
+                ))}
+              </div>
+            </div>
+          )}
+
           {hardwarePreferred && (
             <p className="mt-4 rounded-[14px] bg-accent px-3 py-3 text-[12px] leading-5 text-foreground">
               Ledger signing is enabled. Confirm the transaction on your device after approving.
