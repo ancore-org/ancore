@@ -1,6 +1,7 @@
 import { registerHandler } from '@/messaging';
 import { readAuthState } from '@/router/AuthGuard';
-import { isBackgroundSessionUnlocked } from '../session-state';
+import { clearUnlockSession, isBackgroundSessionUnlocked } from '../session-state';
+import { getSharedStorageManager } from '@/security/storage-manager';
 import { createLogger } from '../logger';
 
 const log = createLogger('[ancore-extension/handlers/wallet-state]');
@@ -13,7 +14,11 @@ export function registerWalletStateHandlers(): void {
       return { state: 'uninitialized' as const };
     }
 
-    if (!isBackgroundSessionUnlocked()) {
+    const storageManager = getSharedStorageManager();
+    if (!isBackgroundSessionUnlocked() || !storageManager.isUnlocked) {
+      if (isBackgroundSessionUnlocked() && !storageManager.isUnlocked) {
+        void clearUnlockSession();
+      }
       return { state: 'locked' as const };
     }
 

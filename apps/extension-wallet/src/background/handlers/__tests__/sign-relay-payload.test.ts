@@ -3,7 +3,8 @@ import { Keypair } from '@stellar/stellar-sdk';
 import { buildRelayCanonicalPayload } from '@ancore/core-sdk';
 import { signRelayPayload, registerSignRelayPayloadHandlers } from '../sign-relay-payload';
 import { registerHandler } from '@/messaging';
-import { isBackgroundSessionUnlocked } from '../../session-state';
+import { clearUnlockSession, isBackgroundSessionUnlocked } from '../../session-state';
+import { getSharedStorageManager } from '@/security/storage-manager';
 import { getSigningKeypair } from '../../signing-key';
 
 vi.mock('@/messaging', () => ({
@@ -12,6 +13,13 @@ vi.mock('@/messaging', () => ({
 
 vi.mock('../../session-state', () => ({
   isBackgroundSessionUnlocked: vi.fn(),
+  clearUnlockSession: vi.fn(),
+}));
+
+vi.mock('@/security/storage-manager', () => ({
+  getSharedStorageManager: vi.fn(() => ({
+    isUnlocked: true,
+  })),
 }));
 
 vi.mock('../../signing-key', () => ({
@@ -21,6 +29,7 @@ vi.mock('../../signing-key', () => ({
 describe('sign-relay-payload handler', () => {
   beforeEach(() => {
     vi.resetAllMocks();
+    (getSharedStorageManager as any).mockReturnValue({ isUnlocked: true });
   });
 
   it('rejects an invalid operation', async () => {
@@ -47,6 +56,22 @@ describe('sign-relay-payload handler', () => {
         asset: 'XLM',
       })
     ).rejects.toThrow('Wallet is locked');
+  });
+
+  it('throws and clears unlock session if session flag is true but storage manager is locked', async () => {
+    (isBackgroundSessionUnlocked as any).mockReturnValue(true);
+    (getSharedStorageManager as any).mockReturnValue({ isUnlocked: false });
+
+    await expect(
+      signRelayPayload({
+        operation: 'relay_execute',
+        nonce: 1,
+        to: 'GDXTVHXGF6DZ4YCVLXV4LEBQ4RPQBHKX5XQOQU4ONHV6BQNVJFQ4XKZ2',
+        amount: '10.0000000',
+        asset: 'XLM',
+      })
+    ).rejects.toThrow('Wallet is locked');
+    expect(clearUnlockSession).toHaveBeenCalled();
   });
 
   it('returns a sessionKey/signature that pass the same canonical-payload verification the relayer performs', async () => {

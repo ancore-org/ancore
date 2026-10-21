@@ -2,7 +2,8 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { Address, Keypair, xdr, Networks } from '@stellar/stellar-sdk';
 import { signAuthEntry, registerSignAuthEntryHandlers } from '../sign-auth-entry';
 import { registerHandler } from '@/messaging';
-import { isBackgroundSessionUnlocked } from '../../session-state';
+import { clearUnlockSession, isBackgroundSessionUnlocked } from '../../session-state';
+import { getSharedStorageManager } from '@/security/storage-manager';
 import { getSigningKeypair } from '../../signing-key';
 import { getSettingsState } from '@/stores/settings';
 
@@ -12,6 +13,13 @@ vi.mock('@/messaging', () => ({
 
 vi.mock('../../session-state', () => ({
   isBackgroundSessionUnlocked: vi.fn(),
+  clearUnlockSession: vi.fn(),
+}));
+
+vi.mock('@/security/storage-manager', () => ({
+  getSharedStorageManager: vi.fn(() => ({
+    isUnlocked: true,
+  })),
 }));
 
 vi.mock('../../signing-key', () => ({
@@ -117,6 +125,16 @@ describe('sign-auth-entry handler', () => {
       await expect(signAuthEntry({ authEntryXdr: 'any-xdr-string' })).rejects.toThrow(
         'Wallet is locked'
       );
+    });
+
+    it('should throw error and clear unlock session if session flag is true but storage manager is locked', async () => {
+      (isBackgroundSessionUnlocked as any).mockReturnValue(true);
+      (getSharedStorageManager as any).mockReturnValue({ isUnlocked: false });
+
+      await expect(signAuthEntry({ authEntryXdr: 'any-xdr-string' })).rejects.toThrow(
+        'Wallet is locked'
+      );
+      expect(clearUnlockSession).toHaveBeenCalled();
     });
 
     it('should throw error on network mismatch', async () => {
