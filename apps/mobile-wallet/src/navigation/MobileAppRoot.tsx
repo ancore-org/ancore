@@ -1,5 +1,4 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { View } from 'react-native';
 import { ReadOnlyAccountView } from '../accounts';
 import { bootstrapMobileWallet } from '../app/bootstrap';
 import { resolveMobileWalletEnv } from '../config/dev-defaults';
