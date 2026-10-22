@@ -312,7 +312,8 @@ Same request body as `/relay/execute`.
 
 ### `GET /relay/status`
 
-Health check. No authentication required.
+Health check. No authentication required. For the full `GET /health` response schema (including
+the `database` dependency and 200/503 semantics), see [docs/HEALTH_CHECK.md](docs/HEALTH_CHECK.md).
 
 **Response `200`:**
 
@@ -436,6 +437,13 @@ Protects against single-client denial-of-service, brute-force, and credential-st
 - **Window:** 60 seconds sliding window (`DEFAULT_IP_RATE_LIMIT_WINDOW_MS = 60_000`).
 - **IP Extraction:** Automatically extracts client IP from `X-Forwarded-For` (first IP in multi-proxy chains), `X-Real-IP`, or Express `req.ip` with `trust proxy` enabled.
 - **Bypasses:** Internal monitoring endpoints (`/health`, `/metrics`) are exempt by default.
+- **Configuration:** the limit and window are not read from environment variables. They come from the
+  `rpm` / `windowMs` options of `createIpRateLimiterMiddleware` (defaults above); `src/server.ts`
+  uses the defaults and only sets `skip` for `/health` and `/metrics`. The per-account and per-route
+  limiters below are the ones tuned through env vars.
+- **Headers:** the limiter emits the IETF draft `RateLimit-Limit`, `RateLimit-Remaining` and
+  `RateLimit-Reset` headers on every response. The legacy `X-RateLimit-*` headers are deliberately
+  disabled (`legacyHeaders: false`), so clients should read the `RateLimit-*` names.
 
 When an IP exceeds its quota, the service responds with `HTTP 429 Too Many Requests`:
 

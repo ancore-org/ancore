@@ -92,6 +92,7 @@ const sessionDetails = await requestSessionKey({
 });
 
 console.log("Registered Session Key:", sessionDetails.publicKey);
+console.log("Expires at (Unix ms):", sessionDetails.expiresAt);
 ```
 
 ---
