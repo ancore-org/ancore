@@ -62,6 +62,27 @@ describe('scoreRisk', () => {
     expect(result.reasons.some((r) => r.includes('Round number'))).toBe(true);
   });
 
+  describe('malformed amounts', () => {
+    it.each(['abc', '', 'NaN', 'Infinity', '-Infinity'])(
+      'scores unparseable amount %j as high risk',
+      (amount) => {
+        const result = scoreRisk(payment(amount));
+        expect(result.level).toBe('high');
+        expect(result.reasons.some((r) => r.startsWith('Unparseable amount'))).toBe(true);
+      }
+    );
+
+    it('scores a negative amount as high risk', () => {
+      const result = scoreRisk(payment('-5'));
+      expect(result.level).toBe('high');
+      expect(result.reasons.some((r) => r.startsWith('Invalid amount'))).toBe(true);
+    });
+
+    it('does not flag a zero amount as malformed', () => {
+      expect(scoreRisk(payment('0')).level).toBe('low');
+    });
+  });
+
   it('returns low risk for invoice intents', () => {
     const invoice: DraftIntent = {
       type: 'invoice',

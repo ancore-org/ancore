@@ -228,6 +228,28 @@ mod tests {
     }
 
     #[test]
+    fn pay_rejects_payer_that_is_not_recipient() {
+        let (env, client) = setup();
+        let creator = random_address(&env);
+        let recipient = random_address(&env);
+        let stranger = random_address(&env);
+        let asset = mock_asset(&env);
+        let payment_tx = soroban_sdk::BytesN::<32>::from_array(&env, &[1u8; 32]);
+
+        let id = client
+            .create(&creator, &recipient, &1_000, &asset, &None, &None, &None)
+            .unwrap();
+        client.open(&id).unwrap();
+
+        let err = client
+            .try_pay(&id, &stranger, &payment_tx)
+            .unwrap_err()
+            .unwrap();
+        assert_eq!(err, InvoiceError::Unauthorized);
+        assert_eq!(client.get(&id).unwrap().status, InvoiceStatus::Open);
+    }
+
+    #[test]
     fn pay_expired_invoice_auto_expires() {
         let (env, client) = setup();
         let creator = random_address(&env);

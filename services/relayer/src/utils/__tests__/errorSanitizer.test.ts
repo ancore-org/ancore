@@ -24,4 +24,23 @@ describe('sanitizeErrorMessage', () => {
   it('leaves ordinary validation messages unchanged', () => {
     expect(sanitizeErrorMessage('Nonce already used')).toBe('Nonce already used');
   });
+
+  it('does not leak table or column names for multi-line SQL errors', () => {
+    const raw = 'relation "idempotency_keys"\n  does not exist';
+    const sanitized = sanitizeErrorMessage(raw);
+    expect(sanitized).toBe(INTERNAL_STORAGE_ERROR);
+    expect(sanitized).not.toContain('idempotency_keys');
+  });
+
+  it('matches SQL error patterns case-insensitively', () => {
+    expect(sanitizeErrorMessage('SYNTAX ERROR AT or near "FROM"')).toBe(INTERNAL_STORAGE_ERROR);
+  });
+
+  it('returns an empty message unchanged', () => {
+    expect(sanitizeErrorMessage('')).toBe('');
+  });
+
+  it('exposes a client-safe generic message', () => {
+    expect(INTERNAL_STORAGE_ERROR).toBe('Internal storage error');
+  });
 });
