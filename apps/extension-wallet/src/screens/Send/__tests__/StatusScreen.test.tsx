@@ -36,7 +36,7 @@ describe('StatusScreen & SuccessScreen (CopyButton integration)', () => {
       />
     );
 
-    const copyBtn = screen.getByTestId('copy-btn');
+    const copyBtn = screen.getByTestId('copy-tx-hash-btn');
     expect(copyBtn).toBeInTheDocument();
     expect(
       screen.getByText('f0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef')
@@ -50,7 +50,7 @@ describe('StatusScreen & SuccessScreen (CopyButton integration)', () => {
       'f0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef'
     );
     expect(screen.getByTestId('copy-tooltip')).toBeInTheDocument();
-    expect(screen.getByText('Copied!')).toBeInTheDocument();
+    expect(screen.getByTestId('copy-tooltip')).toHaveTextContent('Copied!');
 
     act(() => {
       vi.advanceTimersByTime(2000);
@@ -69,8 +69,8 @@ describe('StatusScreen & SuccessScreen (CopyButton integration)', () => {
 
     render(<SuccessScreen txId="tx-hash-success-12345" />);
 
-    expect(screen.getByText('Success')).toBeInTheDocument();
-    const copyBtn = screen.getByTestId('copy-btn');
+    expect(screen.getByText('Sent Successfully')).toBeInTheDocument();
+    const copyBtn = screen.getByTestId('copy-hash-btn');
     expect(copyBtn).toBeInTheDocument();
 
     await act(async () => {

@@ -210,10 +210,20 @@ async function loadServiceWorker(
     AUTH_STORAGE_KEY: 'ancore_extension_auth',
   }));
 
+  let isUnlockedState = false;
   vi.doMock('@/security/storage-manager', () => ({
     getSharedStorageManager: vi.fn(() => ({
-      unlock: vi.fn(async () => options.unlockReturns ?? true),
-      lock: vi.fn(),
+      get isUnlocked() {
+        return isUnlockedState;
+      },
+      unlock: vi.fn(async () => {
+        const res = options.unlockReturns ?? true;
+        isUnlockedState = res;
+        return res;
+      }),
+      lock: vi.fn(() => {
+        isUnlockedState = false;
+      }),
       getAccount: vi.fn(async () => ({ privateKey: options.signingSecret })),
     })),
     resetSharedStorageManagerForTests: vi.fn(),

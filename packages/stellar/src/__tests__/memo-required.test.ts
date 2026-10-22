@@ -1,5 +1,7 @@
 import { checkMemoRequired, clearMemoRequiredCache } from '../memo-required';
 
+const asFetch = (mock: jest.Mock) => mock as unknown as typeof fetch;
+
 describe('checkMemoRequired', () => {
   beforeEach(() => {
     clearMemoRequiredCache();
@@ -13,9 +15,11 @@ describe('checkMemoRequired', () => {
 
   it('returns false for empty or non-string address without fetching', async () => {
     const fetchMock = jest.fn();
-    expect(await checkMemoRequired('', { fetchFn: fetchMock as any })).toBe(false);
-    expect(await checkMemoRequired('   ', { fetchFn: fetchMock as any })).toBe(false);
-    expect(await checkMemoRequired(null as any, { fetchFn: fetchMock as any })).toBe(false);
+    expect(await checkMemoRequired('', { fetchFn: asFetch(fetchMock) })).toBe(false);
+    expect(await checkMemoRequired('   ', { fetchFn: asFetch(fetchMock) })).toBe(false);
+    expect(
+      await checkMemoRequired(null as unknown as string, { fetchFn: asFetch(fetchMock) })
+    ).toBe(false);
     expect(fetchMock).not.toHaveBeenCalled();
   });
 
@@ -31,7 +35,7 @@ describe('checkMemoRequired', () => {
     });
 
     const result = await checkMemoRequired('GBINANCE1234567890', {
-      fetchFn: fetchMock as any,
+      fetchFn: asFetch(fetchMock),
     });
 
     expect(result).toBe(true);
@@ -53,7 +57,7 @@ describe('checkMemoRequired', () => {
     });
 
     const result = await checkMemoRequired('GKRAKEN1234567890', {
-      fetchFn: fetchMock as any,
+      fetchFn: asFetch(fetchMock),
     });
 
     expect(result).toBe(true);
@@ -71,7 +75,7 @@ describe('checkMemoRequired', () => {
     });
 
     const result = await checkMemoRequired('GREGULAR1234567890', {
-      fetchFn: fetchMock as any,
+      fetchFn: asFetch(fetchMock),
     });
 
     expect(result).toBe(false);
@@ -84,7 +88,7 @@ describe('checkMemoRequired', () => {
     });
 
     const result = await checkMemoRequired('GUNKNOWN1234567890', {
-      fetchFn: fetchMock as any,
+      fetchFn: asFetch(fetchMock),
     });
 
     expect(result).toBe(false);
@@ -94,7 +98,7 @@ describe('checkMemoRequired', () => {
     const fetchMock = jest.fn().mockRejectedValue(new Error('Network error'));
 
     const result = await checkMemoRequired('GERR1234567890', {
-      fetchFn: fetchMock as any,
+      fetchFn: asFetch(fetchMock),
     });
 
     expect(result).toBe(false);
@@ -111,7 +115,7 @@ describe('checkMemoRequired', () => {
     });
 
     const res1 = await checkMemoRequired('GCACHE1234567890', {
-      fetchFn: fetchMock as any,
+      fetchFn: asFetch(fetchMock),
       cacheTtlMs: 60000,
     });
     expect(res1).toBe(true);
@@ -119,7 +123,7 @@ describe('checkMemoRequired', () => {
 
     // Second call within TTL -> uses cache
     const res2 = await checkMemoRequired('GCACHE1234567890', {
-      fetchFn: fetchMock as any,
+      fetchFn: asFetch(fetchMock),
       cacheTtlMs: 60000,
     });
     expect(res2).toBe(true);
@@ -130,7 +134,7 @@ describe('checkMemoRequired', () => {
 
     // Third call after TTL -> fetches again
     const res3 = await checkMemoRequired('GCACHE1234567890', {
-      fetchFn: fetchMock as any,
+      fetchFn: asFetch(fetchMock),
       cacheTtlMs: 60000,
     });
     expect(res3).toBe(true);
@@ -147,12 +151,12 @@ describe('checkMemoRequired', () => {
       }),
     });
 
-    await checkMemoRequired('GCLEAR1234567890', { fetchFn: fetchMock as any });
+    await checkMemoRequired('GCLEAR1234567890', { fetchFn: asFetch(fetchMock) });
     expect(fetchMock).toHaveBeenCalledTimes(1);
 
     clearMemoRequiredCache();
 
-    await checkMemoRequired('GCLEAR1234567890', { fetchFn: fetchMock as any });
+    await checkMemoRequired('GCLEAR1234567890', { fetchFn: asFetch(fetchMock) });
     expect(fetchMock).toHaveBeenCalledTimes(2);
   });
 });
