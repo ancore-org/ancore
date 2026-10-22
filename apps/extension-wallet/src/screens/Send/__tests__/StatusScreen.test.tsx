@@ -38,7 +38,9 @@ describe('StatusScreen & SuccessScreen (CopyButton integration)', () => {
 
     const copyBtn = screen.getByTestId('copy-btn');
     expect(copyBtn).toBeInTheDocument();
-    expect(screen.getByText('f0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef')).toBeInTheDocument();
+    expect(
+      screen.getByText('f0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef')
+    ).toBeInTheDocument();
 
     await act(async () => {
       fireEvent.click(copyBtn);
@@ -65,9 +67,7 @@ describe('StatusScreen & SuccessScreen (CopyButton integration)', () => {
       configurable: true,
     });
 
-    render(
-      <SuccessScreen txId="tx-hash-success-12345" />
-    );
+    render(<SuccessScreen txId="tx-hash-success-12345" />);
 
     expect(screen.getByText('Success')).toBeInTheDocument();
     const copyBtn = screen.getByTestId('copy-btn');

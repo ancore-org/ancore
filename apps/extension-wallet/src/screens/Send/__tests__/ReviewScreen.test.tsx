@@ -97,11 +97,7 @@ describe('ReviewScreen memo-required validation (#1448)', () => {
     const user = userEvent.setup();
 
     render(
-      <ReviewScreen
-        transaction={mainnetTx}
-        onBack={() => undefined}
-        onConfirm={() => undefined}
-      />
+      <ReviewScreen transaction={mainnetTx} onBack={() => undefined} onConfirm={() => undefined} />
     );
 
     await waitFor(() => {

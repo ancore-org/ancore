@@ -240,7 +240,8 @@ export function ReviewScreen({
               <span>Memo Required</span>
             </div>
             <p className="text-[11px] text-red-300/90 leading-relaxed font-medium">
-              Memo required for this address on mainnet. Please provide a memo or choose an alternative address.
+              Memo required for this address on mainnet. Please provide a memo or choose an
+              alternative address.
             </p>
           </div>
         )}
