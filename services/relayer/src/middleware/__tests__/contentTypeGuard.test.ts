@@ -88,4 +88,56 @@ describe('createContentTypeGuardMiddleware', () => {
     expect(res._status).toBe(415);
     expect((res._body as { error: string }).error).toBe(UNSUPPORTED_MEDIA_TYPE_REASON);
   });
+
+  it.each(['PUT', 'PATCH'])('rejects %s with text/plain Content-Type with HTTP 415', (method) => {
+    const guard = createContentTypeGuardMiddleware();
+    const res = makeRes();
+    const next = jest.fn() as unknown as NextFunction;
+
+    guard(makeReq(method, 'text/plain'), res as unknown as Response, next);
+
+    expect(next).not.toHaveBeenCalled();
+    expect(res._status).toBe(415);
+  });
+
+  it.each(['PUT', 'PATCH'])('accepts %s with application/json', (method) => {
+    const guard = createContentTypeGuardMiddleware();
+    const next = jest.fn() as unknown as NextFunction;
+
+    guard(makeReq(method, 'application/json'), makeRes() as unknown as Response, next);
+
+    expect(next).toHaveBeenCalledTimes(1);
+  });
+
+  it('treats method and media type case-insensitively', () => {
+    const guard = createContentTypeGuardMiddleware();
+    const next = jest.fn() as unknown as NextFunction;
+
+    guard(makeReq('post', 'Application/JSON'), makeRes() as unknown as Response, next);
+
+    expect(next).toHaveBeenCalledTimes(1);
+  });
+
+  it.each(['GET', 'DELETE', 'HEAD', 'OPTIONS'])('ignores Content-Type on %s requests', (method) => {
+    const guard = createContentTypeGuardMiddleware();
+    const res = makeRes();
+    const next = jest.fn() as unknown as NextFunction;
+
+    guard(makeReq(method, 'text/plain'), res as unknown as Response, next);
+
+    expect(next).toHaveBeenCalledTimes(1);
+    expect(res._status).toBe(200);
+  });
+
+  it('returns the structured 415 body', () => {
+    const guard = createContentTypeGuardMiddleware();
+    const res = makeRes();
+
+    guard(makeReq('POST', 'application/xml'), res as unknown as Response, jest.fn());
+
+    expect(res._body).toEqual({
+      error: UNSUPPORTED_MEDIA_TYPE_REASON,
+      message: 'Content-Type must be application/json',
+    });
+  });
 });
