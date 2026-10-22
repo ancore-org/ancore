@@ -45,11 +45,13 @@ import { Networks } from '@stellar/stellar-sdk';
 import { signTransaction } from '@ancore/wallet-api';
 
 try {
-  const signedXdr = await signTransaction({
+  const { signedXdr, txHash } = await signTransaction({
     xdr: 'AAAAAgAAAAD...',
     networkPassphrase: Networks.TESTNET,
+    // submitViaRelayer: true, // optional: submit through the relayer after signing
   });
   console.log("Signed transaction XDR:", signedXdr);
+  console.log("Transaction hash (set when submitted):", txHash);
 } catch (error) {
   console.error("Signing rejected by user", error);
 }
@@ -82,6 +84,7 @@ try {
   });
   
   console.log("Active Session Key Public Key:", session.publicKey);
+  console.log("Expires at (Unix ms):", session.expiresAt);
 } catch (error) {
   console.error("Session key request denied", error);
 }
@@ -96,9 +99,9 @@ For Soroban-based smart contract authorization, use the SEP-43 signature delegat
 ```javascript
 import { signAuthEntry } from '@ancore/wallet-api';
 
-const signedEntry = await signAuthEntry({
-  entry: authEntryXdr,
-  network: 'TESTNET',
+const { signedAuthEntry } = await signAuthEntry({
+  authEntryXdr,
+  networkPassphrase: Networks.TESTNET,
 });
 ```
 

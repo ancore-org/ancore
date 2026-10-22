@@ -141,3 +141,78 @@ impl IntoResponse for ApiError {
 }
 
 pub type Result<T> = std::result::Result<T, ApiError>;
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use http_body_util::BodyExt;
+
+    async fn respond(err: ApiError) -> (StatusCode, serde_json::Value) {
+        let response = err.into_response();
+        let status = response.status();
+        let bytes = response.into_body().collect().await.unwrap().to_bytes();
+        (status, serde_json::from_slice(&bytes).unwrap())
+    }
+
+    #[tokio::test]
+    async fn not_found_maps_to_404() {
+        let (status, body) = respond(ApiError::NotFound).await;
+        assert_eq!(status, StatusCode::NOT_FOUND);
+        assert_eq!(body["code"], codes::NOT_FOUND);
+        assert_eq!(body["message"], "Resource not found");
+    }
+
+    #[tokio::test]
+    async fn invalid_cursor_maps_to_400() {
+        let (status, body) = respond(ApiError::InvalidCursor("bad".into())).await;
+        assert_eq!(status, StatusCode::BAD_REQUEST);
+        assert_eq!(body["code"], codes::INVALID_CURSOR);
+        assert_eq!(body["message"], "bad");
+    }
+
+    #[tokio::test]
+    async fn invalid_filter_maps_to_400() {
+        let (status, body) = respond(ApiError::InvalidFilter("bad".into())).await;
+        assert_eq!(status, StatusCode::BAD_REQUEST);
+        assert_eq!(body["code"], codes::INVALID_FILTER);
+    }
+
+    #[tokio::test]
+    async fn service_unavailable_maps_to_503() {
+        let (status, body) = respond(ApiError::ServiceUnavailable("down".into())).await;
+        assert_eq!(status, StatusCode::SERVICE_UNAVAILABLE);
+        assert_eq!(body["code"], codes::SERVICE_UNAVAILABLE);
+    }
+
+    #[tokio::test]
+    async fn pool_timeout_maps_to_504() {
+        let (status, body) = respond(ApiError::Database(sqlx::Error::PoolTimedOut)).await;
+        assert_eq!(status, StatusCode::GATEWAY_TIMEOUT);
+        assert_eq!(body["code"], codes::QUERY_TIMEOUT);
+    }
+
+    #[tokio::test]
+    async fn database_error_is_sanitized_500() {
+        let raw = sqlx::Error::Protocol("relation \"secret_table\" does not exist".into());
+        let (status, body) = respond(ApiError::Database(raw)).await;
+        assert_eq!(status, StatusCode::INTERNAL_SERVER_ERROR);
+        assert_eq!(body["code"], codes::DATABASE_ERROR);
+        assert_eq!(body["message"], "Database error");
+        assert!(!body.to_string().contains("secret_table"));
+    }
+
+    #[tokio::test]
+    async fn internal_error_is_sanitized_500() {
+        let (status, body) = respond(ApiError::Internal(anyhow::anyhow!("password=hunter2"))).await;
+        assert_eq!(status, StatusCode::INTERNAL_SERVER_ERROR);
+        assert_eq!(body["code"], codes::INTERNAL_ERROR);
+        assert_eq!(body["message"], "Internal server error");
+        assert!(!body.to_string().contains("hunter2"));
+    }
+
+    #[tokio::test]
+    async fn details_are_omitted_when_none() {
+        let (_, body) = respond(ApiError::NotFound).await;
+        assert!(body.get("details").is_none());
+    }
+}
