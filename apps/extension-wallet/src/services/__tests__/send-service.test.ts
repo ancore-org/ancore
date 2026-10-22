@@ -1,9 +1,17 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { createProductionSendService } from '../send-service';
-import { StellarClient } from '@ancore/stellar';
+import { StellarClient, checkMemoRequired } from '@ancore/stellar';
 import { sendMessage } from '../../messaging';
 
 // Mock dependencies
+vi.mock('@ancore/stellar', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('@ancore/stellar')>();
+  return {
+    ...actual,
+    checkMemoRequired: vi.fn().mockResolvedValue(false),
+  };
+});
+
 vi.mock('../../messaging', () => ({
   sendMessage: vi.fn(),
 }));
@@ -68,6 +76,37 @@ describe('createProductionSendService', () => {
         })
       );
       expect(result).toBe('signed_xdr_mock');
+    });
+
+    it('throws error when memo is required on mainnet and note is missing', async () => {
+      vi.mocked(checkMemoRequired).mockResolvedValueOnce(true);
+
+      const txDraft = {
+        to: VALID_DESTINATION,
+        amount: '10.5',
+        total: '10.5000100',
+        fee: { baseFee: '100', totalFee: '100', network: 'mainnet' as const },
+      };
+
+      await expect(service.signTransaction(txDraft)).rejects.toThrow(
+        'Memo required for this address on mainnet. Please provide a memo or choose an alternative address.'
+      );
+    });
+
+    it('proceeds when memo is required on mainnet and note is provided', async () => {
+      vi.mocked(checkMemoRequired).mockResolvedValueOnce(true);
+      vi.mocked(sendMessage).mockResolvedValueOnce({ signedXdr: 'signed_xdr_with_memo' });
+
+      const txDraft = {
+        to: VALID_DESTINATION,
+        amount: '10.5',
+        total: '10.5000100',
+        note: '123456789',
+        fee: { baseFee: '100', totalFee: '100', network: 'mainnet' as const },
+      };
+
+      const result = await service.signTransaction(txDraft);
+      expect(result).toBe('signed_xdr_with_memo');
     });
   });
 

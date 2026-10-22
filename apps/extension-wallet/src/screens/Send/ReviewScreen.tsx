@@ -1,5 +1,6 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Button, Card, CardContent, CardHeader, CardTitle, Separator, cn } from '@ancore/ui-kit';
+import { checkMemoRequired } from '@ancore/stellar';
 import type { SendTransactionDraft } from '@/hooks/useSendTransaction';
 import { TransferNotePreview } from '@/components/TransferNotePreview';
 import {
@@ -42,7 +43,34 @@ export function ReviewScreen({
 }: ReviewScreenProps) {
   const [isConfirmed, setIsConfirmed] = useState(false);
   const [simulationSkipped, setSimulationSkipped] = useState(false);
+  const [memoRequired, setMemoRequired] = useState(false);
+  const [checkingMemo, setCheckingMemo] = useState(false);
   const isDev = import.meta.env.DEV;
+
+  useEffect(() => {
+    let active = true;
+    if (transaction.fee.network === 'mainnet' && transaction.to) {
+      setCheckingMemo(true);
+      checkMemoRequired(transaction.to)
+        .then((required) => {
+          if (active) setMemoRequired(required);
+        })
+        .catch(() => {
+          if (active) setMemoRequired(false);
+        })
+        .finally(() => {
+          if (active) setCheckingMemo(false);
+        });
+    } else {
+      setMemoRequired(false);
+    }
+    return () => {
+      active = false;
+    };
+  }, [transaction.to, transaction.fee.network]);
+
+  const memoMissing =
+    transaction.fee.network === 'mainnet' && memoRequired && !transaction.note?.trim();
 
   const simulatedFee =
     simulation?.status === 'success' ? simulation.simulatedFee : transaction.fee.totalFee;
@@ -200,6 +228,23 @@ export function ReviewScreen({
           </button>
         )}
 
+        {/* Memo Required Warning Banner */}
+        {memoMissing && (
+          <div
+            role="alert"
+            data-testid="memo-required-warning"
+            className="rounded-2xl border border-red-500/30 bg-red-500/10 p-4 text-xs text-red-200 space-y-1.5"
+          >
+            <div className="flex items-center gap-2 font-bold text-red-400">
+              <AlertCircle className="w-4 h-4 shrink-0" />
+              <span>Memo Required</span>
+            </div>
+            <p className="text-[11px] text-red-300/90 leading-relaxed font-medium">
+              Memo required for this address on mainnet. Please provide a memo or choose an alternative address.
+            </p>
+          </div>
+        )}
+
         {/* Explicit Confirmation Step */}
         <div
           className={cn(
@@ -252,7 +297,7 @@ export function ReviewScreen({
           </Button>
           <Button
             type="button"
-            disabled={!isConfirmed || simulationBlocksApprove}
+            disabled={!isConfirmed || simulationBlocksApprove || memoMissing || checkingMemo}
             className="flex h-12 flex-[2] items-center justify-center gap-2 rounded-full bg-white text-[11px] font-semibold text-black hover:bg-white/90 disabled:opacity-40"
             onClick={onConfirm}
           >
