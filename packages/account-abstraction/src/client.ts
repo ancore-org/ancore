@@ -5,7 +5,15 @@
  * Automatically retries on timeouts, connection resets, and 5xx server errors with exponential backoff and jitter.
  */
 
-import { Address, hash, Networks, StrKey, xdr } from '@stellar/stellar-sdk';
+import {
+  Account,
+  Address,
+  hash,
+  Networks,
+  StrKey,
+  TransactionBuilder,
+  xdr,
+} from '@stellar/stellar-sdk';
 import { AccountContract, type InvocationArgs } from './account-contract';
 import {
   executeContract,
@@ -13,7 +21,14 @@ import {
   type ExecuteOptions,
   type ExecuteResult,
 } from './execute';
-import { NetworkError } from './errors';
+import {
+  AccountContractError,
+  mapContractError,
+  NetworkError,
+  NotInitializedError,
+  SessionKeyExpiredError,
+  SessionKeyNotFoundError,
+} from './errors';
 import type { SessionKey } from '@ancore/types';
 
 const NETWORK_PASSPHRASES: Record<string, string> = {
@@ -227,6 +242,26 @@ export interface AccountAbstractionClientOptions {
 
 export type AncoreClientOptions = AccountAbstractionClientOptions;
 
+export interface RefreshSessionKeyTtlClientOptions {
+  /** Source account used for simulation (defaults to ownerPublicKey or contractId). */
+  sourceAccount?: string;
+  /** Optional contract ID override to validate and target. */
+  contractId?: string;
+  /** Known logical expiry in Unix seconds for client-side expiry preflight. */
+  expiresAt?: number;
+  /** Optional current timestamp override in milliseconds (defaults to Date.now()). */
+  nowMs?: number;
+  /** Optional retry override options. */
+  retryOptions?: ClientRetryOptions;
+}
+
+export interface RefreshSessionKeyTtlClientResult {
+  invocation: InvocationArgs;
+  operation: ReturnType<AccountContract['buildInvokeOperation']>;
+  publicKey: string;
+  expiresAt: number;
+}
+
 function isNotFoundError(err: unknown): boolean {
   if (!err) return false;
   if (typeof err === 'object') {
@@ -265,6 +300,10 @@ export class AccountAbstractionClient {
   readonly server: SorobanRpcServer;
   readonly networkPassphrase?: string;
   readonly retryOptions: ClientRetryOptions;
+  private readonly inflightTtlRefreshes = new Map<
+    string,
+    Promise<RefreshSessionKeyTtlClientResult>
+  >();
 
   constructor(options: AccountAbstractionClientOptions) {
     this.contractId = options.contractId;
@@ -526,6 +565,120 @@ export class AccountAbstractionClient {
         }),
       overrideOptions
     );
+  }
+
+  /**
+   * Refresh the Soroban persistent storage TTL for an active session key.
+   * Validates the target contract address, checks whether the vault/account is deployed
+   * and the session key is not expired, coalesces concurrent refreshes for the same key,
+   * and simulates the `refresh_session_key_ttl` invocation with retry.
+   */
+  async refreshSessionKeyTtl(
+    publicKey: string | Uint8Array,
+    options: RefreshSessionKeyTtlClientOptions = {}
+  ): Promise<RefreshSessionKeyTtlClientResult> {
+    const targetContractId = options.contractId ?? this.contractId;
+    if (!targetContractId || !StrKey.isValidContract(targetContractId)) {
+      throw new AccountContractError(
+        `Invalid contract address: ${String(targetContractId)}`,
+        'INVALID_CONTRACT_ADDRESS'
+      );
+    }
+
+    const targetContract =
+      targetContractId === this.contractId
+        ? this.accountContract
+        : new AccountContract(targetContractId);
+
+    const invocation = targetContract.refreshSessionKeyTtl(publicKey);
+    const normalizedKey =
+      typeof publicKey === 'string'
+        ? publicKey
+        : StrKey.encodeEd25519PublicKey(Buffer.from(publicKey));
+
+    const nowSec = Math.floor((options.nowMs ?? Date.now()) / 1000);
+    if (options.expiresAt !== undefined) {
+      if (
+        !Number.isFinite(options.expiresAt) ||
+        options.expiresAt <= 0 ||
+        options.expiresAt <= nowSec
+      ) {
+        throw new SessionKeyExpiredError('Session key has expired');
+      }
+    }
+
+    const dedupKey = `${targetContractId}:${normalizedKey}`;
+    const existingInflight = this.inflightTtlRefreshes.get(dedupKey);
+    if (existingInflight) {
+      return existingInflight;
+    }
+
+    const task = (async (): Promise<RefreshSessionKeyTtlClientResult> => {
+      if (
+        typeof this.server.getContractData === 'function' ||
+        typeof this.server.getLedgerEntries === 'function'
+      ) {
+        const deployed = await this.isAccountDeployed(targetContractId, options.retryOptions);
+        if (!deployed) {
+          throw new NotInitializedError();
+        }
+      }
+
+      let resolvedExpiresAt = options.expiresAt;
+      if (resolvedExpiresAt === undefined) {
+        const onChainKey = await this.getSessionKey(
+          publicKey,
+          options.sourceAccount,
+          options.retryOptions
+        );
+        if (!onChainKey) {
+          throw new SessionKeyNotFoundError(normalizedKey);
+        }
+        if (onChainKey.expiresAt <= 0 || onChainKey.expiresAt <= nowSec) {
+          throw new SessionKeyExpiredError('Session key has expired');
+        }
+        resolvedExpiresAt = onChainKey.expiresAt;
+      }
+
+      const operation = targetContract.buildInvokeOperation(invocation);
+      const source = options.sourceAccount ?? this.ownerPublicKey ?? targetContractId;
+
+      await this.withRetry(async () => {
+        const accountResp = await this.server.getAccount(source);
+        const account = new Account(accountResp.id, accountResp.sequence ?? '0');
+        const tx = new TransactionBuilder(account, {
+          fee: '100',
+          networkPassphrase: this.networkPassphrase ?? Networks.TESTNET,
+        })
+          .addOperation(operation)
+          .setTimeout(180)
+          .build();
+
+        const sim = (await this.server.simulateTransaction(tx)) as
+          | { error?: string; message?: string; result?: { retval?: xdr.ScVal } }
+          | null
+          | undefined;
+
+        if (sim && typeof sim === 'object' && ('error' in sim || 'message' in sim)) {
+          const errMsg = sim.error ?? sim.message ?? 'Simulation failed';
+          throw mapContractError(String(errMsg), sim, { sessionPublicKey: normalizedKey });
+        }
+      }, options.retryOptions);
+
+      return {
+        invocation,
+        operation,
+        publicKey: normalizedKey,
+        expiresAt: resolvedExpiresAt,
+      };
+    })();
+
+    this.inflightTtlRefreshes.set(dedupKey, task);
+    try {
+      return await task;
+    } finally {
+      this.inflightTtlRefreshes.delete(dedupKey);
+    }
   }
 
   /**
