@@ -214,4 +214,70 @@ describe('createProductionSendService', () => {
       );
     });
   });
+
+  describe('fetchTransactionStatus (#1187)', () => {
+    it('resolves canonical Horizon URL instead of hitting plain Soroban RPC host', async () => {
+      vi.mocked(fetch).mockResolvedValueOnce({
+        ok: true,
+        status: 200,
+        json: vi.fn().mockResolvedValue({ successful: true }),
+      } as unknown as Response);
+
+      const status = await service.fetchTransactionStatus('tx_hash_1187');
+
+      expect(status).toBe('confirmed');
+      expect(fetch).toHaveBeenCalledWith(
+        'https://horizon-testnet.stellar.org/transactions/tx_hash_1187',
+        expect.objectContaining({ method: 'GET' })
+      );
+    });
+
+    it('resolves mainnet Horizon URL when stellarClient network is mainnet with plain RPC host', async () => {
+      vi.mocked(stellarClient.getNetwork).mockReturnValue('mainnet');
+      vi.mocked(stellarClient.getRpcUrls).mockReturnValue(['https://soroban.stellar.org']);
+      vi.mocked(fetch).mockResolvedValueOnce({
+        ok: true,
+        status: 200,
+        json: vi.fn().mockResolvedValue({ successful: true }),
+      } as unknown as Response);
+
+      const status = await service.fetchTransactionStatus('tx_mainnet_1');
+
+      expect(status).toBe('confirmed');
+      expect(fetch).toHaveBeenCalledWith(
+        'https://horizon.stellar.org/transactions/tx_mainnet_1',
+        expect.objectContaining({ method: 'GET' })
+      );
+    });
+
+    it('returns failed when Horizon 200 response reports successful: false', async () => {
+      vi.mocked(fetch).mockResolvedValueOnce({
+        ok: true,
+        status: 200,
+        json: vi.fn().mockResolvedValue({ successful: false }),
+      } as unknown as Response);
+
+      const status = await service.fetchTransactionStatus('tx_failed_onchain');
+      expect(status).toBe('failed');
+    });
+
+    it('supports explicit horizonUrl override and co-located localhost /soroban/rpc gateway', async () => {
+      const customService = createProductionSendService({
+        stellarClient,
+        accountAddress: VALID_ACCOUNT,
+        horizonUrl: 'https://custom-horizon.example.org/',
+      });
+      vi.mocked(fetch).mockResolvedValueOnce({
+        ok: true,
+        status: 200,
+        json: vi.fn().mockResolvedValue({ successful: true }),
+      } as unknown as Response);
+
+      await expect(customService.fetchTransactionStatus('tx_custom')).resolves.toBe('confirmed');
+      expect(fetch).toHaveBeenCalledWith(
+        'https://custom-horizon.example.org/transactions/tx_custom',
+        expect.objectContaining({ method: 'GET' })
+      );
+    });
+  });
 });
