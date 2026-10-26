@@ -370,6 +370,8 @@ const simulation = await client.withRetry(
 );
 ```
 
+See [Retry Policy Configuration](#retry-policy-configuration) for details.
+
 ---
 
 ### Batch Session Keys
@@ -846,24 +848,70 @@ simulateExecute<T>(to, fn, args, nonce, options): Promise<T>
 
 ---
 
-## Retry Policy & Transient Failure Handling
+## Retry Policy Configuration
 
-`@ancore/core-sdk` provides configurable exponential backoff and transient failure handling for all network operations (Soroban RPC simulations, account sequence fetches, rate limits).
+`@ancore/core-sdk` provides configurable exponential backoff and transient failure handling for all network operations (Soroban RPC simulations, Horizon queries, account sequence fetches, and rate-limited endpoints) via `withRetry`, `withNetworkRetry`, and `AncoreClient.withRetry`.
 
-### `withNetworkRetry`
+### Preset Configurations
 
-Executes an asynchronous network call with exponential backoff retries.
+| Preset / Config | `maxRetries` | `baseDelayMs` | `maxDelayMs` | `exponential` | `jitter` | Recommended Use Case |
+|-----------------|--------------|---------------|--------------|---------------|----------|----------------------|
+| `DEFAULT_RETRY_POLICY` / `DEFAULT_RETRY_CONFIG` | `3` | `500ms` (`100ms` in `withRetry`) | `30000ms` (`10000ms` in `withRetry`) | `true` | `false` (`true` in `withRetry`) | General-purpose SDK and RPC calls |
+| `LOW_LATENCY` / `CONSERVATIVE_RETRY_CONFIG` | `2` | `200ms` | `10000ms` | `false` | `true` | Interactive UI actions where fast failure is preferred |
+| `AGGRESSIVE` / `AGGRESSIVE_RETRY_CONFIG` | `4` | `500ms` | `30000ms` | `true` | `true` | High-throughput batch processing and bulk queries |
+| `RELIABLE` | `8` | `3000ms` | `30000ms` | `true` | `true` | Critical background submissions and transaction confirmations |
+| `NO_RETRY_CONFIG` | `0` | `0ms` | `0ms` | `false` | `false` | Deterministic tests or fail-fast preflight probes |
+
+### Exponential Backoff & Jitter Behavior
+
+- **Exponential backoff** (`exponential: true`): Delay doubles on each retry attempt (`delay = Math.min(baseDelayMs * 2^(attempt - 1), maxDelayMs)`).
+- **Linear backoff** (`exponential: false`): Delay remains fixed at `Math.min(baseDelayMs, maxDelayMs)`.
+- **Jitter** (`jitter: true | number`): Applies randomized jitter (`±10%` in `withRetry`, `±20%` in `withNetworkRetry`, or a custom ratio) to prevent thundering-herd spikes against shared Soroban RPC / Horizon nodes.
+
+### Usage with `withRetry`, `withNetworkRetry`, and `client.withRetry`
 
 ```typescript
-import { withNetworkRetry, RELIABLE } from '@ancore/core-sdk';
+import {
+  AncoreClient,
+  withRetry,
+  withNetworkRetry,
+  DEFAULT_RETRY_POLICY,
+  LOW_LATENCY,
+  AGGRESSIVE,
+  RELIABLE,
+  getRetryPreset,
+} from '@ancore/core-sdk';
 
+// 1. Standalone utility with a preset
+const status = await withRetry(() => fetchQuickStatus(), LOW_LATENCY);
+
+// 2. Network retry wrapper with preset name or custom policy
 const account = await withNetworkRetry(
   () => server.getAccount(accountId),
   RELIABLE
 );
+
+// 3. AncoreClient instance with default policy + per-call override
+const client = new AncoreClient({
+  accountContractId: 'C...',
+  retry: DEFAULT_RETRY_POLICY,
+});
+
+// Uses client default policy
+const ledgerAccount = await client.withRetry(() => server.getAccount(accountId));
+
+// Override with AGGRESSIVE preset for a specific call
+const simResult = await client.withRetry(
+  () => server.simulateTransaction(tx),
+  AGGRESSIVE
+);
+
+// Resolve preset dynamically by name ('LOW_LATENCY' | 'AGGRESSIVE' | 'RELIABLE' | 'wallet' | 'indexer')
+const indexerPreset = getRetryPreset('indexer');
+const indexedData = await withRetry(() => queryIndexer(), indexerPreset);
 ```
 
-### Options (`RetryPolicyOptions`)
+### Options (`RetryPolicyOptions` / `RetryOptions`)
 
 | Option | Type | Default | Description |
 |--------|------|---------|-------------|
@@ -871,17 +919,9 @@ const account = await withNetworkRetry(
 | `baseDelayMs` | `number` | `500` | Initial base delay in milliseconds between retries |
 | `maxDelayMs` | `number` | `30000` | Upper bound delay ceiling in milliseconds |
 | `exponential` | `boolean` | `true` | Whether delay doubles each attempt (`baseDelay * 2^(attempt-1)`) |
-| `jitter` | `boolean` | `false` | Adds +/- 20% random jitter to prevent thundering herd spikes |
+| `jitter` | `boolean \| number` | `false` | Adds random jitter to prevent thundering herd spikes |
 | `isRetryable` | `(err) => boolean` | `isTransientNetworkError` | Custom predicate determining retry eligibility |
 | `onRetry` | `(attempt, err, delay) => void` | `undefined` | Callback invoked before each retry sleep |
-
-### Built-in Presets
-
-| Preset | Max Retries | Base Delay | Exponential | Recommended Use Case |
-|--------|-------------|------------|-------------|----------------------|
-| `LOW_LATENCY` | 2 | 200ms | No | Interactive UI actions where fast failure is desired |
-| `RELIABLE` | 8 | 3000ms | Yes | Critical background submissions, transaction confirmations |
-| `AGGRESSIVE` | 4 | 500ms | Yes | High-throughput batch processing |
 
 ### `isTransientNetworkError`
 
