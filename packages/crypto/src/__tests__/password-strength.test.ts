@@ -194,5 +194,26 @@ describe('validatePasswordStrength()', () => {
       const result = validatePasswordStrength('a'.repeat(100));
       expectWeak(result);
     });
+
+    it('rejects repeated characters of exact minimum length', () => {
+      const result = validatePasswordStrength('aaaaaaaaaaaa');
+      expectWeak(result);
+    });
+
+    it('rejects common keyboard sequences and number sequences', () => {
+      expectWeak(validatePasswordStrength('1234567890'));
+      expectWeak(validatePasswordStrength('qwertyuiop'));
+    });
+
+    it('accepts strong multi-word passphrase with symbols and numbers', () => {
+      const result = validatePasswordStrength('Stellar-Horizon-Soroban-2026!');
+      expectStrong(result);
+    });
+
+    it('handles maximum length boundaries cleanly (256-character passphrase)', () => {
+      const longPass = 'Correct-Horse-Battery-Staple-Stellar-Key-' + 'X1!'.repeat(70);
+      const result = validatePasswordStrength(longPass);
+      expectStrong(result);
+    });
   });
 });
