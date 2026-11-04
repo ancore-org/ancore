@@ -79,7 +79,13 @@ export function ApprovalApp() {
       dAppName={dAppName}
       contractId={contractId}
       methodName={methodName}
-      requestType={route === 'sign-auth-entry' ? 'sign-auth-entry' : 'sign-transaction'}
+      requestType={
+        route === 'sign-auth-entry'
+          ? 'sign-auth-entry'
+          : route === 'request-session-key'
+            ? 'request-session-key'
+            : 'sign-transaction'
+      }
       {...copy}
     />
   );

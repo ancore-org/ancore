@@ -104,4 +104,42 @@ describe('SignTransactionApprovalScreen', () => {
       expect.any(Function)
     );
   });
+
+  it('sends APPROVE_SESSION_KEY_REQUEST when requestType is request-session-key (#958)', () => {
+    render(
+      <MemoryRouter>
+        <SignTransactionApprovalScreen
+          requestId="req-session-1"
+          requestType="request-session-key"
+        />
+      </MemoryRouter>
+    );
+
+    const approveBtn = screen.getByRole('button', { name: /^Approve$/i });
+    fireEvent.click(approveBtn);
+
+    expect(sendMessageMock).toHaveBeenCalledWith(
+      { type: 'APPROVE_SESSION_KEY_REQUEST', requestId: 'req-session-1' },
+      expect.any(Function)
+    );
+  });
+
+  it('sends REJECT_SESSION_KEY_REQUEST when requestType is request-session-key (#958)', () => {
+    render(
+      <MemoryRouter>
+        <SignTransactionApprovalScreen
+          requestId="req-session-2"
+          requestType="request-session-key"
+        />
+      </MemoryRouter>
+    );
+
+    const rejectBtn = screen.getByRole('button', { name: /^Reject$/i });
+    fireEvent.click(rejectBtn);
+
+    expect(sendMessageMock).toHaveBeenCalledWith(
+      { type: 'REJECT_SESSION_KEY_REQUEST', requestId: 'req-session-2' },
+      expect.any(Function)
+    );
+  });
 });
