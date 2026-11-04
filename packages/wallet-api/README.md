@@ -103,10 +103,11 @@ tables below list the exact strings the extension produces today.
 
 ### Error classes
 
-| Class                     | `instanceof WalletApiError` | Thrown today?                                                                                                                                                                                   |
-| ------------------------- | --------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `WalletApiError`          | yes                         | Yes — every failure path below                                                                                                                                                                  |
-| `WalletNotInstalledError` | yes (it extends it)         | **Not yet.** Exported for `instanceof` narrowing; with no content script on the page the request currently fails as a timeout instead. See [detecting the extension](#detecting-the-extension). |
+| Class                             | `instanceof WalletApiError` | Thrown today?                                                                                                                                                                                   |
+| --------------------------------- | --------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `WalletApiError`                  | yes                         | Yes — every failure path below                                                                                                                                                                  |
+| `WalletNotInstalledError`         | yes (it extends it)         | Thrown by `getAddress()` on bridge timeout; exported for `instanceof` narrowing. See [detecting the extension](#detecting-the-extension).                                                       |
+| `SessionKeyPolicyValidationError` | yes (it extends it)         | Yes — raised by `requestSessionKey()` with typed `code` and `field` when `expiresAt`, `permissions`, `allowedContracts`, or spend-limit fields fail client-side or contract-aligned validation. |
 
 Because `WalletNotInstalledError extends WalletApiError`, always check the **subclass first** in an
 `if / else if` chain.

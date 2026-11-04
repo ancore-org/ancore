@@ -31,7 +31,7 @@ export interface SignTransactionApprovalScreenProps {
   methodName?: string;
   requestedScopes?: string[];
   /** Determines which message types to send to the background on approve/reject. */
-  requestType?: 'sign-transaction' | 'sign-auth-entry';
+  requestType?: 'sign-transaction' | 'sign-auth-entry' | 'request-session-key';
 }
 
 export function SignTransactionApprovalScreen({
@@ -88,9 +88,17 @@ export function SignTransactionApprovalScreen({
       setDevicePrompt(true);
     }
     const approveType =
-      requestType === 'sign-auth-entry' ? 'APPROVE_AUTH_ENTRY_REQUEST' : 'APPROVE_SIGN_REQUEST';
+      requestType === 'sign-auth-entry'
+        ? 'APPROVE_AUTH_ENTRY_REQUEST'
+        : requestType === 'request-session-key'
+          ? 'APPROVE_SESSION_KEY_REQUEST'
+          : 'APPROVE_SIGN_REQUEST';
     const rejectType =
-      requestType === 'sign-auth-entry' ? 'REJECT_AUTH_ENTRY_REQUEST' : 'REJECT_SIGN_REQUEST';
+      requestType === 'sign-auth-entry'
+        ? 'REJECT_AUTH_ENTRY_REQUEST'
+        : requestType === 'request-session-key'
+          ? 'REJECT_SESSION_KEY_REQUEST'
+          : 'REJECT_SIGN_REQUEST';
     chrome.runtime.sendMessage(
       { type: action === 'approve' ? approveType : rejectType, requestId },
       () => {
