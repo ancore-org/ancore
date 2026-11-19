@@ -326,5 +326,5 @@ async function executeSmartAccountTransaction(
 
 - [Soroban RPC Documentation](https://soroban.stellar.org/api/rpc)
 - [Stellar SDK Transaction Simulation](https://stellar.github.io/js-stellar-sdk/TransactionBuilder.html#simulate)
-- [Ancore Contract Methods](../../contract-methods.md)
-- [Transaction Flow](../../architecture/TRANSACTION_FLOW.md)
+- [Ancore Contract Methods](../contract-methods.md)
+- [Transaction Flow](../architecture/TRANSACTION_FLOW.md)

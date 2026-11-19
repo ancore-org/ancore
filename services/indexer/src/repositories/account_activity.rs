@@ -223,12 +223,8 @@ impl AccountResponseCache {
     }
 
     fn get(&mut self, key: &str, now: Instant) -> Option<String> {
-        let expired = match self.entries.peek(key) {
-            Some(entry) => {
-                now.saturating_duration_since(entry.stored_at) >= ACCOUNT_RESPONSE_CACHE_TTL
-            }
-            None => return None,
-        };
+        let entry = self.entries.peek(key)?;
+        let expired = now.saturating_duration_since(entry.stored_at) >= ACCOUNT_RESPONSE_CACHE_TTL;
         if expired {
             self.entries.pop(key);
             return None;
