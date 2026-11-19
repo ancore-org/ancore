@@ -14,13 +14,26 @@ import type {
   GetPublicKeyResult,
   SignTransactionResult,
   RequestSessionKeyResult,
-  SessionKeyPolicy,
+  SessionKey,
+  SessionPermission,
 } from '@ancore/types';
 import { ExternalApiMethodName as MethodName } from '@ancore/types';
+import { importFromRawEd25519Seed } from '@ancore/crypto';
+import { AccountTransactionBuilder } from '@ancore/core-sdk';
 import { NETWORK_PASSPHRASES } from '@ancore/wallet-shared';
 import { z } from 'zod';
-import { AccountContract } from '@ancore/account-abstraction';
-import { rpc as StellarRpc } from '@stellar/stellar-sdk';
+import {
+  AccountContract,
+  bitmaskToContractVec,
+  bitmaskToPermissions,
+  contractVecToPermissions,
+  getSessionKey,
+  validateSessionKeyPolicy,
+  type PolicyAmount,
+  type SessionKeyPolicyErrorCode,
+  type SessionKeyPolicyValidationError,
+} from '@ancore/account-abstraction';
+import { Account, rpc as StellarRpc, StrKey } from '@stellar/stellar-sdk';
 import { isAllowed, addToAllowlist } from './allowlist';
 import {
   enqueueApproval,
@@ -29,7 +42,10 @@ import {
   writeSessionEntry,
 } from './response-queue';
 import { openApprovalWindow } from '../../approval-window';
+import { getSigningKeypair } from '../../signing-key';
+import { getSharedStorageManager } from '@/security/storage-manager';
 import { getSettingsState } from '@/stores/settings';
+import { useSessionKeyStore } from '@/stores/sessionKeys';
 import { readChromeLocal } from '../../chrome-api';
 
 /** chrome.storage.local key for the deployed smart-account C-address. */
@@ -67,17 +83,6 @@ const signMessageSchema = z
       .refine((v) => v.trim().length > 0, 'message must not be empty'),
     network: z.string().optional(),
     smartAccountId: z.string().optional(),
-  })
-  .passthrough();
-
-const requestSessionKeySchema = z
-  .object({
-    expiresAt: z.number().int().positive('expiresAt must be a positive integer'),
-    permissions: z.number().int().nonnegative('permissions must be a non-negative integer'),
-    network: z.string().optional(),
-    smartAccountId: z.string().optional(),
-    allowedContracts: z.array(z.string()).optional(),
-    maxAmountPerCall: z.string().optional(),
   })
   .passthrough();
 
@@ -472,41 +477,251 @@ export async function handleSignRelayPayload(
   return result as { sessionKey: string; signature: string };
 }
 
-function generateSessionKeyPair(): { publicKey: string; secretKey: string } {
-  const alphabet = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ234567';
-  let publicKey = 'G';
-  const bytes = new Uint8Array(55);
-  crypto.getRandomValues(bytes);
-  for (const b of bytes) publicKey += alphabet[b % alphabet.length];
+const VALID_PERMISSION_BITMASK = 0b111;
+const PLACEHOLDER_SIMULATION_OWNER = 'GAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAWHF';
+const MAX_TX_CONFIRMATION_POLLS = 10;
 
-  let secretKey = 'S';
-  const secretBytes = new Uint8Array(55);
-  crypto.getRandomValues(secretBytes);
-  for (const b of secretBytes) secretKey += alphabet[b % alphabet.length];
+export class SessionKeyPolicyError extends Error {
+  readonly code: SessionKeyPolicyErrorCode;
+  readonly field: string;
+  readonly errors: SessionKeyPolicyValidationError[];
 
-  return { publicKey, secretKey };
+  constructor(errors: SessionKeyPolicyValidationError[]) {
+    const primary = errors[0] ?? {
+      code: 'INVALID_EXPIRES_AT' as const,
+      field: 'expiresAt' as const,
+      message: 'Invalid session key policy',
+    };
+    super(`[${primary.code}] Invalid session key policy (${primary.field}): ${primary.message}`);
+    this.name = 'SessionKeyPolicyError';
+    this.code = primary.code;
+    this.field = primary.field;
+    this.errors = errors;
+  }
+}
+
+interface NormalizedSessionKeyPolicy {
+  expiresAtMs: number;
+  expiresAtSec: number;
+  contractPermissions: number[];
+  uiPermissions: SessionPermission[];
+  allowedContracts?: string[];
+  maxAmountPerCall?: PolicyAmount;
+  cumulativeLimit?: PolicyAmount;
+  spendWindowSeconds: number;
+  network?: string;
+  smartAccountId?: string;
+}
+
+function normalizeSessionKeyPolicy(params: unknown): NormalizedSessionKeyPolicy {
+  if (!params || typeof params !== 'object' || Array.isArray(params)) {
+    throw new SessionKeyPolicyError([
+      {
+        code: 'INVALID_EXPIRES_AT',
+        field: 'expiresAt',
+        message: 'Policy must be a valid object',
+      },
+    ]);
+  }
+
+  const raw = params as Record<string, unknown>;
+  const errors: SessionKeyPolicyValidationError[] = [];
+
+  if (typeof raw.expiresAt !== 'number' || !Number.isInteger(raw.expiresAt) || raw.expiresAt <= 0) {
+    errors.push({
+      code: 'INVALID_EXPIRES_AT',
+      field: 'expiresAt',
+      message: 'expiresAt must be a positive integer Unix timestamp',
+    });
+  }
+
+  let contractPermissions: number[] = [];
+  let uiPermissions: SessionPermission[] = [];
+  let permissionsForValidator: number | number[] = -1;
+
+  if (Array.isArray(raw.permissions)) {
+    if (raw.permissions.length === 0) {
+      errors.push({
+        code: 'INVALID_PERMISSION',
+        field: 'permissions',
+        message: 'permissions must include at least one permission',
+      });
+    } else if (!raw.permissions.every((p) => typeof p === 'number' && Number.isInteger(p))) {
+      errors.push({
+        code: 'INVALID_PERMISSION',
+        field: 'permissions',
+        message: 'permissions array must contain integer permission indices',
+      });
+    } else {
+      permissionsForValidator = raw.permissions as number[];
+      contractPermissions = [...new Set(permissionsForValidator)].sort((a, b) => a - b);
+      uiPermissions = contractVecToPermissions(contractPermissions);
+    }
+  } else if (
+    typeof raw.permissions === 'number' &&
+    Number.isInteger(raw.permissions) &&
+    raw.permissions > 0 &&
+    (raw.permissions & ~VALID_PERMISSION_BITMASK) === 0
+  ) {
+    contractPermissions = bitmaskToContractVec(raw.permissions);
+    uiPermissions = bitmaskToPermissions(raw.permissions);
+    permissionsForValidator = contractPermissions;
+  } else {
+    errors.push({
+      code: 'INVALID_PERMISSION',
+      field: 'permissions',
+      message: 'permissions must be a non-zero permission bitmask within supported bounds',
+    });
+  }
+
+  if (errors.length > 0) {
+    throw new SessionKeyPolicyError(errors);
+  }
+
+  const expiresAtInput = raw.expiresAt as number;
+  const validation = validateSessionKeyPolicy({
+    expiresAt: expiresAtInput,
+    permissions: permissionsForValidator,
+    allowedContracts: raw.allowedContracts as string[] | undefined,
+    maxAmountPerCall: raw.maxAmountPerCall as PolicyAmount | null | undefined,
+    cumulativeLimit: raw.cumulativeLimit as PolicyAmount | null | undefined,
+    spendWindowSeconds: raw.spendWindowSeconds as number | undefined,
+  });
+
+  if (!validation.valid) {
+    throw new SessionKeyPolicyError(validation.errors);
+  }
+
+  let allowedContracts: string[] | undefined;
+  if (raw.allowedContracts !== undefined) {
+    const list = raw.allowedContracts as string[];
+    for (const contractId of list) {
+      if (!StrKey.isValidContract(contractId)) {
+        throw new SessionKeyPolicyError([
+          {
+            code: 'INVALID_ALLOWED_CONTRACTS',
+            field: 'allowedContracts',
+            message: `Invalid contract address in allowlist: ${contractId}`,
+          },
+        ]);
+      }
+    }
+    allowedContracts = [...list];
+  }
+
+  const isMs = expiresAtInput > 1e11;
+  const expiresAtSec = isMs ? Math.floor(expiresAtInput / 1000) : expiresAtInput;
+  const expiresAtMs = isMs ? expiresAtInput : expiresAtInput * 1000;
+
+  return {
+    expiresAtMs,
+    expiresAtSec,
+    contractPermissions,
+    uiPermissions,
+    allowedContracts,
+    maxAmountPerCall:
+      raw.maxAmountPerCall !== undefined && raw.maxAmountPerCall !== null
+        ? (raw.maxAmountPerCall as PolicyAmount)
+        : undefined,
+    cumulativeLimit:
+      raw.cumulativeLimit !== undefined && raw.cumulativeLimit !== null
+        ? (raw.cumulativeLimit as PolicyAmount)
+        : undefined,
+    spendWindowSeconds: typeof raw.spendWindowSeconds === 'number' ? raw.spendWindowSeconds : 0,
+    network: typeof raw.network === 'string' ? raw.network : undefined,
+    smartAccountId: typeof raw.smartAccountId === 'string' ? raw.smartAccountId : undefined,
+  };
+}
+
+async function confirmSubmittedTransaction(
+  rpcServer: StellarRpc.Server,
+  sendResponse: StellarRpc.Api.SendTransactionResponse
+): Promise<void> {
+  if (sendResponse.status === 'ERROR' || sendResponse.status === 'TRY_AGAIN_LATER') {
+    throw new Error(`Failed to submit add_session_key transaction (${sendResponse.status}).`);
+  }
+
+  if (
+    sendResponse.status === 'PENDING' &&
+    typeof (rpcServer as Partial<StellarRpc.Server>).getTransaction === 'function'
+  ) {
+    for (let attempt = 0; attempt < MAX_TX_CONFIRMATION_POLLS; attempt += 1) {
+      const txStatus = await rpcServer.getTransaction(sendResponse.hash);
+      if (txStatus.status === 'SUCCESS') {
+        return;
+      }
+      if (txStatus.status === 'FAILED') {
+        throw new Error(`On-chain add_session_key transaction failed (${sendResponse.hash}).`);
+      }
+    }
+    throw new Error(`Timed out waiting for add_session_key confirmation (${sendResponse.hash}).`);
+  }
 }
 
 /**
- * requestSessionKey handler (#873)
- * Enqueues approval for dApp session key policy; returns key material on approval (MVP mock on-chain).
+ * Query a registered session key directly from the smart-account contract via Soroban RPC.
+ */
+export async function queryRegisteredSessionKey(
+  publicKey: string,
+  options: { network?: string; smartAccountId?: string } = {}
+): Promise<SessionKey | null> {
+  const network = options.network || getSettingsState().network || 'testnet';
+  const rpcUrl = SOROBAN_RPC_URLS[network];
+  if (!rpcUrl) {
+    throw new Error(`Unsupported network: ${network}`);
+  }
+
+  const smartAccountId =
+    options.smartAccountId || (await readFromChromeLocal(CONTRACT_ADDRESS_KEY));
+  if (!smartAccountId) {
+    throw new Error('Wallet not set up. Complete onboarding first.');
+  }
+
+  const networkPassphrase = NETWORK_PASSPHRASES[network] ?? NETWORK_PASSPHRASES['testnet'];
+  const rpcServer = new StellarRpc.Server(rpcUrl, { allowHttp: network === 'local' });
+
+  return getSessionKey(smartAccountId, publicKey, {
+    server: {
+      getAccount: async (accountId: string) => {
+        const account = await rpcServer.getAccount(accountId);
+        return { id: account.accountId(), sequence: account.sequenceNumber() };
+      },
+      simulateTransaction: (tx) =>
+        rpcServer.simulateTransaction(
+          tx as Parameters<StellarRpc.Server['simulateTransaction']>[0]
+        ),
+    },
+    sourceAccount: PLACEHOLDER_SIMULATION_OWNER,
+    networkPassphrase,
+  });
+}
+
+/**
+ * requestSessionKey handler (#958)
+ * Validates policy upfront, awaits explicit user approval, generates a real Ed25519
+ * session keypair via @ancore/crypto, registers it on-chain via add_session_key,
+ * and persists encrypted secret material plus public store metadata.
  */
 export async function handleRequestSessionKey(
   ctx: ExternalHandlerContext
 ): Promise<RequestSessionKeyResult> {
   const { origin, params, requestId } = ctx;
-  const parsed = requestSessionKeySchema.safeParse(params);
-  if (!parsed.success) {
-    throw new Error(
-      `Invalid session key params: ${parsed.error.issues.map((i) => `${i.path.join('.')}: ${i.message}`).join('; ')}`
-    );
-  }
-  const policy = parsed.data as SessionKeyPolicy;
-  if (policy.expiresAt <= Date.now()) {
-    throw new Error('Session key policy must include a future expiresAt timestamp.');
+  const normalized = normalizeSessionKeyPolicy(params);
+
+  const network = normalized.network || getSettingsState().network || 'testnet';
+  const rpcUrl = SOROBAN_RPC_URLS[network];
+  if (!rpcUrl) {
+    throw new Error(`Unsupported network: ${network}`);
   }
 
-  const { network, smartAccountId } = resolveWalletContext(params);
+  const smartAccountId =
+    normalized.smartAccountId || (await readFromChromeLocal(CONTRACT_ADDRESS_KEY));
+  if (!smartAccountId) {
+    throw new Error('Wallet not set up. Complete onboarding first.');
+  }
+  if (!StrKey.isValidContract(smartAccountId)) {
+    throw new Error('Invalid smart account contract ID.');
+  }
 
   const allowed = await isAllowed(network, smartAccountId, origin);
   if (!allowed) {
@@ -514,13 +729,80 @@ export async function handleRequestSessionKey(
   }
 
   enqueueApproval(requestId, origin, MethodName.REQUEST_SESSION_KEY, params);
-  void openApprovalWindow(requestId, 'request-session-key');
+  await openApprovalWindow(requestId, 'request-session-key');
 
-  const { publicKey } = generateSessionKeyPair();
+  const approval = await waitForApproval(requestId);
+  if (approval === undefined) {
+    throw new Error('Session key request was not approved.');
+  }
+
+  const ownerKeypair = await getSigningKeypair();
+  const seed = new Uint8Array(32);
+  crypto.getRandomValues(seed);
+
+  let publicKey: string;
+  let secretKey: string;
+  try {
+    const sessionKeypair = importFromRawEd25519Seed(seed);
+    publicKey = sessionKeypair.publicKey();
+    secretKey = sessionKeypair.secret();
+  } finally {
+    seed.fill(0);
+  }
+
+  const networkPassphrase = NETWORK_PASSPHRASES[network] ?? NETWORK_PASSPHRASES['testnet'];
+  const rpcServer = new StellarRpc.Server(rpcUrl, { allowHttp: network === 'local' });
+  const accountResponse = await rpcServer.getAccount(ownerKeypair.publicKey());
+  const sourceAccount = new Account(accountResponse.accountId(), accountResponse.sequenceNumber());
+
+  const txBuilder = new AccountTransactionBuilder(sourceAccount, {
+    server: rpcServer,
+    accountContractId: smartAccountId,
+    networkPassphrase,
+  });
+
+  txBuilder.addSessionKey(
+    publicKey,
+    normalized.expiresAtSec,
+    normalized.contractPermissions,
+    normalized.allowedContracts,
+    normalized.maxAmountPerCall,
+    normalized.cumulativeLimit,
+    normalized.spendWindowSeconds
+  );
+
+  const preparedTx = await txBuilder.build();
+  preparedTx.sign(ownerKeypair);
+
+  const sendResponse = await rpcServer.sendTransaction(preparedTx);
+  await confirmSubmittedTransaction(rpcServer, sendResponse);
+
+  const storageManager = getSharedStorageManager();
+  if (
+    storageManager.isUnlocked &&
+    typeof storageManager.getSessionKeys === 'function' &&
+    typeof storageManager.saveSessionKeys === 'function'
+  ) {
+    const existing = (await storageManager.getSessionKeys()) ?? { keys: {} };
+    await storageManager.saveSessionKeys({
+      ...existing,
+      keys: {
+        ...existing.keys,
+        [publicKey]: secretKey,
+      },
+    });
+  }
+
+  useSessionKeyStore.getState().addKey({
+    publicKey,
+    permissions: normalized.uiPermissions,
+    expiresAt: normalized.expiresAtMs,
+    label: origin,
+  });
 
   return {
     publicKey,
-    expiresAt: policy.expiresAt,
+    expiresAt: normalized.expiresAtMs,
   };
 }
 

@@ -407,6 +407,24 @@ chrome.runtime.onMessage.addListener((message: unknown, _sender, sendResponse) =
     sendResponse({ ok: true });
     return true;
   }
+  if (msg.type === 'APPROVE_SESSION_KEY_REQUEST' && msg.requestId) {
+    const pending = getApproval(msg.requestId);
+    if (!pending) {
+      rejectRequest(msg.requestId, new Error('Approval request not found'));
+      sendResponse({ ok: false, error: 'Approval request not found' });
+      return true;
+    }
+    resolveRequest(msg.requestId, { approved: true });
+    removeApproval(msg.requestId);
+    sendResponse({ ok: true });
+    return true;
+  }
+  if (msg.type === 'REJECT_SESSION_KEY_REQUEST' && msg.requestId) {
+    rejectRequest(msg.requestId, new Error('User rejected the session key request'));
+    removeApproval(msg.requestId);
+    sendResponse({ ok: true });
+    return true;
+  }
   return false;
 });
 
