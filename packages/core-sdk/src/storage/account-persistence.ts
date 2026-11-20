@@ -101,11 +101,13 @@ export class AccountPersistence {
     const existingRecord = records[input.id];
     const createdAt = existingRecord?.metadata.createdAt ?? new Date(this.now()).toISOString();
     const updatedAt = new Date(this.now()).toISOString();
+    const nextIndex = Object.keys(records).length + 1;
+    const resolvedLabel = input.label?.trim() || existingRecord?.metadata.label || `Account ${nextIndex}`;
 
     const metadata: AccountMetadata = {
       id: input.id,
       address: input.address,
-      label: input.label ?? existingRecord?.metadata.label,
+      label: resolvedLabel,
       createdAt,
       updatedAt,
     };
