@@ -11,7 +11,7 @@ import { PasswordScreen } from './PasswordScreen';
 import { DeployScreen } from './DeployScreen';
 import { SuccessScreen } from './SuccessScreen';
 
-type FlowMode = 'create' | 'import';
+type FlowMode = 'create' | 'import' | 'passkey';
 
 /**
  * Simple import screen — collects mnemonic + password then hands off to deploy.
