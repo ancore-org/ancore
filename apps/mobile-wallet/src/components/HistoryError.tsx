@@ -1,3 +1,4 @@
+import { Pressable, StyleSheet, Text, View } from 'react-native';
 import type { ErrorKind } from '../screens/history/errorTypes';
 
 type Props = {
@@ -33,37 +34,86 @@ export const HistoryError = ({ kind, message, statusCode, onRetry, isRetrying = 
   const errorInfo = ERROR_MESSAGES[kind];
 
   return (
-    <section
-      className="space-y-4 p-4 bg-red-50 border border-red-200 rounded-lg"
-      role="alert"
-      aria-live="polite"
-    >
-      <div>
-        <h2 className="text-lg font-semibold text-red-900">{errorInfo.title}</h2>
-        <p className="text-sm text-red-700 mt-1">{errorInfo.description}</p>
-      </div>
+    <View accessibilityLiveRegion="polite" accessibilityRole="alert" style={styles.container}>
+      <View>
+        <Text accessibilityRole="header" style={styles.title}>
+          {errorInfo.title}
+        </Text>
+        <Text style={styles.description}>{errorInfo.description}</Text>
+      </View>
 
-      {statusCode && (
-        <p className="text-xs text-red-600">
+      {/* A ternary, not `statusCode && ...`: a status of 0 would render a bare "0" inside a View. */}
+      {statusCode ? (
+        <Text style={styles.status}>
           HTTP {statusCode}
           {statusCode >= 500 ? ' - Server Error' : statusCode >= 400 ? ' - Client Error' : ''}
-        </p>
-      )}
+        </Text>
+      ) : null}
 
-      {kind === 'configuration' && (
-        <div className="bg-red-100 p-3 rounded text-sm text-red-800">
-          <p className="font-mono text-xs break-all">{message}</p>
-        </div>
-      )}
+      {kind === 'configuration' ? (
+        <View style={styles.detail}>
+          <Text style={styles.detailText}>{message}</Text>
+        </View>
+      ) : null}
 
-      <button
-        onClick={onRetry}
+      <Pressable
+        accessibilityLabel={isRetrying ? 'Retrying...' : 'Retry loading transactions'}
+        accessibilityRole="button"
+        accessibilityState={{ disabled: isRetrying }}
         disabled={isRetrying}
-        className="px-4 py-2 bg-red-600 text-white rounded hover:bg-red-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-        aria-label={isRetrying ? 'Retrying...' : 'Retry loading transactions'}
+        onPress={onRetry}
+        style={[styles.button, isRetrying && styles.buttonDisabled]}
       >
-        {isRetrying ? 'Retrying…' : 'Retry'}
-      </button>
-    </section>
+        <Text style={styles.buttonText}>{isRetrying ? 'Retrying…' : 'Retry'}</Text>
+      </Pressable>
+    </View>
   );
 };
+
+const styles = StyleSheet.create({
+  container: {
+    gap: 16,
+    padding: 16,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: '#fecaca',
+    backgroundColor: '#fef2f2',
+  },
+  title: {
+    fontSize: 18,
+    fontWeight: '600',
+    color: '#7f1d1d',
+  },
+  description: {
+    marginTop: 4,
+    fontSize: 14,
+    color: '#b91c1c',
+  },
+  status: {
+    fontSize: 12,
+    color: '#dc2626',
+  },
+  detail: {
+    padding: 12,
+    borderRadius: 4,
+    backgroundColor: '#fee2e2',
+  },
+  detailText: {
+    fontFamily: 'Courier',
+    fontSize: 12,
+    color: '#991b1b',
+  },
+  button: {
+    alignSelf: 'flex-start',
+    paddingVertical: 8,
+    paddingHorizontal: 16,
+    borderRadius: 4,
+    backgroundColor: '#dc2626',
+  },
+  buttonDisabled: {
+    opacity: 0.5,
+  },
+  buttonText: {
+    color: '#ffffff',
+  },
+});
