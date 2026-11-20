@@ -14,7 +14,8 @@ type NamespaceEntry = {
 };
 
 const copyProposalNamespaces = (
-  requiredNamespaces: Record<string, NamespaceEntry>
+  requiredNamespaces: Record<string, NamespaceEntry>,
+  fallbackAccount?: string
 ): Record<
   string,
   { accounts: string[]; methods: string[]; events: string[]; chains: string[] }
@@ -26,7 +27,7 @@ const copyProposalNamespaces = (
 
   for (const [key, namespace] of Object.entries(requiredNamespaces)) {
     approvedNamespaces[key] = {
-      accounts: [],
+      accounts: fallbackAccount ? [fallbackAccount] : [],
       methods: namespace.methods ?? [],
       events: namespace.events ?? [],
       chains: namespace.chains ?? [],

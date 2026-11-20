@@ -37,6 +37,8 @@ function extractAmount(prompt: string): string {
   const stripped = prompt.replace(STELLAR_ADDRESS_RE_G, ' ');
   const nearAsset = stripped.match(AMOUNT_BEFORE_ASSET_RE) ?? stripped.match(AMOUNT_AFTER_ASSET_RE);
   if (nearAsset) return nearAsset[1];
+  const paymentWords = /(?:send|transfer|pay|amount of|for)\s+(\d+(?:\.\d+)?)/i.exec(stripped);
+  if (paymentWords) return paymentWords[1];
   const match = stripped.match(AMOUNT_RE);
   return match ? match[1] : '10';
 }
