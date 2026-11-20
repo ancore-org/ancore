@@ -326,3 +326,230 @@ describe('fetchRemoteAppConfig timeout (#1352)', () => {
     ).rejects.toThrow('DNS lookup failed');
   });
 });
+
+/**
+ * #1618: the timeout has to bound the whole request, and it must never leave a timer
+ * behind. The first version cleared the timer as soon as the response headers arrived, so
+ * a body that stalled after that hung startup indefinitely, and it relied on `fetchFn`
+ * honouring the abort signal.
+ */
+describe('fetchRemoteAppConfig bounds the whole request (#1618)', () => {
+  const URL = 'https://config.example.com/app.json';
+  const validBody = { minimumAppVersion: '1.2.0', maintenanceMode: false };
+
+  const respondingWith = (json: () => Promise<unknown>, ok = true, status = 200): FetchLike =>
+    jest.fn(async () => ({ ok, status, json })) as unknown as FetchLike;
+
+  beforeEach(() => jest.useFakeTimers());
+  afterEach(() => jest.useRealTimers());
+
+  it('uses a 5000ms timeout by default', () => {
+    expect(REMOTE_CONFIG_TIMEOUT_MS).toBe(5_000);
+  });
+
+  describe('a response body that never finishes', () => {
+    const stalledBody = () => respondingWith(() => new Promise<never>(() => undefined));
+
+    it('rejects with a timeout error once the time is up', async () => {
+      const result = fetchRemoteAppConfig(URL, stalledBody(), 5_000);
+      const assertion = expect(result).rejects.toThrow(/timed out after 5000ms/);
+
+      await jest.advanceTimersByTimeAsync(5_000);
+
+      await assertion;
+    });
+
+    it('is still pending just before the timeout', async () => {
+      let settled = false;
+      fetchRemoteAppConfig(URL, stalledBody(), 5_000).then(
+        () => (settled = true),
+        () => (settled = true)
+      );
+
+      await jest.advanceTimersByTimeAsync(4_999);
+
+      expect(settled).toBe(false);
+      await jest.advanceTimersByTimeAsync(1);
+      expect(settled).toBe(true);
+    });
+
+    it('lets the app through at the gate', async () => {
+      const gate = checkAppGate({
+        configUrl: URL,
+        appVersion: '1.0.0',
+        fetchFn: stalledBody(),
+        timeoutMs: 5_000,
+      });
+
+      await jest.advanceTimersByTimeAsync(5_000);
+
+      await expect(gate).resolves.toEqual({ status: 'ok' });
+    });
+  });
+
+  describe('a fetch that ignores the abort signal', () => {
+    const deafFetch = (): FetchLike =>
+      jest.fn(() => new Promise<never>(() => undefined)) as unknown as FetchLike;
+
+    it('still times out', async () => {
+      const assertion = expect(fetchRemoteAppConfig(URL, deafFetch(), 3_000)).rejects.toThrow(
+        /timed out after 3000ms/
+      );
+
+      await jest.advanceTimersByTimeAsync(3_000);
+
+      await assertion;
+    });
+
+    it('lets the app through at the gate', async () => {
+      const gate = checkAppGate({
+        configUrl: URL,
+        appVersion: '1.0.0',
+        fetchFn: deafFetch(),
+        timeoutMs: 3_000,
+      });
+
+      await jest.advanceTimersByTimeAsync(3_000);
+
+      await expect(gate).resolves.toEqual({ status: 'ok' });
+    });
+  });
+
+  describe('the abort signal', () => {
+    it('is aborted when the request times out', async () => {
+      let signal: AbortSignal | undefined;
+      const fetchFn = jest.fn((_url: string, init?: { signal?: AbortSignal }) => {
+        signal = init?.signal;
+        return new Promise<never>(() => undefined);
+      }) as unknown as FetchLike;
+
+      const assertion = expect(fetchRemoteAppConfig(URL, fetchFn, 1_000)).rejects.toThrow();
+      await jest.advanceTimersByTimeAsync(1_000);
+      await assertion;
+
+      expect(signal?.aborted).toBe(true);
+    });
+
+    it('is not aborted when the response arrives in time', async () => {
+      let signal: AbortSignal | undefined;
+      const fetchFn = jest.fn(async (_url: string, init?: { signal?: AbortSignal }) => {
+        signal = init?.signal;
+        return { ok: true, status: 200, json: async () => validBody };
+      }) as unknown as FetchLike;
+
+      await expect(fetchRemoteAppConfig(URL, fetchFn, 1_000)).resolves.toEqual(baseConfig);
+
+      expect(signal?.aborted).toBe(false);
+    });
+  });
+
+  describe('timer cleanup', () => {
+    it('leaves no timer behind after a success', async () => {
+      await fetchRemoteAppConfig(
+        URL,
+        respondingWith(async () => validBody),
+        5_000
+      );
+
+      expect(jest.getTimerCount()).toBe(0);
+    });
+
+    it('leaves no timer behind after a network failure', async () => {
+      const failing = jest.fn(async () => {
+        throw new Error('DNS lookup failed');
+      }) as unknown as FetchLike;
+
+      await expect(fetchRemoteAppConfig(URL, failing, 5_000)).rejects.toThrow('DNS lookup failed');
+
+      expect(jest.getTimerCount()).toBe(0);
+    });
+
+    it('leaves no timer behind after a non-OK response', async () => {
+      await expect(
+        fetchRemoteAppConfig(
+          URL,
+          respondingWith(async () => ({}), false, 503),
+          5_000
+        )
+      ).rejects.toThrow(/status 503/);
+
+      expect(jest.getTimerCount()).toBe(0);
+    });
+
+    it('leaves no timer behind after a malformed payload', async () => {
+      await expect(
+        fetchRemoteAppConfig(
+          URL,
+          respondingWith(async () => ({ nonsense: true })),
+          5_000
+        )
+      ).rejects.toThrow(RemoteConfigError);
+
+      expect(jest.getTimerCount()).toBe(0);
+    });
+
+    it('leaves no timer behind after a timeout', async () => {
+      const assertion = expect(
+        fetchRemoteAppConfig(URL, jest.fn(() => new Promise(() => undefined)) as never, 1_000)
+      ).rejects.toThrow();
+      await jest.advanceTimersByTimeAsync(1_000);
+      await assertion;
+
+      expect(jest.getTimerCount()).toBe(0);
+    });
+
+    it('starts no timer when the gate is bypassed or unconfigured', async () => {
+      await checkAppGate({ configUrl: URL, appVersion: '1.0.0', bypass: true });
+      await checkAppGate({ appVersion: '1.0.0' });
+
+      expect(jest.getTimerCount()).toBe(0);
+    });
+  });
+
+  describe('late settlement after the timeout', () => {
+    it('does not raise an unhandled rejection when the stalled fetch fails afterwards', async () => {
+      const unhandled = jest.fn();
+      process.on('unhandledRejection', unhandled);
+
+      let rejectLate!: (error: Error) => void;
+      const fetchFn = jest.fn(
+        () => new Promise<never>((_resolve, reject) => (rejectLate = reject))
+      ) as unknown as FetchLike;
+
+      const assertion = expect(fetchRemoteAppConfig(URL, fetchFn, 1_000)).rejects.toThrow(
+        /timed out/
+      );
+      await jest.advanceTimersByTimeAsync(1_000);
+      await assertion;
+
+      rejectLate(new Error('socket closed after the timeout'));
+      await jest.advanceTimersByTimeAsync(0);
+      await Promise.resolve();
+
+      process.off('unhandledRejection', unhandled);
+      expect(unhandled).not.toHaveBeenCalled();
+    });
+  });
+
+  it('still returns the parsed config for a response that arrives in time', async () => {
+    await expect(
+      fetchRemoteAppConfig(
+        URL,
+        respondingWith(async () => validBody),
+        5_000
+      )
+    ).resolves.toEqual(baseConfig);
+  });
+
+  it('does not time out a slow body that finishes before the limit', async () => {
+    const slowBody = respondingWith(
+      () => new Promise((resolve) => setTimeout(() => resolve(validBody), 4_000))
+    );
+
+    const result = fetchRemoteAppConfig(URL, slowBody, 5_000);
+    await jest.advanceTimersByTimeAsync(4_000);
+
+    await expect(result).resolves.toEqual(baseConfig);
+    expect(jest.getTimerCount()).toBe(0);
+  });
+});

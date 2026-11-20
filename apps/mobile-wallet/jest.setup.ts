@@ -11,14 +11,22 @@ jest.mock(
   'react-native',
   () => {
     const element = (tag: string, props: Record<string, unknown> = {}) => {
+      // React Native-only props with no DOM equivalent are dropped so they do not
+      // reach the DOM element (and trigger React's unknown-attribute warnings).
       const {
+        accessibilityElementsHidden,
         accessibilityLabel,
+        accessibilityLiveRegion,
         accessibilityRole,
         accessibilityState,
+        accessible: _accessible,
         children,
+        importantForAccessibility: _importantForAccessibility,
         onChangeText,
         onPress,
+        returnKeyType: _returnKeyType,
         style,
+        textContentType: _textContentType,
         ...rest
       } = props;
       const flatStyle = Array.isArray(style)
@@ -30,7 +38,9 @@ jest.mock(
           ...rest,
           style: flatStyle,
           'data-testid': rest.testID ?? rest['data-testid'],
+          'aria-hidden': accessibilityElementsHidden,
           'aria-label': accessibilityLabel,
+          'aria-live': accessibilityLiveRegion,
           'aria-disabled':
             accessibilityState && (accessibilityState as { disabled?: boolean }).disabled,
           onChange: onChangeText
@@ -53,7 +63,29 @@ jest.mock(
       ScrollView: (props: Record<string, unknown>) => element('div', props),
       Text: (props: Record<string, unknown>) =>
         element(props.accessibilityRole === 'header' ? 'h1' : 'span', props),
-      TextInput: (props: Record<string, unknown>) => element('input', props),
+      // Maps the React Native props that change behaviour onto the DOM so tests can
+      // observe them: `editable={false}` disables the field, `onSubmitEditing` fires on
+      // Enter, and `secureTextEntry` is exposed as a data attribute (not `type`, so
+      // role queries for the field keep working).
+      TextInput: (props: Record<string, unknown>) => {
+        const {
+          secureTextEntry,
+          editable,
+          onSubmitEditing,
+          autoCorrect: _autoCorrect,
+          ...inputProps
+        } = props;
+        return element('input', {
+          ...inputProps,
+          'data-secure-text-entry': secureTextEntry ? 'true' : undefined,
+          disabled: editable === false ? true : inputProps.disabled,
+          onKeyDown: onSubmitEditing
+            ? (event: React.KeyboardEvent) => {
+                if (event.key === 'Enter') (onSubmitEditing as (e: unknown) => void)(event);
+              }
+            : inputProps.onKeyDown,
+        });
+      },
       Pressable: (props: Record<string, unknown>) => element('button', props),
       TouchableOpacity: (props: Record<string, unknown>) => element('button', props),
       Modal: (props: Record<string, unknown>) =>

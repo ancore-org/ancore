@@ -202,20 +202,58 @@ describe('HistoryError', () => {
   });
 
   describe('styling', () => {
-    it('applies error styling classes', () => {
-      const { container } = render(
-        <HistoryError kind="network" message="Network error" onRetry={jest.fn()} />
-      );
-
-      const section = container.querySelector('section');
-      expect(section).toHaveClass('bg-red-50', 'border-red-200');
-    });
-
-    it('applies button styling classes', () => {
+    it('styles the container as an error banner with StyleSheet styles', () => {
       render(<HistoryError kind="network" message="Network error" onRetry={jest.fn()} />);
 
-      const button = screen.getByRole('button');
-      expect(button).toHaveClass('bg-red-600', 'text-white');
+      expect(screen.getByRole('alert')).toHaveStyle({
+        backgroundColor: '#fef2f2',
+        borderColor: '#fecaca',
+      });
+    });
+
+    it('styles the retry button, and dims it while retrying', () => {
+      const { rerender } = render(
+        <HistoryError kind="network" message="Network error" onRetry={jest.fn()} />
+      );
+      expect(screen.getByRole('button')).toHaveStyle({ backgroundColor: '#dc2626' });
+      expect(screen.getByRole('button')).not.toHaveStyle({ opacity: 0.5 });
+
+      rerender(
+        <HistoryError kind="network" message="Network error" onRetry={jest.fn()} isRetrying />
+      );
+      expect(screen.getByRole('button')).toHaveStyle({ opacity: 0.5 });
+    });
+  });
+
+  describe('native rendering', () => {
+    it('renders no HTML-only text such as a bare 0 when the status code is 0', () => {
+      const { container } = render(
+        <HistoryError kind="network" message="offline" statusCode={0} onRetry={jest.fn()} />
+      );
+
+      expect(screen.queryByText(/HTTP/)).not.toBeInTheDocument();
+      expect(container.textContent).not.toMatch(/(^|[^\d])0([^\d]|$)/);
+    });
+
+    it('keeps the raw message out of the UI for non-configuration errors', () => {
+      render(<HistoryError kind="server" message="secret-internal-detail" onRetry={jest.fn()} />);
+
+      expect(screen.queryByText('secret-internal-detail')).not.toBeInTheDocument();
+    });
+
+    it('marks the retry button as disabled for assistive technology while retrying', () => {
+      render(<HistoryError kind="network" message="x" onRetry={jest.fn()} isRetrying />);
+
+      expect(screen.getByRole('button')).toHaveAttribute('aria-disabled', 'true');
+    });
+
+    it('does not call onRetry while a retry is already in progress', () => {
+      const onRetry = jest.fn();
+      render(<HistoryError kind="network" message="x" onRetry={onRetry} isRetrying />);
+
+      screen.getByRole('button').click();
+
+      expect(onRetry).not.toHaveBeenCalled();
     });
   });
 });
