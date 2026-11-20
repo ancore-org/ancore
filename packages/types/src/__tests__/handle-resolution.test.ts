@@ -38,12 +38,13 @@ describe('normalizeUsernameHandle', () => {
     expect(normalizeUsernameHandle('@alice')).toBe('@alice');
   });
 
-  it('returns null instead of branding invalid raw strings', () => {
-    expect(normalizeUsernameHandle('  !!!not-valid  ')).toBeNull();
-    expect(normalizeUsernameHandle('no-at-sign')).toBeNull();
-    expect(normalizeUsernameHandle('@bad space')).toBeNull();
-    expect(normalizeUsernameHandle('@')).toBeNull();
-    expect(normalizeUsernameHandle(`@${'a'.repeat(32)}`)).toBeNull();
+  it('throws a descriptive error instead of branding invalid raw strings', () => {
+    expect(() => normalizeUsernameHandle('')).toThrow(/Invalid username handle/);
+    expect(() => normalizeUsernameHandle('  !!!not-valid  ')).toThrow(/Invalid username handle/);
+    expect(() => normalizeUsernameHandle('no-at-sign')).toThrow(/Invalid username handle/);
+    expect(() => normalizeUsernameHandle('@bad space')).toThrow(/Invalid username handle/);
+    expect(() => normalizeUsernameHandle('@')).toThrow(/Invalid username handle/);
+    expect(() => normalizeUsernameHandle(`@${'a'.repeat(32)}`)).toThrow(/Invalid username handle/);
   });
 
   it('round-trips branded input as a non-null UsernameHandle', () => {
