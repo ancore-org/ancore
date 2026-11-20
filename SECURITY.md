@@ -175,7 +175,10 @@ The following components undergo rigorous security review:
 
 ### Disclosure Process
 
-1. **Report**: Contact us via Telegram at [Ancore TG](https://t.me/+OqlAx-gQx3M4YzJk) with:
+1. **Report**:
+   - **Private Vulnerability Reporting**: If enabled on GitHub, submit directly via [Private Vulnerability Reporting](https://github.com/ancore-org/ancore/security/advisories/new) (recommended).
+   - **Direct Email**: Send encrypted details directly to `security@ancore.org`.
+   - **Telegram**: Contact core maintainers via Telegram at [Ancore TG](https://t.me/+OqlAx-gQx3M4YzJk) with:
    - Description of the vulnerability
    - Steps to reproduce
    - Potential impact
