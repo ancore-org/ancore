@@ -7,7 +7,7 @@ export type UsernameHandle = string & { readonly __brand: 'UsernameHandle' };
 export const usernameHandleSchema = z
   .string()
   .trim()
-  .regex(/^[a-zA-Z0-9][a-zA-Z0-9_.-]{0,30}$/, {
+  .regex(/^@?[a-zA-Z0-9][a-zA-Z0-9_.-]{0,30}$/, {
     message: 'Enter a valid @username handle',
   });
 
@@ -51,12 +51,13 @@ export function isUsernameHandle(value: string): value is UsernameHandle {
  * Throws a descriptive error instead of allowing invalid input to be branded.
  */
 export function validateUsernameHandle(value: string): UsernameHandle {
-  const result = usernameHandleSchema.safeParse(value);
+  const normalized = value.trim().replace(/^@/, '').toLowerCase();
+  const result = usernameHandleSchema.safeParse(normalized);
   if (!result.success) {
     const detail = result.error.issues[0]?.message ?? 'Invalid username handle';
     throw new Error(`Invalid username handle "${value}": ${detail}`);
   }
-  return result.data as UsernameHandle;
+  return result.data.replace(/^@/, '') as UsernameHandle;
 }
 
 /**
