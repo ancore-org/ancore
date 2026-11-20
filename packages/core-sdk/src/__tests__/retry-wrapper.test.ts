@@ -1,4 +1,3 @@
-import { describe, expect, test, vi } from 'vitest';
 import {
   wrapWithRetry,
   wrapObjectWithRetry,
@@ -8,6 +7,7 @@ import {
   RELIABLE,
   AGGRESSIVE,
 } from '../retry-wrapper';
+import { describe, expect, test } from '@jest/globals';
 
 describe('retry-wrapper', () => {
   describe('withRetry re-export', () => {
@@ -32,7 +32,7 @@ describe('retry-wrapper', () => {
     });
 
     test('uses preset name as option', async () => {
-      const fn = vi.fn().mockResolvedValue('ok');
+      const fn = jest.fn().mockResolvedValue('ok');
       const wrapped = wrapWithRetry(fn, 'LOW_LATENCY');
       const result = await wrapped();
       expect(result).toBe('ok');
@@ -68,7 +68,9 @@ describe('retry-wrapper', () => {
     test('preserves non-function properties', () => {
       const obj = {
         value: 42,
-        async method() { return 'ok'; },
+        async method() {
+          return 'ok';
+        },
       };
       const wrapped = wrapObjectWithRetry(obj, { maxRetries: 1 });
       expect(wrapped.value).toBe(42);

@@ -32,10 +32,21 @@ Comprehensive health check with dependency probing.
     "signatureService": {
       "status": "ok",
       "latencyMs": 10
+    },
+    "database": {
+      "status": "healthy",
+      "latencyMs": 3
     }
   }
 }
 ```
+
+The top-level `status` is `"ok"` or `"degraded"`. The `database` entry is only present when the
+relayer runs with a PostgreSQL pool, and it uses its own vocabulary: `"healthy"` or `"unhealthy"`
+(with a `message` on failure). The probe runs `SELECT 1` and times out after 2000 ms.
+
+`/health` is exempt from the global per-IP rate limiter (see
+[Rate Limiting](../README.md#rate-limiting)), so orchestrator probes are never throttled.
 
 ### GET /relay/status
 
@@ -59,6 +70,7 @@ The service is considered unhealthy if **any** of these are degraded:
 - `rpc`: Soroban RPC endpoint for transaction submission
 - `storage`: Idempotency store
 - `signatureService`: Signature verification backend (KMS)
+- `database`: PostgreSQL connectivity (only when a database pool is configured)
 
 ## Signature Service Health
 

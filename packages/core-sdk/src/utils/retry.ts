@@ -44,7 +44,7 @@ export interface RetryOptions {
    * Custom predicate to determine whether an error should trigger a retry.
    * If not provided, defaults to {@link isTransientNetworkError}.
    */
-  isRetryable?: (error: unknown) => boolean;
+  isRetryable?: (error: any) => boolean;
 
   /**
    * Optional callback invoked before each retry attempt with attempt number, error, and sleep delay.
@@ -90,6 +90,8 @@ const TRANSIENT_MESSAGE_PATTERNS = [
   /service unavailable/i,
   /gateway timeout/i,
   /bad gateway/i,
+  /transient/i,
+  /retry/i,
   /\b50[0234]\b/,
 ];
 
@@ -243,14 +245,14 @@ export async function withRetry<T>(fn: () => Promise<T>, options: RetryOptions =
     } catch (error) {
       lastError = error;
 
-      // Exhausted all retries -> break and throw
-      if (attempt >= maxRetries) {
-        break;
-      }
-
       // Check if error qualifies for retry
       if (!isRetryable(error)) {
         throw error;
+      }
+
+      // Exhausted all retries -> break and throw
+      if (attempt >= maxRetries) {
+        break;
       }
 
       // Compute backoff delay

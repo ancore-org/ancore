@@ -92,101 +92,111 @@ const urlString = (defaultValue: string) =>
 
 // ── Schema ───────────────────────────────────────────────────────────────────
 
-export const relayerEnvSchema = z.object({
-  // Runtime
-  /** Node runtime mode. Only `production` changes relayer behaviour (auth guard). */
-  NODE_ENV: z.preprocess(emptyToUndefined, z.string().min(1).default('development')),
-  /** HTTP listen port. */
-  PORT: intInRange(BOUNDS.PORT.min, BOUNDS.PORT.max, DEFAULT_PORT),
+export const relayerEnvSchema = z
+  .object({
+    // Runtime
+    /** Node runtime mode. Only `production` changes relayer behaviour (auth guard). */
+    NODE_ENV: z.preprocess(emptyToUndefined, z.string().min(1).default('development')),
+    /** HTTP listen port. */
+    PORT: intInRange(BOUNDS.PORT.min, BOUNDS.PORT.max, DEFAULT_PORT),
 
-  // Auth and CORS
-  /** Bearer token secret for protected `/relay` routes. Required in production. */
-  RELAYER_AUTH_SECRET: z.preprocess(
-    emptyToUndefined,
-    z.string().min(1, 'must not be empty').optional()
-  ),
-  /**
-   * Comma-separated CORS allowlist. Unset means `'*'` (any origin), which is
-   * the express `cors` wildcard and must not be used in production.
-   */
-  ALLOWED_ORIGINS: rawString
-    .transform((raw): string[] | '*' => {
-      if (raw === undefined) return '*';
-      return raw
-        .split(',')
-        .map((origin) => origin.trim())
-        .filter((origin) => origin.length > 0);
-    })
-    .refine(
-      (value) => value === '*' || value.length > 0,
-      'must list at least one origin, e.g. "http://localhost:5173,https://app.example.com"'
+    // Auth and CORS
+    /** Bearer token secret for protected `/relay` routes. Required in production. */
+    RELAYER_AUTH_SECRET: z.preprocess(
+      emptyToUndefined,
+      z.string().min(1, 'must not be empty').optional()
+    ),
+    /**
+     * Comma-separated CORS allowlist. Unset means `'*'` (any origin), which is
+     * the express `cors` wildcard and must not be used in production.
+     */
+    ALLOWED_ORIGINS: rawString
+      .transform((raw): string[] | '*' => {
+        if (raw === undefined) return '*';
+        return raw
+          .split(',')
+          .map((origin) => origin.trim())
+          .filter((origin) => origin.length > 0);
+      })
+      .refine(
+        (value) => value === '*' || value.length > 0,
+        'must list at least one origin, e.g. "http://localhost:5173,https://app.example.com"'
+      ),
+
+    // Stellar network
+    /** Network preset used by the transaction submitter. */
+    STELLAR_NETWORK: z.preprocess(
+      emptyToUndefined,
+      z.enum(['testnet', 'mainnet', 'futurenet', 'local']).default('testnet')
+    ),
+    /** Overrides the passphrase derived from `STELLAR_NETWORK`. */
+    STELLAR_NETWORK_PASSPHRASE: z.preprocess(
+      emptyToUndefined,
+      z.string().min(1, 'must not be empty').optional()
+    ),
+    /** Soroban RPC endpoint used for on-chain session-key lookups. */
+    RPC_URL: urlString(DEFAULT_RPC_URL),
+    /** Passphrase used for on-chain session-key lookups. */
+    NETWORK_PASSPHRASE: z.preprocess(
+      emptyToUndefined,
+      z.string().min(1, 'must not be empty').default(DEFAULT_NETWORK_PASSPHRASE)
     ),
 
-  // Stellar network
-  /** Network preset used by the transaction submitter. */
-  STELLAR_NETWORK: z.preprocess(
-    emptyToUndefined,
-    z.enum(['testnet', 'mainnet', 'futurenet', 'local']).default('testnet')
-  ),
-  /** Overrides the passphrase derived from `STELLAR_NETWORK`. */
-  STELLAR_NETWORK_PASSPHRASE: z.preprocess(
-    emptyToUndefined,
-    z.string().min(1, 'must not be empty').optional()
-  ),
-  /** Soroban RPC endpoint used for on-chain session-key lookups. */
-  RPC_URL: urlString(DEFAULT_RPC_URL),
-  /** Passphrase used for on-chain session-key lookups. */
-  NETWORK_PASSPHRASE: z.preprocess(
-    emptyToUndefined,
-    z.string().min(1, 'must not be empty').default(DEFAULT_NETWORK_PASSPHRASE)
-  ),
+    // Database
+    /** PostgreSQL database URL for persistent stores (JobQueue, IdempotencyStore, NonceStore, ScheduledTransfers). Required in production. */
+    DATABASE_URL: z.preprocess(emptyToUndefined, z.string().min(1, 'must not be empty').optional()),
 
-  // Database
-  /** PostgreSQL database URL for persistent stores (JobQueue, IdempotencyStore, NonceStore, ScheduledTransfers). Required in production. */
-  DATABASE_URL: z.preprocess(emptyToUndefined, z.string().min(1, 'must not be empty').optional()),
+    // Limits and timers
+    /** Per-caller/IP requests per 15-minute window on `/relay/*`. */
+    RELAY_RATE_LIMIT_MAX: intInRange(
+      BOUNDS.RELAY_RATE_LIMIT_MAX.min,
+      BOUNDS.RELAY_RATE_LIMIT_MAX.max,
+      DEFAULT_RELAY_RATE_LIMIT_MAX
+    ),
+    /** Per-IP requests per 15-minute window on `/relay/status`. */
+    STATUS_RATE_LIMIT_MAX: intInRange(
+      BOUNDS.STATUS_RATE_LIMIT_MAX.min,
+      BOUNDS.STATUS_RATE_LIMIT_MAX.max,
+      DEFAULT_STATUS_RATE_LIMIT_MAX
+    ),
+    /** Per-account requests per minute on `/relay/execute`. */
+    RELAY_RATE_LIMIT_RPM: intInRange(
+      BOUNDS.RELAY_RATE_LIMIT_RPM.min,
+      BOUNDS.RELAY_RATE_LIMIT_RPM.max,
+      DEFAULT_RELAY_RATE_LIMIT_RPM
+    ),
+    /** Request bodies above this are rejected before JSON parsing. */
+    RELAY_MAX_PAYLOAD_BYTES: intInRange(
+      BOUNDS.RELAY_MAX_PAYLOAD_BYTES.min,
+      BOUNDS.RELAY_MAX_PAYLOAD_BYTES.max,
+      DEFAULT_RELAY_MAX_PAYLOAD_BYTES
+    ),
+    /** Scheduled-transfer engine poll interval. */
+    SCHEDULER_POLL_INTERVAL_MS: intInRange(
+      BOUNDS.SCHEDULER_POLL_INTERVAL_MS.min,
+      BOUNDS.SCHEDULER_POLL_INTERVAL_MS.max,
+      DEFAULT_SCHEDULER_POLL_INTERVAL_MS
+    ),
+    /** Timeout for the signature-service health probe. */
+    SIGNATURE_SERVICE_HEALTH_TIMEOUT_MS: intInRange(
+      BOUNDS.SIGNATURE_SERVICE_HEALTH_TIMEOUT_MS.min,
+      BOUNDS.SIGNATURE_SERVICE_HEALTH_TIMEOUT_MS.max,
+      DEFAULT_SIGNATURE_SERVICE_HEALTH_TIMEOUT_MS
+    ),
 
-  // Limits and timers
-  /** Per-caller/IP requests per 15-minute window on `/relay/*`. */
-  RELAY_RATE_LIMIT_MAX: intInRange(
-    BOUNDS.RELAY_RATE_LIMIT_MAX.min,
-    BOUNDS.RELAY_RATE_LIMIT_MAX.max,
-    DEFAULT_RELAY_RATE_LIMIT_MAX
-  ),
-  /** Per-IP requests per 15-minute window on `/relay/status`. */
-  STATUS_RATE_LIMIT_MAX: intInRange(
-    BOUNDS.STATUS_RATE_LIMIT_MAX.min,
-    BOUNDS.STATUS_RATE_LIMIT_MAX.max,
-    DEFAULT_STATUS_RATE_LIMIT_MAX
-  ),
-  /** Per-account requests per minute on `/relay/execute`. */
-  RELAY_RATE_LIMIT_RPM: intInRange(
-    BOUNDS.RELAY_RATE_LIMIT_RPM.min,
-    BOUNDS.RELAY_RATE_LIMIT_RPM.max,
-    DEFAULT_RELAY_RATE_LIMIT_RPM
-  ),
-  /** Request bodies above this are rejected before JSON parsing. */
-  RELAY_MAX_PAYLOAD_BYTES: intInRange(
-    BOUNDS.RELAY_MAX_PAYLOAD_BYTES.min,
-    BOUNDS.RELAY_MAX_PAYLOAD_BYTES.max,
-    DEFAULT_RELAY_MAX_PAYLOAD_BYTES
-  ),
-  /** Scheduled-transfer engine poll interval. */
-  SCHEDULER_POLL_INTERVAL_MS: intInRange(
-    BOUNDS.SCHEDULER_POLL_INTERVAL_MS.min,
-    BOUNDS.SCHEDULER_POLL_INTERVAL_MS.max,
-    DEFAULT_SCHEDULER_POLL_INTERVAL_MS
-  ),
-  /** Timeout for the signature-service health probe. */
-  SIGNATURE_SERVICE_HEALTH_TIMEOUT_MS: intInRange(
-    BOUNDS.SIGNATURE_SERVICE_HEALTH_TIMEOUT_MS.min,
-    BOUNDS.SIGNATURE_SERVICE_HEALTH_TIMEOUT_MS.max,
-    DEFAULT_SIGNATURE_SERVICE_HEALTH_TIMEOUT_MS
-  ),
-
-  // Dev-only flags
-  /** Skips Stellar entirely and returns a synthetic transaction id. Never enable in production. */
-  RELAYER_USE_MOCK_SUBMISSION: boolFlag(false),
-});
+    // Dev-only flags
+    /** Skips Stellar entirely and returns a synthetic transaction id. Never enable in production. */
+    RELAYER_USE_MOCK_SUBMISSION: boolFlag(false),
+  })
+  .superRefine((env, ctx) => {
+    if (env.NODE_ENV === 'production' && env.RELAYER_USE_MOCK_SUBMISSION) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ['RELAYER_USE_MOCK_SUBMISSION'],
+        message: 'must not be enabled when NODE_ENV is "production"',
+      });
+    }
+  });
 
 export type RelayerEnv = z.infer<typeof relayerEnvSchema>;
 

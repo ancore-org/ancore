@@ -104,4 +104,29 @@ describe('SessionKeyRow', () => {
     expect(screen.getByTestId('session-key-row')).toHaveAttribute('data-status', 'expired');
     expect(screen.getByTestId('expiry-countdown-label')).toHaveTextContent('Expired');
   });
+  it('shows a green relative expiry badge for keys expiring in over a day', () => {
+    renderRow({}, { expiresAt: Date.now() + 3 * 86_400_000 + 60_000 });
+    const badge = screen.getByTestId('expiry-badge');
+    expect(badge).toHaveTextContent('Expires in 3d');
+    expect(badge).toHaveAttribute('data-tone', 'green');
+  });
+
+  it('shows an amber relative expiry badge for keys expiring within 2 hours', () => {
+    renderRow({}, { expiresAt: Date.now() + 45 * 60_000 + 5_000 });
+    const badge = screen.getByTestId('expiry-badge');
+    expect(badge).toHaveTextContent('Expires in 45m');
+    expect(badge).toHaveAttribute('data-tone', 'amber');
+  });
+
+  it('shows a red expired badge for expired keys', () => {
+    renderRow({}, { expiresAt: Date.now() - 60_000 });
+    const badge = screen.getByTestId('expiry-badge');
+    expect(badge).toHaveTextContent('Expired');
+    expect(badge).toHaveAttribute('data-tone', 'red');
+  });
+
+  it('omits the expiry badge for revoked keys', () => {
+    renderRow({}, { expiresAt: 0 });
+    expect(screen.queryByTestId('expiry-badge')).not.toBeInTheDocument();
+  });
 });

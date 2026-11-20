@@ -1,4 +1,5 @@
 import { RelayService } from '../../src/services/relayService';
+import { createHealthHandler } from '../../src/routes/health';
 import type { SignatureServiceContract, TransactionSubmitterContract } from '../../src/types';
 import { IdempotencyStore } from '../../src/store/idempotency';
 import { JobQueue } from '../../src/queue/JobQueue';
@@ -178,4 +179,133 @@ describe('RelayService health check with signature service', () => {
       expect(health.uptime).toBeGreaterThanOrEqual(0);
     });
   });
+});
+
+describe('createHealthHandler database health probe', () => {
+  it('returns 200 and healthy database status when query succeeds', async () => {
+    const mockRelayService = {
+      health: () => ({
+        status: 'ok',
+        uptime: 100,
+        timestamp: new Date().toISOString(),
+        dependencies: {
+          queue: { status: 'ok' },
+          storage: { status: 'ok' },
+          rpc: { status: 'ok' },
+        },
+      }),
+      checkRpcHealth: jest.fn().mockResolvedValue({ status: 'ok' }),
+      checkSignatureServiceHealth: jest.fn().mockResolvedValue({ status: 'ok' }),
+    } as any;
+
+    const mockPool = {
+      query: jest.fn().mockResolvedValue({ rows: [{ '?column?': 1 }] }),
+    } as any;
+
+    const handler = createHealthHandler(mockRelayService, mockPool);
+    const req = {} as any;
+    let statusCode: number | undefined;
+    let jsonBody: any;
+    const res = {
+      status: (code: number) => {
+        statusCode = code;
+        return res;
+      },
+      json: (data: any) => {
+        jsonBody = data;
+      },
+    } as any;
+
+    await handler(req, res);
+
+    expect(mockPool.query).toHaveBeenCalledWith('SELECT 1');
+    expect(statusCode).toBe(200);
+    expect(jsonBody.status).toBe('ok');
+    expect(jsonBody.dependencies.database.status).toBe('healthy');
+    expect(jsonBody.dependencies.database.latencyMs).toBeGreaterThanOrEqual(0);
+  });
+
+  it('returns 503 and unhealthy database status when query fails', async () => {
+    const mockRelayService = {
+      health: () => ({
+        status: 'ok',
+        uptime: 100,
+        timestamp: new Date().toISOString(),
+        dependencies: {
+          queue: { status: 'ok' },
+          storage: { status: 'ok' },
+          rpc: { status: 'ok' },
+        },
+      }),
+      checkRpcHealth: jest.fn().mockResolvedValue({ status: 'ok' }),
+      checkSignatureServiceHealth: jest.fn().mockResolvedValue({ status: 'ok' }),
+    } as any;
+
+    const mockPool = {
+      query: jest.fn().mockRejectedValue(new Error('Connection refused')),
+    } as any;
+
+    const handler = createHealthHandler(mockRelayService, mockPool);
+    const req = {} as any;
+    let statusCode: number | undefined;
+    let jsonBody: any;
+    const res = {
+      status: (code: number) => {
+        statusCode = code;
+        return res;
+      },
+      json: (data: any) => {
+        jsonBody = data;
+      },
+    } as any;
+
+    await handler(req, res);
+
+    expect(statusCode).toBe(503);
+    expect(jsonBody.status).toBe('degraded');
+    expect(jsonBody.dependencies.database.status).toBe('unhealthy');
+    expect(jsonBody.dependencies.database.message).toContain('Connection refused');
+  });
+
+  it('returns 503 and unhealthy database status when query times out', async () => {
+    const mockRelayService = {
+      health: () => ({
+        status: 'ok',
+        uptime: 100,
+        timestamp: new Date().toISOString(),
+        dependencies: {
+          queue: { status: 'ok' },
+          storage: { status: 'ok' },
+          rpc: { status: 'ok' },
+        },
+      }),
+      checkRpcHealth: jest.fn().mockResolvedValue({ status: 'ok' }),
+      checkSignatureServiceHealth: jest.fn().mockResolvedValue({ status: 'ok' }),
+    } as any;
+
+    const mockPool = {
+      query: jest.fn().mockImplementation(() => new Promise(() => {})),
+    } as any;
+
+    const handler = createHealthHandler(mockRelayService, mockPool);
+    const req = {} as any;
+    let statusCode: number | undefined;
+    let jsonBody: any;
+    const res = {
+      status: (code: number) => {
+        statusCode = code;
+        return res;
+      },
+      json: (data: any) => {
+        jsonBody = data;
+      },
+    } as any;
+
+    await handler(req, res);
+
+    expect(statusCode).toBe(503);
+    expect(jsonBody.status).toBe('degraded');
+    expect(jsonBody.dependencies.database.status).toBe('unhealthy');
+    expect(jsonBody.dependencies.database.message).toContain('timed out');
+  }, 5000);
 });

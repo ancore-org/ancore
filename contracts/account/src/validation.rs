@@ -143,6 +143,30 @@ pub fn allowlist_permits_address(
     }
 }
 
+/// Strkey of the all-zero Ed25519 account.
+pub const ZERO_ACCOUNT_STRKEY: &str = "GAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAWHF";
+
+/// Strkey of the all-zero contract id.
+pub const ZERO_CONTRACT_STRKEY: &str = "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAABSC4";
+
+/// Reject an empty strkey or the uninitialized all-zero account/contract address.
+pub fn validate_allowed_contract_address(strkey: &str) -> Result<(), ContractError> {
+    if strkey.is_empty() || strkey == ZERO_ACCOUNT_STRKEY || strkey == ZERO_CONTRACT_STRKEY {
+        return Err(ContractError::InsufficientPermission);
+    }
+    Ok(())
+}
+
+/// Reject any empty or zero address in an allowlist.
+pub fn validate_allowed_contract_addresses<'a>(
+    strkeys: impl IntoIterator<Item = &'a str>,
+) -> Result<(), ContractError> {
+    for strkey in strkeys {
+        validate_allowed_contract_address(strkey)?;
+    }
+    Ok(())
+}
+
 /// Expiration must be non-zero and strictly after `now` (seconds).
 pub fn validate_expiry(expires_at_secs: u64, now: u64) -> Result<(), ContractError> {
     if expires_at_secs == 0 {
@@ -201,5 +225,30 @@ mod tests {
         assert!(!session_key_is_expired(9, 10));
         assert!(validate_expiry(11, 10).is_ok());
         assert!(validate_expiry(10, 10).is_err());
+    }
+
+    #[test]
+    fn allowed_contract_addresses_reject_empty_and_zero() {
+        assert_eq!(
+            validate_allowed_contract_address(""),
+            Err(ContractError::InsufficientPermission)
+        );
+        assert_eq!(
+            validate_allowed_contract_address(ZERO_ACCOUNT_STRKEY),
+            Err(ContractError::InsufficientPermission)
+        );
+        assert_eq!(
+            validate_allowed_contract_address(ZERO_CONTRACT_STRKEY),
+            Err(ContractError::InsufficientPermission)
+        );
+        assert!(validate_allowed_contract_addresses([
+            "",
+            "CDLZFC3SYJYDZT7K67VZ75HPJVIEUVNIXF47ZG2FB2RMQQVU2HHGCYSC",
+        ])
+        .is_err());
+        assert!(validate_allowed_contract_address(
+            "CDLZFC3SYJYDZT7K67VZ75HPJVIEUVNIXF47ZG2FB2RMQQVU2HHGCYSC"
+        )
+        .is_ok());
     }
 }

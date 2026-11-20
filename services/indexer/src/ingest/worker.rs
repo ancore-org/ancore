@@ -233,6 +233,7 @@ where
             stats.dead_lettered = count;
         }
 
+        let commit_started = std::time::Instant::now();
         if !canonical.is_empty() {
             self.sink
                 .persist(&canonical)
@@ -251,6 +252,9 @@ where
                 })
                 .await
                 .context("save checkpoint")?;
+
+            let commit_duration = commit_started.elapsed().as_secs_f64();
+            metrics::record_checkpoint_ingest_duration(commit_duration);
 
             info!(
                 stream = %self.config.stream,

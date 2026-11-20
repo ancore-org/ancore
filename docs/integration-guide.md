@@ -13,10 +13,15 @@ This document contains two main sections:
 Integrating Ancore into your Stellar/Soroban dApp is designed to be as close to Freighter as possible, but with additional features for Account Abstraction (AA) and session keys.
 
 ### 1. Installation
-Install the Ancore wallet API wrapper:
+Install the wallet API and the packages used to build the Soroban transaction:
 ```bash
-npm install @ancore/wallet-api
+npm install @ancore/wallet-api @ancore/core-sdk @stellar/stellar-sdk
 ```
+
+The complete [TypeScript connect and sign example](examples/dapp-connect.ts) checks the connection,
+connects when needed, builds and simulates a session-key revocation transaction, and handles a rejected
+approval. It prompts for an existing session-key G-address and targets Testnet; the wallet's smart
+account must be initialized there with a funded owner account and that session key.
 
 ### 2. Connect Wallet
 Request permission to connect and retrieve the user's smart account address:
@@ -40,11 +45,13 @@ import { Networks } from '@stellar/stellar-sdk';
 import { signTransaction } from '@ancore/wallet-api';
 
 try {
-  const signedXdr = await signTransaction({
+  const { signedXdr, txHash } = await signTransaction({
     xdr: 'AAAAAgAAAAD...',
     networkPassphrase: Networks.TESTNET,
+    // submitViaRelayer: true, // optional: submit through the relayer after signing
   });
   console.log("Signed transaction XDR:", signedXdr);
+  console.log("Transaction hash (set when submitted):", txHash);
 } catch (error) {
   console.error("Signing rejected by user", error);
 }
@@ -77,6 +84,7 @@ try {
   });
   
   console.log("Active Session Key Public Key:", session.publicKey);
+  console.log("Expires at (Unix ms):", session.expiresAt);
 } catch (error) {
   console.error("Session key request denied", error);
 }
@@ -91,9 +99,9 @@ For Soroban-based smart contract authorization, use the SEP-43 signature delegat
 ```javascript
 import { signAuthEntry } from '@ancore/wallet-api';
 
-const signedEntry = await signAuthEntry({
-  entry: authEntryXdr,
-  network: 'TESTNET',
+const { signedAuthEntry } = await signAuthEntry({
+  authEntryXdr,
+  networkPassphrase: Networks.TESTNET,
 });
 ```
 

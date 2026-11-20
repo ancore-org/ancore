@@ -132,7 +132,12 @@ export function isInsufficientFee(
   if (typeof error === 'string') {
     parts.push(error);
   } else if (typeof error === 'object') {
-    const candidate = error as { code?: unknown; name?: unknown; message?: unknown; data?: unknown };
+    const candidate = error as {
+      code?: unknown;
+      name?: unknown;
+      message?: unknown;
+      data?: unknown;
+    };
     if (typeof candidate.code === 'string') parts.push(candidate.code);
     if (typeof candidate.name === 'string') parts.push(candidate.name);
     if (typeof candidate.message === 'string') parts.push(candidate.message);
@@ -194,6 +199,31 @@ export function isContractNotFoundError(
     (message.includes('hosterror') && message.includes('missingvalue')) ||
     /contract (was )?not found|missing contract|contract_not_found|contract_missing/.test(message)
   );
+}
+
+/** Alias for isInvalidSignatureError */
+export const isInvalidSignature = isInvalidSignatureError;
+
+/** True when a request encountered a network error or connection failure. */
+export function isNetworkError(
+  error: unknown
+): error is ErrorWithCode<
+  'NETWORK_ERROR' | 'NETWORK_TIMEOUT' | 'ETIMEDOUT' | 'ECONNABORTED' | 'ECONNREFUSED'
+> {
+  return hasErrorCode(error, [
+    'NETWORK_ERROR',
+    'NETWORK_TIMEOUT',
+    'ETIMEDOUT',
+    'ECONNABORTED',
+    'ECONNREFUSED',
+  ] as const);
+}
+
+/** True when a smart contract invocation fails or reverts. */
+export function isContractFailed(
+  error: unknown
+): error is ErrorWithCode<'CONTRACT_FAILED' | 'CONTRACT_ERROR' | 'CONTRACT_NOT_FOUND'> {
+  return hasErrorCode(error, ['CONTRACT_FAILED', 'CONTRACT_ERROR', 'CONTRACT_NOT_FOUND'] as const);
 }
 
 // ---------------------------------------------------------------------------

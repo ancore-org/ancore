@@ -42,6 +42,17 @@ Install the required workspace packages and Stellar SDK:
 pnpm add @ancore/core-sdk @ancore/account-abstraction @ancore/types @stellar/stellar-sdk
 ```
 
+Every symbol the examples use, and where it is exported from:
+
+| Symbol | Package | Role in the examples |
+| --- | --- | --- |
+| `AncoreClient` | `@ancore/core-sdk` | Builds `add_session_key` / `revoke_session_key` invocations and holds the contract ID |
+| `createSmartAccount` | `@ancore/core-sdk` | Creates a client from an owner key or contract ID, deriving the contract ID when needed |
+| `AccountTransactionBuilder` | `@ancore/core-sdk` | Chainable transaction builder that simulates and assembles the batch |
+| `AccountContract` | `@ancore/account-abstraction` | Low-level invocation and read helpers (`buildInvokeOperation`, `getSessionKey`) |
+| `SessionPermission` | `@ancore/types` | Permission enum stored on each session key |
+| `Account`, `Keypair`, `Networks`, `rpc`, `TransactionBuilder` | `@stellar/stellar-sdk` | Key material, network config, RPC submission and raw transaction assembly |
+
 ---
 
 ## 1. Generating Multiple Scoped Session Keys
@@ -242,7 +253,7 @@ You can combine different session key lifecycle operations in a single atomic tr
 - Revoke an old or compromised session key (`revoke_session_key`)
 
 ```typescript
-import { AncoreClient, AccountTransactionBuilder } from '@ancore/core-sdk';
+import { createSmartAccount, AccountTransactionBuilder } from '@ancore/core-sdk';
 import { Account, Keypair, Networks, rpc } from '@stellar/stellar-sdk';
 import { SessionPermission } from '@ancore/types';
 
@@ -250,11 +261,12 @@ async function atomicKeyRotation(
   ownerKeypair: Keypair,
   contractId: string,
   newSessionKeyPub: string,
-  activeSessionKeyPub: string,
   oldSessionKeyPub: string,
   rpcServer: rpc.Server
 ) {
-  const client = AncoreClient.createSmartAccount(ownerKeypair.publicKey(), {
+  // `createSmartAccount` derives the contract ID from the owner key when one
+  // is not supplied, so the helper works before the account is deployed.
+  const client = createSmartAccount(ownerKeypair.publicKey(), {
     accountContractId: contractId,
   });
 

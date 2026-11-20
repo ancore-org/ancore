@@ -38,6 +38,7 @@
   },
   "dependencies": {
     "@ancore/types": "workspace:*",
+    "@ancore/wallet-shared": "workspace:*",
     "@ancore/account-abstraction": "workspace:*",
     "@ancore/crypto": "workspace:*",
     "@ancore/stellar": "workspace:*",

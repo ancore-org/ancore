@@ -26,9 +26,7 @@ export interface SmartAccount {
  * @param params - Account creation parameters
  * @returns Promise resolving to the created smart account
  */
-export async function createSmartAccount(
-  params: CreateSmartAccountParams
-): Promise<SmartAccount> {
+export async function createSmartAccount(params: CreateSmartAccountParams): Promise<SmartAccount> {
   const { signer, network, salt = Date.now().toString() } = params;
 
   const factory = new AccountFactory(network);

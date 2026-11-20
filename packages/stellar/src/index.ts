@@ -53,3 +53,7 @@ export { HorizonUrlValidationError } from './horizon-url';
 // Account sequence fetch helper
 export { fetchAccountSequence, clearSequenceCache } from './account-sequence';
 export type { AccountSequenceResult, FetchAccountSequenceOptions } from './account-sequence';
+
+// Memo-required validation
+export { checkMemoRequired, clearMemoRequiredCache } from './memo-required';
+export type { CheckMemoRequiredOptions } from './memo-required';

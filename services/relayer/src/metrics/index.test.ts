@@ -3,11 +3,17 @@
  * Issue #675
  */
 
-import { relayLatency, relayErrors, renderPrometheusMetrics } from './index';
+import {
+  relayLatency,
+  relayErrors,
+  relaySubmissionDuration,
+  renderPrometheusMetrics,
+} from './index';
 
 beforeEach(() => {
   relayLatency.reset();
   relayErrors.reset();
+  relaySubmissionDuration.reset();
 });
 
 describe('RelayLatencyHistogram', () => {
@@ -127,5 +133,49 @@ describe('renderPrometheusMetrics', () => {
   it('output ends with a newline', () => {
     const output = renderPrometheusMetrics();
     expect(output.endsWith('\n')).toBe(true);
+  });
+});
+
+describe('relay_submission_duration_seconds', () => {
+  it('records observations separately per operation label', () => {
+    relaySubmissionDuration.observe('execute', 0.3);
+    relaySubmissionDuration.observe('execute', 1.2);
+    relaySubmissionDuration.observe('validate', 0.05);
+
+    const snap = relaySubmissionDuration.snapshot();
+    expect(snap['execute'].count).toBe(2);
+    expect(snap['execute'].sum).toBeCloseTo(1.5);
+    expect(snap['validate'].count).toBe(1);
+  });
+
+  it('uses Stellar RPC tuned buckets', () => {
+    relaySubmissionDuration.observe('execute', 0.3);
+    const les = relaySubmissionDuration.snapshot()['execute'].buckets.map((b) => b.le);
+    expect(les).toEqual([0.1, 0.25, 0.5, 1, 2.5, 5, 10, '+Inf']);
+  });
+
+  it('exposes the histogram with operation label on the metrics output', () => {
+    relaySubmissionDuration.observe('execute', 0.3);
+    relaySubmissionDuration.observe('validate', 0.05);
+    const output = renderPrometheusMetrics();
+
+    expect(output).toContain('# TYPE relay_submission_duration_seconds histogram');
+    expect(output).toContain(
+      'relay_submission_duration_seconds_bucket{operation="execute",le="0.25"} 0'
+    );
+    expect(output).toContain(
+      'relay_submission_duration_seconds_bucket{operation="execute",le="0.5"} 1'
+    );
+    expect(output).toContain(
+      'relay_submission_duration_seconds_bucket{operation="execute",le="+Inf"} 1'
+    );
+    expect(output).toContain('relay_submission_duration_seconds_count{operation="execute"} 1');
+    expect(output).toContain(
+      'relay_submission_duration_seconds_bucket{operation="validate",le="0.1"} 1'
+    );
+  });
+
+  it('exposes HELP and TYPE even before any observation', () => {
+    expect(renderPrometheusMetrics()).toContain('# HELP relay_submission_duration_seconds');
   });
 });

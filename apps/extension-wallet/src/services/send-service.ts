@@ -6,10 +6,10 @@ import type {
   TxStatus,
   UiSimulationResult,
 } from '../hooks/useSendTransaction';
-import type { StellarClient } from '@ancore/stellar';
+import { checkMemoRequired, type StellarClient } from '@ancore/stellar';
 import { sendMessage } from '../messaging';
 import { resolveRelayerUrl } from '../config/urls';
-import { Account, Asset, Operation, TransactionBuilder } from '@stellar/stellar-sdk';
+import { Account, Asset, Memo, Operation, TransactionBuilder } from '@stellar/stellar-sdk';
 import { getErrorUserMessage } from '../errors/error-handler';
 import { simulateTransaction as simulateSorobanTransaction } from './simulation-service';
 import type { StellarNetwork } from '@ancore/wallet-shared';
@@ -120,6 +120,10 @@ export function createProductionSendService(options: ProductionSendServiceOption
       })
     );
 
+    if (tx.note?.trim()) {
+      builder.addMemo(Memo.text(tx.note.trim()));
+    }
+
     builder.setTimeout(300);
     return builder.build().toXDR();
   }
@@ -140,6 +144,16 @@ export function createProductionSendService(options: ProductionSendServiceOption
     },
 
     async signTransaction(tx: SendTransactionDraft): Promise<string> {
+      const network = stellarClient.getNetwork();
+      if (network === 'mainnet' || tx.fee?.network === 'mainnet') {
+        const memoRequired = await checkMemoRequired(tx.to);
+        if (memoRequired && !tx.note?.trim()) {
+          throw new Error(
+            'Memo required for this address on mainnet. Please provide a memo or choose an alternative address.'
+          );
+        }
+      }
+
       const unsignedXdr = await buildPaymentXdr(tx);
       const networkPassphrase = stellarClient.getNetworkPassphrase();
       const { signerMode, ledgerPublicKey } = getHardwareWalletState();

@@ -151,6 +151,7 @@ console.log(client.accountContractId); // C...
 | Parameter | Type | Required | Description |
 |-----------|------|----------|-------------|
 | `options.accountContractId` | `string` | ✓ | Deployed contract ID (C… address) |
+| `options.retry` | `RetryPolicyOptions \| RetryPresetName` | | Default retry policy or preset for network calls |
 
 Throws `BuilderValidationError` if `accountContractId` is empty.
 
@@ -289,6 +290,7 @@ interface RefreshSessionKeyTtlParams {
 interface RefreshSessionKeyTtlOptions extends AccountContractReadOptions {
   nowMs?:               number; // Override current time in ms (useful for deterministic testing)
   simulationTimeoutMs?: number; // Maximum time in ms to wait for Soroban simulation RPC (default: 15000)
+  retry?:               RetryPolicyOptions | RetryPresetName; // Retry policy override for simulation call
 }
 
 interface RefreshSessionKeyTtlResult {
@@ -322,14 +324,243 @@ const invocation = client.refreshSessionKeyTtl({
   expiresAt: Math.floor(Date.now() / 1000) + 3600,
 });
 
-// With simulation against RPC network (asynchronous)
+// With simulation against RPC network (asynchronous, with retry)
 const result = await client.refreshSessionKeyTtl(
   {
     publicKey: 'GABC...XYZ',
     expiresAt: Math.floor(Date.now() / 1000) + 3600,
   },
-  { rpcUrl: 'https://soroban-testnet.stellar.org' }
+  {
+    server,
+    sourceAccount: ownerAddress,
+    networkPassphrase: Networks.TESTNET,
+    retry: 'RELIABLE',
+  }
 );
+```
+
+---
+
+#### `client.withRetry`
+
+Wraps an arbitrary asynchronous network operation (e.g. Soroban RPC or Horizon calls) with the client's configured retry policy or an explicit method-level override.
+
+```typescript
+withRetry<T>(
+  fn: () => Promise<T>,
+  override?: RetryPolicyOptions | RetryPresetName
+): Promise<T>
+```
+
+**Example**
+
+```typescript
+const client = new AncoreClient({
+  accountContractId: 'C...',
+  retry: 'RELIABLE',
+});
+
+// Uses client's default RELIABLE retry policy
+const account = await client.withRetry(() => server.getAccount(accountId));
+
+// Or override per-call
+const simulation = await client.withRetry(
+  () => server.simulateTransaction(tx),
+  { maxRetries: 5, baseDelayMs: 300, jitter: true }
+);
+```
+
+---
+
+### Batch Session Keys
+
+Example showing how to configure, register, and maintain multiple scoped session keys (e.g., one for contract calls/queries and one for payment transfers) in a unified flow with end-to-end error handling and TTL refresh.
+
+#### Flow Overview
+
+1. **Key Generation & Policy Definition:** Define distinct permissions and lifespan for each session key.
+2. **Permission Preflight & Validation:** Verify each key's parameter integrity (`publicKey`, `permissions`, `expiresAt`) using `client.addSessionKey`.
+3. **Multi-Key Registration:** Collect individual `InvocationArgs` with try/catch error boundaries around each key.
+4. **Storage TTL Maintenance:** Extend the Soroban ledger persistent storage TTL for registered keys via `client.refreshSessionKeyTtl`.
+5. **Granular Error Handling:** Differentiate between parameter validation errors (`BuilderValidationError`), expired key errors (`SessionKeyManagementError`), simulation failures (`SimulationFailedError`), and network issues.
+
+#### Example
+
+```typescript
+import {
+  AncoreClient,
+  SessionPermission,
+  BuilderValidationError,
+  SessionKeyManagementError,
+  SimulationFailedError,
+  type InvocationArgs,
+} from '@ancore/core-sdk';
+import { Keypair } from '@stellar/stellar-sdk';
+
+interface SessionKeyConfig {
+  name: string;
+  keypair: Keypair;
+  permissions: SessionPermission[];
+  ttlSeconds: number;
+}
+
+interface BatchSessionKeysResult {
+  successful: Array<{
+    name: string;
+    publicKey: string;
+    expiresAt: number;
+    addInvocation: InvocationArgs;
+    ttlRefreshed: boolean;
+  }>;
+  failed: Array<{
+    name: string;
+    publicKey: string;
+    error: string;
+    code?: string;
+  }>;
+}
+
+/**
+ * Configure, register, and refresh TTL for multiple session keys in a single flow.
+ */
+export async function batchRegisterSessionKeys(
+  accountContractId: string,
+  keyConfigs: SessionKeyConfig[],
+  rpcUrl?: string
+): Promise<BatchSessionKeysResult> {
+  const client = new AncoreClient({ accountContractId });
+  const result: BatchSessionKeysResult = {
+    successful: [],
+    failed: [],
+  };
+
+  const nowSeconds = Math.floor(Date.now() / 1000);
+
+  for (const config of keyConfigs) {
+    const pubKey = config.keypair.publicKey();
+    const expiresAt = nowSeconds + config.ttlSeconds;
+
+    try {
+      // 1. Permission check and validation
+      if (!config.permissions || config.permissions.length === 0) {
+        throw new BuilderValidationError(
+          `Session key '${config.name}' must have at least one permission assigned.`
+        );
+      }
+
+      // 2. Build the add_session_key invocation (synchronous validation)
+      const addInvocation = client.addSessionKey({
+        publicKey: pubKey,
+        permissions: config.permissions,
+        expiresAt,
+      });
+
+      // 3. Refresh / simulate Soroban storage TTL if RPC URL is provided
+      let ttlRefreshed = false;
+      if (rpcUrl) {
+        try {
+          await client.refreshSessionKeyTtl(
+            {
+              publicKey: pubKey,
+              expiresAt,
+            },
+            { rpcUrl }
+          );
+          ttlRefreshed = true;
+        } catch (ttlErr) {
+          // Log TTL refresh warning without failing the key registration
+          console.warn(`TTL refresh warning for ${config.name} (${pubKey}):`, ttlErr);
+        }
+      }
+
+      result.successful.push({
+        name: config.name,
+        publicKey: pubKey,
+        expiresAt,
+        addInvocation,
+        ttlRefreshed,
+      });
+    } catch (err) {
+      if (err instanceof BuilderValidationError) {
+        result.failed.push({
+          name: config.name,
+          publicKey: pubKey,
+          error: `Validation error: ${err.message}`,
+          code: err.code,
+        });
+      } else if (err instanceof SessionKeyManagementError) {
+        result.failed.push({
+          name: config.name,
+          publicKey: pubKey,
+          error: `Session key error (${err.code}): ${err.message}`,
+          code: err.code,
+        });
+      } else if (err instanceof SimulationFailedError) {
+        result.failed.push({
+          name: config.name,
+          publicKey: pubKey,
+          error: `Simulation failed: ${err.message}`,
+          code: err.code,
+        });
+      } else {
+        result.failed.push({
+          name: config.name,
+          publicKey: pubKey,
+          error: err instanceof Error ? err.message : 'Unknown error during session key setup',
+        });
+      }
+    }
+  }
+
+  return result;
+}
+
+// ── Usage Example ────────────────────────────────────────────────────────────
+
+async function main() {
+  const CONTRACT_ID = 'CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA';
+  const RPC_URL = 'https://soroban-testnet.stellar.org';
+
+  // Define separate keys: one for contract invocations and one for transfers
+  const readKeyPair = Keypair.random();
+  const paymentKeyPair = Keypair.random();
+
+  const configs: SessionKeyConfig[] = [
+    {
+      name: 'dApp-invoker',
+      keypair: readKeyPair,
+      permissions: [SessionPermission.INVOKE_CONTRACT],
+      ttlSeconds: 3600 * 24, // 24 hours
+    },
+    {
+      name: 'micro-payment',
+      keypair: paymentKeyPair,
+      permissions: [SessionPermission.SEND_PAYMENT],
+      ttlSeconds: 3600 * 2, // 2 hours (shorter lifespan for transfer key)
+    },
+  ];
+
+  const { successful, failed } = await batchRegisterSessionKeys(
+    CONTRACT_ID,
+    configs,
+    RPC_URL
+  );
+
+  console.log(`Successfully prepared ${successful.length} session key invocations:`);
+  for (const key of successful) {
+    console.log(
+      ` - [${key.name}] ${key.publicKey} (expires at: ${key.expiresAt}, TTL refreshed: ${key.ttlRefreshed})`
+    );
+    // Pass key.addInvocation to your TransactionBuilder or relayer
+  }
+
+  if (failed.length > 0) {
+    console.error(`Failed to prepare ${failed.length} session keys:`);
+    for (const fail of failed) {
+      console.error(` - [${fail.name}] ${fail.publicKey}: ${fail.error} (code: ${fail.code ?? 'N/A'})`);
+    }
+  }
+}
 ```
 
 ---
@@ -615,6 +846,55 @@ simulateExecute<T>(to, fn, args, nonce, options): Promise<T>
 
 ---
 
+## Retry Policy & Transient Failure Handling
+
+`@ancore/core-sdk` provides configurable exponential backoff and transient failure handling for all network operations (Soroban RPC simulations, account sequence fetches, rate limits).
+
+### `withNetworkRetry`
+
+Executes an asynchronous network call with exponential backoff retries.
+
+```typescript
+import { withNetworkRetry, RELIABLE } from '@ancore/core-sdk';
+
+const account = await withNetworkRetry(
+  () => server.getAccount(accountId),
+  RELIABLE
+);
+```
+
+### Options (`RetryPolicyOptions`)
+
+| Option | Type | Default | Description |
+|--------|------|---------|-------------|
+| `maxRetries` | `number` | `3` | Maximum number of retry attempts after the initial failure |
+| `baseDelayMs` | `number` | `500` | Initial base delay in milliseconds between retries |
+| `maxDelayMs` | `number` | `30000` | Upper bound delay ceiling in milliseconds |
+| `exponential` | `boolean` | `true` | Whether delay doubles each attempt (`baseDelay * 2^(attempt-1)`) |
+| `jitter` | `boolean` | `false` | Adds +/- 20% random jitter to prevent thundering herd spikes |
+| `isRetryable` | `(err) => boolean` | `isTransientNetworkError` | Custom predicate determining retry eligibility |
+| `onRetry` | `(attempt, err, delay) => void` | `undefined` | Callback invoked before each retry sleep |
+
+### Built-in Presets
+
+| Preset | Max Retries | Base Delay | Exponential | Recommended Use Case |
+|--------|-------------|------------|-------------|----------------------|
+| `LOW_LATENCY` | 2 | 200ms | No | Interactive UI actions where fast failure is desired |
+| `RELIABLE` | 8 | 3000ms | Yes | Critical background submissions, transaction confirmations |
+| `AGGRESSIVE` | 4 | 500ms | Yes | High-throughput batch processing |
+
+### `isTransientNetworkError`
+
+Determines if an error is transient and safe to retry automatically:
+- HTTP status 5xx (`500`, `502`, `503`, `504`)
+- HTTP status 429 (`Too Many Requests` / Rate Limiting)
+- POSIX socket errors (`ETIMEDOUT`, `ECONNRESET`, `ECONNREFUSED`, `ENOTFOUND`, etc.)
+- Abort / Timeout errors (`TimeoutError`, `AbortError`)
+- Standard fetch/network failure messages
+- Non-transient errors (4xx client errors, invalid signatures, validation errors) are never retried.
+
+---
+
 ## Version compatibility
 
 | SDK version | Contract version | Notes |
@@ -623,3 +903,4 @@ simulateExecute<T>(to, fn, args, nonce, options): Promise<T>
 
 Breaking changes to public APIs require a major version bump and RFC.
 See [`RFC.md`](../RFC.md) for the process.
+

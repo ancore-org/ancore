@@ -1,13 +1,16 @@
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { RefreshCw, TrendingUp, AlertCircle, Coins } from 'lucide-react';
 import { Button } from '@ancore/ui-kit';
 import { Card, CardContent, CardHeader, CardTitle } from '@ancore/ui-kit';
+
+export const REFRESH_COOLDOWN_MS = 5_000;
 
 interface BalanceCardProps {
   balance: number;
   isLoading: boolean;
   error: Error | null;
   currency: string;
-  onRefresh: () => void;
+  onRefresh: () => void | Promise<unknown>;
   isRefreshing: boolean;
 }
 
@@ -19,6 +22,47 @@ export function BalanceCard({
   onRefresh,
   isRefreshing,
 }: BalanceCardProps) {
+  const [cooldownSeconds, setCooldownSeconds] = useState(0);
+  const [isInFlight, setIsInFlight] = useState(false);
+  const coolingDownRef = useRef(false);
+  const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const mountedRef = useRef(true);
+
+  useEffect(() => {
+    mountedRef.current = true;
+    return () => {
+      mountedRef.current = false;
+      if (timerRef.current !== null) clearInterval(timerRef.current);
+    };
+  }, []);
+
+  const handleRefresh = useCallback(() => {
+    if (coolingDownRef.current) return;
+    coolingDownRef.current = true;
+
+    let remaining = Math.ceil(REFRESH_COOLDOWN_MS / 1000);
+    setCooldownSeconds(remaining);
+    timerRef.current = setInterval(() => {
+      remaining -= 1;
+      setCooldownSeconds(remaining);
+      if (remaining <= 0) {
+        if (timerRef.current !== null) clearInterval(timerRef.current);
+        timerRef.current = null;
+        coolingDownRef.current = false;
+      }
+    }, 1000);
+
+    setIsInFlight(true);
+    Promise.resolve(onRefresh())
+      .catch(() => undefined)
+      .finally(() => {
+        if (mountedRef.current) setIsInFlight(false);
+      });
+  }, [onRefresh]);
+
+  const spinning = isRefreshing || isInFlight;
+  const coolingDown = cooldownSeconds > 0;
+
   // Format balance with proper decimal places
   const formattedBalance = new Intl.NumberFormat('en-US', {
     minimumFractionDigits: 2,
@@ -72,12 +116,13 @@ export function BalanceCard({
             <Button
               variant="ghost"
               size="icon"
-              onClick={onRefresh}
-              disabled={isLoading || isRefreshing}
+              onClick={handleRefresh}
+              disabled={isLoading || spinning || coolingDown}
               className="rounded-full hover:bg-accent/50 transition-all duration-300 hover:rotate-180 hover:scale-110 disabled:opacity-50 disabled:cursor-not-allowed"
               aria-label="Refresh balance"
             >
-              <RefreshCw className={`w-5 h-5 ${isRefreshing ? 'animate-spin' : ''}`} />
+              <RefreshCw className={`w-5 h-5 ${spinning ? 'animate-spin' : ''}`} />
+              {coolingDown && <span className="ml-1 text-xs tabular-nums">{cooldownSeconds}s</span>}
             </Button>
           </div>
         </CardHeader>
@@ -92,11 +137,11 @@ export function BalanceCard({
               <p className="text-muted-foreground mb-4">{error.message}</p>
               <Button
                 variant="outline"
-                onClick={onRefresh}
-                disabled={isRefreshing}
+                onClick={handleRefresh}
+                disabled={spinning || coolingDown}
                 className="gap-2"
               >
-                <RefreshCw className={`w-4 h-4 ${isRefreshing ? 'animate-spin' : ''}`} />
+                <RefreshCw className={`w-4 h-4 ${spinning ? 'animate-spin' : ''}`} />
                 Try Again
               </Button>
             </div>

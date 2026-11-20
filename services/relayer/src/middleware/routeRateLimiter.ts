@@ -158,6 +158,7 @@ export function createRouteRateLimiter(
     standardHeaders: true, // emits RateLimit-* draft headers
     legacyHeaders: false, // suppresses deprecated X-RateLimit-* headers
     keyGenerator: isIpKeyed ? (req: Request) => req.ip || 'unknown' : resolveAccountKey,
+    validate: false,
     handler(_req: Request, res: Response) {
       res.status(429).json({
         error: 'RATE_LIMITED',

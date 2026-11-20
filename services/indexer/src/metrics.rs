@@ -29,6 +29,12 @@ pub struct CursorMetrics {
 /// Default: 5 minutes (60 ledgers at 5s per ledger).
 pub const CURSOR_STALE_THRESHOLD_SECONDS: i64 = 300;
 
+/// Prometheus metric name for checkpoint ingest latency.
+pub const CHECKPOINT_INGEST_DURATION: &str = "checkpoint_ingest_duration_seconds";
+
+/// Standard histogram bucket thresholds in seconds for checkpoint ingest duration.
+pub const CHECKPOINT_INGEST_DURATION_BUCKETS: &[f64] = &[0.01, 0.05, 0.1, 0.5, 1.0, 5.0];
+
 /// Initialize Prometheus metrics descriptions.
 ///
 /// Call this once at application startup to register metric metadata.
@@ -47,10 +53,19 @@ pub fn init_prometheus_metrics() {
         "indexer_ingest_batch_duration_seconds",
         "Duration of ingest batch processing"
     );
+    describe_histogram!(
+        "checkpoint_ingest_duration_seconds",
+        "Duration of ledger checkpoint processing and sink commit in seconds"
+    );
     describe_counter!(
         "indexer_ingest_normalise_failures_total",
         "Number of raw events that failed normalisation during ingest"
     );
+}
+
+/// Record duration taken to process and commit a ledger checkpoint.
+pub fn record_checkpoint_ingest_duration(duration_seconds: f64) {
+    histogram!("checkpoint_ingest_duration_seconds").record(duration_seconds);
 }
 
 /// Record lag metrics for Prometheus export.

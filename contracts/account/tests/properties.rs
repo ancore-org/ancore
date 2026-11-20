@@ -11,6 +11,16 @@ use ancore_account::validation::{
 use ancore_account::ContractError;
 use proptest::prelude::*;
 
+/// Same check `execute` uses before it increments the nonce.
+/// A mismatch is `InvalidNonce` (#4), which the Soroban client surfaces as a panic.
+fn execute_nonce_check(expected: u64, current: u64) -> Result<(), ContractError> {
+    if nonce_matches(expected, current) {
+        Ok(())
+    } else {
+        Err(ContractError::InvalidNonce)
+    }
+}
+
 proptest! {
     #![proptest_config(ProptestConfig::with_cases(256))]
 
@@ -156,6 +166,35 @@ proptest! {
             let list: Vec<[u8; 32]> = allowed_bytes.iter().map(|b| [*b; 32]).collect();
             let expected = list.iter().any(|e| e == &target);
             prop_assert_eq!(allowlist_permits(Some(list.as_slice()), &target), expected);
+        }
+    }
+
+    #[test]
+    fn execute_nonce_sequence_rejects_non_current(
+        nonces in prop::collection::vec(0u64..64, 1..32),
+    ) {
+        let mut current: u64 = 0;
+        let mut accepted: Vec<u64> = Vec::new();
+        for nonce in nonces {
+            if nonce != current {
+                prop_assert_eq!(
+                    execute_nonce_check(nonce, current),
+                    Err(ContractError::InvalidNonce)
+                );
+            } else {
+                prop_assert!(execute_nonce_check(nonce, current).is_ok());
+                accepted.push(current);
+                current = current.checked_add(1).expect("nonce overflow");
+            }
+        }
+        for (index, nonce) in accepted.iter().enumerate() {
+            prop_assert_eq!(*nonce, index as u64);
+        }
+        for prev in &accepted {
+            prop_assert_eq!(
+                execute_nonce_check(*prev, current),
+                Err(ContractError::InvalidNonce)
+            );
         }
     }
 }

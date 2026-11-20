@@ -769,3 +769,69 @@ async fn test_limit_exceeds_max_clamped() {
     // Should be clamped to 100
     assert_eq!(json["data"].as_array().unwrap().len(), 100);
 }
+
+#[tokio::test]
+#[ignore]
+async fn test_invalid_cursor_base64_returns_400() {
+    let (app, _pool) = setup_test_app().await;
+    let account_id = "GABC1234567890ABCDEFGHIJKLMNOPQRSTUVWXYZ1234567890";
+
+    // Invalid base64 characters
+    let response = app
+        .clone()
+        .oneshot(
+            Request::builder()
+                .uri(&format!(
+                    "/api/v1/accounts/{}/activity?cursor_after=invalid-base64!!!",
+                    account_id
+                ))
+                .body(Body::empty())
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+
+    assert_eq!(response.status(), StatusCode::BAD_REQUEST);
+    let body = response_body_bytes(response).await;
+    let json: serde_json::Value = serde_json::from_slice(&body).unwrap();
+    assert_eq!(json["code"].as_str().unwrap(), "INVALID_CURSOR");
+
+    // Empty cursor string
+    let response = app
+        .clone()
+        .oneshot(
+            Request::builder()
+                .uri(&format!(
+                    "/api/v1/accounts/{}/activity?cursor_after=",
+                    account_id
+                ))
+                .body(Body::empty())
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+
+    assert_eq!(response.status(), StatusCode::BAD_REQUEST);
+    let body = response_body_bytes(response).await;
+    let json: serde_json::Value = serde_json::from_slice(&body).unwrap();
+    assert_eq!(json["code"].as_str().unwrap(), "INVALID_CURSOR");
+
+    // Non-JSON payload
+    let response = app
+        .oneshot(
+            Request::builder()
+                .uri(&format!(
+                    "/api/v1/accounts/{}/activity?cursor_before=aGVsbG8=",
+                    account_id
+                ))
+                .body(Body::empty())
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+
+    assert_eq!(response.status(), StatusCode::BAD_REQUEST);
+    let body = response_body_bytes(response).await;
+    let json: serde_json::Value = serde_json::from_slice(&body).unwrap();
+    assert_eq!(json["code"].as_str().unwrap(), "INVALID_CURSOR");
+}

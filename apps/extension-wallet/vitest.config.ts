@@ -37,7 +37,8 @@ export default defineConfig({
       '**/*.e2e.test.{ts,tsx}',
       '**/tests/e2e/**',
       '**/messaging/__tests__/messaging.test.ts',
-      '**/SessionKeys/__tests__/**',
+      '**/SessionKeys/__tests__/SessionKeysScreen.test.tsx',
+      '**/SessionKeys/__tests__/SessionKeysIntegration.test.tsx',
       '**/hooks/__tests__/useSessionKeys.test.ts',
     ],
     coverage: {

@@ -1,38 +1,39 @@
 import { useEffect, useRef } from 'react';
+import { Text, StyleSheet } from 'react-native';
 
 import { type TransactionStatus } from '../screens/history/types';
 
 type StatusMeta = {
   icon: string;
   label: string;
-  className: string;
+  color: string;
 };
 
 const STATUS_META: Record<TransactionStatus | 'unknown', StatusMeta> = {
   success: {
     icon: '✓',
     label: 'Transaction successful',
-    className: 'text-green-600',
+    color: '#16a34a',
   },
   completed: {
     icon: '✓',
     label: 'Transaction completed',
-    className: 'text-green-600',
+    color: '#16a34a',
   },
   pending: {
     icon: '⏳',
     label: 'Transaction pending',
-    className: 'text-amber-600',
+    color: '#d97706',
   },
   failed: {
     icon: '✕',
     label: 'Transaction failed',
-    className: 'text-red-600',
+    color: '#dc2626',
   },
   unknown: {
     icon: '?',
     label: 'Transaction status unknown',
-    className: 'text-slate-500',
+    color: '#64748b',
   },
 };
 
@@ -61,12 +62,23 @@ export const TransactionStatusIcon = ({ status, onUnknownStatus }: Props) => {
   }, [isUnrecognized, status, onUnknownStatus]);
 
   return (
-    <span
-      className={`inline-flex items-center justify-center w-5 h-5 font-semibold ${meta.className}`}
-      aria-label={meta.label}
-      role="img"
+    <Text
+      style={[styles.icon, { color: meta.color }]}
+      accessibilityLabel={meta.label}
+      accessibilityRole="image"
     >
       {meta.icon}
-    </span>
+    </Text>
   );
 };
+
+const styles = StyleSheet.create({
+  icon: {
+    width: 20,
+    height: 20,
+    fontSize: 16,
+    fontWeight: '600',
+    textAlign: 'center',
+    lineHeight: 20,
+  },
+});

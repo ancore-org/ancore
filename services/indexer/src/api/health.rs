@@ -3,7 +3,7 @@ use chrono::Utc;
 use serde::Serialize;
 use sqlx::{PgPool, Row};
 
-use crate::error::Result;
+use crate::error::{ApiError, Result};
 use crate::metrics::record_lag;
 use crate::repositories::migrations::{
     fetch_migration_state, MigrationStatus, EXPECTED_SCHEMA_VERSION,
@@ -142,6 +142,27 @@ async fn fetch_chain_head_from_rpc(rpc_url: &str) -> anyhow::Result<i64> {
 /// the live database schema version read from the `schema_migrations` ledger.
 /// The chain_head sequence is fetched from the live network via getLatestLedger RPC.
 pub async fn health_handler(State(db): State<PgPool>) -> Result<Json<HealthResponse>> {
+    // Verify PostgreSQL connection pool health with 1-second timeout
+    let acquire_timeout = std::time::Duration::from_secs(1);
+    match tokio::time::timeout(acquire_timeout, db.acquire()).await {
+        Ok(Ok(conn)) => {
+            drop(conn);
+        }
+        Ok(Err(err)) => {
+            tracing::error!(error = %err, "database connection pool acquire failed in health check");
+            return Err(ApiError::ServiceUnavailable(format!(
+                "Database pool acquire failed: {}",
+                err
+            )));
+        }
+        Err(_) => {
+            tracing::error!("database connection pool acquire timed out after 1s in health check");
+            return Err(ApiError::ServiceUnavailable(
+                "Database connection pool acquire timed out".to_string(),
+            ));
+        }
+    }
+
     // Latest ledger the indexer has indexed (most-recent record persisted).
     let indexed_row =
         sqlx::query("SELECT COALESCE(MAX(ledger_seq), 0) AS latest FROM account_activity")

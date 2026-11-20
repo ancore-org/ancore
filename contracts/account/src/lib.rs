@@ -23,6 +23,7 @@
 //! - `executed`: Emitted when a transaction is executed with to, function, and nonce
 //! - `session_key_added`: Emitted when a session key is added with public_key and expires_at
 //! - `session_key_revoked`: Emitted when a session key is revoked with public_key
+//! - `session_key_refreshed`: Emitted when a session key TTL is extended with public_key and new_expires_at
 //! - `allowed_contracts_set`: Emitted when allowed contracts are updated for a session key
 //! - `module_registered`: Emitted when a validation module is registered
 //! - `module_unregistered`: Emitted when a validation module is unregistered
@@ -120,6 +121,12 @@ mod events {
         Symbol::new(env, "session_key_ttl_refreshed")
     }
 
+    /// Event emitted when `refresh_session_key_ttl` extends a session key.
+    /// Data: (public_key: BytesN<32>, new_expires_at: u64)
+    pub fn session_key_refreshed(env: &Env) -> Symbol {
+        Symbol::new(env, "session_key_refreshed")
+    }
+
     /// Event emitted when an owner is added.
     /// Data: (new_owner: Address)
     pub fn owner_added(env: &Env) -> Symbol {
@@ -212,6 +219,8 @@ const DAY_IN_LEDGERS: u32 = 17280; // 24 hours * 60 min * 60 sec / 5 sec per led
 const INSTANCE_BUMP_AMOUNT: u32 = 30 * DAY_IN_LEDGERS; // 30 days
 const INSTANCE_BUMP_THRESHOLD: u32 = 15 * DAY_IN_LEDGERS; // 15 days
 const MIN_MILLISECONDS_TIMESTAMP: u64 = 100_000_000_000;
+/// Maximum number of contracts that may be stored in a session-key allowlist.
+pub const MAX_ALLOWED_CONTRACTS: u32 = 50;
 
 /// Permission bit for send payment operations
 pub const PERMISSION_SEND_PAYMENT: u32 = validation::PERMISSION_SEND_PAYMENT;
@@ -455,6 +464,31 @@ impl AncoreAccount {
         Ok(result)
     }
 
+    /// Reject empty or all-zero addresses in a session-key allowlist.
+    fn reject_zero_allowed_contracts(
+        allowed_contracts: &Option<Vec<Address>>,
+    ) -> Result<(), ContractError> {
+        let Some(list) = allowed_contracts else {
+            return Ok(());
+        };
+        if list.len() > MAX_ALLOWED_CONTRACTS {
+            return Err(ContractError::InsufficientPermission);
+        }
+        for address in list.iter() {
+            let key = address.to_string();
+            let len = key.len() as usize;
+            if len == 0 || len > 56 {
+                return Err(ContractError::InsufficientPermission);
+            }
+            let mut buf = [0u8; 56];
+            key.copy_into_slice(&mut buf[..len]);
+            let strkey = core::str::from_utf8(&buf[..len])
+                .map_err(|_| ContractError::InsufficientPermission)?;
+            validation::validate_allowed_contract_address(strkey)?;
+        }
+        Ok(())
+    }
+
     /// Add a session key
     pub fn add_session_key(
         env: Env,
@@ -490,6 +524,7 @@ impl AncoreAccount {
             permission_len += 1;
         }
         validation::validate_permissions(&permission_buf[..permission_len])?;
+        Self::reject_zero_allowed_contracts(&allowed_contracts)?;
 
         if env
             .storage()
@@ -578,6 +613,7 @@ impl AncoreAccount {
         let mut session_key = Self::get_session_key(env.clone(), public_key.clone())
             .ok_or(ContractError::SessionKeyNotFound)?;
 
+        Self::reject_zero_allowed_contracts(&allowed_contracts)?;
         session_key.allowed_contracts = allowed_contracts.clone();
 
         env.storage()
@@ -1004,6 +1040,12 @@ impl AncoreAccount {
         // Issue #195: Emit event on session key TTL refresh
         env.events().publish(
             (events::session_key_ttl_refreshed(&env),),
+            (public_key.clone(), normalized_expiry),
+        );
+
+        // Issue #1555: indexers track the updated expiry under this topic.
+        env.events().publish(
+            (events::session_key_refreshed(&env),),
             (public_key, normalized_expiry),
         );
 
@@ -1170,6 +1212,35 @@ mod test {
     fn init(env: &Env, client: &AncoreAccountClient, owner: &Address) {
         env.mock_all_auths();
         client.initialize(owner);
+    }
+
+    /// Register an executable session key and advance mock time beyond its expiry.
+    /// Keeping this setup in one place prevents expiry tests from drifting apart.
+    fn create_expired_session_key(
+        env: &Env,
+        client: &AncoreAccountClient,
+    ) -> (SigningKey, BytesN<32>, u64) {
+        env.mock_all_auths();
+        env.ledger().set_timestamp(1_000);
+
+        let signing_key = SigningKey::generate(&mut OsRng);
+        let session_pk = BytesN::from_array(env, &signing_key.verifying_key().to_bytes());
+        let expires_at = env.ledger().timestamp() + 100;
+        let mut permissions = Vec::new(env);
+        permissions.push_back(PERMISSION_EXECUTE);
+
+        client.add_session_key(
+            &session_pk,
+            &expires_at,
+            &permissions,
+            &None,
+            &None,
+            &None,
+            &0u64,
+        );
+        env.ledger().set_timestamp(expires_at + 1);
+
+        (signing_key, session_pk, expires_at)
     }
 
     mod approving_validation_module {
@@ -1628,6 +1699,52 @@ mod test {
     }
 
     #[test]
+    fn test_refresh_session_key_ttl_emits_session_key_refreshed() {
+        let env = Env::default();
+        let contract_id = env.register_contract(None, AncoreAccount);
+        let client = AncoreAccountClient::new(&env, &contract_id);
+
+        let owner = Address::generate(&env);
+        init(&env, &client, &owner);
+
+        env.mock_all_auths();
+
+        let session_pk = BytesN::from_array(&env, &[1u8; 32]);
+        let expires_at = env.ledger().timestamp() + 10000;
+        let permissions = Vec::new(&env);
+
+        client.add_session_key(
+            &session_pk,
+            &expires_at,
+            &permissions,
+            &None,
+            &None,
+            &None,
+            &0u64,
+        );
+        client.refresh_session_key_ttl(&session_pk);
+
+        let events_list = env.events().all();
+        let mut found = false;
+        for index in 0..events_list.len() {
+            let (_contract, topics, data) = events_list.get_unchecked(index).clone();
+            if topics.len() != 1 {
+                continue;
+            }
+            let topic_symbol: soroban_sdk::Symbol =
+                soroban_sdk::FromVal::from_val(&env, &topics.get_unchecked(0));
+            if topic_symbol != events::session_key_refreshed(&env) {
+                continue;
+            }
+            let data_tuple: (BytesN<32>, u64) = soroban_sdk::FromVal::from_val(&env, &data);
+            assert_eq!(data_tuple.0, session_pk);
+            assert_eq!(data_tuple.1, expires_at);
+            found = true;
+        }
+        assert!(found, "session_key_refreshed event was not emitted");
+    }
+
+    #[test]
     fn test_refresh_session_key_ttl_unknown_key_returns_session_key_not_found() {
         let env = Env::default();
         let contract_id = env.register_contract(None, AncoreAccount);
@@ -1740,28 +1857,7 @@ mod test {
 
         let owner = Address::generate(&env);
         init(&env, &client, &owner);
-        env.mock_all_auths();
-
-        let mut csprng = OsRng;
-        let signing_key = SigningKey::generate(&mut csprng);
-        let session_pk = BytesN::from_array(&env, &signing_key.verifying_key().to_bytes());
-
-        env.ledger().set_timestamp(1_000);
-        let expires_at = env.ledger().timestamp() + 100;
-        let mut permissions = Vec::new(&env);
-        permissions.push_back(PERMISSION_EXECUTE);
-
-        client.add_session_key(
-            &session_pk,
-            &expires_at,
-            &permissions,
-            &None,
-            &None,
-            &None,
-            &0u64,
-        );
-
-        env.ledger().set_timestamp(expires_at + 1);
+        let (signing_key, session_pk, _expires_at) = create_expired_session_key(&env, &client);
 
         let callee_id = env.register_contract(None, AncoreAccount);
         let function = soroban_sdk::symbol_short!("get_nonce");
@@ -2077,6 +2173,106 @@ mod test {
         ));
     }
 
+    fn zero_contract_address(env: &Env) -> Address {
+        use soroban_sdk::xdr::{Hash, ScAddress};
+        Address::try_from_val(env, &ScAddress::Contract(Hash([0u8; 32]))).unwrap()
+    }
+
+    #[test]
+    fn test_add_session_key_rejects_zero_allowed_contract() {
+        let env = Env::default();
+        let contract_id = env.register_contract(None, AncoreAccount);
+        let client = AncoreAccountClient::new(&env, &contract_id);
+
+        let owner = Address::generate(&env);
+        init(&env, &client, &owner);
+        env.mock_all_auths();
+
+        let zero = zero_contract_address(&env);
+        let mut zero_buf = [0u8; 56];
+        let zero_key = zero.to_string();
+        assert_eq!(zero_key.len(), 56);
+        zero_key.copy_into_slice(&mut zero_buf);
+        assert_eq!(
+            core::str::from_utf8(&zero_buf).unwrap(),
+            validation::ZERO_CONTRACT_STRKEY
+        );
+
+        let session_pk = BytesN::from_array(&env, &[4u8; 32]);
+        let expires_at = 9999999999u64;
+        let mut permissions = Vec::new(&env);
+        permissions.push_back(PERMISSION_EXECUTE);
+        let mut allowed = Vec::new(&env);
+        allowed.push_back(zero);
+
+        let rejected = client.try_add_session_key(
+            &session_pk,
+            &expires_at,
+            &permissions,
+            &Some(allowed),
+            &None,
+            &None,
+            &0u64,
+        );
+        assert!(matches!(
+            rejected,
+            Err(Ok(ContractError::InsufficientPermission))
+        ));
+
+        let valid = Address::generate(&env);
+        let mut valid_list = Vec::new(&env);
+        valid_list.push_back(valid);
+        client.add_session_key(
+            &session_pk,
+            &expires_at,
+            &permissions,
+            &Some(valid_list),
+            &None,
+            &None,
+            &0u64,
+        );
+        let stored = client.get_session_key(&session_pk).unwrap();
+        assert_eq!(stored.allowed_contracts.unwrap().len(), 1);
+    }
+
+    #[test]
+    fn test_set_allowed_contracts_rejects_zero_address() {
+        let env = Env::default();
+        let contract_id = env.register_contract(None, AncoreAccount);
+        let client = AncoreAccountClient::new(&env, &contract_id);
+
+        let owner = Address::generate(&env);
+        init(&env, &client, &owner);
+        env.mock_all_auths();
+
+        let session_pk = BytesN::from_array(&env, &[5u8; 32]);
+        let expires_at = 9999999999u64;
+        let mut permissions = Vec::new(&env);
+        permissions.push_back(PERMISSION_EXECUTE);
+        client.add_session_key(
+            &session_pk,
+            &expires_at,
+            &permissions,
+            &None,
+            &None,
+            &None,
+            &0u64,
+        );
+
+        let mut allowed = Vec::new(&env);
+        allowed.push_back(zero_contract_address(&env));
+        let rejected = client.try_set_allowed_contracts(&session_pk, &Some(allowed));
+        assert!(matches!(
+            rejected,
+            Err(Ok(ContractError::InsufficientPermission))
+        ));
+        assert!(client
+            .get_session_key(&session_pk)
+            .unwrap()
+            .allowed_contracts
+            .is_none());
+    }
+
     #[test]
     fn test_allowed_contracts_none_permits_any_contract() {
         let env = Env::default();
@@ -2184,6 +2380,56 @@ mod test {
         client.set_allowed_contracts(&session_pk, &None);
         let key = client.get_session_key(&session_pk).unwrap();
         assert!(key.allowed_contracts.is_none());
+    }
+
+    #[test]
+    fn test_allowed_contracts_rejects_more_than_maximum() {
+        let env = Env::default();
+        let contract_id = env.register_contract(None, AncoreAccount);
+        let client = AncoreAccountClient::new(&env, &contract_id);
+        let owner = Address::generate(&env);
+        init(&env, &client, &owner);
+        env.mock_all_auths();
+
+        let session_pk = BytesN::from_array(&env, &[14u8; 32]);
+        let expires_at = 9_999_999_999u64;
+        let permissions = Vec::new(&env);
+        let mut maximum = Vec::new(&env);
+        for _ in 0..MAX_ALLOWED_CONTRACTS {
+            maximum.push_back(Address::generate(&env));
+        }
+
+        client.add_session_key(
+            &session_pk,
+            &expires_at,
+            &permissions,
+            &Some(maximum.clone()),
+            &None,
+            &None,
+            &0u64,
+        );
+        assert_eq!(
+            client
+                .get_session_key(&session_pk)
+                .unwrap()
+                .allowed_contracts
+                .unwrap()
+                .len(),
+            MAX_ALLOWED_CONTRACTS
+        );
+
+        maximum.push_back(Address::generate(&env));
+        let rejected = client.try_set_allowed_contracts(&session_pk, &Some(maximum));
+        assert_eq!(rejected, Err(Ok(ContractError::InsufficientPermission)));
+        assert_eq!(
+            client
+                .get_session_key(&session_pk)
+                .unwrap()
+                .allowed_contracts
+                .unwrap()
+                .len(),
+            MAX_ALLOWED_CONTRACTS
+        );
     }
 
     #[test]

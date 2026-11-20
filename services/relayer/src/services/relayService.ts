@@ -24,7 +24,8 @@ import type {
 import { RelayErrorCodes } from '../types';
 import { mapSimulationError } from './mapSimulationError';
 import { mapSubmissionError } from './mapSubmissionError';
-import { recordSubmitLatency } from '../metrics';
+import { recordSubmitLatency, relaySubmissionDuration } from '../metrics';
+import { rootLogger } from '../logging';
 
 const SIGNED_TX_PARAMETER = 'signedTransactionXdr';
 const startTime = Date.now();
@@ -34,6 +35,26 @@ function mockTxId(): string {
 }
 
 const tracer = trace.getTracer('ancore-relayer');
+
+/** Keep the first and last 4 characters of a session key; hide the middle. */
+function redactAuditSessionKey(sessionKey: string): string {
+  if (sessionKey.length <= 8) {
+    return '[REDACTED]';
+  }
+  return `${sessionKey.slice(0, 4)}\u2026${sessionKey.slice(-4)}`;
+}
+
+function logNonceReplay(request: RelayExecuteRequest, clientIp?: string): void {
+  rootLogger.warn(
+    {
+      event: 'NONCE_REPLAY_DETECTED',
+      sessionKey: redactAuditSessionKey(request.sessionKey),
+      nonce: request.nonce,
+      clientIp,
+    },
+    'NONCE_REPLAY_DETECTED'
+  );
+}
 
 function isMockSubmissionEnabled(options?: RelayServiceOptions): boolean {
   return options?.useMockSubmission === true || getEnv().RELAYER_USE_MOCK_SUBMISSION;
@@ -79,6 +100,7 @@ export class RelayService implements RelayServiceContract {
             code: RelayErrorCodes.NONCE_REPLAY,
             message: 'Nonce must be non-negative',
           };
+          logNonceReplay(request, options?.clientIp);
           span.setStatus({ code: SpanStatusCode.ERROR, message: error.message });
           span.setAttribute('error.code', error.code);
           return { valid: false, error };
@@ -90,6 +112,7 @@ export class RelayService implements RelayServiceContract {
           } catch (err) {
             const message = err instanceof Error ? err.message : 'Nonce already used';
             const error: RelayError = { code: RelayErrorCodes.NONCE_REPLAY, message };
+            logNonceReplay(request, options?.clientIp);
             span.setStatus({ code: SpanStatusCode.ERROR, message });
             span.setAttribute('error.code', error.code);
             return { valid: false, error };
@@ -177,7 +200,9 @@ export class RelayService implements RelayServiceContract {
     request: RelayExecuteRequest,
     options?: RelayExecutionOptions
   ): Promise<RelayExecuteResponse> {
+    const validateStart = Date.now();
     const validation = await this.validateRelay(request, options);
+    relaySubmissionDuration.observe('validate', (Date.now() - validateStart) / 1000);
     if (!validation.valid || validation.requiresStepUp) {
       return {
         success: false,
@@ -263,6 +288,7 @@ export class RelayService implements RelayServiceContract {
       });
       const submitDurationSeconds = (Date.now() - submitStart) / 1000;
       recordSubmitLatency(submitDurationSeconds);
+      relaySubmissionDuration.observe('execute', submitDurationSeconds);
 
       return {
         success: true,

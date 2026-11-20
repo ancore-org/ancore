@@ -163,4 +163,22 @@ describe('useOnboarding', () => {
     expect(result.current.error).toBeNull();
     expect(result.current.account?.contractId).toBe(MOCK_CONTRACT_ID);
   });
+
+  it('wipes mnemonic and password when navigating back to welcome', () => {
+    const { result } = renderHook(() => useOnboarding());
+
+    act(() => {
+      result.current.setMnemonicForImport(MNEMONIC);
+      result.current.setPassword('SecurePass123!');
+    });
+    expect(result.current.mnemonic).toBe(MNEMONIC);
+
+    act(() => {
+      result.current.goToStep('welcome');
+    });
+
+    expect(result.current.mnemonic).toBeNull();
+    expect(result.current.password).toBeNull();
+    expect(result.current.step).toBe('welcome');
+  });
 });

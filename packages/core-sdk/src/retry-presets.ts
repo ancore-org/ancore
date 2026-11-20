@@ -7,7 +7,7 @@
  * @module retry-presets
  */
 
-import type { RetryOptions } from '@ancore/stellar';
+import type { RetryOptions } from './utils/retry';
 import { InvalidRetryPresetError } from './errors';
 
 /**

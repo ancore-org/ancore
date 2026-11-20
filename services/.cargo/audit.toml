@@ -12,4 +12,9 @@ ignore = [
   # scans Cargo.lock, which retains sqlx's optional driver crates.
   # No fixed upstream release exists; re-evaluate if a MySQL driver is adopted.
   "RUSTSEC-2023-0071",
+  # RUSTSEC-2026-0459 (libsqlite3-sys via C SQLite CVE-2026-119375).
+  # False positive for this workspace: `libsqlite3-sys` is only reachable via `sqlx-sqlite`,
+  # and we build sqlx with the `postgres` driver only. It appears solely because cargo-audit
+  # scans Cargo.lock, which retains sqlx's optional driver crates.
+  "RUSTSEC-2026-0459",
 ]

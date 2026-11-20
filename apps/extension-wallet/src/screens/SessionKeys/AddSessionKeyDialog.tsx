@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { StrKey } from '@stellar/stellar-sdk';
 import { Dialog, Button, Input } from '@ancore/ui-kit';
 import { SessionPermission } from '../../hooks/useSessionKeys';
 import type { AddSessionKeyInput } from '../../hooks/useSessionKeys';
@@ -8,6 +9,14 @@ interface AddSessionKeyDialogProps {
   open: boolean;
   onClose: () => void;
   onSave: (input: AddSessionKeyInput) => Promise<void>;
+}
+
+export function validateContractId(value: string): string | null {
+  if (StrKey.isValidContract(value)) return null;
+  if (StrKey.isValidEd25519PublicKey(value)) {
+    return 'Must be a valid Soroban contract ID (C...), not an account address (G...)';
+  }
+  return 'Must be a valid Soroban contract ID (C...)';
 }
 
 function expiryDurationToMs(expiry: string): number {
@@ -34,8 +43,32 @@ export const AddSessionKeyDialog: React.FC<AddSessionKeyDialogProps> = ({
   const [label, setLabel] = useState('');
   const [permissionsBitmask, setPermissionsBitmask] = useState<number>(0);
   const [expiry, setExpiry] = useState('1d');
+  const [contractInput, setContractInput] = useState('');
+  const [contractError, setContractError] = useState<string | null>(null);
+  const [allowedContracts, setAllowedContracts] = useState<string[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  const trimmedContract = contractInput.trim();
+  const canAddContract = trimmedContract !== '' && validateContractId(trimmedContract) === null;
+
+  const handleContractChange = (value: string): void => {
+    setContractInput(value);
+    if (contractError) setContractError(validateContractId(value.trim()));
+  };
+
+  const handleContractBlur = (): void => {
+    setContractError(trimmedContract === '' ? null : validateContractId(trimmedContract));
+  };
+
+  const handleAddContract = (): void => {
+    if (!canAddContract) return;
+    setAllowedContracts((prev) =>
+      prev.includes(trimmedContract) ? prev : [...prev, trimmedContract]
+    );
+    setContractInput('');
+    setContractError(null);
+  };
 
   const handleSave = async (): Promise<void> => {
     setLoading(true);
@@ -50,10 +83,16 @@ export const AddSessionKeyDialog: React.FC<AddSessionKeyDialogProps> = ({
       if (permissionsBitmask & SessionPermission.INVOKE_CONTRACT)
         permissionsArray.push(SessionPermission.INVOKE_CONTRACT);
 
-      await onSave({ label, permissions: permissionsArray, expiresAt: expiryDurationToMs(expiry) });
+      await onSave({
+        label,
+        permissions: permissionsArray,
+        expiresAt: expiryDurationToMs(expiry),
+        allowedContracts,
+      });
       setLabel('');
       setPermissionsBitmask(0);
       setExpiry('1d');
+      setAllowedContracts([]);
       onClose();
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to add key');
@@ -94,6 +133,37 @@ export const AddSessionKeyDialog: React.FC<AddSessionKeyDialogProps> = ({
           <option value="1w">1 Week</option>
           <option value="30d">30 Days</option>
         </select>
+
+        <label htmlFor="allowed-contract" className="block mb-2 font-medium">
+          Contract address
+        </label>
+        <div className="flex gap-2 mb-1">
+          <Input
+            id="allowed-contract"
+            value={contractInput}
+            onChange={(e: React.ChangeEvent<HTMLInputElement>) =>
+              handleContractChange(e.target.value)
+            }
+            onBlur={handleContractBlur}
+            placeholder="C..."
+            aria-invalid={contractError !== null}
+          />
+          <Button onClick={handleAddContract} disabled={!canAddContract} variant="secondary">
+            Add Contract
+          </Button>
+        </div>
+        {contractError && (
+          <p role="alert" className="text-red-500 text-sm mb-2">
+            {contractError}
+          </p>
+        )}
+        <ul className="mb-4 space-y-1">
+          {allowedContracts.map((id) => (
+            <li key={id} className="text-xs font-mono break-all">
+              {id}
+            </li>
+          ))}
+        </ul>
 
         {error && <p className="text-red-500 text-sm mb-3">{error}</p>}
 

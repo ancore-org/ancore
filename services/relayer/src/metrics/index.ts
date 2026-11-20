@@ -136,6 +136,35 @@ class NonceOperationCounter {
 }
 
 // ---------------------------------------------------------------------------
+// Labelled histogram � one RelayHistogram per label value
+// ---------------------------------------------------------------------------
+
+class LabelledRelayHistogram {
+  private readonly series: Map<string, RelayHistogram> = new Map();
+
+  constructor(private readonly bucketDefs: number[]) {}
+
+  observe(label: string, durationSeconds: number): void {
+    let histogram = this.series.get(label);
+    if (!histogram) {
+      histogram = new RelayHistogram(this.bucketDefs);
+      this.series.set(label, histogram);
+    }
+    histogram.observe(durationSeconds);
+  }
+
+  snapshot(): Record<string, HistogramSnapshot> {
+    return Object.fromEntries(
+      [...this.series.entries()].map(([label, histogram]) => [label, histogram.snapshot()])
+    );
+  }
+
+  reset(): void {
+    this.series.clear();
+  }
+}
+
+// ---------------------------------------------------------------------------
 // Singleton registry
 // ---------------------------------------------------------------------------
 
@@ -150,6 +179,11 @@ export const relayMockMode = new RelayGauge();
 export const relaySubmitLatency = new RelayHistogram([
   0.01, 0.05, 0.1, 0.25, 0.5, 1, 2.5, 5, 10, 20,
 ]);
+
+export type RelaySubmissionOperation = 'execute' | 'validate';
+
+/** Buckets tuned for Stellar RPC latencies. */
+export const relaySubmissionDuration = new LabelledRelayHistogram([0.1, 0.25, 0.5, 1, 2.5, 5, 10]);
 
 // ---------------------------------------------------------------------------
 // Helpers for recording with OTEL metric instruments (future migration)
@@ -249,6 +283,23 @@ function renderHistogram(name: string, help: string, h: RelayHistogram): string[
   return lines;
 }
 
+function renderLabelledHistogram(
+  name: string,
+  help: string,
+  label: string,
+  h: LabelledRelayHistogram
+): string[] {
+  const lines: string[] = [`# HELP ${name} ${help}`, `# TYPE ${name} histogram`];
+  for (const [value, snap] of Object.entries(h.snapshot())) {
+    for (const bucket of snap.buckets) {
+      lines.push(`${name}_bucket{${label}="${value}",le="${bucket.le}"} ${bucket.count}`);
+    }
+    lines.push(`${name}_sum{${label}="${value}"} ${snap.sum}`);
+    lines.push(`${name}_count{${label}="${value}"} ${snap.count}`);
+  }
+  return lines;
+}
+
 function renderCounter(name: string, help: string, c: RelayCounter, label: string): string[] {
   const snap = c.snapshot();
   const lines: string[] = [`# HELP ${name} ${help}`, `# TYPE ${name} counter`];
@@ -321,6 +372,15 @@ export function renderPrometheusMetrics(): string {
       'relay_submit_duration_seconds',
       'Histogram of Stellar submit operation latency in seconds',
       relaySubmitLatency
+    )
+  );
+
+  lines.push(
+    ...renderLabelledHistogram(
+      'relay_submission_duration_seconds',
+      'Histogram of relay submission latency in seconds by operation',
+      'operation',
+      relaySubmissionDuration
     )
   );
 

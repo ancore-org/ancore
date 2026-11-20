@@ -6,6 +6,12 @@
 export const SDK_VERSION = '0.1.0';
 
 export {
+  CONTRACT_EVENTS,
+  type ContractEventName,
+  type ContractEventTopic,
+} from '@ancore/wallet-shared';
+
+export {
   createWallet,
   importWallet,
   restoreWallet,
@@ -107,9 +113,12 @@ export {
   isRateLimitError,
   isInsufficientBalance,
   isInvalidSignatureError,
+  isInvalidSignature,
   isNetworkTimeoutError,
+  isNetworkError,
   isVaultNotFoundError,
   isContractNotFoundError,
+  isContractFailed,
   isInsufficientFee,
   assertValidEd25519PublicKey,
   assertValidContractId,
@@ -137,6 +146,16 @@ export {
   isTransientStatusCode,
   type RetryOptions,
 } from './utils/retry';
+
+// Retry policy wrapper
+export {
+  withNetworkRetry,
+  createRetryPolicyWrapper,
+  resolveRetryPolicy,
+  calculateRetryDelay,
+  DEFAULT_RETRY_POLICY,
+  type RetryPolicyOptions,
+} from './retry-policy';
 
 // Account sequence fetch helper — re-exported from @ancore/stellar for SDK consumers.
 // Use fetchAccountSequence to retrieve a Stellar account's current sequence number

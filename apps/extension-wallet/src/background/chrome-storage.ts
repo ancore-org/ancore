@@ -8,12 +8,14 @@ type StorageSetCallback = () => void;
 type ChromeStorageLocal = {
   get: (key: string, callback: StorageGetCallback) => void;
   set: (items: Record<string, unknown>, callback?: StorageSetCallback) => void;
+  clear?: (callback?: StorageSetCallback) => void;
 };
 
 type ChromeStorageSession = {
   get: (key: string, callback: StorageGetCallback) => void;
   set: (items: Record<string, unknown>, callback?: StorageSetCallback) => void;
   remove: (key: string, callback?: StorageSetCallback) => void;
+  clear?: (callback?: StorageSetCallback) => void;
 };
 
 function getChromeStorageApi():

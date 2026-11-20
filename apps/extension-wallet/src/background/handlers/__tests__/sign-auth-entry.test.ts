@@ -10,9 +10,13 @@ vi.mock('@/messaging', () => ({
   registerHandler: vi.fn(),
 }));
 
-vi.mock('../../session-state', () => ({
-  isBackgroundSessionUnlocked: vi.fn(),
-}));
+vi.mock('../../session-state', () => {
+  const isBackgroundSessionUnlocked = vi.fn();
+  return {
+    isBackgroundSessionUnlocked,
+    isBackgroundSessionUnlockedAsync: vi.fn(async () => isBackgroundSessionUnlocked()),
+  };
+});
 
 vi.mock('../../signing-key', () => ({
   getSigningKeypair: vi.fn(),
@@ -117,6 +121,18 @@ describe('sign-auth-entry handler', () => {
       await expect(signAuthEntry({ authEntryXdr: 'any-xdr-string' })).rejects.toThrow(
         'Wallet is locked'
       );
+    });
+
+    it('should succeed when session is restored asynchronously after SW restart', async () => {
+      (isBackgroundSessionUnlocked as any).mockReturnValue(false);
+      const { isBackgroundSessionUnlockedAsync } = await import('../../session-state');
+      (isBackgroundSessionUnlockedAsync as any).mockResolvedValueOnce(true);
+
+      const unsignedEntry = makeUnsignedAuthEntry(testKp);
+      const result = await signAuthEntry({
+        authEntryXdr: unsignedEntry.toXDR('base64'),
+      });
+      expect(result.signedAuthEntry).toBeDefined();
     });
 
     it('should throw error on network mismatch', async () => {

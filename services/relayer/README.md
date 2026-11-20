@@ -142,6 +142,41 @@ accepts **any** non-empty Bearer token.
 
 ---
 
+## Graceful Shutdown
+
+The process drains on `SIGTERM` (rolling deploys, `docker compose down`, ECS task
+replacement) and `SIGINT` instead of dying mid-request (#1346). For a service that signs and
+submits transactions this is not hygiene: a relay killed after the transaction is submitted but
+before the confirmation is recorded leaves the ledger and the store disagreeing.
+
+1. **Stop taking new work.** `server.close()` stops accepting connections, the scheduler stops
+   starting new ticks, and anything arriving now is the load balancer's problem.
+2. **Finish what is in flight**, concurrently and bounded by the budget: HTTP responses, the
+   current scheduler tick, and queue jobs.
+3. **Release the Postgres pool** (#1470). `Pool#end()` refuses new queries the moment it is
+   called, so the pool is closed _after_ the drains settle, never alongside them — a pool closed
+   during the drain would fail the in-flight submissions shutdown exists to finish.
+4. **Exit.** Status `0` when everything drained and was released, `1` when the budget ran out
+   first, so a truncated shutdown is visible in the orchestrator's logs rather than looking like
+   a clean one.
+
+A second signal during shutdown exits immediately with `1`: an operator pressing Ctrl-C twice is
+asking to stop now, and appearing hung is the wrong answer to that.
+
+| Behaviour                     | Value                                                           |
+| ----------------------------- | --------------------------------------------------------------- |
+| Signals                       | `SIGTERM`, `SIGINT`                                             |
+| Budget (drain + release)      | 15s — deliberately half of Kubernetes' default 30s grace period |
+| Exit on clean shutdown        | `0`                                                             |
+| Exit when the budget is spent | `1`                                                             |
+
+The budget is not configurable through the environment on purpose: it has to stay well inside the
+orchestrator's grace period, or SIGKILL lands mid-drain and the handler achieves nothing. Handlers
+are installed only when `src/server.ts` is the process entrypoint, so importing `createApp` into a
+test or another process does not hijack that process's signal handling.
+
+---
+
 ## API
 
 All endpoints accept and return `application/json`.
@@ -277,7 +312,8 @@ Same request body as `/relay/execute`.
 
 ### `GET /relay/status`
 
-Health check. No authentication required.
+Health check. No authentication required. For the full `GET /health` response schema (including
+the `database` dependency and 200/503 semantics), see [docs/HEALTH_CHECK.md](docs/HEALTH_CHECK.md).
 
 **Response `200`:**
 
@@ -391,14 +427,60 @@ The service rejects negative nonces at the validation layer. Full replay trackin
 
 ### Rate Limiting
 
-Per-account rate limiting is enforced via `createAccountRateLimiterMiddleware` (default: 30 requests/minute per account session key or address, configurable via `RELAY_RATE_LIMIT_RPM`).
+The relayer employs a multi-tiered defense-in-depth rate limiting architecture:
 
-When an account exceeds its limit, the relayer returns `HTTP 429 Too Many Requests` with:
+#### 1. Global Per-IP Rate Limiting (`createIpRateLimiterMiddleware`)
 
-- **Header:** `Retry-After: 60`
-- **Body:** `{ "error": "RATE_LIMITED", "retryAfter": 60 }`
+Protects against single-client denial-of-service, brute-force, and credential-stuffing attacks across all endpoints.
 
-Note: uses in-memory store by default (unit-only unless a Redis store like `rate-limit-redis` is configured for multi-instance deployments).
+- **Default Limit:** 100 requests per minute per IP address (`DEFAULT_IP_RATE_LIMIT_RPM = 100`).
+- **Window:** 60 seconds sliding window (`DEFAULT_IP_RATE_LIMIT_WINDOW_MS = 60_000`).
+- **IP Extraction:** Automatically extracts client IP from `X-Forwarded-For` (first IP in multi-proxy chains), `X-Real-IP`, or Express `req.ip` with `trust proxy` enabled.
+- **Bypasses:** Internal monitoring endpoints (`/health`, `/metrics`) are exempt by default.
+- **Configuration:** the limit and window are not read from environment variables. They come from the
+  `rpm` / `windowMs` options of `createIpRateLimiterMiddleware` (defaults above); `src/server.ts`
+  uses the defaults and only sets `skip` for `/health` and `/metrics`. The per-account and per-route
+  limiters below are the ones tuned through env vars.
+- **Headers:** the limiter emits the IETF draft `RateLimit-Limit`, `RateLimit-Remaining` and
+  `RateLimit-Reset` headers on every response. The legacy `X-RateLimit-*` headers are deliberately
+  disabled (`legacyHeaders: false`), so clients should read the `RateLimit-*` names.
+
+When an IP exceeds its quota, the service responds with `HTTP 429 Too Many Requests`:
+
+- **Headers:**
+  - `RateLimit-Limit: 100`
+  - `RateLimit-Remaining: 0`
+  - `RateLimit-Reset: <epoch_seconds>`
+  - `Retry-After: 60`
+- **Body:**
+  ```json
+  {
+    "error": "TOO_MANY_REQUESTS",
+    "message": "Too many requests from this IP, please try again later.",
+    "retryAfter": 60
+  }
+  ```
+
+#### 2. Per-Account Rate Limiting (`createAccountRateLimiterMiddleware`)
+
+Limits requests per session key or account identity across relay execution routes.
+
+- **Default:** 30 requests/minute per account (configurable via `RELAY_RATE_LIMIT_RPM`).
+- **Response:** `HTTP 429` with `{ "error": "RATE_LIMITED", "retryAfter": 60 }`.
+
+#### 3. Per-Route Rate Limiting (`createRouteRateLimiter`)
+
+Enforces endpoint-specific limits based on sensitivity:
+
+| Route                       | RPM | Rationale                        |
+| --------------------------- | --- | -------------------------------- |
+| `/relay/execute`            | 30  | Standard relay execution         |
+| `/relay/validate`           | 60  | Read-only simulation probe       |
+| `/relay/session-key`        | 10  | Sensitive: credential creation   |
+| `/relay/revoke-session-key` | 10  | Sensitive: credential revocation |
+| `/relay/status`             | 120 | Health / monitoring              |
+
+Note: uses in-memory store by default (swap in `rate-limit-redis` for multi-instance production deployments).
 
 ### Gas Limit Enforcement
 
@@ -410,13 +492,13 @@ Deploy behind TLS termination (e.g. AWS ALB, nginx). The service itself does not
 
 ### Threat Summary
 
-| Threat              | Mitigation                                          |
-| ------------------- | --------------------------------------------------- |
-| Signature forgery   | Ed25519 verification (stub → real before prod)      |
-| Replay attacks      | Nonce validation (full tracking needed before prod) |
-| Abuse / DoS         | Rate limiting (not yet implemented)                 |
-| Gas griefing        | Gas limit enforcement (not yet implemented)         |
-| Unauthorised access | Bearer token auth on all mutating endpoints         |
+| Threat              | Mitigation                                                                                          |
+| ------------------- | --------------------------------------------------------------------------------------------------- |
+| Signature forgery   | Ed25519 verification (stub → real before prod)                                                      |
+| Replay attacks      | Nonce validation (full tracking needed before prod)                                                 |
+| Abuse / DoS         | Multi-tier rate limiting (global per-IP throttling + per-route limits + per-account session limits) |
+| Gas griefing        | Gas limit enforcement (not yet implemented)                                                         |
+| Unauthorised access | Bearer token auth on all mutating endpoints                                                         |
 
 ---
 

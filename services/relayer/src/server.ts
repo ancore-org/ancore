@@ -16,6 +16,7 @@ import { RelayService } from './services/relayService';
 import { createStellarSubmitterFromEnv } from './services/stellarSubmitter';
 import { createAuthMiddleware } from './middleware/auth';
 import { createAccountRateLimiterMiddleware } from './middleware/accountRateLimiter';
+import { createIpRateLimiterMiddleware } from './middleware/ipRateLimiter';
 import { createRouteRateLimiter } from './middleware/routeRateLimiter';
 import { createIdempotencyMiddleware } from './middleware/idempotency';
 import { createPayloadGuardMiddleware } from './middleware/payloadGuard';
@@ -133,6 +134,7 @@ export function createApp(
   const resolvedAuthService =
     authService ?? (authSecret ? createBearerAuthService(authSecret) : stubAuthService);
   const app = express();
+  app.set('trust proxy', 1);
 
   app.use(
     cors({
@@ -149,6 +151,12 @@ export function createApp(
   app.use(createRequestIdMiddleware());
 
   app.use(createRequestLoggerMiddleware());
+
+  app.use(
+    createIpRateLimiterMiddleware({
+      skip: (req) => req.path === '/health' || req.path === '/metrics',
+    })
+  );
 
   const useMockSubmission =
     relayOptions?.useMockSubmission === true || env.RELAYER_USE_MOCK_SUBMISSION;
@@ -201,7 +209,7 @@ export function createApp(
 
   const executeHandler = createExecuteRelayHandler(relayService);
   const validateHandler = createValidateRelayHandler(relayService);
-  const healthHandler = createHealthHandler(relayService);
+  const healthHandler = createHealthHandler(relayService, dbPool);
 
   const scheduledTransferService = new ScheduledTransferService(
     resolvedScheduledTransferStore,
@@ -211,7 +219,7 @@ export function createApp(
     pollIntervalMs: env.SCHEDULER_POLL_INTERVAL_MS,
   });
 
-  if (relayOptions?.startScheduler !== false) {
+  if (relayOptions?.startScheduler ?? env.NODE_ENV !== 'test') {
     schedulerEngine.start();
   }
 
@@ -237,7 +245,7 @@ export function createApp(
   );
   app.post('/relay/validate', auth, contentTypeGuard, relayLimiter, validate, validateHandler);
   app.get('/relay/status', statusLimiter, healthHandler);
-  app.get('/health', healthHandler);
+  app.get('/health', healthRouteLimiter, healthHandler);
   app.get('/metrics', (_req, res) => {
     res.set('Content-Type', 'text/plain; version=0.0.4; charset=utf-8');
     res.send(renderPrometheusMetrics());
@@ -313,6 +321,10 @@ if (require.main === module) {
     const server = app.listen(env.PORT, () => {
       console.log(`Relayer service listening on port ${env.PORT}`);
     });
+    // Avoid 502 Bad Gateway behind AWS ALB / Cloudflare (both use 60s+
+    // keepalive). headersTimeout must exceed keepAliveTimeout.
+    server.keepAliveTimeout = 65_000;
+    server.headersTimeout = 66_000;
 
     // Drain on SIGTERM/SIGINT instead of dying mid-flight (#1346). Installed
     // only when this file is the entrypoint: importing `createApp` into a test
@@ -320,6 +332,11 @@ if (require.main === module) {
     installShutdownHandlers({
       server,
       drainables: [app.locals.schedulerEngine as SchedulerEngine],
+      // The pool is closed last, after the HTTP server, scheduler tick and
+      // queue worker have settled (#1470). `Pool#end()` rejects new queries
+      // the moment it is called, so closing it during the drain phase would
+      // fail the in-flight submissions shutdown is meant to finish.
+      closers: pool ? [() => pool.end()] : [],
     });
   })().catch((error) => {
     console.error('Relayer startup failed', error);

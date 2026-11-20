@@ -3,7 +3,14 @@ import type { SessionKey } from '@ancore/types';
 import { permissionsToLabels } from '@ancore/core-sdk';
 import { ExpiryCountdown, useExpiryCountdown, useToast } from '@ancore/ui-kit';
 
+import { formatRelativeExpiry, type ExpiryTone } from '../../utils/time';
 import { refreshSessionKeyTtl } from './refreshSessionKeyTtl';
+
+const TONE_CLASS: Record<ExpiryTone, string> = {
+  green: 'bg-green-100 text-green-700',
+  amber: 'bg-amber-100 text-amber-700',
+  red: 'bg-red-100 text-red-700',
+};
 
 export interface SessionKeyRowProps {
   sessionKey: SessionKey;
@@ -31,6 +38,8 @@ export const SessionKeyRow: React.FC<SessionKeyRowProps> = ({
       ? 'bg-green-100 text-green-700'
       : 'bg-gray-200 text-gray-500';
 
+  const relativeExpiry = isRevoked ? null : formatRelativeExpiry(sessionKey.expiresAt);
+
   const handleRefresh = async (): Promise<void> => {
     setRefreshLoading(true);
     try {
@@ -54,6 +63,15 @@ export const SessionKeyRow: React.FC<SessionKeyRowProps> = ({
         <p className="font-medium">
           {sessionKey.label || 'Unnamed Key'}
           <span className={`ml-2 text-xs px-1.5 py-0.5 rounded ${badgeClass}`}>{badgeLabel}</span>
+          {relativeExpiry && (
+            <span
+              data-testid="expiry-badge"
+              data-tone={relativeExpiry.tone}
+              className={`ml-2 text-xs px-1.5 py-0.5 rounded ${TONE_CLASS[relativeExpiry.tone]}`}
+            >
+              {relativeExpiry.label}
+            </span>
+          )}
         </p>
         <p className="text-xs text-gray-500 font-mono mt-0.5">
           {truncatePublicKey(sessionKey.publicKey)}

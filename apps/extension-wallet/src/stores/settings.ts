@@ -168,7 +168,19 @@ export const useSettingsStore = create<SettingsState>()(
           applyTheme(theme);
           return { theme };
         }),
-      setAutoLockMinutes: (autoLockMinutes) => set({ autoLockMinutes }),
+      setAutoLockMinutes: (autoLockMinutes) => {
+        if (
+          typeof autoLockMinutes !== 'number' ||
+          !Number.isFinite(autoLockMinutes) ||
+          autoLockMinutes < 1 ||
+          autoLockMinutes > 1440
+        ) {
+          throw new RangeError(
+            `autoLockMinutes must be a number between 1 and 1440, got ${autoLockMinutes}`
+          );
+        }
+        set({ autoLockMinutes });
+      },
       setRequirePasswordForSensitiveActions: (requirePasswordForSensitiveActions) =>
         set({ requirePasswordForSensitiveActions }),
       setNotificationPreference: (category, enabled) =>

@@ -479,6 +479,82 @@ describe('refreshSessionKeyTtl', () => {
       isErrorSpy.mockRestore();
     }
   });
+
+  it('supports custom RetryPolicy options when simulating invocation', async () => {
+    const invocation = { method: 'refresh_session_key_ttl', args: [] };
+    const operation = xdr.Operation.fromXDR(
+      '000000000000000a0000000474657374000000010000000376616c00',
+      'hex'
+    );
+    mockedAccountAbstraction.__mocked.refreshSessionKeyTtl.mockReturnValue(invocation);
+    mockedAccountAbstraction.__mocked.buildInvokeOperation.mockReturnValue(operation);
+
+    const contractEvent = makeSessionKeyTtlRefreshedEvent(SESSION_PUBLIC_KEY, NOW_SECONDS + 3600);
+    const server = {
+      getAccount: jest.fn().mockResolvedValue({ id: SESSION_PUBLIC_KEY, sequence: '42' }),
+      simulateTransaction: jest.fn().mockResolvedValue({
+        events: [contractEvent.event],
+        latestLedger: 1,
+      }),
+    } as unknown as rpc.Server;
+
+    const isSuccessSpy = jest.spyOn(rpc.Api, 'isSimulationSuccess').mockReturnValue(true);
+    const isErrorSpy = jest.spyOn(rpc.Api, 'isSimulationError').mockReturnValue(false);
+
+    try {
+      const res = await refreshSessionKeyTtl(
+        {
+          refreshSessionKeyTtl: mockedAccountAbstraction.__mocked.refreshSessionKeyTtl,
+          buildInvokeOperation: mockedAccountAbstraction.__mocked.buildInvokeOperation,
+        },
+        params,
+        {
+          server,
+          sourceAccount: SESSION_PUBLIC_KEY,
+          networkPassphrase: Networks.TESTNET,
+          retry: { maxRetries: 2, backoff: 'fixed', delayMs: 10 },
+        }
+      );
+      expect(res.invocation).toBe(invocation);
+      expect(res.operation).toBe(operation);
+    } finally {
+      isSuccessSpy.mockRestore();
+      isErrorSpy.mockRestore();
+    }
+  });
+
+  it('rejects with SimulationFailedError when simulation times out', async () => {
+    const invocation = { method: 'refresh_session_key_ttl', args: [] };
+    const operation = xdr.Operation.fromXDR(
+      '000000000000000a0000000474657374000000010000000376616c00',
+      'hex'
+    );
+    mockedAccountAbstraction.__mocked.refreshSessionKeyTtl.mockReturnValue(invocation);
+    mockedAccountAbstraction.__mocked.buildInvokeOperation.mockReturnValue(operation);
+
+    const server = {
+      getAccount: jest.fn().mockResolvedValue({ id: SESSION_PUBLIC_KEY, sequence: '42' }),
+      simulateTransaction: jest
+        .fn()
+        .mockImplementation(() => new Promise((resolve) => setTimeout(resolve, 50))),
+    } as unknown as rpc.Server;
+
+    await expect(
+      refreshSessionKeyTtl(
+        {
+          refreshSessionKeyTtl: mockedAccountAbstraction.__mocked.refreshSessionKeyTtl,
+          buildInvokeOperation: mockedAccountAbstraction.__mocked.buildInvokeOperation,
+        },
+        params,
+        {
+          server,
+          sourceAccount: SESSION_PUBLIC_KEY,
+          networkPassphrase: Networks.TESTNET,
+          simulationTimeoutMs: 5,
+        }
+      )
+    ).rejects.toThrow('Session key TTL simulation timed out after 5ms.');
+  });
 });
 
 describe('parseSessionKeyTtlRefreshedEvent', () => {

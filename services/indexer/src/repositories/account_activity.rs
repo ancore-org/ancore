@@ -1,7 +1,11 @@
 use base64::Engine as _;
 use chrono::{DateTime, Utc};
+use lru::LruCache;
 use serde::{Deserialize, Serialize};
 use sqlx::{PgPool, Row};
+use std::num::NonZeroUsize;
+use std::sync::{Mutex, OnceLock};
+use std::time::{Duration, Instant};
 use uuid::Uuid;
 
 use crate::error::{ApiError, Result};
@@ -102,6 +106,9 @@ pub async fn insert_activity(db: &PgPool, params: &InsertActivity) -> Result<Opt
     .fetch_optional(db)
     .await?;
 
+    // A successful ingest write advances the checkpoint, so cached reads are stale.
+    invalidate_account_response_cache();
+
     Ok(row.map(|r| r.get::<Uuid, _>("id")))
 }
 
@@ -109,6 +116,7 @@ pub async fn insert_activity(db: &PgPool, params: &InsertActivity) -> Result<Opt
 #[derive(Debug, Clone, Default)]
 pub struct ActivityFilter {
     pub activity_type: Option<String>,
+    pub operation_type: Option<String>,
     pub asset: Option<String>,
     pub counterparty: Option<String>,
     pub ledger_min: Option<i64>,
@@ -126,7 +134,7 @@ pub struct CursorPage {
 }
 
 /// Paginated result
-#[derive(Debug, Clone, Serialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct PageResult<T> {
     pub items: Vec<T>,
     pub has_next_page: bool,
@@ -190,6 +198,108 @@ fn decode_cursor(cursor: &str) -> Result<DecodedCursor> {
     Ok(cursor_obj)
 }
 
+/// Bound on cached account responses. Issue #1551.
+pub const ACCOUNT_RESPONSE_CACHE_CAPACITY: usize = 10_000;
+
+/// Identical account reads within this window are served from memory.
+const ACCOUNT_RESPONSE_CACHE_TTL: Duration = Duration::from_secs(5);
+
+struct CacheEntry {
+    serialized: String,
+    stored_at: Instant,
+}
+
+/// LRU cache of serialized account query responses.
+struct AccountResponseCache {
+    entries: LruCache<String, CacheEntry>,
+}
+
+impl AccountResponseCache {
+    fn new(capacity: usize) -> Self {
+        let capacity = NonZeroUsize::new(capacity.max(1)).expect("capacity is non-zero");
+        Self {
+            entries: LruCache::new(capacity),
+        }
+    }
+
+    fn get(&mut self, key: &str, now: Instant) -> Option<String> {
+        let entry = self.entries.peek(key)?;
+        let expired = now.saturating_duration_since(entry.stored_at) >= ACCOUNT_RESPONSE_CACHE_TTL;
+        if expired {
+            self.entries.pop(key);
+            return None;
+        }
+        self.entries.get(key).map(|entry| entry.serialized.clone())
+    }
+
+    fn insert(&mut self, key: String, serialized: String, now: Instant) {
+        self.entries.put(
+            key,
+            CacheEntry {
+                serialized,
+                stored_at: now,
+            },
+        );
+    }
+
+    fn invalidate_all(&mut self) {
+        self.entries.clear();
+    }
+}
+
+fn response_cache() -> &'static Mutex<AccountResponseCache> {
+    static CACHE: OnceLock<Mutex<AccountResponseCache>> = OnceLock::new();
+    CACHE.get_or_init(|| Mutex::new(AccountResponseCache::new(ACCOUNT_RESPONSE_CACHE_CAPACITY)))
+}
+
+fn account_activity_cache_key(
+    account_id: &str,
+    filter: &ActivityFilter,
+    page: &CursorPage,
+    limit: u32,
+) -> String {
+    format!(
+        "{account_id}|{}|{}|{}|{:?}|{:?}|{:?}|{:?}|{}|{}|{limit}",
+        filter.activity_type.as_deref().unwrap_or(""),
+        filter.asset.as_deref().unwrap_or(""),
+        filter.counterparty.as_deref().unwrap_or(""),
+        filter.ledger_min,
+        filter.ledger_max,
+        filter.from_date.map(|ts| ts.timestamp_millis()),
+        filter.to_date.map(|ts| ts.timestamp_millis()),
+        page.after.as_deref().unwrap_or(""),
+        page.before.as_deref().unwrap_or(""),
+    )
+}
+
+fn read_cached_account_activity(key: &str) -> Option<PageResult<ActivityRecord>> {
+    let serialized = {
+        let mut cache = response_cache()
+            .lock()
+            .unwrap_or_else(|err| err.into_inner());
+        cache.get(key, Instant::now())?
+    };
+    serde_json::from_str(&serialized).ok()
+}
+
+fn store_cached_account_activity(key: &str, page: &PageResult<ActivityRecord>) {
+    let Ok(serialized) = serde_json::to_string(page) else {
+        return;
+    };
+    let mut cache = response_cache()
+        .lock()
+        .unwrap_or_else(|err| err.into_inner());
+    cache.insert(key.to_string(), serialized, Instant::now());
+}
+
+/// Drop cached account responses after an ingest checkpoint write.
+pub fn invalidate_account_response_cache() {
+    let mut cache = response_cache()
+        .lock()
+        .unwrap_or_else(|err| err.into_inner());
+    cache.invalidate_all();
+}
+
 /// Get account activity with cursor pagination and filters
 pub async fn get_account_activity(
     db: &PgPool,
@@ -222,6 +332,11 @@ pub async fn get_account_activity(
         None
     };
 
+    let cache_key = account_activity_cache_key(account_id, filter, page, limit);
+    if let Some(cached) = read_cached_account_activity(&cache_key) {
+        return Ok(cached);
+    }
+
     // Build query dynamically using QueryBuilder
     let mut query = sqlx::query_builder::QueryBuilder::new(
         "SELECT id, account_id, activity_type, amount, asset, asset_code, asset_issuer, counterparty, tx_hash, ledger_seq, created_at, metadata FROM account_activity WHERE account_id = ",
@@ -250,7 +365,11 @@ pub async fn get_account_activity(
     }
 
     // Apply filters
-    if let Some(ref activity_type) = filter.activity_type {
+    let op_type_filter = filter
+        .operation_type
+        .as_ref()
+        .or(filter.activity_type.as_ref());
+    if let Some(activity_type) = op_type_filter {
         query.push(" AND activity_type = ");
         query.push_bind(activity_type);
     }
@@ -340,13 +459,15 @@ pub async fn get_account_activity(
 
     let has_previous_page = prev_cursor.is_some();
 
-    Ok(PageResult {
+    let result = PageResult {
         items,
         has_next_page,
         has_previous_page,
         next_cursor,
         prev_cursor,
-    })
+    };
+    store_cached_account_activity(&cache_key, &result);
+    Ok(result)
 }
 
 /// Get a single activity by ID, scoped to account_id
@@ -617,5 +738,50 @@ mod tests {
         let cloned = record.clone();
         assert_eq!(record.id, cloned.id);
         assert_eq!(record.account_id, cloned.account_id);
+    }
+
+    #[test]
+    fn cached_account_response_is_reused_within_ttl() {
+        use std::time::{Duration, Instant};
+
+        let mut cache = super::AccountResponseCache::new(ACCOUNT_RESPONSE_CACHE_CAPACITY);
+        let now = Instant::now();
+        let key = "GABC|default";
+        let payload = r#"{"items":[],"has_next_page":false,"has_previous_page":false,"next_cursor":null,"prev_cursor":null}"#;
+
+        assert!(cache.get(key, now).is_none());
+        cache.insert(key.to_string(), payload.to_string(), now);
+
+        assert_eq!(cache.get(key, now).as_deref(), Some(payload));
+        assert_eq!(
+            cache.get(key, now + Duration::from_secs(4)).as_deref(),
+            Some(payload)
+        );
+        assert!(cache.get(key, now + Duration::from_secs(5)).is_none());
+    }
+
+    #[test]
+    fn ingest_checkpoint_invalidates_cached_account_responses() {
+        use std::time::Instant;
+
+        let mut cache = super::AccountResponseCache::new(4);
+        let now = Instant::now();
+        cache.insert("acct".to_string(), "1".to_string(), now);
+        cache.invalidate_all();
+        assert!(cache.get("acct", now).is_none());
+    }
+
+    #[test]
+    fn account_response_cache_is_bounded_to_ten_thousand() {
+        use std::time::Instant;
+
+        assert_eq!(ACCOUNT_RESPONSE_CACHE_CAPACITY, 10_000);
+        let mut cache = super::AccountResponseCache::new(2);
+        let now = Instant::now();
+        cache.insert("a".to_string(), "1".to_string(), now);
+        cache.insert("b".to_string(), "2".to_string(), now);
+        cache.insert("c".to_string(), "3".to_string(), now);
+        assert!(cache.get("a", now).is_none());
+        assert_eq!(cache.get("c", now).as_deref(), Some("3"));
     }
 }

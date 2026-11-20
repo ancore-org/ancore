@@ -1,3 +1,4 @@
+import request from 'supertest';
 import { Request, Response, NextFunction } from 'express';
 import {
   createPayloadGuardMiddleware,
@@ -6,6 +7,7 @@ import {
   PAYLOAD_TOO_LARGE_REASON,
 } from '../payloadGuard';
 import { EnvValidationError, resetEnvCache } from '../../config/env';
+import { createApp } from '../../server';
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -193,5 +195,73 @@ describe('createPayloadGuardMiddleware', () => {
     expect(loggedArg.reason).toBe(PAYLOAD_TOO_LARGE_REASON);
 
     warnSpy.mockRestore();
+  });
+});
+
+// -- /relay/validate integration --
+
+describe('/relay/validate payload guard', () => {
+  const originalEnv = process.env['RELAY_MAX_PAYLOAD_BYTES'];
+
+  beforeEach(() => {
+    process.env['RELAY_MAX_PAYLOAD_BYTES'] = '1024';
+    resetEnvCache();
+  });
+
+  afterEach(() => {
+    if (originalEnv === undefined) {
+      delete process.env['RELAY_MAX_PAYLOAD_BYTES'];
+    } else {
+      process.env['RELAY_MAX_PAYLOAD_BYTES'] = originalEnv;
+    }
+    resetEnvCache();
+  });
+
+  it('rejects a body exceeding RELAY_MAX_PAYLOAD_BYTES with 413 before auth or parsing', async () => {
+    const app = createApp();
+    const res = await request(app)
+      .post('/relay/validate')
+      .set('Content-Type', 'application/json')
+      .send(JSON.stringify({ padding: 'x'.repeat(2048) }));
+
+    expect(res.status).toBe(413);
+    expect(res.body.error).toBe(PAYLOAD_TOO_LARGE_REASON);
+  });
+
+  it('lets a standard-size body past the guard', async () => {
+    const app = createApp();
+    const res = await request(app)
+      .post('/relay/validate')
+      .set('Content-Type', 'application/json')
+      .send(JSON.stringify({ padding: 'x' }));
+
+    expect(res.status).not.toBe(413);
+  });
+
+  it('accepts a body exactly at the limit', async () => {
+    const app = createApp();
+    const body = JSON.stringify({ padding: 'x'.repeat(1024 - '{"padding":""}'.length) });
+    expect(Buffer.byteLength(body)).toBe(1024);
+
+    const res = await request(app)
+      .post('/relay/validate')
+      .set('Content-Type', 'application/json')
+      .send(body);
+
+    expect(res.status).not.toBe(413);
+  });
+
+  it('rejects a body one byte over the limit', async () => {
+    const app = createApp();
+    const body = JSON.stringify({ padding: 'x'.repeat(1025 - '{"padding":""}'.length) });
+    expect(Buffer.byteLength(body)).toBe(1025);
+
+    const res = await request(app)
+      .post('/relay/validate')
+      .set('Content-Type', 'application/json')
+      .send(body);
+
+    expect(res.status).toBe(413);
+    expect(res.body.error).toBe(PAYLOAD_TOO_LARGE_REASON);
   });
 });

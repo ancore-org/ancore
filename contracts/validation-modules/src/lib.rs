@@ -366,6 +366,165 @@ mod tests {
         assert_eq!(result, Err(Ok(ValidationModuleError::TargetNotAllowed)));
     }
 
+    fn setup_module() -> (Env, TargetAllowlistModuleClient<'static>) {
+        let env = Env::default();
+        env.mock_all_auths();
+        let contract_id = env.register_contract(None, TargetAllowlistModule);
+        let client = TargetAllowlistModuleClient::new(&env, &contract_id);
+        client.initialize(&Address::generate(&env));
+        (env, client)
+    }
+
+    #[test]
+    fn removing_function_revokes_validation() {
+        let (env, client) = setup_module();
+        let target = Address::generate(&env);
+
+        client.set_allowed_function(&target, &symbol_short!("execute"), &true);
+        client.set_allowed_function(&target, &symbol_short!("execute"), &false);
+
+        assert!(!client.is_allowed_function(&target, &symbol_short!("execute")));
+        assert_eq!(
+            client.try_validate(&context(&env, target)),
+            Err(Ok(ValidationModuleError::TargetNotAllowed))
+        );
+    }
+
+    #[test]
+    fn readding_target_restores_validation() {
+        let (env, client) = setup_module();
+        let target = Address::generate(&env);
+
+        client.set_allowed_target(&target, &true);
+        client.set_allowed_target(&target, &false);
+        client.set_allowed_target(&target, &true);
+
+        assert!(client.is_allowed_target(&target));
+        assert_eq!(client.try_validate(&context(&env, target)), Ok(Ok(())));
+    }
+
+    #[test]
+    fn readding_function_restores_validation() {
+        let (env, client) = setup_module();
+        let target = Address::generate(&env);
+
+        client.set_allowed_function(&target, &symbol_short!("execute"), &true);
+        client.set_allowed_function(&target, &symbol_short!("execute"), &false);
+        client.set_allowed_function(&target, &symbol_short!("execute"), &true);
+
+        assert_eq!(client.try_validate(&context(&env, target)), Ok(Ok(())));
+    }
+
+    #[test]
+    fn duplicate_target_registration_is_idempotent() {
+        let (env, client) = setup_module();
+        let target = Address::generate(&env);
+
+        client.set_allowed_target(&target, &true);
+        client.set_allowed_target(&target, &true);
+        assert!(client.is_allowed_target(&target));
+
+        // A single revoke fully removes the entry; no duplicate lingers.
+        client.set_allowed_target(&target, &false);
+        assert!(!client.is_allowed_target(&target));
+        assert_eq!(
+            client.try_validate(&context(&env, target)),
+            Err(Ok(ValidationModuleError::TargetNotAllowed))
+        );
+    }
+
+    #[test]
+    fn duplicate_function_registration_is_idempotent() {
+        let (env, client) = setup_module();
+        let target = Address::generate(&env);
+        let function = symbol_short!("execute");
+
+        client.set_allowed_function(&target, &function, &true);
+        client.set_allowed_function(&target, &function, &true);
+        client.set_allowed_function(&target, &function, &false);
+
+        assert!(!client.is_allowed_function(&target, &function));
+    }
+
+    #[test]
+    fn revoking_unregistered_entries_is_a_noop() {
+        let (env, client) = setup_module();
+        let target = Address::generate(&env);
+
+        client.set_allowed_target(&target, &false);
+        client.set_allowed_function(&target, &symbol_short!("execute"), &false);
+
+        assert!(!client.is_allowed_target(&target));
+        assert!(!client.is_allowed_function(&target, &symbol_short!("execute")));
+    }
+
+    #[test]
+    fn function_allowlist_is_scoped_to_its_target_and_name() {
+        let (env, client) = setup_module();
+        let target = Address::generate(&env);
+        let other = Address::generate(&env);
+
+        client.set_allowed_function(&target, &symbol_short!("execute"), &true);
+
+        assert!(!client.is_allowed_function(&other, &symbol_short!("execute")));
+        assert!(!client.is_allowed_function(&target, &symbol_short!("other")));
+        assert_eq!(
+            client.try_validate(&context(&env, other)),
+            Err(Ok(ValidationModuleError::TargetNotAllowed))
+        );
+    }
+
+    #[test]
+    fn revoking_target_keeps_function_level_allowance() {
+        let (env, client) = setup_module();
+        let target = Address::generate(&env);
+
+        client.set_allowed_target(&target, &true);
+        client.set_allowed_function(&target, &symbol_short!("execute"), &true);
+        client.set_allowed_target(&target, &false);
+
+        assert_eq!(client.try_validate(&context(&env, target)), Ok(Ok(())));
+    }
+
+    #[test]
+    fn empty_allowlist_rejects_everything() {
+        let (env, client) = setup_module();
+        let target = Address::generate(&env);
+
+        assert_eq!(
+            client.try_validate(&context(&env, target)),
+            Err(Ok(ValidationModuleError::TargetNotAllowed))
+        );
+    }
+
+    #[test]
+    fn allowlist_changes_require_admin_auth() {
+        use soroban_sdk::{testutils::MockAuth, testutils::MockAuthInvoke, IntoVal};
+
+        let env = Env::default();
+        let contract_id = env.register_contract(None, TargetAllowlistModule);
+        let client = TargetAllowlistModuleClient::new(&env, &contract_id);
+        let admin = Address::generate(&env);
+        let target = Address::generate(&env);
+
+        // Authorize only `initialize`; later admin-gated calls get no auth.
+        env.mock_auths(&[MockAuth {
+            address: &admin,
+            invoke: &MockAuthInvoke {
+                contract: &contract_id,
+                fn_name: "initialize",
+                args: (&admin,).into_val(&env),
+                sub_invokes: &[],
+            },
+        }]);
+        client.initialize(&admin);
+
+        assert!(client.try_set_allowed_target(&target, &true).is_err());
+        assert!(client
+            .try_set_allowed_function(&target, &symbol_short!("execute"), &true)
+            .is_err());
+    }
+
     #[test]
     fn read_paths_reject_before_initialization() {
         let env = Env::default();

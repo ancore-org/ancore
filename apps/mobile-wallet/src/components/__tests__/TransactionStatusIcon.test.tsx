@@ -32,7 +32,7 @@ describe('TransactionStatusIcon', () => {
       render(<TransactionStatusIcon />);
 
       const icon = screen.getByRole('img');
-      expect(icon).toHaveClass('text-slate-500');
+      expect(icon).toHaveStyle({ color: '#64748b' });
       expect(icon.textContent).toBe('?');
     });
 
@@ -127,46 +127,46 @@ describe('TransactionStatusIcon', () => {
   });
 
   describe('styling', () => {
-    it('applies correct color class for success status', () => {
+    it('applies correct color style for success status', () => {
       render(<TransactionStatusIcon status="success" />);
 
       const icon = screen.getByRole('img');
-      expect(icon).toHaveClass('text-green-600');
+      expect(icon).toHaveStyle({ color: '#16a34a' });
     });
 
-    it('applies correct color class for completed status', () => {
+    it('applies correct color style for completed status', () => {
       render(<TransactionStatusIcon status="completed" />);
 
       const icon = screen.getByRole('img');
-      expect(icon).toHaveClass('text-green-600');
+      expect(icon).toHaveStyle({ color: '#16a34a' });
     });
 
-    it('applies correct color class for pending status', () => {
+    it('applies correct color style for pending status', () => {
       render(<TransactionStatusIcon status="pending" />);
 
       const icon = screen.getByRole('img');
-      expect(icon).toHaveClass('text-amber-600');
+      expect(icon).toHaveStyle({ color: '#d97706' });
     });
 
-    it('applies correct color class for failed status', () => {
+    it('applies correct color style for failed status', () => {
       render(<TransactionStatusIcon status="failed" />);
 
       const icon = screen.getByRole('img');
-      expect(icon).toHaveClass('text-red-600');
+      expect(icon).toHaveStyle({ color: '#dc2626' });
     });
 
-    it('applies correct color class for unknown status', () => {
+    it('applies correct color style for unknown status', () => {
       render(<TransactionStatusIcon />);
 
       const icon = screen.getByRole('img');
-      expect(icon).toHaveClass('text-slate-500');
+      expect(icon).toHaveStyle({ color: '#64748b' });
     });
 
-    it('has consistent sizing and layout classes', () => {
+    it('has consistent sizing and layout styles', () => {
       render(<TransactionStatusIcon status="success" />);
 
       const icon = screen.getByRole('img');
-      expect(icon).toHaveClass('inline-flex', 'items-center', 'justify-center', 'w-5', 'h-5');
+      expect(icon).toHaveStyle({ width: '20px', height: '20px' });
     });
   });
 

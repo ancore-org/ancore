@@ -501,3 +501,134 @@ async fn integration_test_invalid_ledger_range_returns_400() {
 
     assert_eq!(response.status(), StatusCode::BAD_REQUEST);
 }
+
+#[tokio::test]
+async fn unmatched_route_returns_canonical_not_found_envelope() {
+    let app = Router::new().fallback(ancore_indexer::api::not_found);
+
+    let response = app
+        .oneshot(
+            Request::builder()
+                .uri("/invalid")
+                .body(Body::empty())
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+
+    assert_eq!(response.status(), StatusCode::NOT_FOUND);
+    let content_type = response
+        .headers()
+        .get(axum::http::header::CONTENT_TYPE)
+        .and_then(|value| value.to_str().ok())
+        .unwrap_or("");
+    assert!(
+        content_type.starts_with("application/json"),
+        "expected application/json, got {content_type}"
+    );
+
+    let body = response_body_bytes(response).await;
+    let json: serde_json::Value = serde_json::from_slice(&body).unwrap();
+    assert_eq!(json["code"], "NOT_FOUND");
+    assert_eq!(json["message"], "Resource not found");
+    assert!(json.get("details").is_none());
+}
+
+#[tokio::test]
+#[ignore]
+async fn integration_test_invalid_operation_type_returns_400() {
+    let (app, _pool) = setup_test_app().await;
+
+    let account_id = "GBBM6BKZPEHWYO3E3YKREDPQXMS4VK35YLNU7NFBRI26RAN7GI5POFBB";
+
+    let response = app
+        .oneshot(
+            Request::builder()
+                .uri(&format!(
+                    "/api/v1/accounts/{}/activity?type=unsupported_type",
+                    account_id
+                ))
+                .body(Body::empty())
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+
+    assert_eq!(response.status(), StatusCode::BAD_REQUEST);
+
+    let body = response_body_bytes(response).await;
+    let json: serde_json::Value = serde_json::from_slice(&body).unwrap();
+    assert_eq!(json["code"], "INVALID_FILTER");
+}
+
+#[tokio::test]
+#[ignore]
+async fn integration_test_filter_by_operation_type() {
+    let (app, pool) = setup_test_app().await;
+
+    let account_id = "GBBM6BKZPEHWYO3E3YKREDPQXMS4VK35YLNU7NFBRI26RAN7GI5POFBB";
+    let base_time = chrono::Utc
+        .with_ymd_and_hms(2024, 1, 15, 10, 30, 0)
+        .unwrap();
+
+    // Seed records of different types
+    insert_test_activity(&pool, account_id, "payment", 100, base_time).await;
+    insert_test_activity(
+        &pool,
+        account_id,
+        "invoke",
+        101,
+        base_time + chrono::Duration::seconds(1),
+    )
+    .await;
+    insert_test_activity(
+        &pool,
+        account_id,
+        "create_account",
+        102,
+        base_time + chrono::Duration::seconds(2),
+    )
+    .await;
+
+    // Filter by type=payment
+    let response = app
+        .clone()
+        .oneshot(
+            Request::builder()
+                .uri(&format!(
+                    "/api/v1/accounts/{}/activity?type=payment",
+                    account_id
+                ))
+                .body(Body::empty())
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+
+    assert_eq!(response.status(), StatusCode::OK);
+    let body = response_body_bytes(response).await;
+    let json: serde_json::Value = serde_json::from_slice(&body).unwrap();
+    assert_eq!(json["data"].as_array().unwrap().len(), 1);
+    assert_eq!(json["data"][0]["activity_type"], "payment");
+
+    // Filter by type=invoke
+    let response_invoke = app
+        .clone()
+        .oneshot(
+            Request::builder()
+                .uri(&format!(
+                    "/api/v1/accounts/{}/activity?type=invoke",
+                    account_id
+                ))
+                .body(Body::empty())
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+
+    assert_eq!(response_invoke.status(), StatusCode::OK);
+    let body_invoke = response_body_bytes(response_invoke).await;
+    let json_invoke: serde_json::Value = serde_json::from_slice(&body_invoke).unwrap();
+    assert_eq!(json_invoke["data"].as_array().unwrap().len(), 1);
+    assert_eq!(json_invoke["data"][0]["activity_type"], "invoke");
+}

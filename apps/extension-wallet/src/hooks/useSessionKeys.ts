@@ -11,6 +11,7 @@ export interface AddSessionKeyInput {
   label: string;
   permissions: SessionPermission[];
   expiresAt: number;
+  allowedContracts?: string[];
 }
 
 export interface UseSessionKeysReturn {

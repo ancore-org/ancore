@@ -145,10 +145,150 @@ describe('runShutdown', () => {
   });
 
   it('has a default timeout well inside a typical orchestrator grace period', () => {
-    // Kubernetes defaults to 30s before SIGKILL; a longer budget than that
-    // would mean the handler never completes in practice.
+    // Kubernetes defaults to 30s before SIGKILL; a budget equal to (or longer
+    // than) that would mean SIGKILL lands while the handler is still draining,
+    // which is the outcome the handler exists to prevent.
     expect(DEFAULT_SHUTDOWN_TIMEOUT_MS).toBeLessThan(30_000);
     expect(DEFAULT_SHUTDOWN_TIMEOUT_MS).toBeGreaterThan(0);
+  });
+
+  it('reports a clean shutdown when there is nothing to close', async () => {
+    const { server, finish } = makeServer();
+    finish();
+
+    await expect(
+      runShutdown({ server, closers: [], timeoutMs: 1000, log: () => {} })
+    ).resolves.toBe(true);
+  });
+
+  /**
+   * The ordering is the point (#1470): `Pool#end()` refuses new queries, so a
+   * connection pool closed in parallel with a draining request fails exactly
+   * the work shutdown exists to finish.
+   */
+  it('releases resources only after the drains have settled', async () => {
+    const { server, finish } = makeServer();
+    const order: string[] = [];
+
+    let releaseDrain: (() => void) | undefined;
+    const drainable: Drainable = {
+      drain: jest.fn(async () => {
+        order.push('drain:start');
+        await new Promise<void>((resolve) => {
+          releaseDrain = resolve;
+        });
+        order.push('drain:end');
+        return true;
+      }),
+    };
+
+    const pending = runShutdown({
+      server,
+      drainables: [drainable],
+      closers: [() => void order.push('close')],
+      timeoutMs: 1000,
+      log: () => {},
+    });
+
+    // The drain is still running here, so the closer must not have run yet.
+    await new Promise((resolve) => setTimeout(resolve, 20));
+    finish();
+    expect(order).toEqual(['drain:start']);
+
+    releaseDrain?.();
+    await expect(pending).resolves.toBe(true);
+    expect(order).toEqual(['drain:start', 'drain:end', 'close']);
+  });
+
+  /**
+   * A drain that reports failure has still stopped accepting work, so the
+   * resources behind it are safe to release — and releasing them is better
+   * than exiting with connections open just because a drain went badly.
+   */
+  it('releases resources even when a drain reports failure, and reports it', async () => {
+    const { server, finish } = makeServer();
+    finish();
+    const failedDrain: Drainable = { drain: jest.fn().mockResolvedValue(false) };
+    const closer = jest.fn();
+
+    await expect(
+      runShutdown({
+        server,
+        drainables: [failedDrain],
+        closers: [closer],
+        timeoutMs: 500,
+        log: () => {},
+      })
+    ).resolves.toBe(false);
+
+    expect(closer).toHaveBeenCalledTimes(1);
+  });
+
+  /**
+   * Once the budget is gone there is nothing left to spend on the release
+   * phase: SIGKILL is next, and pretending to drain past the deadline is how a
+   * process gets killed holding the connections anyway.
+   */
+  it('does not attempt to release resources once the drain has spent the budget', async () => {
+    const { server } = makeServer();
+    const closer = jest.fn();
+
+    await expect(
+      runShutdown({
+        server,
+        drainables: [makeDrainable(null)],
+        closers: [closer],
+        timeoutMs: 40,
+        log: () => {},
+      })
+    ).resolves.toBe(false);
+
+    expect(closer).not.toHaveBeenCalled();
+  });
+
+  it('reports an unclean shutdown when a closer throws', async () => {
+    const { server, finish } = makeServer();
+    finish();
+    const healthy = jest.fn();
+
+    await expect(
+      runShutdown({
+        server,
+        closers: [
+          () => {
+            throw new Error('pool already closed');
+          },
+          healthy,
+        ],
+        timeoutMs: 500,
+        log: () => {},
+      })
+    ).resolves.toBe(false);
+
+    // A failed closer must not take the rest of the release phase with it.
+    expect(healthy).toHaveBeenCalledTimes(1);
+  });
+
+  it('bounds the release phase by the budget left after draining', async () => {
+    const { server, finish } = makeServer();
+    finish();
+
+    const started = Date.now();
+    await expect(
+      runShutdown({
+        server,
+        // Burns most of the budget before the closer phase is reached.
+        drainables: [makeDrainable(60)],
+        closers: [() => new Promise<void>(() => {})],
+        timeoutMs: 100,
+        log: () => {},
+      })
+    ).resolves.toBe(false);
+    const elapsed = Date.now() - started;
+
+    // Dropping the closer deadline entirely (or restarting the full budget for
+    // it) would hold the process for the whole 100ms twice over.
+    expect(elapsed).toBeLessThan(200);
   });
 });
 

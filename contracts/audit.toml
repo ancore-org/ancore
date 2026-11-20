@@ -2,4 +2,10 @@
 # Add triaged advisory IDs to `ignore` to allowlist known false positives.
 
 [advisories]
-ignore = []
+ignore = [
+  # RUSTSEC-2026-0387 (crypto-bigint timing variability in non-constant-time operations).
+  # Transitive dependency of soroban-env-host v21.2.1 via soroban-sdk v21.7.7.
+  # soroban-sdk pins k256/elliptic-curve which requires crypto-bigint 0.5.x.
+  # On-chain smart contract execution targets wasm32 where soroban-env-host is not compiled into the WASM bundle.
+  "RUSTSEC-2026-0387",
+]

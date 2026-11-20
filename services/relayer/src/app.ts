@@ -1,3 +1,10 @@
+/**
+ * app.ts
+ *
+ * Re-exports the Express application factory for relayer service consumers.
+ */
+
+export { createApp } from './server';
 import express, { type Application } from 'express';
 import { requestIdMiddleware } from './middleware/requestId';
 

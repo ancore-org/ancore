@@ -9,6 +9,7 @@
     "tsBuildInfoFile": "./dist/.tsbuildinfo",
     "baseUrl": ".",
     "paths": {
+      "@ancore/wallet-shared": ["../wallet-shared/dist"],
       "@ancore/types": ["../types/dist"],
       "@ancore/types/*": ["../types/dist/*"],
       "@ancore/crypto": ["../crypto/dist"],

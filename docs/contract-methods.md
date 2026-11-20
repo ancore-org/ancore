@@ -28,19 +28,31 @@ entries are bumped proportionally to their `expires_at` value.
 
 ## Error codes
 
-| Code | Name | Description |
-|------|------|-------------|
-| 1 | `AlreadyInitialized` | `initialize()` called on an already-initialized contract |
-| 2 | `NotInitialized` | Any call before `initialize()` |
-| 3 | `Unauthorized` | `require_auth()` failed (caller is not the owner) |
-| 4 | `InvalidNonce` | `expected_nonce` does not match the stored nonce |
-| 5 | `SessionKeyNotFound` | No session key found for the given public key |
-| 6 | `SessionKeyExpired` | `ledger.timestamp() >= session_key.expires_at` |
-| 7 | `InsufficientPermission` | Session key lacks `PERMISSION_EXECUTE` (bit 1) |
-| 8 | `InvalidVersion` | `new_version <= current_version` in `migrate()` |
-| 9 | `InvalidSignature` | Signature or payload missing, or payload mismatch |
-| 10 | `InvalidWasmHash` | All-zero WASM hash passed to `upgrade()` |
-| 11 | `InvalidExpiration` | `expires_at == 0` in `add_session_key()` |
+Every `ContractError` is encoded as a stable integer by Soroban. Clients should
+branch on the code (and not on localized panic text) when presenting recovery
+guidance. The following table is the complete contract error catalogue.
+
+| Code | Variant | Cause | Resolution |
+|------|---------|-------|------------|
+| 1 | `AlreadyInitialized` | `initialize()` or `initialize_multi_owner()` was called after initialization. | Use the existing account; do not initialize it again. |
+| 2 | `NotInitialized` | An entrypoint requiring account state was called before `initialize()`. | Initialize the deployed account before using it. |
+| 3 | `Unauthorized` | Required owner, signer, or quorum authorization was not provided. | Retry with the configured owner or enough distinct authorized owners. |
+| 4 | `InvalidNonce` | `expected_nonce` does not match the stored replay-protection nonce. | Fetch the current nonce and rebuild/sign the transaction. |
+| 5 | `SessionKeyNotFound` | No session key exists for the supplied public key. | Register the key or use a key that has not been revoked. |
+| 6 | `SessionKeyExpired` | `ledger.timestamp() >= session_key.expires_at`. | Create or refresh a session key with a future expiry. |
+| 7 | `InsufficientPermission` | The session key lacks the permission required by the operation, or its allowlist contains an invalid address. | Request the required permission and valid contract allowlist. |
+| 8 | `InvalidVersion` | `new_version <= current_version` in `migrate()`. | Migrate to a strictly greater version. |
+| 9 | `InvalidSignature` | Signature or signed payload is missing or cannot be verified. | Sign the canonical payload with the matching session private key. |
+| 10 | `InvalidWasmHash` | `upgrade()` received an all-zero or otherwise invalid WASM hash. | Supply the hash of the intended deployed WASM. |
+| 11 | `InvalidExpiration` | `expires_at == 0` in `add_session_key()`. | Supply a non-zero expiry timestamp. |
+| 12 | `InvalidCallerIdentity` | The caller identity and supplied session-key/authentication parameters disagree. | Use matching `CallerIdentity`, public key, and signature parameters. |
+| 13 | `SignaturePayloadMismatch` | The signed payload differs from the canonical `(to, function, args, nonce)` payload. | Rebuild the exact canonical payload before signing. |
+| 14 | `SessionKeyAlreadyExists` | A session key with the same public key is already registered. | Revoke the old key first or use a different public key. |
+| 15 | `SessionKeyExpirationInPast` | A session-key expiry is not later than the current ledger timestamp. | Choose an expiry in the future. |
+| 16 | `ArithmeticOverflow` | A checked arithmetic operation exceeded the supported integer range. | Reduce the value or split the operation into safe amounts. |
+| 17 | `ExceededSpendLimit` | A call exceeds the per-call or cumulative session-key spend limit. | Request a larger limit or wait for the spend window to reset. |
+| 18 | `InvalidSpendPolicy` | Spend limits or their window are inconsistent or invalid. | Supply positive, compatible limits and a valid window configuration. |
+| 19 | `InvalidThreshold` | Owner threshold is zero, exceeds the owner count, or owner configuration is invalid. | Provide unique owners and a threshold between 1 and the owner count. |
 
 ---
 

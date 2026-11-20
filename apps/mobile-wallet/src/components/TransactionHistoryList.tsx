@@ -1,3 +1,4 @@
+import { FlatList, View, Text, Pressable, StyleSheet, ActivityIndicator } from 'react-native';
 import { type Transaction } from '../screens/history/types';
 import { type HistoryError } from '../screens/history/errorTypes';
 import { TransactionStatusIcon } from './TransactionStatusIcon';
@@ -37,7 +38,14 @@ export const TransactionHistoryList = ({
   formatTimestamp = defaultFormatTimestamp,
 }: Props) => {
   if (isLoadingInitial) {
-    return <p aria-live="polite">Loading transactions...</p>;
+    return (
+      <View style={styles.centerContainer}>
+        <ActivityIndicator size="large" color="#3b82f6" />
+        <Text style={styles.loadingText} accessibilityLiveRegion="polite">
+          Loading transactions...
+        </Text>
+      </View>
+    );
   }
 
   if (error && transactions.length === 0) {
@@ -55,30 +63,69 @@ export const TransactionHistoryList = ({
   if (transactions.length === 0) {
     return (
       <PullToRefreshControl isRefreshing={isRefreshing} onRefresh={onRefresh}>
-        {isOffline ? (
-          <p aria-live="polite" role="status">
-            You are offline. Transaction history will refresh when your connection returns.
-          </p>
-        ) : null}
-        <p>No transactions yet.</p>
-        <button onClick={onRefresh} disabled={isRefreshing || isOffline}>
-          {isRefreshing ? 'Refreshing...' : 'Refresh'}
-        </button>
+        <View style={styles.emptyContainer}>
+          {isOffline ? (
+            <Text
+              style={styles.offlineText}
+              accessibilityLiveRegion="polite"
+              accessibilityRole="alert"
+            >
+              You are offline. Transaction history will refresh when your connection returns.
+            </Text>
+          ) : null}
+          <Text style={styles.emptyText}>No transactions yet.</Text>
+          <Pressable
+            onPress={onRefresh}
+            disabled={isRefreshing || isOffline}
+            style={[styles.button, (isRefreshing || isOffline) && styles.buttonDisabled]}
+          >
+            {({ pressed }) => (
+              <Text style={[styles.buttonText, pressed && styles.buttonPressed]}>
+                {isRefreshing ? 'Refreshing...' : 'Refresh'}
+              </Text>
+            )}
+          </Pressable>
+        </View>
       </PullToRefreshControl>
     );
   }
 
-  return (
-    <PullToRefreshControl isRefreshing={isRefreshing} onRefresh={onRefresh}>
+  const renderItem = ({ item: tx }: { item: Transaction }) => (
+    <View style={styles.transactionItem}>
+      <TransactionStatusIcon status={tx.status} onUnknownStatus={onUnknownStatus} />
+      <View style={styles.transactionContent}>
+        <Text style={styles.transactionText}>
+          <Text style={styles.transactionLabel}>{tx.direction === 'in' ? 'Received' : 'Sent'}</Text>{' '}
+          {tx.amount}
+          {tx.asset ? ` ${tx.asset}` : ''} · {formatTimestamp(tx.timestamp)}
+        </Text>
+      </View>
+    </View>
+  );
+
+  const ListHeaderComponent = () => (
+    <>
       {isOffline ? (
-        <p aria-live="polite" role="status">
+        <Text style={styles.offlineText} accessibilityLiveRegion="polite" accessibilityRole="alert">
           You are offline. Transaction history will refresh when your connection returns.
-        </p>
+        </Text>
       ) : null}
 
-      <button onClick={onRefresh} disabled={isRefreshing || isOffline}>
-        {isRefreshing ? 'Refreshing...' : 'Refresh'}
-      </button>
+      <Pressable
+        onPress={onRefresh}
+        disabled={isRefreshing || isOffline}
+        style={[
+          styles.button,
+          styles.refreshButton,
+          (isRefreshing || isOffline) && styles.buttonDisabled,
+        ]}
+      >
+        {({ pressed }) => (
+          <Text style={[styles.buttonText, pressed && styles.buttonPressed]}>
+            {isRefreshing ? 'Refreshing...' : 'Refresh'}
+          </Text>
+        )}
+      </Pressable>
 
       {error ? (
         <HistoryErrorComponent
@@ -89,26 +136,128 @@ export const TransactionHistoryList = ({
           isRetrying={isRefreshing}
         />
       ) : null}
+    </>
+  );
 
-      <ul aria-label="Transaction history">
-        {transactions.map((tx) => (
-          <li key={tx.id} className="flex items-center gap-3 py-3 border-b border-slate-200">
-            <TransactionStatusIcon status={tx.status} onUnknownStatus={onUnknownStatus} />
-            <div className="flex-1">
-              <strong>{tx.direction === 'in' ? 'Received' : 'Sent'}</strong> {tx.amount}
-              {tx.asset ? ` ${tx.asset}` : ''} &middot; {formatTimestamp(tx.timestamp)}
-            </div>
-          </li>
-        ))}
-      </ul>
-
+  const ListFooterComponent = () => (
+    <View style={styles.footerContainer}>
       {hasMore ? (
-        <button onClick={onLoadMore} disabled={isLoadingMore}>
-          {isLoadingMore ? 'Loading more...' : 'Load more'}
-        </button>
+        <Pressable
+          onPress={onLoadMore}
+          disabled={isLoadingMore}
+          style={[styles.button, isLoadingMore && styles.buttonDisabled]}
+        >
+          {({ pressed }) => (
+            <Text style={[styles.buttonText, pressed && styles.buttonPressed]}>
+              {isLoadingMore ? 'Loading more...' : 'Load more'}
+            </Text>
+          )}
+        </Pressable>
       ) : (
-        <p>End of transaction history</p>
+        <Text style={styles.endText}>End of transaction history</Text>
       )}
+    </View>
+  );
+
+  return (
+    <PullToRefreshControl isRefreshing={isRefreshing} onRefresh={onRefresh}>
+      <FlatList
+        data={transactions}
+        renderItem={renderItem}
+        keyExtractor={(item) => item.id}
+        ListHeaderComponent={ListHeaderComponent}
+        ListFooterComponent={ListFooterComponent}
+        accessibilityLabel="Transaction history"
+        contentContainerStyle={styles.listContent}
+        ItemSeparatorComponent={() => <View style={styles.separator} />}
+      />
     </PullToRefreshControl>
   );
 };
+
+const styles = StyleSheet.create({
+  centerContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 20,
+    gap: 12,
+  },
+  loadingText: {
+    fontSize: 16,
+    color: '#64748b',
+  },
+  emptyContainer: {
+    padding: 20,
+    gap: 16,
+    alignItems: 'center',
+  },
+  emptyText: {
+    fontSize: 16,
+    color: '#64748b',
+    textAlign: 'center',
+  },
+  offlineText: {
+    fontSize: 14,
+    color: '#f59e0b',
+    textAlign: 'center',
+    padding: 12,
+    backgroundColor: '#fef3c7',
+    borderRadius: 6,
+  },
+  listContent: {
+    padding: 16,
+  },
+  transactionItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    paddingVertical: 12,
+  },
+  transactionContent: {
+    flex: 1,
+  },
+  transactionText: {
+    fontSize: 14,
+    color: '#334155',
+  },
+  transactionLabel: {
+    fontWeight: '600',
+  },
+  separator: {
+    height: 1,
+    backgroundColor: '#e2e8f0',
+  },
+  button: {
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+    borderRadius: 6,
+    borderWidth: 1,
+    borderColor: '#cbd5e1',
+    backgroundColor: '#ffffff',
+    alignItems: 'center',
+  },
+  refreshButton: {
+    marginBottom: 12,
+  },
+  buttonDisabled: {
+    opacity: 0.5,
+  },
+  buttonText: {
+    fontSize: 16,
+    fontWeight: '500',
+    color: '#334155',
+  },
+  buttonPressed: {
+    opacity: 0.7,
+  },
+  footerContainer: {
+    paddingTop: 16,
+    alignItems: 'center',
+  },
+  endText: {
+    fontSize: 14,
+    color: '#64748b',
+    textAlign: 'center',
+  },
+});

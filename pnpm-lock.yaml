@@ -590,6 +590,9 @@ importers:
       '@ancore/types':
         specifier: workspace:*
         version: link:../types
+      '@ancore/wallet-shared':
+        specifier: workspace:*
+        version: link:../wallet-shared
       '@stellar/stellar-sdk':
         specifier: ^13.3.0
         version: 13.3.0
@@ -636,6 +639,9 @@ importers:
       '@ancore/types':
         specifier: workspace:*
         version: link:../types
+      '@ancore/wallet-shared':
+        specifier: workspace:*
+        version: link:../wallet-shared
       '@ledgerhq/hw-app-str':
         specifier: ^7.7.4
         version: 7.7.4
@@ -13502,7 +13508,7 @@ snapshots:
     dependencies:
       '@babel/core': 7.29.7
       '@babel/preset-env': 7.29.7(@babel/core@7.29.7)
-      '@babel/types': 7.29.7
+      '@babel/types': 7.29.8
       '@storybook/csf': 0.1.13
       '@storybook/csf-tools': 7.6.24
       '@storybook/node-logger': 7.6.24
@@ -13630,10 +13636,10 @@ snapshots:
 
   '@storybook/csf-tools@7.6.24':
     dependencies:
-      '@babel/generator': 7.29.7
-      '@babel/parser': 7.29.7
+      '@babel/generator': 7.29.8
+      '@babel/parser': 7.29.8
       '@babel/traverse': 7.29.7
-      '@babel/types': 7.29.7
+      '@babel/types': 7.29.8
       '@storybook/csf': 0.1.13
       '@storybook/types': 7.6.24
       fs-extra: 11.3.5
@@ -17684,7 +17690,7 @@ snapshots:
   jscodeshift@0.15.2(@babel/preset-env@7.29.7(@babel/core@7.29.7)):
     dependencies:
       '@babel/core': 7.29.7
-      '@babel/parser': 7.29.7
+      '@babel/parser': 7.29.8
       '@babel/plugin-transform-class-properties': 7.29.7(@babel/core@7.29.7)
       '@babel/plugin-transform-modules-commonjs': 7.29.7(@babel/core@7.29.7)
       '@babel/plugin-transform-nullish-coalescing-operator': 7.29.7(@babel/core@7.29.7)
@@ -18229,7 +18235,7 @@ snapshots:
       source-map: 0.5.7
       throat: 5.0.0
       ws: 7.5.13
-      yargs: 17.7.2
+      yargs: 17.7.3
     transitivePeerDependencies:
       - bufferutil
       - supports-color

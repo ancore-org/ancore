@@ -20,8 +20,15 @@ export function MnemonicScreen({ mnemonic, onNext, onBack }: MnemonicScreenProps
   const [copied, setCopied] = React.useState(false);
   const [showWarning, setShowWarning] = React.useState(true);
 
-  const words = React.useMemo(() => {
-    return mnemonic.split(' ');
+  const [words, setWords] = React.useState<string[]>([]);
+
+  React.useEffect(() => {
+    const local = mnemonic.split(' ');
+    setWords(local);
+    return () => {
+      local.fill('');
+      setWords([]);
+    };
   }, [mnemonic]);
 
   const copyToClipboard = React.useCallback(async () => {

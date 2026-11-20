@@ -188,6 +188,52 @@ sequenceDiagram
 
 **Alternate path (no relayer):** When the owner key signs directly, `sendPayment()` in `@ancore/core-sdk` can submit through `StellarClient.submitTransaction` without calling the relayer. Session-key sends in the extension are expected to use the relay path above so the owner key stays offline.
 
+### dApp to Relayer Flow
+
+The dApp builds and simulates its Soroban transaction with the Core SDK, then requests a wallet signature through the extension bridge. For relay execution, the dApp submits the signed transaction and relay authorization to the relayer, which verifies the relay signature and nonce before simulating and submitting the transaction.
+
+```mermaid
+sequenceDiagram
+   autonumber
+   actor User
+   participant DApp as dApp
+   participant CS as Extension ContentScript
+   participant BG as Background SW
+   participant SDK as Core SDK
+   participant RPC as Soroban RPC
+   participant Relayer
+   participant Contract as Soroban Contract
+
+   DApp->>SDK: Build account transaction
+   SDK->>RPC: Simulate transaction
+   RPC-->>SDK: Simulation result and resource estimates
+   SDK-->>DApp: Unsigned transaction XDR
+   DApp->>CS: window.postMessage(signTransaction, XDR)
+   CS->>BG: chrome.runtime.sendMessage(origin, request)
+   BG->>BG: Validate origin and dApp access
+   BG-->>User: Request transaction approval
+   User-->>BG: Approve
+   BG->>BG: Sign transaction with wallet key
+   BG-->>CS: Signed transaction XDR
+   CS-->>DApp: window.postMessage(signed XDR)
+   DApp->>CS: window.postMessage(signRelayPayload, relay fields)
+   CS->>BG: chrome.runtime.sendMessage(origin, request)
+   BG-->>User: Request relay authorization approval
+   User-->>BG: Approve
+   BG->>BG: Sign canonical relay payload
+   BG-->>CS: sessionKey and signature
+   CS-->>DApp: window.postMessage(relay authorization)
+   DApp->>Relayer: POST /relay/execute(signed XDR, relay authorization)
+   Relayer->>Relayer: Verify relay signature and nonce
+   Relayer->>RPC: Simulate and assemble transaction
+   RPC-->>Relayer: Assembled transaction XDR
+   Relayer->>RPC: Submit transaction
+   RPC->>Contract: Execute account contract invocation
+   Contract-->>RPC: Execution result
+   RPC-->>Relayer: Transaction hash and status
+   Relayer-->>DApp: Transaction result
+```
+
 ### Transaction Flow (summary)
 
 For other operation types (session-key management, contract calls), the same pattern applies: SDK builds the Soroban invocation → client signs → relayer validates and submits → account contract enforces policy → Horizon settles.

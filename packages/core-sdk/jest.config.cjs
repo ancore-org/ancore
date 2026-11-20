@@ -19,6 +19,7 @@ module.exports = {
     '^@ancore/account-abstraction/(.*)$': '<rootDir>/../account-abstraction/src/$1',
     '^@ancore/stellar$': '<rootDir>/../stellar/src/index.ts',
     '^@ancore/stellar/(.*)$': '<rootDir>/../stellar/src/$1',
+    '^@ancore/wallet-shared$': '<rootDir>/../wallet-shared/src/index.ts',
     '^@ancore/types$': '<rootDir>/../types/src/index.ts',
     '^@ancore/types/(.*)$': '<rootDir>/../types/src/$1',
     '^@ancore/crypto$': '<rootDir>/../crypto/src/index.ts',

@@ -9,6 +9,7 @@ import {
 } from '@ancore/types';
 import { mapRpcStatus, isTerminalStatus } from '@/utils/transaction-status';
 import { validateTransferNote, truncateTransferNote } from '@/utils/note-validation';
+import { isMemoRequired } from '@/utils/memoCheck';
 import { validateTransferPolicy } from '@ancore/types';
 import type { ScheduleConfig, TransferTiming } from '@/screens/Send/ScheduleControls';
 import { validateSchedule } from '@/utils/schedule-validation';
@@ -364,6 +365,18 @@ export function useSendTransaction(options: UseSendTransactionOptions = {}) {
         }
 
         const estimatedFee = await service.estimateFee(resolvedValues);
+
+        if (estimatedFee.network === 'mainnet' && !values.note?.trim()) {
+          const memoReq = await isMemoRequired(resolvedValues.to);
+          if (memoReq) {
+            setErrors((current) => ({
+              ...current,
+              note: 'This destination requires a memo on mainnet. Please enter a memo before proceeding.',
+            }));
+            return false;
+          }
+        }
+
         const total = (Number(values.amount) + Number(estimatedFee.totalFee)).toFixed(7);
         const truncatedNote = values.note ? truncateTransferNote(values.note) : undefined;
 
@@ -456,7 +469,14 @@ export function useSendTransaction(options: UseSendTransactionOptions = {}) {
         setSubmitting(false);
       }
     },
-    [service, validateForm, todayTransferTotal, dailyTransferLimit, transferStepUpThreshold]
+    [
+      service,
+      validateForm,
+      todayTransferTotal,
+      dailyTransferLimit,
+      transferStepUpThreshold,
+      assetCode,
+    ]
   );
 
   const requestConfirm = useCallback(() => {

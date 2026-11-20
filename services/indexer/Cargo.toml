@@ -52,6 +52,9 @@ stellar-xdr = { version = "22.2.0", features = ["curr"] }
 reqwest = { version = "0.13.3", features = ["json"] }
 stellar-strkey = "0.0.10"
 
+# In-memory account response cache (issue #1551)
+lru = "0.12"
+
 [dev-dependencies]
 sqlx = { version = "0.8", features = ["runtime-tokio", "postgres", "chrono", "uuid", "json", "macros"] }
 tower = { version = "0.4", features = ["full"] }

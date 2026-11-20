@@ -1,12 +1,17 @@
-import { render, screen, fireEvent } from '@testing-library/react';
+import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { SessionKeys, SessionKeysPanel } from '../SessionKeysPanel';
+import { formatRelativeExpiry } from '../../utils/time';
+
+const { mockToast } = vi.hoisted(() => ({ mockToast: vi.fn() }));
 
 // Mock lucide-react to avoid issues with SVG rendering in tests
 vi.mock('lucide-react', () => ({
   AlertCircle: () => <div data-testid="alert-icon" />,
+  Copy: () => <div data-testid="copy-icon" />,
   Key: () => <div data-testid="key-icon" />,
   RefreshCw: () => <div data-testid="refresh-icon" />,
+  Trash2: () => <div data-testid="trash-icon" />,
 }));
 
 // Mock @ancore/ui-kit
@@ -39,6 +44,7 @@ vi.mock('@ancore/ui-kit', () => ({
       {children}
     </span>
   ),
+  useToast: () => ({ toast: mockToast }),
 }));
 
 describe('SessionKeys Widget', () => {
@@ -82,6 +88,51 @@ describe('SessionKeys Widget', () => {
 
     expect(screen.getByText('Active')).toBeInTheDocument();
     expect(screen.getByText('Expired')).toBeInTheDocument();
+    expect(screen.getByText('in 1 hour')).toBeInTheDocument();
+    expect(screen.getByText('expired')).toBeInTheDocument();
+    expect(screen.getByText('in 1 hour').closest('time')).toHaveAttribute(
+      'title',
+      new Date(validKey.expiresAt * 1000).toISOString()
+    );
+  });
+
+  it('formats expiry values as relative countdowns', () => {
+    expect(formatRelativeExpiry(Math.floor(nowMs / 1000) + 3 * 60 * 60, nowMs)).toBe('in 3 hours');
+    expect(formatRelativeExpiry(Math.floor(nowMs / 1000) - 1, nowMs)).toBe('expired');
+  });
+
+  it('copies a key ID and shows a three-second success toast', async () => {
+    const writeText = vi.fn().mockResolvedValue(undefined);
+    Object.defineProperty(navigator, 'clipboard', {
+      configurable: true,
+      value: { writeText },
+    });
+
+    render(<SessionKeysPanel keys={[validKey]} nowMs={nowMs} />);
+    fireEvent.click(screen.getByRole('button', { name: 'Copy Test Session Key ID' }));
+
+    await waitFor(() =>
+      expect(mockToast).toHaveBeenCalledWith('Key ID copied to clipboard', 'success', 3000)
+    );
+    expect(writeText).toHaveBeenCalledWith(validKey.publicKey);
+  });
+
+  it('revokes a key and shows success or error feedback', async () => {
+    const onRevoke = vi.fn().mockResolvedValue(undefined);
+    render(<SessionKeysPanel keys={[validKey]} nowMs={nowMs} onRevoke={onRevoke} />);
+    fireEvent.click(screen.getByRole('button', { name: 'Revoke Test Session Key' }));
+
+    await waitFor(() =>
+      expect(mockToast).toHaveBeenCalledWith('Session key revoked', 'success', 3000)
+    );
+    expect(onRevoke).toHaveBeenCalledWith(validKey.publicKey);
+
+    mockToast.mockClear();
+    onRevoke.mockRejectedValueOnce(new Error('RPC unavailable'));
+    fireEvent.click(screen.getByRole('button', { name: 'Revoke Test Session Key' }));
+    await waitFor(() =>
+      expect(mockToast).toHaveBeenCalledWith('Unable to revoke session key', 'error', 3000)
+    );
   });
 
   it('catches API failure with WidgetErrorBoundary and renders retry button', () => {

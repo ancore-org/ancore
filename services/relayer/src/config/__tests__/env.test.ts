@@ -252,6 +252,36 @@ describe('relayer env schema', () => {
     });
   });
 
+  describe('RELAYER_USE_MOCK_SUBMISSION in production', () => {
+    it('throws EnvValidationError when NODE_ENV=production and mock submission is enabled', () => {
+      const attempt = () =>
+        parseEnv({ ...EMPTY, NODE_ENV: 'production', RELAYER_USE_MOCK_SUBMISSION: 'true' });
+
+      expect(attempt).toThrow(EnvValidationError);
+      expect(attempt).toThrow(/RELAYER_USE_MOCK_SUBMISSION: .*production/);
+    });
+
+    it('allows mock submission outside production', () => {
+      expect(
+        parseEnv({ ...EMPTY, NODE_ENV: 'development', RELAYER_USE_MOCK_SUBMISSION: 'true' })
+          .RELAYER_USE_MOCK_SUBMISSION
+      ).toBe(true);
+      expect(parseEnv({ ...EMPTY, RELAYER_USE_MOCK_SUBMISSION: 'true' })).toMatchObject({
+        RELAYER_USE_MOCK_SUBMISSION: true,
+      });
+    });
+
+    it('allows production when mock submission is disabled', () => {
+      expect(
+        parseEnv({ ...EMPTY, NODE_ENV: 'production', RELAYER_USE_MOCK_SUBMISSION: 'false' })
+          .RELAYER_USE_MOCK_SUBMISSION
+      ).toBe(false);
+      expect(parseEnv({ ...EMPTY, NODE_ENV: 'production' }).RELAYER_USE_MOCK_SUBMISSION).toBe(
+        false
+      );
+    });
+  });
+
   describe('loadEnvOrExit', () => {
     it('returns the parsed env when valid', () => {
       expect(loadEnvOrExit({ ...EMPTY, PORT: '4300' }).PORT).toBe(4300);

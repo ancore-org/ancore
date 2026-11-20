@@ -51,6 +51,10 @@ export function scoreRisk(intent: ScoreableIntent, ctx: RiskContext = {}): RiskS
       reasons.push(`Unparseable amount: '${intent.amount}'`);
       return { level: 'high', reasons };
     }
+    if (amount < 0) {
+      reasons.push(`Invalid amount: '${intent.amount}' is negative`);
+      return { level: 'high', reasons };
+    }
     const isUsdc = intent.asset === 'USDC';
     const mediumThreshold = isUsdc ? MEDIUM_THRESHOLD_USDC : MEDIUM_THRESHOLD_XLM;
     const highThreshold = isUsdc ? HIGH_THRESHOLD_USDC : HIGH_THRESHOLD_XLM;

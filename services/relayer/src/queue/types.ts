@@ -15,6 +15,8 @@ export interface Job<T = unknown> {
   idempotencyKey: string;
   type: JobType;
   payload: T;
+  /** Originating HTTP request ID for end-to-end trace correlation (#1530). */
+  requestId?: string;
   status: JobStatus;
   /** Number of attempts made so far */
   attempts: number;
@@ -36,6 +38,8 @@ export interface EnqueueOptions {
   payload: unknown;
   /** Override default max attempts (default: 5) */
   maxAttempts?: number;
+  /** Originating HTTP request ID propagated for end-to-end trace correlation (#1530). */
+  requestId?: string;
 }
 
 export interface DequeueResult<T = unknown> {

@@ -4,6 +4,9 @@ import { sha512 } from '@noble/hashes/sha2';
 import * as ed25519HdKey from 'ed25519-hd-key';
 import { Keypair } from '@stellar/stellar-sdk';
 
+/** Largest index that stays below the hardened offset (2^31) once hardened. */
+const MAX_HARDENED_INDEX = 0x7fffffff;
+
 function mnemonicToSeedSync(mnemonic: string): Uint8Array {
   const enc = new TextEncoder();
   const mnemonicBytes = enc.encode(mnemonic.normalize('NFKD'));
@@ -18,7 +21,8 @@ function mnemonicToSeedSync(mnemonic: string): Uint8Array {
  * @param {string} mnemonic - The BIP39 mnemonic phrase (12 or 24 words)
  * @param {number} index - The account index (0-based)
  * @returns {Keypair} A Stellar keypair derived from the mnemonic and index
- * @throws {Error} If the mnemonic is invalid or index is negative
+ * @throws {Error} If the mnemonic is invalid
+ * @throws {RangeError} If the index is not an integer in [0, 2^31 - 1]
  */
 export function deriveKeypairFromMnemonic(mnemonic: string, index: number): Keypair {
   if (!validateMnemonic(mnemonic)) {
@@ -26,7 +30,11 @@ export function deriveKeypairFromMnemonic(mnemonic: string, index: number): Keyp
   }
 
   if (index < 0 || !Number.isInteger(index)) {
-    throw new Error('Index must be a non-negative integer');
+    throw new RangeError('Index must be a non-negative integer');
+  }
+
+  if (index > MAX_HARDENED_INDEX) {
+    throw new RangeError(`Index must be between 0 and ${MAX_HARDENED_INDEX}`);
   }
 
   const seed = mnemonicToSeedSync(mnemonic);

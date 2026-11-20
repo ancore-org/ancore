@@ -189,6 +189,13 @@ async fn main() -> anyhow::Result<()> {
 
     PrometheusBuilder::new()
         .with_http_listener(SocketAddr::from(([0, 0, 0, 0], prometheus_port)))
+        .set_buckets_for_metric(
+            metrics_exporter_prometheus::Matcher::Full(
+                ancore_indexer::metrics::CHECKPOINT_INGEST_DURATION.to_string(),
+            ),
+            ancore_indexer::metrics::CHECKPOINT_INGEST_DURATION_BUCKETS,
+        )
+        .expect("valid histogram buckets")
         .install()
         .expect("failed to install Prometheus exporter");
 
@@ -327,6 +334,7 @@ async fn main() -> anyhow::Result<()> {
         .route("/health", get(health::health_handler))
         .route("/metrics", get(metrics_handler))
         .route("/metrics/prometheus", get(prometheus_metrics_handler))
+        .fallback(ancore_indexer::api::not_found)
         .layer(GovernorLayer {
             config: governor_conf,
         })

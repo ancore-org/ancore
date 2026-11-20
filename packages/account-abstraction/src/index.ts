@@ -11,13 +11,33 @@ export type { AccountContractReadOptions, InvocationArgs } from './account-contr
 
 export {
   AccountAbstractionClient,
+  AncoreClient,
+  createSmartAccount,
+  deriveAccountContractId,
+  ACCOUNT_CONTRACT_SALT,
   withNetworkRetry,
   isTransientError,
   calculateBackoff,
   type ClientRetryOptions,
   type AccountAbstractionClientOptions,
+  type AncoreClientOptions,
+  type CreateSmartAccountOptions,
   type SorobanRpcServer,
 } from './client';
+
+export {
+  CONTRACT_EVENTS,
+  type ContractEventName,
+  type ContractEventTopic,
+} from '@ancore/wallet-shared';
+export { validateSessionKeyPolicy } from './validation';
+export type {
+  PolicyAmount,
+  SessionKeyPolicy,
+  SessionKeyPolicyErrorCode,
+  SessionKeyPolicyValidationError,
+  ValidationResult,
+} from './validation';
 
 export { getOwner, getNonce, getVersion } from './get-owner-nonce';
 export { getSessionKey } from './get-session-key';
@@ -33,6 +53,7 @@ export {
   SessionKeyExpiredError,
   InsufficientPermissionError,
   ContractInvocationError,
+  NetworkError,
   NotImplementedError,
   mapContractError,
   CONTRACT_ERROR_MESSAGES,
