@@ -1,4 +1,4 @@
-import { validateHorizonUrl, isValidHorizonUrl, HorizonUrlValidationError } from '../horizon-url';
+import { validateHorizonUrl, isValidHorizonUrl, deriveHorizonUrl, HorizonUrlValidationError } from '../horizon-url';
 
 describe('validateHorizonUrl', () => {
   describe('mainnet validation', () => {
@@ -210,6 +210,19 @@ describe('validateHorizonUrl', () => {
   });
 });
 
+describe('deriveHorizonUrl', () => {
+  it('maps testnet RPC URLs with or without path and port', () => {
+    expect(deriveHorizonUrl('https://soroban-testnet.stellar.org')).toBe('https://horizon-testnet.stellar.org');
+    expect(deriveHorizonUrl('https://soroban-testnet.stellar.org:443')).toBe('https://horizon-testnet.stellar.org');
+    expect(deriveHorizonUrl('https://soroban-testnet.stellar.org/soroban/rpc')).toBe('https://horizon-testnet.stellar.org');
+  });
+
+  it('maps futurenet RPC URLs with or without port', () => {
+    expect(deriveHorizonUrl('https://rpc-futurenet.stellar.org:443')).toBe('https://horizon-futurenet.stellar.org');
+    expect(deriveHorizonUrl('https://rpc-futurenet.stellar.org')).toBe('https://horizon-futurenet.stellar.org');
+  });
+});
+
 describe('isValidHorizonUrl', () => {
   it('returns true for valid URLs', () => {
     expect(isValidHorizonUrl('https://horizon.stellar.org', 'mainnet')).toBe(true);
@@ -224,5 +237,18 @@ describe('isValidHorizonUrl', () => {
 
   it('does not throw for invalid URLs', () => {
     expect(() => isValidHorizonUrl('invalid-url', 'mainnet')).not.toThrow();
+  });
+});
+
+describe('deriveHorizonUrl', () => {
+  it('maps testnet RPC URLs with or without path and port', () => {
+    expect(deriveHorizonUrl('https://soroban-testnet.stellar.org')).toBe('https://horizon-testnet.stellar.org');
+    expect(deriveHorizonUrl('https://soroban-testnet.stellar.org:443')).toBe('https://horizon-testnet.stellar.org');
+    expect(deriveHorizonUrl('https://soroban-testnet.stellar.org/soroban/rpc')).toBe('https://horizon-testnet.stellar.org');
+  });
+
+  it('maps futurenet RPC URLs with or without port', () => {
+    expect(deriveHorizonUrl('https://rpc-futurenet.stellar.org:443')).toBe('https://horizon-futurenet.stellar.org');
+    expect(deriveHorizonUrl('https://rpc-futurenet.stellar.org')).toBe('https://horizon-futurenet.stellar.org');
   });
 });
