@@ -1,13 +1,13 @@
 import { z } from 'zod';
 
 /** Canonical @username handle accepted by Ancore send flows. */
-export type UsernameHandle = `@${string}`;
+export type UsernameHandle = string & { readonly __brand: 'UsernameHandle' };
 
 /** Minimum portable username rules shared by clients and resolver services. */
 export const usernameHandleSchema = z
   .string()
   .trim()
-  .regex(/^@[a-zA-Z0-9][a-zA-Z0-9_.-]{0,30}$/, {
+  .regex(/^[a-zA-Z0-9][a-zA-Z0-9_.-]{0,30}$/, {
     message: 'Enter a valid @username handle',
   });
 
@@ -72,6 +72,6 @@ export function normalizeUsernameHandle(value: UsernameHandle): UsernameHandle;
 export function normalizeUsernameHandle(value: string): UsernameHandle;
 // eslint-disable-next-line no-redeclare -- implementation signature for the overloads above
 export function normalizeUsernameHandle(value: string): UsernameHandle {
-  const normalized = value.trim().toLowerCase();
+  const normalized = value.trim().replace(/^@/, '').toLowerCase();
   return validateUsernameHandle(normalized);
 }
