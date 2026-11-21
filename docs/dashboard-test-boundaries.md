@@ -1,0 +1,1 @@
+# Dashboard test boundaries`n`nDashboard and extension storage modules require deterministic coverage for download cleanup, client wrappers, browser persistence, and contact validation state.
