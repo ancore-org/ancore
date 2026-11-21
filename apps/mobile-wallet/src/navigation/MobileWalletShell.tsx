@@ -54,7 +54,7 @@ export const MobileWalletShell = ({
           {items.map((item) => (
             <li key={item.route} aria-current={item.route === activeRoute ? 'page' : undefined}>
               {onNavigate ? (
-                <button type="button" onClick={() => onNavigate(item.route)}>
+                <button type="button" role="tab" aria-selected={item.route === activeRoute} onClick={() => onNavigate(item.route)}>
                   {item.label}
                 </button>
               ) : (
