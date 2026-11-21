@@ -1,0 +1,1 @@
+# Mobile validation boundaries`n`nRelayer validation and mobile security helpers require explicit invalid-path coverage, release-build gating, storage-failure behavior, and safe service URL resolution.
