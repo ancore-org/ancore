@@ -31,6 +31,7 @@ export function WalletRecoverScreen({ onBack = noop, onCancel = noop, onContinue
           aria-label="Backup phrase"
           onChange={(event) => setBackupPhrase(event.target.value)}
           placeholder="Enter your backup phrase"
+          spellCheck={false}
           value={backupPhrase}
         />
       </label>
@@ -39,8 +40,10 @@ export function WalletRecoverScreen({ onBack = noop, onCancel = noop, onContinue
         <span>Recovery code</span>
         <input
           aria-label="Recovery code"
+          autoComplete="off"
           onChange={(event) => setRecoveryCode(event.target.value)}
           placeholder="Enter your recovery code"
+          type="password"
           value={recoveryCode}
         />
       </label>
