@@ -2,6 +2,12 @@ import { describe, expect, it } from 'vitest';
 import { validateSchedule } from '@/utils/schedule-validation';
 
 describe('schedule-validation', () => {
+  it('rejects an invalid start date', () => {
+    expect(validateSchedule({ frequency: 'daily', startAt: 'not-a-date' })).toBe(
+      'Invalid schedule start time'
+    );
+  });
+
   it('rejects invalid end dates', () => {
     expect(
       validateSchedule({

@@ -49,6 +49,20 @@ describe('simulateTransaction', () => {
     expect(result.footprint).toBe('footprint-xdr');
   });
 
+  it('passes the unsigned XDR through to the injected client on mainnet', async () => {
+    const client = {
+      simulateTransaction: vi.fn().mockResolvedValue({
+        fee: '0.0000100',
+        resourceLimits: { cpuInsn: 0, memBytes: 0 },
+        authEntries: [],
+        footprint: '',
+      }),
+    };
+
+    await simulateTransaction(fixtureXdr, 'mainnet', { client });
+    expect(client.simulateTransaction).toHaveBeenCalledWith(fixtureXdr);
+  });
+
   it('returns an error payload without throwing when simulation fails', async () => {
     const client = {
       simulateTransaction: vi.fn().mockResolvedValue({
