@@ -52,6 +52,31 @@ describe('schedule-utils', () => {
       expect(next?.toISOString()).toBe('2026-02-15T12:00:00.000Z');
     });
 
+
+    it('clamps March 31 to April 30', () => {
+      const from = new Date('2026-03-31T12:00:00.000Z');
+      const next = computeNextRunAt(from, 'monthly');
+      expect(next?.toISOString()).toBe('2026-04-30T12:00:00.000Z');
+    });
+
+    it('preserves the UTC time across a leap-day month boundary', () => {
+      const from = new Date('2028-01-31T23:45:12.345Z');
+      const next = computeNextRunAt(from, 'monthly');
+      expect(next?.toISOString()).toBe('2028-02-29T23:45:12.345Z');
+    });
+
+    it('does not mutate the original date when clamping a month end', () => {
+      const from = new Date('2025-01-31T12:00:00.000Z');
+      computeNextRunAt(from, 'monthly');
+      expect(from.toISOString()).toBe('2025-01-31T12:00:00.000Z');
+    });
+
+    it('returns null when a clamped monthly run would exceed endAt', () => {
+      const from = new Date('2025-01-31T12:00:00.000Z');
+      const endAt = new Date('2025-02-28T11:59:59.999Z');
+      expect(computeNextRunAt(from, 'monthly', endAt)).toBeNull();
+    });
+
     it('rolls over the year correctly for a December run', () => {
       const from = new Date('2026-12-31T12:00:00.000Z');
       const next = computeNextRunAt(from, 'monthly');
