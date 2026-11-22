@@ -285,7 +285,7 @@ describe('resolveSendRecipient handle validation', () => {
 
     const resolved = await resolveSendRecipient('  @Alice  ', resolver);
 
-    expect(resolver).toHaveBeenCalledWith('@alice');
+    expect(resolver).toHaveBeenCalledWith('alice');
     expect(resolved.accountAddress).toBe(VALID_ADDRESS);
   });
 });
