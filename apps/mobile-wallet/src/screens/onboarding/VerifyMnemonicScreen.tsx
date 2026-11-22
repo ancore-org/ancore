@@ -1,4 +1,5 @@
 import { useCallback, useMemo, useState } from 'react';
+import { View, Text, Pressable, StyleSheet } from 'react-native';
 
 type Props = {
   mnemonic: string;
@@ -69,37 +70,116 @@ export function VerifyMnemonicScreen({
   );
 
   return (
-    <section aria-label="Verify recovery phrase" className="space-y-4">
-      <header className="space-y-2">
-        <p className="text-sm uppercase tracking-wide text-slate-500">Create</p>
-        <h1 className="text-2xl font-semibold text-slate-950">Verify your recovery phrase</h1>
-        <p className="text-sm text-slate-600">
+    <View accessibilityLabel="Verify recovery phrase" style={styles.container}>
+      <View style={styles.header}>
+        <Text style={styles.subtitle}>Create</Text>
+        <Text accessibilityRole="header" style={styles.title}>
+          Verify your recovery phrase
+        </Text>
+        <Text style={styles.description}>
           Select word #{position + 1} to confirm you wrote it down correctly.
-        </p>
-      </header>
+        </Text>
+      </View>
 
-      {error && (
-        <p aria-live="polite" className="text-sm text-red-600" role="alert">
+      {error ? (
+        <Text accessibilityLiveRegion="polite" accessibilityRole="alert" style={styles.error}>
           Incorrect word. Please try again.
-        </p>
-      )}
+        </Text>
+      ) : null}
 
-      <div aria-label="Word options" className="grid grid-cols-2 gap-2" role="group">
+      <View accessibilityLabel="Word options" style={styles.wordGrid}>
         {wordBank.map((word) => (
-          <button key={word} onClick={() => handleWordSelect(word)} type="button">
-            {word}
-          </button>
+          <Pressable
+            key={word}
+            accessibilityRole="button"
+            onPress={() => handleWordSelect(word)}
+            style={styles.wordButton}
+          >
+            {({ pressed }) => (
+              <Text style={[styles.buttonText, pressed && styles.buttonPressed]}>{word}</Text>
+            )}
+          </Pressable>
         ))}
-      </div>
+      </View>
 
-      <div className="flex gap-3">
-        <button onClick={onBack} type="button">
-          Back
-        </button>
-        <button onClick={onCancel} type="button">
-          Cancel
-        </button>
-      </div>
-    </section>
+      <View style={styles.actions}>
+        <Pressable accessibilityRole="button" onPress={onBack} style={styles.actionButton}>
+          {({ pressed }) => (
+            <Text style={[styles.buttonText, pressed && styles.buttonPressed]}>Back</Text>
+          )}
+        </Pressable>
+        <Pressable accessibilityRole="button" onPress={onCancel} style={styles.actionButton}>
+          {({ pressed }) => (
+            <Text style={[styles.buttonText, pressed && styles.buttonPressed]}>Cancel</Text>
+          )}
+        </Pressable>
+      </View>
+    </View>
   );
 }
+
+const styles = StyleSheet.create({
+  container: {
+    padding: 16,
+    gap: 16,
+  },
+  header: {
+    gap: 8,
+  },
+  subtitle: {
+    fontSize: 12,
+    textTransform: 'uppercase',
+    letterSpacing: 1,
+    color: '#64748b',
+  },
+  title: {
+    fontSize: 24,
+    fontWeight: '600',
+    color: '#0f172a',
+  },
+  description: {
+    fontSize: 14,
+    color: '#475569',
+  },
+  error: {
+    fontSize: 14,
+    color: '#dc2626',
+  },
+  wordGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+  },
+  wordButton: {
+    width: '48%',
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+    borderRadius: 6,
+    borderWidth: 1,
+    borderColor: '#cbd5e1',
+    backgroundColor: '#ffffff',
+    alignItems: 'center',
+  },
+  actions: {
+    flexDirection: 'row',
+    gap: 12,
+  },
+  actionButton: {
+    flex: 1,
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+    borderRadius: 6,
+    borderWidth: 1,
+    borderColor: '#cbd5e1',
+    backgroundColor: '#ffffff',
+    alignItems: 'center',
+  },
+  buttonText: {
+    fontSize: 16,
+    fontWeight: '500',
+    color: '#334155',
+  },
+  buttonPressed: {
+    opacity: 0.7,
+  },
+});

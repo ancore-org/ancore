@@ -126,31 +126,46 @@ export const fetchRemoteAppConfig = async (
   timeoutMs: number = REMOTE_CONFIG_TIMEOUT_MS
 ): Promise<RemoteAppConfig> => {
   const controller = new AbortController();
-  const timer = setTimeout(() => controller.abort(), timeoutMs);
+  const timeoutError = () =>
+    new RemoteConfigError(`Remote config request timed out after ${timeoutMs}ms.`);
 
-  let response: Awaited<ReturnType<FetchLike>>;
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  // Rejects when time is up. It is raced against the request below rather than relying
+  // on `fetchFn` to honour the abort signal: a polyfill that ignores it would otherwise
+  // leave startup hanging exactly as if there were no timeout (#1618).
+  const timedOut = new Promise<never>((_resolve, reject) => {
+    timer = setTimeout(() => {
+      controller.abort();
+      reject(timeoutError());
+    }, timeoutMs);
+  });
+
+  const request = (async () => {
+    const response = await fetchFn(url, { signal: controller.signal });
+    if (!response.ok) {
+      throw new RemoteConfigError(`Remote config request failed with status ${response.status}.`);
+    }
+    // Still inside the timed section: headers can arrive and the body then stall on a
+    // degraded connection, which must not hang startup either.
+    return parseRemoteAppConfig(await response.json());
+  })();
+
   try {
-    response = await fetchFn(url, { signal: controller.signal });
+    return await Promise.race([request, timedOut]);
   } catch (error) {
-    // `AbortError` is the timeout firing; anything else is a genuine network
-    // failure. Both are reported the same way — the caller's only sensible
+    // `AbortError` is the signal firing; anything else is a genuine failure. A timeout
+    // and a network failure are reported the same way — the caller's only sensible
     // reaction to either is to proceed without a config.
     if (error instanceof Error && error.name === 'AbortError') {
-      throw new RemoteConfigError(`Remote config request timed out after ${timeoutMs}ms.`);
+      throw timeoutError();
     }
     throw error;
   } finally {
-    // Always cleared: leaving it pending keeps a timer alive for the full
-    // duration on every successful startup, which on React Native shows up as
-    // a warning about an unhandled timer.
+    // Always cleared, on success and on every failure: a timer left pending keeps the
+    // process alive for the full duration and, on React Native, shows up as a warning
+    // about an unhandled timer.
     clearTimeout(timer);
   }
-
-  if (!response.ok) {
-    throw new RemoteConfigError(`Remote config request failed with status ${response.status}.`);
-  }
-
-  return parseRemoteAppConfig(await response.json());
 };
 
 export interface EvaluateAppGateOptions {
