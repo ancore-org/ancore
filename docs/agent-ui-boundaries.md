@@ -1,0 +1,1 @@
+# Agent and UI boundaries`n`nAI authentication must fail closed, shared UI timers need lifecycle coverage, mobile onboarding must use native primitives, and contacts import/export requires validated persisted data.

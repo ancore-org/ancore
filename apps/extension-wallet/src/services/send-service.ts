@@ -95,10 +95,71 @@ export interface ProductionSendServiceOptions {
   accountAddress: string;
   isContractAccount?: boolean;
   environment?: string;
+  /** Optional explicit Horizon base URL override for transaction status polling. */
+  horizonUrl?: string;
+}
+
+const DEFAULT_HORIZON_URLS: Record<string, string> = {
+  mainnet: 'https://horizon.stellar.org',
+  testnet: 'https://horizon-testnet.stellar.org',
+  futurenet: 'https://horizon-futurenet.stellar.org',
+  local: 'http://localhost:8000',
+};
+
+/**
+ * Resolve the Horizon REST base URL for transaction status polling (#1187).
+ *
+ * Avoids blindly string-stripping `/soroban/rpc` from a plain Soroban RPC host
+ * (such as `https://soroban-testnet.stellar.org`), which has no `/soroban/rpc`
+ * suffix and does not serve Horizon `/transactions/:id` REST routes.
+ */
+export function resolveHorizonBaseUrl(
+  stellarClient: StellarClient,
+  horizonUrlOverride?: string
+): string {
+  if (horizonUrlOverride && horizonUrlOverride.trim().length > 0) {
+    return horizonUrlOverride.trim().replace(/\/+$/, '');
+  }
+
+  const clientWithHorizon = stellarClient as StellarClient & {
+    getHorizonUrl?: () => string;
+  };
+  if (typeof clientWithHorizon.getHorizonUrl === 'function') {
+    const configured = clientWithHorizon.getHorizonUrl();
+    if (configured && configured.trim().length > 0) {
+      return configured.trim().replace(/\/+$/, '');
+    }
+  }
+
+  const rpcUrl = stellarClient.getRpcUrls?.()[0]?.trim();
+  if (rpcUrl && /\/soroban\/rpc\/?$/i.test(rpcUrl)) {
+    const stripped = rpcUrl.replace(/\/soroban\/rpc\/?$/i, '').replace(/\/+$/, '');
+    try {
+      const parsed = new URL(stripped);
+      if (
+        parsed.hostname.includes('horizon') ||
+        parsed.hostname === 'localhost' ||
+        parsed.hostname === '127.0.0.1'
+      ) {
+        return stripped;
+      }
+    } catch {
+      // Fall through to network-based Horizon URL resolution
+    }
+  }
+
+  const network = String(stellarClient.getNetwork?.() ?? 'testnet').toLowerCase();
+  return DEFAULT_HORIZON_URLS[network] ?? DEFAULT_HORIZON_URLS['testnet']!;
 }
 
 export function createProductionSendService(options: ProductionSendServiceOptions): SendService {
-  const { stellarClient, accountAddress, isContractAccount, environment = 'production' } = options;
+  const {
+    stellarClient,
+    accountAddress,
+    isContractAccount,
+    environment = 'production',
+    horizonUrl,
+  } = options;
 
   async function buildPaymentXdr(tx: SendTransactionDraft): Promise<string> {
     const accountResponse = await stellarClient.getAccount(accountAddress);
@@ -285,7 +346,8 @@ export function createProductionSendService(options: ProductionSendServiceOption
      * tell the user why the answer is late.
      */
     async fetchTransactionStatus(txId: string): Promise<TxStatus> {
-      const url = `${stellarClient.getRpcUrls()[0]?.replace('/soroban/rpc', '')}/transactions/${txId}`;
+      const baseUrl = resolveHorizonBaseUrl(stellarClient, horizonUrl);
+      const url = `${baseUrl}/transactions/${encodeURIComponent(txId)}`;
 
       let response: Response;
       try {
@@ -297,6 +359,14 @@ export function createProductionSendService(options: ProductionSendServiceOption
       }
 
       if (response.ok) {
+        try {
+          const payload = (await response.json()) as { successful?: boolean } | null;
+          if (payload && typeof payload === 'object' && payload.successful === false) {
+            return 'failed';
+          }
+        } catch {
+          // Non-JSON or empty 200 body still counts as confirmed
+        }
         return 'confirmed';
       }
       if (response.status === 404) {

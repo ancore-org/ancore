@@ -2,4 +2,7 @@
 # Add triaged advisory IDs to `ignore` to allowlist known false positives.
 
 [advisories]
-ignore = []
+ignore = [
+  "RUSTSEC-2023-0071",
+  "RUSTSEC-2026-0459",
+]

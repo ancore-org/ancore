@@ -47,7 +47,7 @@ export { parseSimulationResponse, simulateUnsignedTransaction } from './simulati
 export type { ParsedSimulationResult, SorobanResourceLimits } from './simulation';
 
 // Horizon URL validation
-export { validateHorizonUrl, isValidHorizonUrl } from './horizon-url';
+export { validateHorizonUrl, isValidHorizonUrl, deriveHorizonUrl } from './horizon-url';
 export { HorizonUrlValidationError } from './horizon-url';
 
 // Account sequence fetch helper

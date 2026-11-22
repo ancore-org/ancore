@@ -83,6 +83,8 @@ export function createAccountRateLimiterMiddleware(options?: AccountRateLimiterO
     keyGenerator: deriveAccountKey,
     handler(_req: Request, res: Response) {
       res.setHeader('Retry-After', '60');
+      res.setHeader('X-RateLimit-Scope', 'account');
+      res.setHeader('X-RateLimit-Metric', 'relayer_account_limit_hit');
       res.status(429).json({ error: 'RATE_LIMITED', retryAfter: 60 });
     },
   });

@@ -218,3 +218,24 @@ export function isValidHorizonUrl(url: string, network: Network): boolean {
     return false;
   }
 }
+
+/**
+ * Derives the corresponding Horizon URL for a given Soroban RPC or Horizon URL.
+ * Supports plain host URLs, port :443, and /soroban/rpc paths.
+ */
+export function deriveHorizonUrl(rpcUrl: string): string {
+  if (!rpcUrl || typeof rpcUrl !== 'string') {
+    return 'https://horizon.stellar.org';
+  }
+  const clean = rpcUrl.trim();
+  if (/futurenet/i.test(clean)) {
+    return 'https://horizon-futurenet.stellar.org';
+  }
+  if (/testnet/i.test(clean)) {
+    return 'https://horizon-testnet.stellar.org';
+  }
+  if (/localhost|127\.0\.0\.1/i.test(clean)) {
+    return 'http://localhost:8000';
+  }
+  return 'https://horizon.stellar.org';
+}

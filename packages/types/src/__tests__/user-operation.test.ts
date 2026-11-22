@@ -1,4 +1,9 @@
-import { UserOperationSchema, TransactionResultSchema } from '../user-operation';
+import {
+  UserOperationSchema,
+  TransactionResultSchema,
+  parseUserOperation,
+  parseTransactionResult,
+} from '../user-operation';
 import { isUserOperation, isTransactionResult } from '../guards';
 
 describe('UserOperation', () => {
@@ -288,5 +293,203 @@ describe('TransactionResult', () => {
         })
       ).toBe(false);
     });
+  });
+});
+
+describe('parseUserOperation', () => {
+  const validOp = () => ({
+    id: 'op-parse-1',
+    type: 'payment',
+    operation: { type: 'payment', amount: '100' },
+    gasLimit: 1000,
+    createdAt: Date.now(),
+  });
+
+  test('returns success with data for a valid operation', () => {
+    const op = validOp();
+    const result = parseUserOperation(op);
+    expect(result.success).toBe(true);
+    if (result.success) {
+      expect(result.data.id).toBe(op.id);
+      expect(result.data.type).toBe(op.type);
+      expect(result.data.gasLimit).toBe(op.gasLimit);
+      expect(result.data.createdAt).toBe(op.createdAt);
+    }
+  });
+
+  test('round trips a valid operation', () => {
+    const first = parseUserOperation(validOp());
+    expect(first.success).toBe(true);
+    if (first.success) {
+      const second = parseUserOperation(first.data);
+      expect(second.success).toBe(true);
+      if (second.success) {
+        expect(second.data).toEqual(first.data);
+      }
+    }
+  });
+
+  test('returns failure for missing id', () => {
+    const { id: _id, ...rest } = validOp();
+    const result = parseUserOperation(rest);
+    expect(result.success).toBe(false);
+    if (!result.success) {
+      expect(result.error).toBeDefined();
+      expect(result.error.issues.length).toBeGreaterThan(0);
+    }
+  });
+
+  test('returns failure for missing type', () => {
+    const { type: _type, ...rest } = validOp();
+    const result = parseUserOperation(rest);
+    expect(result.success).toBe(false);
+    if (!result.success) {
+      expect(result.error.issues.length).toBeGreaterThan(0);
+    }
+  });
+
+  test('returns failure for missing operation', () => {
+    const { operation: _operation, ...rest } = validOp();
+    const result = parseUserOperation(rest);
+    expect(result.success).toBe(false);
+    if (!result.success) {
+      expect(result.error.issues.length).toBeGreaterThan(0);
+    }
+  });
+
+  test('returns failure for missing createdAt', () => {
+    const { createdAt: _createdAt, ...rest } = validOp();
+    const result = parseUserOperation(rest);
+    expect(result.success).toBe(false);
+    if (!result.success) {
+      expect(result.error.issues.length).toBeGreaterThan(0);
+    }
+  });
+
+  test('returns failure for wrong-typed id', () => {
+    const result = parseUserOperation({ ...validOp(), id: 123 });
+    expect(result.success).toBe(false);
+    if (!result.success) {
+      expect(result.error.issues.length).toBeGreaterThan(0);
+    }
+  });
+
+  test('returns failure for wrong-typed createdAt', () => {
+    const result = parseUserOperation({ ...validOp(), createdAt: 'not-a-number' });
+    expect(result.success).toBe(false);
+    if (!result.success) {
+      expect(result.error.issues.length).toBeGreaterThan(0);
+    }
+  });
+
+  test('returns failure for null input', () => {
+    const result = parseUserOperation(null);
+    expect(result.success).toBe(false);
+    if (!result.success) {
+      expect(result.error).toBeDefined();
+      expect(result.error.issues.length).toBeGreaterThan(0);
+    }
+  });
+
+  test('preserves extra unknown fields (non-strict schema)', () => {
+    const op = { ...validOp(), extraField: 'extra-value' };
+    const result = parseUserOperation(op);
+    expect(result.success).toBe(true);
+    if (result.success) {
+      expect((result.data as Record<string, unknown>).extraField).toBe('extra-value');
+    }
+  });
+});
+
+describe('parseTransactionResult', () => {
+  test('returns success with data for a valid success result', () => {
+    const result = parseTransactionResult({
+      status: 'success',
+      hash: 'txabcd1234',
+      ledger: 1000,
+      timestamp: Date.now(),
+    });
+    expect(result.success).toBe(true);
+    if (result.success) {
+      expect(result.data.status).toBe('success');
+      expect(result.data.hash).toBe('txabcd1234');
+      expect(result.data.ledger).toBe(1000);
+    }
+  });
+
+  test('returns success with data for a valid failure result', () => {
+    const result = parseTransactionResult({
+      status: 'failure',
+      error: 'Insufficient balance',
+      timestamp: Date.now(),
+    });
+    expect(result.success).toBe(true);
+    if (result.success) {
+      expect(result.data.status).toBe('failure');
+      expect(result.data.error).toBe('Insufficient balance');
+    }
+  });
+
+  test('returns success with data for a valid pending result', () => {
+    const result = parseTransactionResult({
+      status: 'pending',
+      timestamp: Date.now(),
+    });
+    expect(result.success).toBe(true);
+    if (result.success) {
+      expect(result.data.status).toBe('pending');
+    }
+  });
+
+  test('returns failure for invalid status', () => {
+    const result = parseTransactionResult({
+      status: 'invalid',
+      timestamp: Date.now(),
+    });
+    expect(result.success).toBe(false);
+    if (!result.success) {
+      expect(result.error.issues.length).toBeGreaterThan(0);
+    }
+  });
+
+  test('returns failure for missing timestamp', () => {
+    const result = parseTransactionResult({ status: 'success' });
+    expect(result.success).toBe(false);
+    if (!result.success) {
+      expect(result.error.issues.length).toBeGreaterThan(0);
+    }
+  });
+
+  test('returns failure for wrong-typed hash', () => {
+    const result = parseTransactionResult({
+      status: 'success',
+      hash: 12345,
+      timestamp: Date.now(),
+    });
+    expect(result.success).toBe(false);
+    if (!result.success) {
+      expect(result.error.issues.length).toBeGreaterThan(0);
+    }
+  });
+
+  test('returns failure for wrong-typed ledger', () => {
+    const result = parseTransactionResult({
+      status: 'success',
+      ledger: 'not-a-number',
+      timestamp: Date.now(),
+    });
+    expect(result.success).toBe(false);
+    if (!result.success) {
+      expect(result.error.issues.length).toBeGreaterThan(0);
+    }
+  });
+
+  test('returns failure for null input', () => {
+    const result = parseTransactionResult(null);
+    expect(result.success).toBe(false);
+    if (!result.success) {
+      expect(result.error).toBeDefined();
+      expect(result.error.issues.length).toBeGreaterThan(0);
+    }
   });
 });

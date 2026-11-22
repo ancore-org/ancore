@@ -1,9 +1,13 @@
 import { Keypair, StrKey, xdr } from '@stellar/stellar-sdk';
 import {
   AccountAbstractionClient,
+  AccountContractError,
   createSmartAccount,
   deriveAccountContractId,
   ACCOUNT_CONTRACT_SALT,
+  NotInitializedError,
+  SessionKeyExpiredError,
+  SessionKeyNotFoundError,
 } from '../src/index';
 
 describe('createSmartAccount factory & AccountAbstractionClient', () => {
@@ -265,6 +269,141 @@ describe('createSmartAccount factory & AccountAbstractionClient', () => {
         retryOptions: { maxRetries: 0 },
       });
       await expect(client.isAccountDeployed()).rejects.toThrow('Network timeout or failure');
+    });
+  });
+
+  describe('refreshSessionKeyTtl edge cases (#1458)', () => {
+    const fixedNowMs = 1_750_000_000_000;
+    const fixedNowSec = Math.floor(fixedNowMs / 1000);
+    const activeExpiresAt = fixedNowSec + 3600;
+
+    it('rejects expired session keys during preflight and when on-chain key is expired', async () => {
+      const sessionPub = Keypair.random().publicKey();
+      const client = createSmartAccount(mockOwner, mockServer, {
+        retryOptions: { maxRetries: 0 },
+      });
+
+      await expect(
+        client.refreshSessionKeyTtl(sessionPub, {
+          expiresAt: fixedNowSec - 10,
+          nowMs: fixedNowMs,
+        })
+      ).rejects.toBeInstanceOf(SessionKeyExpiredError);
+
+      jest.spyOn(client, 'getSessionKey').mockResolvedValueOnce({
+        publicKey: sessionPub,
+        permissions: [0],
+        expiresAt: fixedNowSec - 1,
+      });
+
+      await expect(
+        client.refreshSessionKeyTtl(sessionPub, { nowMs: fixedNowMs })
+      ).rejects.toBeInstanceOf(SessionKeyExpiredError);
+      expect(mockServer.simulateTransaction).not.toHaveBeenCalled();
+    });
+
+    it('rejects invalid contract addresses with INVALID_CONTRACT_ADDRESS', async () => {
+      const sessionPub = Keypair.random().publicKey();
+      const client = createSmartAccount(mockOwner, mockServer);
+
+      await expect(
+        client.refreshSessionKeyTtl(sessionPub, {
+          contractId: 'INVALID_CONTRACT_ADDRESS',
+          expiresAt: activeExpiresAt,
+          nowMs: fixedNowMs,
+        })
+      ).rejects.toThrow(AccountContractError);
+    });
+
+    it('rejects when smart account vault is missing/undeployed or session key is missing on-chain', async () => {
+      const sessionPub = Keypair.random().publicKey();
+      const undeployedServer = {
+        ...mockServer,
+        getContractData: jest.fn().mockRejectedValue({ status: 404, message: 'Entry not found' }),
+      };
+      const undeployedClient = createSmartAccount(mockOwner, undeployedServer, {
+        retryOptions: { maxRetries: 0 },
+      });
+
+      await expect(
+        undeployedClient.refreshSessionKeyTtl(sessionPub, {
+          expiresAt: activeExpiresAt,
+          nowMs: fixedNowMs,
+        })
+      ).rejects.toBeInstanceOf(NotInitializedError);
+
+      const client = createSmartAccount(mockOwner, mockServer, {
+        retryOptions: { maxRetries: 0 },
+      });
+      jest.spyOn(client, 'getSessionKey').mockResolvedValueOnce(null);
+
+      await expect(
+        client.refreshSessionKeyTtl(sessionPub, { nowMs: fixedNowMs })
+      ).rejects.toBeInstanceOf(SessionKeyNotFoundError);
+    });
+
+    it('coalesces concurrent refreshes for the same session key and runs distinct keys independently', async () => {
+      const sessionPubA = Keypair.random().publicKey();
+      const sessionPubB = Keypair.random().publicKey();
+      mockServer.getAccount.mockResolvedValue({ id: mockOwner, sequence: '100' });
+      mockServer.simulateTransaction.mockImplementation(
+        () =>
+          new Promise((resolve) =>
+            setTimeout(() => resolve({ result: { retval: xdr.ScVal.scvVoid() } }), 20)
+          )
+      );
+
+      const client = createSmartAccount(mockOwner, mockServer, {
+        retryOptions: { maxRetries: 0 },
+      });
+
+      const [resA1, resA2, resB] = await Promise.all([
+        client.refreshSessionKeyTtl(sessionPubA, {
+          expiresAt: activeExpiresAt,
+          nowMs: fixedNowMs,
+        }),
+        client.refreshSessionKeyTtl(sessionPubA, {
+          expiresAt: activeExpiresAt,
+          nowMs: fixedNowMs,
+        }),
+        client.refreshSessionKeyTtl(sessionPubB, {
+          expiresAt: activeExpiresAt,
+          nowMs: fixedNowMs,
+        }),
+      ]);
+
+      expect(resA1).toEqual(resA2);
+      expect(resA1.publicKey).toBe(sessionPubA);
+      expect(resB.publicKey).toBe(sessionPubB);
+      // Two unique session keys => only 2 simulation calls despite 3 concurrent invocations
+      expect(mockServer.simulateTransaction).toHaveBeenCalledTimes(2);
+    });
+
+    it('successfully simulates refresh_session_key_ttl and returns invocation and operation', async () => {
+      const sessionPub = Keypair.random().publicKey();
+      mockServer.getAccount.mockResolvedValueOnce({ id: mockOwner, sequence: '42' });
+      mockServer.simulateTransaction.mockResolvedValueOnce({
+        result: { retval: xdr.ScVal.scvVoid() },
+      });
+
+      const client = createSmartAccount(mockOwner, mockServer, {
+        retryOptions: { maxRetries: 0 },
+      });
+      jest.spyOn(client, 'getSessionKey').mockResolvedValueOnce({
+        publicKey: sessionPub,
+        permissions: [0],
+        expiresAt: activeExpiresAt,
+      });
+
+      const result = await client.refreshSessionKeyTtl(sessionPub, {
+        nowMs: fixedNowMs,
+      });
+
+      expect(result.invocation.method).toBe('refresh_session_key_ttl');
+      expect(result.publicKey).toBe(sessionPub);
+      expect(result.expiresAt).toBe(activeExpiresAt);
+      expect(result.operation).toBeDefined();
+      expect(mockServer.simulateTransaction).toHaveBeenCalledTimes(1);
     });
   });
 });

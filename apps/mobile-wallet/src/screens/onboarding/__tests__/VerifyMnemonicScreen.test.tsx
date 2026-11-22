@@ -9,7 +9,7 @@ const TEST_MNEMONIC =
 
 describe('VerifyMnemonicScreen', () => {
   const getWordButtons = (): HTMLElement[] => {
-    const grid = screen.getByRole('group', { name: /word options/i });
+    const grid = screen.getByLabelText(/word options/i);
     return Array.from(grid.querySelectorAll('button'));
   };
 
@@ -98,5 +98,33 @@ describe('VerifyMnemonicScreen', () => {
 
     fireEvent.click(screen.getByRole('button', { name: /^cancel$/i }));
     expect(onCancel).toHaveBeenCalledTimes(1);
+  });
+
+  it('labels the screen and offers four word options as buttons', () => {
+    render(<VerifyMnemonicScreen mnemonic={TEST_MNEMONIC} />);
+
+    expect(screen.getByLabelText('Verify recovery phrase')).toBeInTheDocument();
+    expect(getWordButtons()).toHaveLength(4);
+  });
+
+  it('announces a wrong selection politely and clears it after a correct one', () => {
+    render(<VerifyMnemonicScreen mnemonic={TEST_MNEMONIC} />);
+
+    const match = screen.getByText(/select word #\d+/i).textContent?.match(/#(\d+)/);
+    const position = parseInt(match![1], 10) - 1;
+    const correctWord = TEST_MNEMONIC.split(' ')[position];
+    fireEvent.click(getWordButtons().find((btn) => btn.textContent !== correctWord)!);
+
+    const alert = screen.getByRole('alert');
+    expect(alert).toHaveAttribute('aria-live', 'polite');
+
+    selectCorrectWord(TEST_MNEMONIC, position);
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument();
+  });
+
+  it('shows no alert before any selection is made', () => {
+    render(<VerifyMnemonicScreen mnemonic={TEST_MNEMONIC} />);
+
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument();
   });
 });

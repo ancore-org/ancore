@@ -323,12 +323,46 @@ new AncoreClient(options: AncoreClientOptions)
 
 ### Retry Policy & Transient Failure Handling
 
-- `withNetworkRetry(fn, policy)`: Executes async network calls with configurable exponential backoff and transient failure handling.
+`@ancore/core-sdk` exports built-in retry presets (`DEFAULT_RETRY_POLICY`, `LOW_LATENCY`, `AGGRESSIVE`, `RELIABLE`) and retry helpers (`withRetry`, `withNetworkRetry`, `AncoreClient.withRetry`) for resilient Soroban RPC and Horizon calls.
+
+| Preset / Config                                 | `maxRetries` | `baseDelayMs` | `maxDelayMs` | `exponential` | Use Case                               |
+| ----------------------------------------------- | ------------ | ------------- | ------------ | ------------- | -------------------------------------- |
+| `DEFAULT_RETRY_POLICY` (`DEFAULT_RETRY_CONFIG`) | `3`          | `500ms`       | `30000ms`    | `true`        | Standard RPC & Horizon queries         |
+| `LOW_LATENCY` (`CONSERVATIVE_RETRY_CONFIG`)     | `2`          | `200ms`       | `10000ms`    | `false`       | Time-sensitive interactive UI requests |
+| `AGGRESSIVE` (`AGGRESSIVE_RETRY_CONFIG`)        | `4`          | `500ms`       | `30000ms`    | `true`        | High-throughput batch operations       |
+| `RELIABLE`                                      | `8`          | `3000ms`      | `30000ms`    | `true`        | Critical transaction submissions       |
+| `NO_RETRY_CONFIG` (`{ maxRetries: 0 }`)         | `0`          | `0ms`         | `0ms`        | `false`       | Fail-fast calls and unit tests         |
+
+```typescript
+import {
+  AncoreClient,
+  withRetry,
+  DEFAULT_RETRY_POLICY,
+  LOW_LATENCY,
+  AGGRESSIVE,
+  RELIABLE,
+} from '@ancore/core-sdk';
+
+// Standalone withRetry usage with a preset
+const account = await withRetry(() => server.getAccount(publicKey), LOW_LATENCY);
+
+// Client-level retry configuration and per-call override
+const client = new AncoreClient({
+  accountContractId: 'CABC...',
+  retry: DEFAULT_RETRY_POLICY,
+});
+
+const sim = await client.withRetry(() => server.simulateTransaction(tx), AGGRESSIVE);
+const critical = await client.withRetry(() => server.sendTransaction(tx), RELIABLE);
+```
+
+- `withRetry(fn, options)`: Executes an async operation with exponential backoff, jitter (`±10%` by default), and transient error filtering.
+- `withNetworkRetry(fn, policy)`: Executes async network calls with configurable exponential backoff and preset name resolution.
 - `isTransientNetworkError(error)`: Determines if an error is transient (HTTP 5xx, 429 rate limits, network timeouts, ECONNRESET, etc.) versus non-retryable 4xx client errors.
 - `createRetryPolicyWrapper(defaultPolicy)`: Returns a reusable wrapper with pre-configured retry settings.
 - `resolveRetryPolicy(policy)`: Resolves preset names or custom options into normalized retry options.
 - `calculateRetryDelay(attempt, baseDelayMs, exponential, maxDelayMs, jitter)`: Calculates delay with exponential backoff and optional jitter.
-- `LOW_LATENCY`, `RELIABLE`, `AGGRESSIVE`: Built-in retry presets.
+- `LOW_LATENCY`, `RELIABLE`, `AGGRESSIVE`, `DEFAULT_RETRY_POLICY`, `getRetryPreset`: Built-in retry presets and lookup helper.
 
 ---
 

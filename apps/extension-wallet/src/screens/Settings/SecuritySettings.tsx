@@ -12,6 +12,7 @@ import { useTransferPolicy } from '../../hooks/useTransferPolicy';
 import { ScreenHeader } from './NetworkSettings';
 import { useDeviceSessionsStore, type DeviceSession } from '../../stores/deviceSessions';
 import { formatRemainingLockTime } from '@/background/session-state';
+import { getChromeSessionStorage } from '@/background/chrome-storage';
 import { UNLOCK_SESSION_STORAGE_KEY } from '@ancore/wallet-shared';
 
 type SecurityView =
@@ -192,18 +193,14 @@ export function useAutoLockCountdown(autoLockMinutes: number): string {
 
     async function updateCountdown() {
       try {
-        if (typeof chrome !== 'undefined' && chrome.storage?.session) {
-          const res = await new Promise<Record<string, unknown>>((resolve) => {
-            chrome.storage.session.get(UNLOCK_SESSION_STORAGE_KEY, resolve);
-          });
-          const session = res?.[UNLOCK_SESSION_STORAGE_KEY] as { expiresAt?: number } | undefined;
-          if (session && typeof session.expiresAt === 'number') {
-            const remainingMs = Math.max(0, session.expiresAt - Date.now());
-            if (isMounted) {
-              setCountdown(formatRemainingLockTime(remainingMs));
-            }
-            return;
+        const raw = await getChromeSessionStorage(UNLOCK_SESSION_STORAGE_KEY);
+        const session = raw as { expiresAt?: number } | undefined;
+        if (session && typeof session.expiresAt === 'number') {
+          const remainingMs = Math.max(0, session.expiresAt - Date.now());
+          if (isMounted) {
+            setCountdown(formatRemainingLockTime(remainingMs));
           }
+          return;
         }
       } catch {
         // Fallback to configured duration
