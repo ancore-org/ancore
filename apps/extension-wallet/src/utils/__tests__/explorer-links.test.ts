@@ -52,6 +52,12 @@ describe('getTransactionExplorerLink', () => {
     });
   });
 
+  it('encodes spaces and question marks in the hash', () => {
+    expect(getTransactionExplorerLink('a b?c', 'futurenet')).toBe(
+      'https://stellar.expert/explorer/futurenet/tx/a%20b%3Fc'
+    );
+  });
+
   it('handles empty hash string', () => {
     const hash = '';
     const expectedUrl = 'https://stellar.expert/explorer/public/tx/';

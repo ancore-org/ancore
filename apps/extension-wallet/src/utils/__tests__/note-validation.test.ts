@@ -161,6 +161,13 @@ describe('Note Validation Utilities', () => {
     });
   });
 
+  describe('Unicode truncation', () => {
+    it('keeps emoji-based notes within the character limit', () => {
+      const result = truncateTransferNote('😀'.repeat(MAX_NOTE_LENGTH + 5));
+      expect(Array.from(result).length).toBeLessThanOrEqual(MAX_NOTE_LENGTH);
+    });
+  });
+
   describe('MAX_NOTE_LENGTH constant', () => {
     it('should be 140', () => {
       expect(MAX_NOTE_LENGTH).toBe(140);
