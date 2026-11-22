@@ -194,5 +194,10 @@ describe('validatePasswordStrength()', () => {
       const result = validatePasswordStrength('a'.repeat(100));
       expectWeak(result);
     });
+
+    it('rejects keyboard walk and repeated pattern passwords', () => {
+      expectWeak(validatePasswordStrength('qwertyuiop12!'));
+      expectWeak(validatePasswordStrength('aaaaaaaaaaaa1!'));
+    });
   });
 });
