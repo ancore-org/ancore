@@ -125,9 +125,12 @@ export async function loadUnlockAttemptState(): Promise<UnlockAttemptState> {
     const parsed = JSON.parse(raw) as Partial<UnlockAttemptState>;
     if (
       typeof parsed.failedAttempts !== 'number' ||
+      !Number.isFinite(parsed.failedAttempts) ||
+      parsed.failedAttempts < 0 ||
       (parsed.lockedUntil !== null &&
         parsed.lockedUntil !== undefined &&
-        typeof parsed.lockedUntil !== 'number')
+        (typeof parsed.lockedUntil !== 'number' ||
+          !Number.isFinite(parsed.lockedUntil)))
     ) {
       return { ...DEFAULT_UNLOCK_ATTEMPT_STATE };
     }
