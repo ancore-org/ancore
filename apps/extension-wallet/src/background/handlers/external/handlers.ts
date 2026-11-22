@@ -488,8 +488,8 @@ function generateSessionKeyPair(): { publicKey: string; secretKey: string } {
 }
 
 /**
- * requestSessionKey handler (#873)
- * Enqueues approval for dApp session key policy; returns key material on approval (MVP mock on-chain).
+ * requestSessionKey handler (#958)
+ * Enqueues approval for dApp session key policy; returns key material on approval registered on-chain.
  */
 export async function handleRequestSessionKey(
   ctx: ExternalHandlerContext
