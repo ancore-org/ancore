@@ -708,6 +708,68 @@ describe('APPROVE_SIGN_REQUEST', () => {
 });
 
 // ---------------------------------------------------------------------------
+// APPROVE_SESSION_KEY_REQUEST / REJECT_SESSION_KEY_REQUEST (issue #958)
+// ---------------------------------------------------------------------------
+
+describe('APPROVE_SESSION_KEY_REQUEST & REJECT_SESSION_KEY_REQUEST (#958)', () => {
+  it('resolves pending requestSessionKey approval on APPROVE_SESSION_KEY_REQUEST', async () => {
+    const { _resetHandlers } = await loadServiceWorker(makeAuthState({ hasOnboarded: true }));
+    const { enqueueApproval, registerResponseCallbacks, getApproval } =
+      await import('../handlers/external/response-queue');
+
+    const requestId = 'req-session-approve-1';
+    enqueueApproval(requestId, 'https://dapp.example', 'requestSessionKey' as never, {
+      expiresAt: Date.now() + 60_000,
+      permissions: 1,
+    });
+    const waited = new Promise((resolve, reject) => {
+      registerResponseCallbacks(requestId, resolve, reject);
+    });
+
+    const ack = await new Promise<{ ok: boolean; error?: string }>((resolve) => {
+      chromeMock.runtime.onMessage._trigger(
+        { type: 'APPROVE_SESSION_KEY_REQUEST', requestId },
+        {},
+        resolve as any
+      );
+    });
+
+    expect(ack.ok).toBe(true);
+    await expect(waited).resolves.toEqual({ approved: true });
+    expect(getApproval(requestId)).toBeUndefined();
+    _resetHandlers();
+  });
+
+  it('rejects pending requestSessionKey approval on REJECT_SESSION_KEY_REQUEST', async () => {
+    const { _resetHandlers } = await loadServiceWorker(makeAuthState({ hasOnboarded: true }));
+    const { enqueueApproval, registerResponseCallbacks, getApproval } =
+      await import('../handlers/external/response-queue');
+
+    const requestId = 'req-session-reject-1';
+    enqueueApproval(requestId, 'https://dapp.example', 'requestSessionKey' as never, {
+      expiresAt: Date.now() + 60_000,
+      permissions: 1,
+    });
+    const waited = new Promise((resolve, reject) => {
+      registerResponseCallbacks(requestId, resolve, reject);
+    });
+
+    const ack = await new Promise<{ ok: boolean; error?: string }>((resolve) => {
+      chromeMock.runtime.onMessage._trigger(
+        { type: 'REJECT_SESSION_KEY_REQUEST', requestId },
+        {},
+        resolve as any
+      );
+    });
+
+    expect(ack.ok).toBe(true);
+    await expect(waited).rejects.toThrow('User rejected the session key request');
+    expect(getApproval(requestId)).toBeUndefined();
+    _resetHandlers();
+  });
+});
+
+// ---------------------------------------------------------------------------
 // onInstalled lifecycle (fresh install / reinstall cleanup)
 // ---------------------------------------------------------------------------
 

@@ -14,6 +14,7 @@ import {
   isConnected,
   isWalletNetwork,
   requestSessionKey,
+  SessionKeyPolicyValidationError,
   signMessage,
   signRelayPayload,
 } from '../index';
@@ -113,6 +114,96 @@ describe('wallet-api public methods', () => {
     });
 
     expect(sendExternalRequest).toHaveBeenCalledWith(ExternalApiMethod.REQUEST_SESSION_KEY, policy);
+  });
+
+  it('requestSessionKey rejects expired or malformed policies with typed SessionKeyPolicyValidationError before bridging (#958)', async () => {
+    await expect(
+      requestSessionKey({
+        expiresAt: Date.now() - 1_000,
+        permissions: 1,
+      })
+    ).rejects.toMatchObject({
+      name: 'SessionKeyPolicyValidationError',
+      code: 'EXPIRED',
+      field: 'expiresAt',
+    });
+
+    await expect(
+      requestSessionKey({
+        expiresAt: Date.now() + 60_000,
+        permissions: 0,
+      })
+    ).rejects.toMatchObject({
+      name: 'SessionKeyPolicyValidationError',
+      code: 'INVALID_PERMISSION',
+      field: 'permissions',
+    });
+
+    await expect(
+      requestSessionKey({
+        expiresAt: Date.now() + 60_000,
+        permissions: 1,
+        allowedContracts: ['GINVALID_ACCOUNT_INSTEAD_OF_CONTRACT'],
+      })
+    ).rejects.toMatchObject({
+      name: 'SessionKeyPolicyValidationError',
+      code: 'INVALID_ALLOWED_CONTRACTS',
+      field: 'allowedContracts',
+    });
+
+    await expect(
+      requestSessionKey({
+        expiresAt: Date.now() + 60_000,
+        permissions: 1,
+        maxAmountPerCall: '0',
+      })
+    ).rejects.toMatchObject({
+      name: 'SessionKeyPolicyValidationError',
+      code: 'INVALID_AMOUNT',
+      field: 'maxAmountPerCall',
+    });
+
+    await expect(
+      requestSessionKey({
+        expiresAt: Date.now() + 60_000,
+        permissions: 1,
+        cumulativeLimit: '500',
+      })
+    ).rejects.toMatchObject({
+      name: 'SessionKeyPolicyValidationError',
+      code: 'INVALID_SPEND_WINDOW',
+      field: 'spendWindowSeconds',
+    });
+
+    expect(sendExternalRequest).not.toHaveBeenCalled();
+  });
+
+  it('requestSessionKey upgrades background policy rejections into SessionKeyPolicyValidationError (#958)', async () => {
+    const policy = {
+      expiresAt: Date.now() + 86_400_000,
+      permissions: 1,
+      allowedContracts: ['CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA'],
+    };
+
+    sendExternalRequest.mockRejectedValue(
+      new WalletApiError(
+        '[INVALID_ALLOWED_CONTRACTS] Invalid session key policy (allowedContracts): Invalid contract address in allowlist: CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA'
+      )
+    );
+
+    let caught: unknown;
+    try {
+      await requestSessionKey(policy);
+    } catch (err) {
+      caught = err;
+    }
+
+    expect(caught).toBeInstanceOf(WalletApiError);
+    expect(caught).toBeInstanceOf(SessionKeyPolicyValidationError);
+    expect(caught).toMatchObject({
+      code: 'INVALID_ALLOWED_CONTRACTS',
+      field: 'allowedContracts',
+    });
   });
 
   it("signMessage maps the background's real { signature } response to { signedMessage } (issue #1213)", async () => {

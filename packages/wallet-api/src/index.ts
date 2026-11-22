@@ -7,7 +7,13 @@
 
 import { ExternalApiMethod } from '@ancore/wallet-shared';
 import type { RequestSessionKeyResult, SessionKeyPolicy } from '@ancore/types';
-import { sendExternalRequest, WalletApiError, WalletNotInstalledError } from './bridge';
+import {
+  parsePolicyValidationError,
+  sendExternalRequest,
+  SessionKeyPolicyValidationError,
+  WalletApiError,
+  WalletNotInstalledError,
+} from './bridge';
 
 /**
  * Stellar networks exposed to dApps via getNetwork().
@@ -183,17 +189,152 @@ export async function signMessage(params: {
   return { signedMessage: result.signature };
 }
 
+export interface SessionKeyRequestPolicy extends SessionKeyPolicy {
+  /** Optional cumulative spend cap per window (stroops / smallest unit string). */
+  cumulativeLimit?: string;
+  /** Length of the cumulative spend window in seconds when cumulativeLimit is set. */
+  spendWindowSeconds?: number;
+  /** Optional target network override. */
+  network?: WalletNetwork;
+  /** Optional smart-account contract ID override. */
+  smartAccountId?: string;
+}
+
+const VALID_PERMISSION_MASK = 0b111;
+
+function validateSessionKeyRequestPolicy(policy: SessionKeyRequestPolicy): void {
+  if (!policy || typeof policy !== 'object') {
+    throw new SessionKeyPolicyValidationError(
+      'INVALID_EXPIRES_AT',
+      'Policy must be a valid object',
+      'expiresAt'
+    );
+  }
+
+  if (
+    typeof policy.expiresAt !== 'number' ||
+    !Number.isInteger(policy.expiresAt) ||
+    policy.expiresAt <= 0
+  ) {
+    throw new SessionKeyPolicyValidationError(
+      'INVALID_EXPIRES_AT',
+      'expiresAt must be a positive integer Unix timestamp',
+      'expiresAt'
+    );
+  }
+
+  const expiresAtSec =
+    policy.expiresAt > 1e11 ? Math.floor(policy.expiresAt / 1000) : policy.expiresAt;
+  if (expiresAtSec <= Date.now() / 1000) {
+    throw new SessionKeyPolicyValidationError(
+      'EXPIRED',
+      'expiresAt must be in the future',
+      'expiresAt'
+    );
+  }
+
+  if (
+    typeof policy.permissions !== 'number' ||
+    !Number.isInteger(policy.permissions) ||
+    policy.permissions <= 0 ||
+    (policy.permissions & ~VALID_PERMISSION_MASK) !== 0
+  ) {
+    throw new SessionKeyPolicyValidationError(
+      'INVALID_PERMISSION',
+      'permissions must be a non-zero permission bitmask within supported bounds',
+      'permissions'
+    );
+  }
+
+  if (policy.allowedContracts !== undefined) {
+    if (!Array.isArray(policy.allowedContracts)) {
+      throw new SessionKeyPolicyValidationError(
+        'INVALID_ALLOWED_CONTRACTS',
+        'allowedContracts must be an array of contract IDs',
+        'allowedContracts'
+      );
+    }
+    for (const contractId of policy.allowedContracts) {
+      if (typeof contractId !== 'string' || !/^C[A-Z2-7]{55}$/.test(contractId)) {
+        throw new SessionKeyPolicyValidationError(
+          'INVALID_ALLOWED_CONTRACTS',
+          `Invalid contract address in allowlist: ${String(contractId)}`,
+          'allowedContracts'
+        );
+      }
+    }
+  }
+
+  const checkPositiveIntString = (
+    value: string | undefined,
+    field: 'maxAmountPerCall' | 'cumulativeLimit'
+  ): void => {
+    if (value === undefined) return;
+    if (typeof value !== 'string' || !/^\d+$/.test(value.trim()) || BigInt(value.trim()) <= 0n) {
+      throw new SessionKeyPolicyValidationError(
+        'INVALID_AMOUNT',
+        `${field} must be a positive integer amount`,
+        field
+      );
+    }
+  };
+  checkPositiveIntString(policy.maxAmountPerCall, 'maxAmountPerCall');
+  checkPositiveIntString(policy.cumulativeLimit, 'cumulativeLimit');
+
+  const hasCumulativeLimit = policy.cumulativeLimit !== undefined;
+  if (policy.spendWindowSeconds !== undefined) {
+    if (!Number.isInteger(policy.spendWindowSeconds) || policy.spendWindowSeconds < 0) {
+      throw new SessionKeyPolicyValidationError(
+        'INVALID_SPEND_WINDOW',
+        'spendWindowSeconds must be a non-negative integer',
+        'spendWindowSeconds'
+      );
+    }
+    if (policy.spendWindowSeconds > 0 && !hasCumulativeLimit) {
+      throw new SessionKeyPolicyValidationError(
+        'INVALID_SPEND_WINDOW',
+        'spendWindowSeconds requires cumulativeLimit',
+        'spendWindowSeconds'
+      );
+    }
+    if (policy.spendWindowSeconds === 0 && hasCumulativeLimit) {
+      throw new SessionKeyPolicyValidationError(
+        'INVALID_SPEND_WINDOW',
+        'spendWindowSeconds must be greater than 0 when cumulativeLimit is set',
+        'spendWindowSeconds'
+      );
+    }
+  } else if (hasCumulativeLimit) {
+    throw new SessionKeyPolicyValidationError(
+      'INVALID_SPEND_WINDOW',
+      'spendWindowSeconds must be greater than 0 when cumulativeLimit is set',
+      'spendWindowSeconds'
+    );
+  }
+}
+
 /**
  * Request a scoped session key from the user's smart account.
  * Opens an approval screen showing duration, allowed contracts, and spend limits.
  */
 export async function requestSessionKey(
-  policy: SessionKeyPolicy
+  policy: SessionKeyRequestPolicy
 ): Promise<RequestSessionKeyResult> {
-  return sendExternalRequest<RequestSessionKeyResult>(
-    ExternalApiMethod.REQUEST_SESSION_KEY,
-    policy as unknown as Record<string, unknown>
-  );
+  validateSessionKeyRequestPolicy(policy);
+  try {
+    return await sendExternalRequest<RequestSessionKeyResult>(
+      ExternalApiMethod.REQUEST_SESSION_KEY,
+      policy as unknown as Record<string, unknown>
+    );
+  } catch (error) {
+    if (error instanceof WalletApiError && !(error instanceof SessionKeyPolicyValidationError)) {
+      const typedError = parsePolicyValidationError(error.message);
+      if (typedError) {
+        throw typedError;
+      }
+    }
+    throw error;
+  }
 }
 
 /**
@@ -214,4 +355,9 @@ export async function signRelayPayload(params: {
 
 export type { SessionKeyPolicy, RequestSessionKeyResult } from '@ancore/types';
 
-export { WalletApiError, WalletNotInstalledError } from './bridge';
+export {
+  SessionKeyPolicyValidationError,
+  type SessionKeyPolicyErrorCode,
+  WalletApiError,
+  WalletNotInstalledError,
+} from './bridge';

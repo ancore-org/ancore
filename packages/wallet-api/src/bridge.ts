@@ -22,6 +22,25 @@ function randomRequestId(): string {
   return `req_${Date.now()}_${Math.random().toString(36).slice(2)}`;
 }
 
+export type SessionKeyPolicyErrorCode =
+  | 'INVALID_EXPIRES_AT'
+  | 'EXPIRED'
+  | 'INVALID_PERMISSION'
+  | 'DUPLICATE_PERMISSION'
+  | 'INVALID_AMOUNT'
+  | 'INVALID_SPEND_WINDOW'
+  | 'INVALID_ALLOWED_CONTRACTS';
+
+const POLICY_ERROR_CODES: ReadonlySet<string> = new Set<SessionKeyPolicyErrorCode>([
+  'INVALID_EXPIRES_AT',
+  'EXPIRED',
+  'INVALID_PERMISSION',
+  'DUPLICATE_PERMISSION',
+  'INVALID_AMOUNT',
+  'INVALID_SPEND_WINDOW',
+  'INVALID_ALLOWED_CONTRACTS',
+]);
+
 export class WalletApiError extends Error {
   constructor(message: string) {
     super(message);
@@ -36,6 +55,38 @@ export class WalletNotInstalledError extends WalletApiError {
     );
     this.name = 'WalletNotInstalledError';
   }
+}
+
+export class SessionKeyPolicyValidationError extends WalletApiError {
+  readonly code: SessionKeyPolicyErrorCode;
+  readonly field?: string;
+
+  constructor(code: SessionKeyPolicyErrorCode, message: string, field?: string) {
+    super(message);
+    this.name = 'SessionKeyPolicyValidationError';
+    this.code = code;
+    this.field = field;
+  }
+}
+
+export function parsePolicyValidationError(
+  message: string
+): SessionKeyPolicyValidationError | null {
+  const match = /^\[([A-Z_]+)\]\s*Invalid session key policy(?:\s*\(([^)]+)\))?:\s*(.+)$/.exec(
+    message
+  );
+  if (!match) {
+    return null;
+  }
+  const [, rawCode, field, detail] = match;
+  if (!POLICY_ERROR_CODES.has(rawCode)) {
+    return null;
+  }
+  return new SessionKeyPolicyValidationError(
+    rawCode as SessionKeyPolicyErrorCode,
+    detail,
+    field || undefined
+  );
 }
 
 /**
