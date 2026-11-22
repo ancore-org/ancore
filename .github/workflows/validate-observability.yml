@@ -13,7 +13,7 @@ jobs:
     name: Lint Prometheus Alert Rules
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       - name: Install promtool
         run: |
@@ -33,7 +33,7 @@ jobs:
     name: Lint Alertmanager Config
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       - name: Install amtool
         run: |
@@ -56,7 +56,7 @@ jobs:
     name: Validate Grafana Dashboard JSON
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       - name: Validate JSON syntax and required fields
         run: |
@@ -95,7 +95,7 @@ jobs:
     name: Check Runbook Completeness
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       - name: Verify alerts link to incident response doc
         run: |
@@ -128,7 +128,7 @@ jobs:
     name: Check SLO Document Exists
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - name: Verify SLO definitions file
         run: |
           test -f docs/ops/slo-definitions.md || \
