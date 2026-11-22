@@ -8,6 +8,7 @@ import {
 
 describe('formatAssetAmountValue', () => {
   it('renders whole and short decimal amounts without padding', () => {
+    expect(formatAssetAmountValue(0)).toBe('0');
     expect(formatAssetAmountValue(10)).toBe('10');
     expect(formatAssetAmountValue(142.5)).toBe('142.5');
   });

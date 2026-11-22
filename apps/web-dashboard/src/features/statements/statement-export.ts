@@ -121,6 +121,11 @@ function escapeCsvCell(value: string): string {
   return safe;
 }
 
+/**
+ * Sanitize CSV cell values to prevent formula injection and escape special characters.
+ */
+export const sanitizeCsvCell = escapeCsvCell;
+
 export function toStatementCsv(rows: StatementRow[]): string {
   const header = STATEMENT_COLUMNS.map((column) => escapeCsvCell(column.header)).join(',');
   const body = rows.map((row) =>
