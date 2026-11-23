@@ -16,12 +16,7 @@ import type { TransactionStatusKind } from '@/components/TransactionStatus';
  * plus the additional states Horizon can return.
  */
 export type RpcTransactionStatus =
-  | 'success'
-  | 'failure'
-  | 'pending'
-  | 'not_found'
-  | 'error'
-  | 'timeout';
+  'success' | 'failure' | 'pending' | 'not_found' | 'error' | 'timeout';
 
 /**
  * Status values produced by the send-transaction polling loop
@@ -70,15 +65,18 @@ const RPC_TO_APP: Record<AnyRpcStatus, TransactionStatusKind> = {
  * mapRpcStatus('UNKNOWN')   // → 'pending'  (safe fallback)
  */
 export function mapRpcStatus(raw: string): TransactionStatusKind {
-  const normalised = raw.toLowerCase() as AnyRpcStatus;
-  return RPC_TO_APP[normalised] ?? 'pending';
+  const normalised = raw.toLowerCase();
+  if (!Object.hasOwn(RPC_TO_APP, normalised)) {
+    return 'pending';
+  }
+  return RPC_TO_APP[normalised as AnyRpcStatus];
 }
 
 /**
  * Type-guard: returns true when `raw` is a known RPC status string.
  */
 export function isKnownRpcStatus(raw: string): raw is AnyRpcStatus {
-  return raw.toLowerCase() in RPC_TO_APP;
+  return Object.hasOwn(RPC_TO_APP, raw.toLowerCase());
 }
 
 /**
