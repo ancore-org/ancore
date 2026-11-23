@@ -16,12 +16,51 @@ interface VerificationChallenge {
   isCorrect: boolean | null;
 }
 
-function selectVerificationIndices(): number[] {
-  // Select 3 random non-consecutive indices between 0 and 11
+const UINT32_RANGE = 2 ** 32;
+
+/**
+ * Returns a uniformly distributed integer in [0, max) using a
+ * cryptographically secure source. Rejection sampling avoids the modulo bias
+ * of `secureValue % max`.
+ */
+export function randomInt(max: number): number {
+  if (!Number.isSafeInteger(max) || max <= 0) {
+    throw new RangeError('max must be a positive safe integer');
+  }
+
+  const cryptoApi = globalThis.crypto;
+  if (!cryptoApi?.getRandomValues) {
+    throw new Error('Secure randomness API is not available in this environment.');
+  }
+
+  const limit = UINT32_RANGE - (UINT32_RANGE % max);
+  const buffer = new Uint32Array(1);
+
+  let value: number;
+  do {
+    cryptoApi.getRandomValues(buffer);
+    value = buffer[0];
+  } while (value >= limit);
+
+  return value % max;
+}
+
+/** Returns a new array shuffled with an unbiased Fisher-Yates shuffle. */
+export function shuffle<T>(items: readonly T[]): T[] {
+  const result = [...items];
+  for (let i = result.length - 1; i > 0; i -= 1) {
+    const j = randomInt(i + 1);
+    [result[i], result[j]] = [result[j], result[i]];
+  }
+  return result;
+}
+
+export function selectVerificationIndices(): number[] {
+  // Select 3 random non-adjacent indices between 0 and 11
   const indices: number[] = [];
   while (indices.length < 3) {
-    const nextIdx = Math.floor(Math.random() * 12);
-    // Check if it's not already in the array, and no consecutive indices
+    const nextIdx = randomInt(12);
+    // Check if it's not already in the array, and no adjacent indices
     if (!indices.includes(nextIdx) && !indices.some((i) => Math.abs(i - nextIdx) <= 1)) {
       indices.push(nextIdx);
     }
@@ -29,18 +68,18 @@ function selectVerificationIndices(): number[] {
   return indices.sort((a, b) => a - b);
 }
 
-function generateOptions(correctWord: string, allWords: string[]): string[] {
+export function generateOptions(correctWord: string, allWords: string[]): string[] {
   const options = new Set<string>();
   options.add(correctWord);
 
   while (options.size < 4) {
-    const randomWord = allWords[Math.floor(Math.random() * allWords.length)];
+    const randomWord = allWords[randomInt(allWords.length)];
     if (randomWord) {
       options.add(randomWord);
     }
   }
 
-  return Array.from(options).sort(() => Math.random() - 0.5);
+  return shuffle(Array.from(options));
 }
 
 export function VerifyMnemonicScreen({ mnemonic, onSuccess, onBack }: VerifyMnemonicScreenProps) {
