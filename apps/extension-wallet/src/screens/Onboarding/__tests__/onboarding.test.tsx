@@ -1,10 +1,16 @@
-import { describe, it, expect, vi } from 'vitest';
+import { describe, it, expect, vi, afterEach } from 'vitest';
 import * as React from 'react';
 import { render, screen, fireEvent, waitFor, within } from '@testing-library/react';
 import { NotificationProvider } from '@ancore/ui-kit';
 import { WelcomeScreen } from '../WelcomeScreen';
 import { MnemonicScreen } from '../MnemonicScreen';
-import { VerifyMnemonicScreen } from '../VerifyMnemonicScreen';
+import {
+  VerifyMnemonicScreen,
+  randomInt,
+  shuffle,
+  selectVerificationIndices,
+  generateOptions,
+} from '../VerifyMnemonicScreen';
 import { PasswordScreen } from '../PasswordScreen';
 import { DeployScreen } from '../DeployScreen';
 import { SuccessScreen } from '../SuccessScreen';
@@ -213,6 +219,66 @@ describe('VerifyMnemonicScreen', () => {
     const [{ container }] = getChallengeContainers();
     fireEvent.click(within(container).getAllByRole('button')[0]);
     expect(verifyButton).toBeDisabled();
+  });
+});
+
+describe('secure mnemonic verification helpers', () => {
+  function stubSecureRandom(values: number[]) {
+    const queue = [...values];
+    return vi.spyOn(globalThis.crypto, 'getRandomValues').mockImplementation(((
+      array: Uint32Array
+    ) => {
+      array[0] = queue.shift() ?? 0;
+      return array;
+    }) as typeof globalThis.crypto.getRandomValues);
+  }
+
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  it('randomInt stays within range and rejects values that would bias modulo', () => {
+    // 0xffffffff is >= the rejection limit for max=12, so it is discarded.
+    stubSecureRandom([0xffffffff, 5]);
+    expect(randomInt(12)).toBe(5);
+  });
+
+  it('randomInt rejects non-positive or non-integer bounds', () => {
+    expect(() => randomInt(0)).toThrow(RangeError);
+    expect(() => randomInt(-1)).toThrow(RangeError);
+    expect(() => randomInt(1.5)).toThrow(RangeError);
+  });
+
+  it('shuffle returns a permutation without mutating the input', () => {
+    const input = [1, 2, 3, 4];
+    stubSecureRandom([0, 0, 0]);
+    const output = shuffle(input);
+
+    expect(input).toEqual([1, 2, 3, 4]);
+    expect(output).toHaveLength(4);
+    expect(new Set(output)).toEqual(new Set(input));
+  });
+
+  it('selects 3 unique, non-adjacent, sorted indices', () => {
+    stubSecureRandom([0, 2, 4]);
+    expect(selectVerificationIndices()).toEqual([0, 2, 4]);
+  });
+
+  it('rejects duplicate and adjacent indices while selecting', () => {
+    // 0 accepted; 1 adjacent; 0 duplicate; 2 accepted; 3 adjacent; 4 accepted.
+    stubSecureRandom([0, 1, 0, 2, 3, 4]);
+    expect(selectVerificationIndices()).toEqual([0, 2, 4]);
+  });
+
+  it('always includes the correct word among 4 unique options', () => {
+    const words = ['correct', 'alpha', 'bravo', 'charlie', 'delta'];
+    stubSecureRandom([1, 2, 3, 0, 0, 0]);
+
+    const options = generateOptions('correct', words);
+
+    expect(options).toHaveLength(4);
+    expect(new Set(options).size).toBe(4);
+    expect(options).toContain('correct');
   });
 });
 
