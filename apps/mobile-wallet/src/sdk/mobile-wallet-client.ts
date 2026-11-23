@@ -1,11 +1,10 @@
-// @ts-nocheck
 import { AncoreClient, SDK_VERSION } from '@ancore/core-sdk';
 import type { NetworkConfig } from '@ancore/types';
 
 import type { MobileWalletEnvironment } from '../config/environment';
 
 export interface MobileWalletSdkClient {
-  readonly client: unknown;
+  readonly client: AncoreClient;
   readonly accountContractId: string;
   readonly network: NetworkConfig;
   readonly sdkVersion: string;
