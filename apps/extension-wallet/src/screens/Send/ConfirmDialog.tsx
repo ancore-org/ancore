@@ -10,7 +10,7 @@ import {
   DialogContent,
 } from '@ancore/ui-kit';
 import type { SendTransactionDraft } from '@/hooks/useSendTransaction';
-import { KeyRound, ArrowRight, ShieldCheck, Info } from 'lucide-react';
+import { KeyRound, ArrowRight, ShieldCheck } from 'lucide-react';
 
 interface ConfirmDialogProps {
   transaction: SendTransactionDraft;
