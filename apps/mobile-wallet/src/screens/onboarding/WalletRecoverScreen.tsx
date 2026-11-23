@@ -8,6 +8,8 @@ type Props = {
 
 const noop = () => {};
 
+export const MIN_BACKUP_PHRASE_WORDS = 12;
+
 export function WalletRecoverScreen({ onBack = noop, onCancel = noop, onContinue = noop }: Props) {
   const [backupPhrase, setBackupPhrase] = React.useState('');
   const [recoveryCode, setRecoveryCode] = React.useState('');

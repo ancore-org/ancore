@@ -16,6 +16,8 @@ interface Props {
   onNavigate?: (route: MobileWalletRoute) => void;
 }
 
+export const NAV_ITEM_ROLE = 'tab';
+
 export const DEFAULT_MOBILE_WALLET_NAVIGATION: NavigationItem[] = [
   { route: 'account', label: 'Account' },
   { route: 'activity', label: 'Activity' },

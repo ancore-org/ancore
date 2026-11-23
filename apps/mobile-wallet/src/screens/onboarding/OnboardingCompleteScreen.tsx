@@ -4,6 +4,8 @@ type Props = {
 
 const noop = () => {};
 
+export const COMPLETE_SECTION_LABEL = 'Onboarding complete';
+
 export function OnboardingCompleteScreen({ onRestart = noop }: Props) {
   return (
     <section aria-label="Onboarding complete" aria-live="polite" className="space-y-4">
