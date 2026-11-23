@@ -1,4 +1,5 @@
 import http from 'http';
+import request from 'supertest';
 import { createApp } from './server';
 import { resetEnvCache } from './config/env';
 
@@ -81,5 +82,42 @@ describe('HTTP server keep-alive timeouts', () => {
 
     expect(server.keepAliveTimeout).toBeGreaterThanOrEqual(65_000);
     expect(server.headersTimeout).toBeGreaterThan(server.keepAliveTimeout);
+  });
+});
+
+describe('relay rate limiting', () => {
+  it('counts authenticated callers independently at the same IP', async () => {
+    const originalEnv = process.env;
+    process.env = { ...originalEnv, RELAY_RATE_LIMIT_MAX: '2' };
+    resetEnvCache();
+
+    try {
+      const callers = new Map([
+        ['token-alice', 'alice'],
+        ['token-bob', 'bob'],
+      ]);
+      const app = createApp({
+        async verifyToken(token) {
+          const callerId = callers.get(token);
+          if (!callerId) throw new Error('unauthorized');
+          return { callerId };
+        },
+      });
+      const validate = (token: string) =>
+        request(app).post('/relay/validate').set('Authorization', `Bearer ${token}`).send({});
+
+      await request(app).post('/relay/validate').send({}).expect(401);
+
+      // The empty JSON body fails validation after consuming a rate-limit slot.
+      await validate('token-alice').expect(400);
+      await validate('token-alice').expect(400);
+      await validate('token-alice').expect(429);
+      await validate('token-bob').expect(400);
+      await validate('token-bob').expect(400);
+      await validate('token-bob').expect(429);
+    } finally {
+      process.env = originalEnv;
+      resetEnvCache();
+    }
   });
 });

@@ -26,17 +26,17 @@ export function formatTransactionAmount(
   assetCode = 'XLM',
   options?: Intl.NumberFormatOptions
 ): string {
-  const parsed = typeof value === 'number' ? value : Number(value);
-
-  if (!Number.isFinite(parsed)) {
+  if (typeof value === 'string' ? !/^-?\d+(\.\d+)?$/.test(value) : !Number.isFinite(value)) {
     return `0 ${assetCode}`;
   }
 
-  const formatted = new Intl.NumberFormat('en-US', {
+  const { format } = new Intl.NumberFormat('en-US', {
     minimumFractionDigits: 2,
     maximumFractionDigits: 7,
     ...options,
-  }).format(parsed);
+  });
+  // ES2022 types omit the decimal-string overload supported by modern runtimes.
+  const formatted = (format as (amount: number | string) => string)(value);
 
   return `${formatted} ${assetCode}`;
 }

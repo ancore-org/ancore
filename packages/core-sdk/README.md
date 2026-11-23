@@ -438,6 +438,10 @@ All other core functionalities are exported as standalone, modular functions, cl
 - `LocalStorageAdapter`
 - `createStorageAdapter`
 
+New exports use backup version 2. Its SHA-256 checksum covers the encrypted account and session-key
+payloads regardless of object key order. Version 1 backups remain importable with their original
+checksums. AES-GCM authenticates the encrypted data in both versions.
+
 #### Error Types
 
 - `AncoreSdkError`

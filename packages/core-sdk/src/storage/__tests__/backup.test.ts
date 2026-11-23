@@ -41,7 +41,7 @@ describe('backup', () => {
 
       const backup = await exportBackup(storage, password);
 
-      expect(backup.version).toBe(1);
+      expect(backup.version).toBe(CURRENT_BACKUP_VERSION);
       expect(backup.account).toBeUndefined();
       expect(backup.sessionKeys).toBeUndefined();
     });
@@ -56,7 +56,7 @@ describe('backup', () => {
 
       const backup = await exportBackup(storage, 'password');
 
-      expect(backup.version).toBe(1);
+      expect(backup.version).toBe(CURRENT_BACKUP_VERSION);
       expect(backup.account).toBeDefined();
       expect(backup.account?.salt).toBeDefined();
       expect(backup.account?.iv).toBeDefined();
@@ -75,7 +75,7 @@ describe('backup', () => {
 
       const backup = await exportBackup(storage, 'password');
 
-      expect(backup.version).toBe(1);
+      expect(backup.version).toBe(CURRENT_BACKUP_VERSION);
       expect(backup.sessionKeys).toBeDefined();
       expect(backup.sessionKeys?.salt).toBeDefined();
       expect(backup.sessionKeys?.iv).toBeDefined();
@@ -92,7 +92,7 @@ describe('backup', () => {
 
       const backup = await exportBackup(storage, 'password');
 
-      expect(backup.version).toBe(1);
+      expect(backup.version).toBe(CURRENT_BACKUP_VERSION);
       expect(backup.account).toBeDefined();
       expect(backup.sessionKeys).toBeDefined();
     });
@@ -205,26 +205,25 @@ describe('backup', () => {
       );
     });
 
-    it('should fail with corrupted backup', async () => {
-      const storage = new MockStorageAdapter();
-      await storage.set('account', {
-        privateKey: 'SBXYZ...',
-        publicKey: 'GABC...',
-      } satisfies AccountData);
-      const backup = await exportBackup(storage, 'password');
+    it.each(['account', 'sessionKeys'] as const)(
+      'rejects a modified encrypted %s payload before writing to storage',
+      async (field) => {
+        const source = new MockStorageAdapter();
+        await source.set('account', { privateKey: 'test-key' } satisfies AccountData);
+        await source.set('sessionKeys', { keys: { GABC: 'key1' } } satisfies SessionKeysData);
+        const backup = await exportBackup(source, 'password');
+        const tamperedBackup = {
+          ...backup,
+          [field]: { ...backup[field], ciphertext: 'corrupted' },
+        };
+        const destination = new MockStorageAdapter();
 
-      const corruptedBackup: BackupPayload = {
-        ...backup,
-        account: {
-          ...(backup.account as any),
-          ciphertext: 'invalid',
-        },
-      };
-
-      await expect(importBackup(corruptedBackup, storage, 'password')).rejects.toThrow(
-        'Failed to restore account data'
-      );
-    });
+        await expect(importBackup(tamperedBackup, destination, 'password')).rejects.toMatchObject({
+          code: 'CHECKSUM_MISMATCH',
+        });
+        expect(destination.inspect().size).toBe(0);
+      }
+    );
 
     it('should fail with unsupported backup version', async () => {
       const storage = new MockStorageAdapter();
@@ -443,21 +442,17 @@ describe('backup', () => {
     it('should validate account data structure on import', async () => {
       const storage = new MockStorageAdapter();
 
-      // Use export to get a valid checksum for "account present" shape.
-      await storage.set('account', { privateKey: 'SBXYZ...' } satisfies AccountData);
-      const template = await exportBackup(storage, 'password');
-
       // Create backup that decrypts to an invalid AccountData payload (missing privateKey)
       const invalidAccountEncrypted = await encrypt(
         JSON.stringify({ publicKey: 'GABC...' }),
         'password'
       );
-      const invalidAccountBackup = {
+      const invalidAccountBackup: BackupPayload = {
         version: 1,
         metadata: {
           version: 1,
-          createdAt: template.metadata.createdAt,
-          checksum: template.metadata.checksum,
+          createdAt: '2026-01-01T00:00:00.000Z',
+          checksum: '33aedbd5869e25da907975b70e722b060c0ee47647dcf3218da665bdf5a3faaf',
         },
         account: invalidAccountEncrypted,
       };
@@ -470,21 +465,17 @@ describe('backup', () => {
     it('should validate session keys data structure on import', async () => {
       const storage = new MockStorageAdapter();
 
-      // Use export to get a valid checksum for "sessionKeys present" shape.
-      await storage.set('sessionKeys', { keys: { 'GABC...': 'key1' } } satisfies SessionKeysData);
-      const template = await exportBackup(storage, 'password');
-
       // Create backup that decrypts to an invalid SessionKeysData payload (missing keys)
       const invalidSessionKeysEncrypted = await encrypt(
         JSON.stringify({ metadata: { v: 1 } }),
         'password'
       );
-      const invalidSessionKeysBackup = {
+      const invalidSessionKeysBackup: BackupPayload = {
         version: 1,
         metadata: {
           version: 1,
-          createdAt: template.metadata.createdAt,
-          checksum: template.metadata.checksum,
+          createdAt: '2026-01-01T00:00:00.000Z',
+          checksum: '26b917630c955f30589280708af2a61c66bcd2d7d3d24af4526e3929b2a88b34',
         },
         sessionKeys: invalidSessionKeysEncrypted,
       };
@@ -564,6 +555,44 @@ describe('backup', () => {
       expect(result).toBeUndefined();
     });
 
+    it('restores a legacy backup with the original v1 checksum', async () => {
+      const legacyBackup: BackupPayload = {
+        version: 1,
+        metadata: {
+          version: 1,
+          createdAt: '2026-01-01T00:00:00.000Z',
+          checksum: '33aedbd5869e25da907975b70e722b060c0ee47647dcf3218da665bdf5a3faaf',
+        },
+        account: {
+          salt: 'c+JD1Roqr5wk7j64aGOefA==',
+          iv: '0IcMMBPxDkdE1Ei3',
+          ciphertext:
+            'SZRLJpPLJcmJB0Fd37dAQYTsKDNg0msWJxzjyv4kchnrD5ZraYQaiJhqzuKnms0wOfh7SiKxmb2NmXECRa/zpq6TohlZSW0k',
+        },
+      };
+      const storage = new MockStorageAdapter();
+
+      await expect(importBackup(legacyBackup, storage, 'password')).resolves.toMatchObject({
+        success: true,
+        migratedFrom: 1,
+        migratedTo: CURRENT_BACKUP_VERSION,
+      });
+      expect(await storage.get('account')).toEqual({
+        privateKey: 'legacy-key',
+        publicKey: 'legacy-address',
+      });
+    });
+
+    it('rejects mismatched payload and metadata versions', async () => {
+      const storage = new MockStorageAdapter();
+      const backup = await exportBackup(storage, 'password');
+      const mismatchedBackup = { ...backup, metadata: { ...backup.metadata, version: 1 } };
+
+      await expect(importBackup(mismatchedBackup, storage, 'password')).rejects.toMatchObject({
+        code: 'INVALID_VERSION',
+      });
+    });
+
     it('should support all declared backup versions', () => {
       expect(SUPPORTED_BACKUP_VERSIONS).toContain(CURRENT_BACKUP_VERSION);
       expect(SUPPORTED_BACKUP_VERSIONS.length).toBeGreaterThan(0);
@@ -592,33 +621,22 @@ describe('backup', () => {
   });
 
   describe('backup security and integrity', () => {
-    it('should generate different checksums for different data', async () => {
-      const storage1 = new MockStorageAdapter();
-      const storage2 = new MockStorageAdapter();
+    it('verifies the same checksum after reordering nested object keys', async () => {
+      const storage = new MockStorageAdapter();
+      const accountData: AccountData = { privateKey: 'test-key' };
+      await storage.set('account', accountData);
+      const backup = await exportBackup(storage, 'password');
+      if (!backup.account) throw new Error('Expected an encrypted account');
+      const { salt, iv, ciphertext } = backup.account;
+      const reorderedBackup = {
+        account: { ciphertext, iv, salt },
+        metadata: backup.metadata,
+        version: backup.version,
+      };
 
-      await storage1.set('account', { privateKey: 'key1' });
-      await storage2.set('account', { privateKey: 'key2' });
-
-      const backup1 = await exportBackup(storage1, 'password');
-      const backup2 = await exportBackup(storage2, 'password');
-
-      // Current checksum implementation intentionally ignores encrypted payload contents (only structure).
-      // Integrity checks are still enforced when the structure changes or checksum is tampered with.
-      expect(backup1.metadata.checksum).toBe(backup2.metadata.checksum);
-    });
-
-    it('should generate same checksum for identical data', async () => {
-      const storage1 = new MockStorageAdapter();
-      const storage2 = new MockStorageAdapter();
-      const accountData = { privateKey: 'same-key' };
-
-      await storage1.set('account', accountData);
-      await storage2.set('account', accountData);
-
-      const backup1 = await exportBackup(storage1, 'password');
-      const backup2 = await exportBackup(storage2, 'password');
-
-      expect(backup1.metadata.checksum).toBe(backup2.metadata.checksum);
+      const destination = new MockStorageAdapter();
+      await importBackup(reorderedBackup, destination, 'password');
+      expect(await destination.get('account')).toEqual(accountData);
     });
 
     it('should include creation timestamp in metadata', async () => {

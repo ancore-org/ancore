@@ -2,7 +2,7 @@
 // any other module creates spans or instruments HTTP traffic.
 import './tracing';
 
-import express, { Express, Request, Response, NextFunction } from 'express';
+import express, { Express } from 'express';
 import cors from 'cors';
 import rateLimit from 'express-rate-limit';
 import { z } from 'zod';
@@ -173,11 +173,9 @@ export function createApp(
   const relayLimiter = rateLimit({
     windowMs: 15 * 60 * 1000,
     max: env.RELAY_RATE_LIMIT_MAX,
-    message: 'Too many relay requests from this IP, please try again later.',
-    keyGenerator: (req: Request) => {
-      const callerId = (req as any).callerId;
-      return callerId || req.ip;
-    },
+    message: 'Too many relay requests, please try again later.',
+    keyGenerator: (req, res) =>
+      (res.locals['callerId'] as string | undefined) ?? req.ip ?? 'unknown',
   });
 
   const accountLimiter = createAccountRateLimiterMiddleware();

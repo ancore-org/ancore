@@ -184,6 +184,20 @@ describe('parseAmount', () => {
 // ---------------------------------------------------------------------------
 
 describe('formatAmount', () => {
+  it.each([
+    [100, 0, '100'],
+    [1000, 0, '1000'],
+    [0, 0, '0'],
+    [10, 2, '10'],
+    [1.5, 7, '1.5'],
+  ])('formats %s with %s decimals as %s', (value, decimals, expected) => {
+    expect(formatAmount(value, decimals)).toBe(expected);
+  });
+
+  it('formats zero with the default precision', () => {
+    expect(formatAmount(0)).toBe('0');
+  });
+
   it('formats with default 7 decimal places and trims trailing zeros', () => {
     expect(formatAmount(10)).toBe('10');
   });
