@@ -6,6 +6,8 @@ import type {
   ScheduledTransferStatus,
 } from './types';
 
+export const SCHEDULED_TRANSFER_LEASE_MS = 60_000;
+
 /**
  * In-memory store for scheduled transfers and execution logs.
  * Designed to be swapped for a persistent backend when ready.
