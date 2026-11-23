@@ -46,3 +46,5 @@ export async function recordCurrentDevice(): Promise<void> {
     console.error('Failed to record device session', error);
   }
 }
+
+export const recordCurrentDeviceSession = recordCurrentDevice;

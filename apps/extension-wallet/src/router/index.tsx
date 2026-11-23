@@ -13,17 +13,7 @@ import {
   useParams,
   useSearchParams,
 } from 'react-router-dom';
-import {
-  ArrowDownLeft,
-  ArrowLeft,
-  ArrowUpRight,
-  Clock3,
-  History,
-  KeyRound,
-  Lock,
-  PlusCircle,
-  Wallet,
-} from 'lucide-react';
+import { ArrowLeft, Lock } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 import { NotificationProvider } from '@ancore/ui-kit';
 import {
@@ -461,6 +451,7 @@ function useTransactionHistory() {
   const [initialLoading, setInitialLoading] = React.useState(true);
   const [loadingMore, setLoadingMore] = React.useState(false);
   const [error, setError] = React.useState<Error | null>(null);
+  const [refreshKey, setRefreshKey] = React.useState(0);
 
   React.useEffect(() => {
     if (!adapter) {
@@ -493,7 +484,7 @@ function useTransactionHistory() {
     return () => {
       cancelled = true;
     };
-  }, [adapter]);
+  }, [adapter, refreshKey]);
 
   const loadMore = React.useCallback(async () => {
     if (!adapter || !nextCursor || loadingMore) return;
@@ -530,6 +521,7 @@ function useTransactionHistory() {
     error,
     hasMore,
     loadMore,
+    refetch: () => setRefreshKey((key) => key + 1),
     activeFilter: filter,
     setFilter,
     smartAccountId,
@@ -693,6 +685,7 @@ function HistoryScreen() {
     error,
     hasMore,
     loadMore,
+    refetch,
     activeFilter,
     setFilter,
     smartAccountId,
@@ -743,7 +736,7 @@ function HistoryScreen() {
           <p className="text-sm text-muted-foreground">
             {error.message || 'Could not load transaction history.'}
           </p>
-          <PrimaryButton className="mt-3" onClick={() => window.location.reload()}>
+          <PrimaryButton className="mt-3" onClick={refetch}>
             Retry
           </PrimaryButton>
         </Card>
@@ -769,6 +762,7 @@ function HistoryScreen() {
             activeFilter={activeFilter}
             entries={entries}
             onFilterChange={setFilter}
+            onReceive={() => navigate('/receive')}
             onSelectEntry={handleSelectEntry}
           />
           {hasMore && (
