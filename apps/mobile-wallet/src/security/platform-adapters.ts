@@ -1,4 +1,3 @@
-// @ts-nocheck
 import type { IPasswordAuthService } from './hooks/useBiometricUnlock';
 import type { SecureStoreAdapter } from '../storage/types';
 

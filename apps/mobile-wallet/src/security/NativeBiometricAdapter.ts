@@ -1,4 +1,3 @@
-// @ts-nocheck
 import ReactNativeBiometrics from 'react-native-biometrics';
 import type { IBiometricAuthService } from './hooks/useBiometricUnlock';
 import type { BiometricFailureReason } from './biometric-lockout.types';
