@@ -94,8 +94,7 @@ Full contributor security tiers: [CONTRIBUTING.md](CONTRIBUTING.md#security-boun
 
 ## Before you push — run what CI runs
 
-CI checks TypeScript/JS and Rust separately, and each has its own format + lint + test gate. Run the
-matching block locally before pushing; all four commands must exit 0.
+CI checks TypeScript/JavaScript and Rust independently, with separate formatting, linting, and testing requirements. Run the relevant command block locally before pushing and ensure all four commands complete successfully with exit code 0.
 
 **TypeScript/JS (root):**
 
