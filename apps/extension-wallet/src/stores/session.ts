@@ -34,7 +34,7 @@ export const useSessionStore = create<SessionState>()((set) => ({
 export function setSessionState(
   updater: Partial<SessionState> | ((state: SessionState) => Partial<SessionState>)
 ) {
-  useSessionStore.setState(updater as any);
+  useSessionStore.setState(updater);
 }
 
 export function getSessionState() {

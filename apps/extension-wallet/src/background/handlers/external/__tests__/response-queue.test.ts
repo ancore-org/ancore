@@ -2,6 +2,7 @@
  * Unit tests for response queue
  */
 
+import { ExternalApiMethodName as MethodName } from '@ancore/types';
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 
 import {
@@ -57,7 +58,7 @@ describe('response queue', () => {
   describe('approval queue', () => {
     describe('enqueueApproval', () => {
       it('enqueues a request for approval', () => {
-        enqueueApproval('123', 'https://example.com', 'signTransaction', { xdr: 'test' });
+        enqueueApproval('123', 'https://example.com', MethodName.SIGN_TRANSACTION, { xdr: 'test' });
 
         const approval = getApproval('123');
         expect(approval).toEqual({
@@ -70,8 +71,12 @@ describe('response queue', () => {
       });
 
       it('replaces existing approval with same requestId', () => {
-        enqueueApproval('123', 'https://example.com', 'signTransaction', { xdr: 'test1' });
-        enqueueApproval('123', 'https://example.com', 'signTransaction', { xdr: 'test2' });
+        enqueueApproval('123', 'https://example.com', MethodName.SIGN_TRANSACTION, {
+          xdr: 'test1',
+        });
+        enqueueApproval('123', 'https://example.com', MethodName.SIGN_TRANSACTION, {
+          xdr: 'test2',
+        });
 
         const approval = getApproval('123');
         expect(approval?.params).toEqual({ xdr: 'test2' });
@@ -80,7 +85,7 @@ describe('response queue', () => {
 
     describe('getApproval', () => {
       it('returns approval for existing requestId', () => {
-        enqueueApproval('123', 'https://example.com', 'signTransaction', { xdr: 'test' });
+        enqueueApproval('123', 'https://example.com', MethodName.SIGN_TRANSACTION, { xdr: 'test' });
 
         const approval = getApproval('123');
         expect(approval).toBeDefined();
@@ -94,7 +99,7 @@ describe('response queue', () => {
 
     describe('removeApproval', () => {
       it('removes an approval', () => {
-        enqueueApproval('123', 'https://example.com', 'signTransaction', { xdr: 'test' });
+        enqueueApproval('123', 'https://example.com', MethodName.SIGN_TRANSACTION, { xdr: 'test' });
         removeApproval('123');
 
         const approval = getApproval('123');
@@ -108,8 +113,10 @@ describe('response queue', () => {
 
     describe('getAllApprovals', () => {
       it('returns all pending approvals', () => {
-        enqueueApproval('123', 'https://example.com', 'signTransaction', { xdr: 'test1' });
-        enqueueApproval('456', 'https://other.com', 'signTransaction', { xdr: 'test2' });
+        enqueueApproval('123', 'https://example.com', MethodName.SIGN_TRANSACTION, {
+          xdr: 'test1',
+        });
+        enqueueApproval('456', 'https://other.com', MethodName.SIGN_TRANSACTION, { xdr: 'test2' });
 
         const approvals = getAllApprovals();
         expect(approvals).toHaveLength(2);
@@ -123,7 +130,7 @@ describe('response queue', () => {
 
     describe('clearApprovals', () => {
       it('clears all approvals', () => {
-        enqueueApproval('123', 'https://example.com', 'signTransaction', { xdr: 'test' });
+        enqueueApproval('123', 'https://example.com', MethodName.SIGN_TRANSACTION, { xdr: 'test' });
         clearApprovals();
 
         const approvals = getAllApprovals();
@@ -275,7 +282,7 @@ describe('response queue', () => {
 
   describe('session storage', () => {
     it('enqueueApproval writes pending status to session storage', () => {
-      enqueueApproval('req-1', 'https://dapp.example', 'signTransaction', {});
+      enqueueApproval('req-1', 'https://dapp.example', MethodName.SIGN_TRANSACTION, {});
 
       expect(mockSession.set).toHaveBeenCalledWith(
         expect.objectContaining({
@@ -356,7 +363,7 @@ describe('response queue', () => {
   describe('sweepStaleRequests', () => {
     it('sweeps and rejects pending approvals older than specified TTL', () => {
       let rejectedError: Error | null = null;
-      enqueueApproval('stale-1', 'https://example.com', 'signTransaction', {});
+      enqueueApproval('stale-1', 'https://example.com', MethodName.SIGN_TRANSACTION, {});
       registerResponseCallbacks(
         'stale-1',
         () => {},
@@ -383,7 +390,7 @@ describe('response queue', () => {
 
     it('evicts entries older than 5 minutes and keeps fresh ones when a new request is enqueued', () => {
       const rejections: string[] = [];
-      enqueueApproval('old', 'https://a.example', 'signTransaction', {});
+      enqueueApproval('old', 'https://a.example', MethodName.SIGN_TRANSACTION, {});
       registerResponseCallbacks(
         'old',
         () => {},
@@ -392,7 +399,7 @@ describe('response queue', () => {
 
       const now = Date.now();
       const spy = vi.spyOn(Date, 'now').mockReturnValue(now + 5 * 60 * 1000 + 1);
-      enqueueApproval('fresh', 'https://b.example', 'signTransaction', {});
+      enqueueApproval('fresh', 'https://b.example', MethodName.SIGN_TRANSACTION, {});
 
       expect(getApproval('old')).toBeUndefined();
       expect(getApproval('fresh')).toBeDefined();
@@ -404,7 +411,7 @@ describe('response queue', () => {
     it('does not evict entries at or under 5 minutes', () => {
       const now = Date.now();
       const spy = vi.spyOn(Date, 'now').mockReturnValue(now);
-      enqueueApproval('edge', 'https://a.example', 'signTransaction', {});
+      enqueueApproval('edge', 'https://a.example', MethodName.SIGN_TRANSACTION, {});
       spy.mockReturnValue(now + 5 * 60 * 1000);
       expect(sweepStaleRequests()).toBe(0);
       expect(getApproval('edge')).toBeDefined();
@@ -412,7 +419,7 @@ describe('response queue', () => {
     });
 
     it('removes approval entry when resolved or rejected', () => {
-      enqueueApproval('req-active', 'https://example.com', 'signTransaction', {});
+      enqueueApproval('req-active', 'https://example.com', MethodName.SIGN_TRANSACTION, {});
       expect(getApproval('req-active')).toBeDefined();
 
       resolveRequest('req-active', { ok: true });
