@@ -20,6 +20,7 @@
  */
 
 import type { MessageType, MessageHandler, MessageEnvelope, ResponseEnvelope } from './types';
+import { redactForLog } from './redact';
 
 // ---------------------------------------------------------------------------
 // Chrome API surface needed by this module
@@ -122,10 +123,13 @@ export function installMessageDispatcher(): void {
       }
 
       if (import.meta.env.DEV) {
-        console.debug(`${logPrefix} ← ${envelope.type}`, {
-          id: envelope.id,
-          payload: envelope.payload,
-        });
+        console.debug(
+          `${logPrefix} ← ${envelope.type}`,
+          redactForLog(envelope.type, {
+            id: envelope.id,
+            payload: envelope.payload,
+          })
+        );
       }
 
       handler(envelope.payload)
@@ -137,10 +141,10 @@ export function installMessageDispatcher(): void {
           };
 
           if (import.meta.env.DEV) {
-            console.debug(`${logPrefix} → ${envelope.type}`, {
-              id: envelope.id,
-              payload: result,
-            });
+            console.debug(
+              `${logPrefix} → ${envelope.type}`,
+              redactForLog(envelope.type, { id: envelope.id, payload: result })
+            );
           }
 
           sendResponse(response);

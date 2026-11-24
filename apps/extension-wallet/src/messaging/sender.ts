@@ -20,6 +20,7 @@ import type {
   ResponseEnvelope,
   SendOptions,
 } from './types';
+import { redactForLog } from './redact';
 
 // ---------------------------------------------------------------------------
 // Chrome API surface needed by this module
@@ -79,7 +80,7 @@ export function sendMessage<T extends MessageType>(
   const envelope: MessageEnvelope = { type, id, payload };
 
   if (import.meta.env.DEV) {
-    console.debug(`${logPrefix} → ${type}`, { id, payload });
+    console.debug(`${logPrefix} → ${type}`, redactForLog(type, { id, payload }));
   }
 
   return new Promise<MessageResponse<T>>((resolve, reject) => {
@@ -113,7 +114,10 @@ export function sendMessage<T extends MessageType>(
       }
 
       if (import.meta.env.DEV) {
-        console.debug(`${logPrefix} ← ${type}`, { id, payload: response.payload });
+        console.debug(
+          `${logPrefix} ← ${type}`,
+          redactForLog(type, { id, payload: response.payload })
+        );
       }
 
       resolve(response.payload as MessageResponse<T>);

@@ -10,6 +10,7 @@
 | [Contract methods](contract-methods.md) | Soroban account contract API |
 | [dApp API reference](api-reference.md) | Complete dApp message protocol and response formats |
 | [API reference (OpenAPI)](api-reference.yaml) | OpenAPI spec for services |
+| [Roadmap](ROADMAP.md) | Delivery status and open successor trackers |
 
 ## Architecture
 
@@ -18,6 +19,7 @@
 | [System overview](architecture/OVERVIEW.md) | High-level architecture |
 | [Transaction flow](architecture/TRANSACTION_FLOW.md) | dApp, extension, vault, session key, relayer, and blockchain flow |
 | [Architecture flow diagram](architecture/flow.md) | Component diagram with the session-key vs vault signing decision |
+| [WASM validation](architecture/WASM_VALIDATION.md) | Off-chain attestation and on-chain enforcement of contract WASM policy |
 
 ## Examples
 
@@ -28,6 +30,7 @@
 | [Batch session keys](examples/batch-session-keys.md) | Batch multiple session key requests with AncoreClient |
 | [Session key execute](examples/session-key-execute.md) | Execute with a session key |
 | [Event decoder usage](examples/event-decoder-usage.md) | Decode contract events |
+| [Invoice lifecycle](invoice-lifecycle.md) | Issue, pay, cancel, and expire on-chain payment requests |
 
 ## User guide
 
@@ -49,6 +52,9 @@
 | [Extension wallet](security/extension-wallet.md) | CSP and wallet security |
 | [Audit checklist](security/AUDIT_CHECKLIST.md) | Pre-audit preparation checklist |
 | [Incident response](security/INCIDENT_RESPONSE.md) | Security and production incident playbook |
+| [Extension wallet privacy](privacy/extension-wallet.md) | Opt-in usage analytics and privacy controls |
+| [Dependency audit gate](security/dependency-audit.md) | CI audit gate and local triage steps |
+| [Internal audit: account contract v0](security/INTERNAL_AUDIT_v0.md) | Findings and fixes from the internal account contract review |
 
 ## Operations
 
@@ -56,6 +62,9 @@
 |----------|---------|
 | [Ops overview](ops/README.md) | Prometheus alerts, dashboards, and SLOs |
 | [SLO definitions](ops/slo-definitions.md) | SLI/SLO targets and error budget policy |
+| [Indexer metrics](ops/indexer-metrics.md) | Prometheus metrics exposed by the indexer service |
+| [Triage failed relay by trace](ops/runbooks/triage-failed-relay-by-trace.md) | Locate a failed relay request using its trace ID |
+| [Indexer backfill and dead-letter reprocessing](ops/runbooks/indexer-backfill-and-dead-letter-reprocessing.md) | Recover missed or failed indexed events |
 
 ## Release
 
@@ -64,6 +73,40 @@
 | [Release checklist](release/checklist.md) | CI-parsed gate checklist for releases |
 | [Release runbook](release/runbook.md) | Step-by-step release procedure |
 | [Mobile release](release/mobile.md) | TestFlight / Play internal pipeline |
+| [Upgrade and migration runbook](release/upgrade-migration.md) | Execute smart account contract upgrades on testnet and mainnet |
+
+## Testing
+
+| Document | Purpose |
+|----------|---------|
+| [Extension e2e setup](testing/extension-e2e-setup.md) | Playwright setup for the real built extension artifact |
+| [Mobile e2e setup](testing/mobile-e2e-setup.md) | Maestro setup for device-level wallet validation |
+| [Background handlers coverage](testing/extension-handlers-coverage.md) | Vitest coverage thresholds for background handlers |
+| [Dashboard test boundaries](dashboard-test-boundaries.md) | Storage, download, and validation coverage boundaries |
+| [Mobile validation boundaries](mobile-validation-boundaries.md) | Relayer validation, release gating, and storage failure coverage |
+| [Agent and UI boundaries](agent-ui-boundaries.md) | AI auth, shared UI timers, native onboarding, and contacts coverage |
+
+## Product
+
+| Document | Purpose |
+|----------|---------|
+| [Product requirements](product/PRD.md) | MVP product vision, audience, and requirements |
+| [Financial OS roadmap](product/FINANCIAL_OS_ROADMAP.md) | Product phases for the Stellar financial operating system |
+
+## Guides
+
+| Document | Purpose |
+|----------|---------|
+| [Session keys](guides/session-keys.md) | Scoped, time-bound session key lifecycle |
+| [Contributor assignment](guides/contributor-assignment.md) | GitHub issue assignment rules and procedures |
+
+## RFCs
+
+| Document | Purpose |
+|----------|---------|
+| [RFC template](rfcs/0000-template.md) | Template for new change proposals |
+| [RFC 0001: WebAuthn passkey onboarding](rfcs/0001-webauthn-passkey-onboarding.md) | Passkey-based P-256 session key onboarding |
+| [RFC 294: hardening backlog seeding](rfcs/294-hardening-backlog-seeding.md) | Track deferred audit and review findings |
 
 ## Other
 

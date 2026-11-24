@@ -35,7 +35,17 @@ export interface ExtensionFixtures {
   seedWallet: (state: WalletState) => Promise<void>;
   clearWallet: () => Promise<void>;
   freezeTime: (isoDate: string) => Promise<void>;
-  // Extension-loader fixtures for real-artifact tests
+  /**
+   * Installs a localStorage-backed chrome shim into the dev page before any
+   * app script runs. It records every runtime message so approval requests can
+   * be asserted, and resolves UNLOCK_WALLET against `unlockPassword` so the
+   * real unlock verifier code path is exercised without a built extension.
+   * Returns a reader for the recorded messages.
+   */
+  installExtensionBridge: (
+    unlockPassword?: string
+  ) => Promise<() => Promise<Record<string, unknown>[]>>;
+  // Extension-loader fixtures for tests that load the built dist/ artifact
   extensionContext: BrowserContext;
   extensionId: string;
   extensionUrl: (path: string) => string;
@@ -76,6 +86,68 @@ export const test = base.extend<ExtensionFixtures>({
           Date.now = realNow;
         };
       }, fixedTime);
+    });
+  },
+
+  installExtensionBridge: async ({ page }, use) => {
+    await use(async (unlockPassword?: string) => {
+      await page.addInitScript((expectedPassword?: string) => {
+        type RecordedMessage = Record<string, unknown> & {
+          type?: string;
+          payload?: { password?: string };
+        };
+        const messages: RecordedMessage[] = [];
+        (window as unknown as { __E2E_MESSAGES__: RecordedMessage[] }).__E2E_MESSAGES__ = messages;
+
+        // chrome.storage.local proxies to localStorage so fixtures that seed
+        // auth state with localStorage keep working once the shim is present.
+        const local = {
+          get: (key: string, cb: (result: Record<string, string>) => void) => {
+            const value = localStorage.getItem(key);
+            cb(value === null ? {} : { [key]: value });
+          },
+          set: (items: Record<string, string>, cb?: () => void) => {
+            for (const [key, value] of Object.entries(items)) {
+              localStorage.setItem(key, String(value));
+            }
+            cb?.();
+          },
+          remove: (key: string, cb?: () => void) => {
+            localStorage.removeItem(key);
+            cb?.();
+          },
+        };
+
+        const shim = {
+          storage: { local },
+          runtime: {
+            lastError: null,
+            sendMessage: (message: RecordedMessage, cb?: (response?: unknown) => void) => {
+              messages.push(message);
+              if (message.type === 'UNLOCK_WALLET') {
+                cb?.({
+                  ok: true,
+                  payload: {
+                    success: expectedPassword
+                      ? message.payload?.password === expectedPassword
+                      : true,
+                  },
+                });
+                return;
+              }
+              cb?.({ ok: true, payload: {} });
+            },
+          },
+        };
+        (window as unknown as { chrome: typeof shim }).chrome = shim;
+      }, unlockPassword);
+
+      return async () =>
+        page.evaluate(
+          () =>
+            (window as unknown as { __E2E_MESSAGES__?: Record<string, unknown>[] })
+              .__E2E_MESSAGES__ ?? []
+        );
     });
   },
 
@@ -136,8 +208,26 @@ export async function waitForAppReady(page: Page): Promise<void> {
 
 export async function navigateTo(page: Page, path: string): Promise<void> {
   // The app uses HashRouter in dev (see router/index.tsx), so app routes live
-  // under the URL hash — a plain pathname navigation never reaches them and
+  // under the URL hash. A plain pathname navigation never reaches them and
   // silently falls back to whatever route has no hash (e.g. /home).
   await page.goto(`/#${path}`, { waitUntil: 'domcontentloaded' });
   await waitForAppReady(page);
+}
+
+/**
+ * URL for the popup entry with a pending grant-access approval. The Vite dev
+ * server serves both entry points, and popup/main.tsx renders ApprovalApp
+ * whenever a requestId is present in the query string.
+ */
+export function approvalUrl(params: {
+  requestId: string;
+  dappName?: string;
+  origin?: string;
+  description?: string;
+}): string {
+  const search = new URLSearchParams({ route: 'grant-access', requestId: params.requestId });
+  if (params.dappName) search.set('dappName', params.dappName);
+  if (params.origin) search.set('origin', params.origin);
+  if (params.description) search.set('description', params.description);
+  return `/src/popup/index.html?${search.toString()}`;
 }

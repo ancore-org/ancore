@@ -44,6 +44,7 @@ import {
   type ExternalApiMethodName,
 } from '@ancore/wallet-shared';
 import type { MessageType } from '@/messaging/types';
+import { redactForLog } from '@/messaging/redact';
 
 const logPrefix = '[ancore/content-script]';
 
@@ -194,7 +195,10 @@ window.addEventListener('message', (event: MessageEvent) => {
   // ── 2. Envelope validation: drop silently if not a recognised wallet request.
   if (!isExternalRequest(event.data)) {
     if (import.meta.env.DEV && event.data) {
-      console.debug(`${logPrefix} Dropped non-wallet message`, event.data);
+      console.debug(
+        `${logPrefix} Dropped non-wallet message`,
+        redactForLog('EXTERNAL_MESSAGE', event.data)
+      );
     }
     return;
   }
@@ -252,7 +256,10 @@ window.addEventListener('message', (event: MessageEvent) => {
   }
 
   if (import.meta.env.DEV) {
-    console.debug(`${logPrefix} ← ${method} (→ ${messageType})`, { requestId, params });
+    console.debug(
+      `${logPrefix} ← ${method} (→ ${messageType})`,
+      redactForLog(messageType, { requestId, params })
+    );
   }
 
   // ── 6. Generate an internal correlation ID so the background response can be
