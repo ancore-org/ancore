@@ -166,17 +166,21 @@ describe('passwordSchema', () => {
 // ---------------------------------------------------------------------------
 
 describe('parseAmount', () => {
-  it('parses a plain number string', () => {
-    expect(parseAmount('123.45')).toBe(123.45);
+  it.each([
+    ['12.5', 12.5],
+    ['.5', 0.5],
+    ['12.3456789', 12.3456789],
+    ['  12  ', 12],
+  ])('parses %j as %s', (input, expected) => {
+    expect(parseAmount(input)).toBe(expected);
   });
 
-  it('strips non-numeric characters', () => {
-    expect(parseAmount('$1,234.56')).toBeCloseTo(1234.56);
-  });
-
-  it('returns NaN for a fully non-numeric string', () => {
-    expect(isNaN(parseAmount('abc'))).toBe(true);
-  });
+  it.each(['-5', '1e5', '1,5', 'abc1', '', '1.', '$1,234.56', '1.2.3'])(
+    'returns NaN for %j',
+    (input) => {
+      expect(parseAmount(input)).toBeNaN();
+    }
+  );
 });
 
 // ---------------------------------------------------------------------------

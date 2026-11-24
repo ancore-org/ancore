@@ -1,3 +1,4 @@
+import { ExternalApiMethodName as MethodName } from '@ancore/types';
 import { DASHBOARD_SETTINGS_STORAGE_KEY } from '../state/dashboard-settings';
 import { getChromeLocalStorage } from './chrome-storage';
 import { enqueueApproval, rejectRequest, getApproval } from './handlers/external/response-queue';
@@ -22,10 +23,7 @@ type ChromeSidePanel = {
 };
 
 type ApprovalRoute =
-  | 'grant-access'
-  | 'sign-transaction'
-  | 'sign-auth-entry'
-  | 'request-session-key';
+  'grant-access' | 'sign-transaction' | 'sign-auth-entry' | 'request-session-key';
 type ApprovalUxPreference = 'sidePanel' | 'popup';
 
 const DEFAULT_APPROVAL_UX: ApprovalUxPreference = 'sidePanel';
@@ -106,7 +104,7 @@ export async function openApprovalWindow(
 
 export async function openMockApproval(): Promise<void> {
   const requestId = crypto.randomUUID();
-  enqueueApproval(requestId, 'https://example-dapp.com', 'signTransaction', {
+  enqueueApproval(requestId, 'https://example-dapp.com', MethodName.SIGN_TRANSACTION, {
     xdr: 'AAAAAgAAAAA=',
     network: 'testnet',
     smartAccountId: 'CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA',

@@ -92,14 +92,14 @@ const pendingApprovals = new Map<string, ApprovalQueueEntry>();
 export function enqueueApproval(
   requestId: string,
   origin: string,
-  method: string,
+  method: ApprovalQueueEntry['method'],
   params: unknown
 ): void {
   sweepStaleRequests();
   const entry: ApprovalQueueEntry = {
     requestId,
     origin,
-    method: method as any,
+    method,
     params,
     timestamp: Date.now(),
   };

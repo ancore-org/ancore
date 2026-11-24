@@ -63,10 +63,12 @@ export function validateAmountPrecision(value: string, decimals: number): string
 }
 
 /**
- * Parses an amount string to a number. Returns NaN if invalid.
+ * Parses an unsigned decimal amount, allowing surrounding whitespace and a
+ * leading decimal point. Returns NaN for invalid input, including a trailing dot.
  */
 export function parseAmount(value: string): number {
-  return parseFloat(value.replace(/[^0-9.]/g, ''));
+  const amount = value.trim();
+  return /^(?:\d+(?:\.\d+)?|\.\d+)$/.test(amount) ? Number(amount) : NaN;
 }
 
 /**

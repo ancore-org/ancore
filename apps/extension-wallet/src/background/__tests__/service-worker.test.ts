@@ -9,6 +9,7 @@
  * picks it up at load time.
  */
 
+import { ExternalApiMethodName as MethodName } from '@ancore/types';
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { Keypair } from '@stellar/stellar-sdk';
 import type { MessageEnvelope, ResponseEnvelope } from '../../../messaging/types';
@@ -567,6 +568,31 @@ describe('UNLOCK_WALLET', () => {
   });
 });
 
+it('rejects an unknown external API method without queuing an approval', async () => {
+  const { _resetHandlers } = await loadServiceWorker(makeAuthState({ hasOnboarded: true }));
+  const { getApproval } = await import('../handlers/external/response-queue');
+  const sendResponse = vi.fn();
+  const requestId = 'req-unknown-method';
+  const origin = 'https://dapp.example';
+
+  chromeMock.runtime.onMessage._trigger(
+    { type: 'EXTERNAL_API_REQUEST', requestId, origin, method: 'unknownMethod', params: {} },
+    { origin },
+    sendResponse
+  );
+
+  await vi.waitFor(() =>
+    expect(sendResponse).toHaveBeenCalledWith({
+      type: 'EXTERNAL_API_RESPONSE',
+      requestId,
+      ok: false,
+      error: 'Unknown external API method: unknownMethod',
+    })
+  );
+  expect(getApproval(requestId)).toBeUndefined();
+  _resetHandlers();
+});
+
 // ---------------------------------------------------------------------------
 // APPROVE_SIGN_REQUEST (dApp-facing sign/message bridge — issue #1213)
 // ---------------------------------------------------------------------------
@@ -604,7 +630,7 @@ describe('APPROVE_SIGN_REQUEST', () => {
     const xdr = tx.toXDR();
 
     const requestId = 'req-sign-tx-1';
-    enqueueApproval(requestId, 'https://dapp.example', 'signTransaction', {
+    enqueueApproval(requestId, 'https://dapp.example', MethodName.SIGN_TRANSACTION, {
       xdr,
       networkPassphrase: Networks.TESTNET,
     });
@@ -634,7 +660,7 @@ describe('APPROVE_SIGN_REQUEST', () => {
 
     const message = '7b2273657373696f6e4b6579223a223078227d';
     const requestId = 'req-sign-msg-1';
-    enqueueApproval(requestId, 'https://dapp.example', 'signMessage', { message });
+    enqueueApproval(requestId, 'https://dapp.example', MethodName.SIGN_MESSAGE, { message });
     const waited = new Promise((resolve, reject) => {
       registerResponseCallbacks(requestId, resolve, reject);
     });
@@ -662,7 +688,7 @@ describe('APPROVE_SIGN_REQUEST', () => {
     const { buildRelayCanonicalPayload } = await import('@ancore/core-sdk');
 
     const requestId = 'req-sign-relay-1';
-    enqueueApproval(requestId, 'https://dapp.example', 'signRelayPayload', {
+    enqueueApproval(requestId, 'https://dapp.example', MethodName.SIGN_RELAY_PAYLOAD, {
       operation: 'relay_execute',
       nonce: 99,
       to: 'GDXTVHXGF6DZ4YCVLXV4LEBQ4RPQBHKX5XQOQU4ONHV6BQNVJFQ4XKZ2',
@@ -718,7 +744,7 @@ describe('APPROVE_SESSION_KEY_REQUEST & REJECT_SESSION_KEY_REQUEST (#958)', () =
       await import('../handlers/external/response-queue');
 
     const requestId = 'req-session-approve-1';
-    enqueueApproval(requestId, 'https://dapp.example', 'requestSessionKey' as never, {
+    enqueueApproval(requestId, 'https://dapp.example', MethodName.REQUEST_SESSION_KEY, {
       expiresAt: Date.now() + 60_000,
       permissions: 1,
     });
@@ -746,7 +772,7 @@ describe('APPROVE_SESSION_KEY_REQUEST & REJECT_SESSION_KEY_REQUEST (#958)', () =
       await import('../handlers/external/response-queue');
 
     const requestId = 'req-session-reject-1';
-    enqueueApproval(requestId, 'https://dapp.example', 'requestSessionKey' as never, {
+    enqueueApproval(requestId, 'https://dapp.example', MethodName.REQUEST_SESSION_KEY, {
       expiresAt: Date.now() + 60_000,
       permissions: 1,
     });
