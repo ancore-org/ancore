@@ -1,102 +1,85 @@
-import { test, expect } from '../fixtures/extension';
-import { AllowlistPage } from '../page-objects/AllowlistPage';
+import { approvalUrl, test, expect } from '../fixtures/extension';
 
 const MOCK_DAPP_ORIGIN = 'https://app.example-dapp.test';
+const MOCK_DAPP_NAME = 'Example DApp';
 
 /**
- * Grant-access / allowlist flow specs.
- * Injects a mock wallet-api requestAccess call and asserts the smart account
- * ID is returned after user approval.
+ * Grant-access flow specs.
  *
- * Full flow unblocks after #764 + #768.
+ * These drive the real GrantAccess UI rendered by the popup entry when a dApp
+ * request is pending (src/popup/index.html?requestId=...), which is how the
+ * extension opens an approval window. The chrome bridge records the message
+ * the screen sends to the background so approve and reject are asserted on
+ * the real code path.
  */
 test.describe('grant access', () => {
-  test('inject mock requestAccess → approve → smart account id returned to dapp', async ({
-    context,
-    extensionUrl,
+  test('approve a requestAccess prompt sends APPROVE_ACCESS_REQUEST', async ({
+    page,
+    installExtensionBridge,
   }) => {
-    // TODO: unblocks after #764 + #768
-    const page = await context.newPage();
-    await page.goto(extensionUrl('index.html'));
-
-    // Simulate a dApp calling requestAccess via the wallet API message bus
-    await page.evaluate((origin) => {
-      window.postMessage({ type: 'ANCORE_REQUEST_ACCESS', origin, requestId: 'req-001' }, '*');
-    }, MOCK_DAPP_ORIGIN);
-
-    const allowlist = new AllowlistPage(page);
-    await allowlist.waitForApprovalPrompt();
-    await allowlist.approveAccessRequest();
-
-    // Extension should post back with the smart account ID
-    const response = await page.evaluate(
-      () =>
-        new Promise<{ smartAccountId: string }>((resolve) => {
-          window.addEventListener('message', (evt) => {
-            if ((evt.data as Record<string, unknown>).type === 'ANCORE_ACCESS_GRANTED') {
-              resolve(evt.data as { smartAccountId: string });
-            }
-          });
-        })
+    const readMessages = await installExtensionBridge();
+    await page.goto(
+      approvalUrl({
+        requestId: 'req-approve',
+        dappName: MOCK_DAPP_NAME,
+        origin: MOCK_DAPP_ORIGIN,
+        description: 'Connect to Example DApp',
+      })
     );
 
-    expect(response.smartAccountId).toBeTruthy();
-    expect(response.smartAccountId).toMatch(/^[CG]/); // Stellar address prefix
+    await expect(page.getByTestId('dapp-name')).toHaveText(MOCK_DAPP_NAME);
+    await expect(page.getByTestId('dapp-origin')).toContainText(MOCK_DAPP_ORIGIN);
+
+    await page.getByTestId('approve-access-btn').click();
+
+    await expect(page.getByRole('heading', { name: 'Request Processed' })).toBeVisible();
+    const messages = await readMessages();
+    expect(messages).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ type: 'APPROVE_ACCESS_REQUEST', requestId: 'req-approve' }),
+      ])
+    );
   });
 
-  test.skip('inject mock requestAccess → deny → error returned to dapp', async ({
-    context,
-    extensionUrl,
+  test('deny a requestAccess prompt sends REJECT_ACCESS_REQUEST', async ({
+    page,
+    installExtensionBridge,
   }) => {
-    // TODO: unblocks after #764
-    const page = await context.newPage();
-    await page.goto(extensionUrl('index.html'));
-
-    await page.evaluate((origin) => {
-      window.postMessage({ type: 'ANCORE_REQUEST_ACCESS', origin, requestId: 'req-002' }, '*');
-    }, MOCK_DAPP_ORIGIN);
-
-    const allowlist = new AllowlistPage(page);
-    await allowlist.waitForApprovalPrompt();
-    await allowlist.denyAccessRequest();
-
-    const response = await page.evaluate(
-      () =>
-        new Promise<{ error: string }>((resolve) => {
-          window.addEventListener('message', (evt) => {
-            if ((evt.data as Record<string, unknown>).type === 'ANCORE_ACCESS_DENIED') {
-              resolve(evt.data as { error: string });
-            }
-          });
-        })
+    const readMessages = await installExtensionBridge();
+    await page.goto(
+      approvalUrl({
+        requestId: 'req-deny',
+        dappName: MOCK_DAPP_NAME,
+        origin: MOCK_DAPP_ORIGIN,
+      })
     );
 
-    expect(response.error).toMatch(/denied|rejected/i);
+    await expect(page.getByTestId('dapp-name')).toHaveText(MOCK_DAPP_NAME);
+
+    await page.getByTestId('reject-access-btn').click();
+
+    await expect(page.getByRole('heading', { name: 'Request Processed' })).toBeVisible();
+    const messages = await readMessages();
+    expect(messages).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ type: 'REJECT_ACCESS_REQUEST', requestId: 'req-deny' }),
+      ])
+    );
   });
 
-  test.skip('approved origin appears in allowlist settings and can be revoked', async ({
-    context,
-    extensionUrl,
-  }) => {
-    // TODO: unblocks after #764
-    const page = await context.newPage();
-    await page.goto(extensionUrl('index.html'));
-
-    // Grant access first
-    await page.evaluate((origin) => {
-      window.postMessage({ type: 'ANCORE_REQUEST_ACCESS', origin, requestId: 'req-003' }, '*');
-    }, MOCK_DAPP_ORIGIN);
-
-    const allowlist = new AllowlistPage(page);
-    await allowlist.waitForApprovalPrompt();
-    await allowlist.approveAccessRequest();
-
-    // Navigate to allowlist settings and verify the origin is listed
-    await allowlist.navigate();
-    await expect(page.getByTestId(`allowlist-origin-${MOCK_DAPP_ORIGIN}`)).toBeVisible();
-
-    // Revoke and confirm it's removed
-    await allowlist.revokeOrigin(MOCK_DAPP_ORIGIN);
-    await expect(page.getByTestId(`allowlist-origin-${MOCK_DAPP_ORIGIN}`)).not.toBeVisible();
+  // Skipped: the connected-sites settings view exists but has no navigation
+  // item in the settings menu, so there is no UI path to approve an origin,
+  // open the allowlist and revoke it. Tracked in
+  // https://github.com/ancore-org/ancore/issues/1733
+  test.skip('approved origin appears in connected sites and can be revoked', async ({ page }) => {
+    await page.goto(
+      approvalUrl({
+        requestId: 'req-allowlist',
+        dappName: MOCK_DAPP_NAME,
+        origin: MOCK_DAPP_ORIGIN,
+      })
+    );
+    await page.getByTestId('approve-access-btn').click();
+    await expect(page.getByRole('heading', { name: 'Request Processed' })).toBeVisible();
   });
 });

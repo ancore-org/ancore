@@ -24,7 +24,7 @@ describe('createLogger', () => {
     log.info('login', { password: 'hunter2', username: 'alice' });
 
     const [, meta] = infoSpy.mock.calls[0];
-    expect(meta).toEqual({ password: '<redacted>', username: 'alice' });
+    expect(meta).toEqual({ password: '[redacted]', username: 'alice' });
   });
 
   it('does not throw on an object with a circular reference', () => {

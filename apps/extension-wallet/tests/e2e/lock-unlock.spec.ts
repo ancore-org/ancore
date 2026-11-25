@@ -1,4 +1,4 @@
-import { test, expect, navigateTo } from '../fixtures/extension';
+import { approvalUrl, navigateTo, test, expect } from '../fixtures/extension';
 import { TEST_PASSWORD } from '../fixtures/test-mnemonics';
 
 test.describe('Lock / unlock flow', () => {
@@ -21,75 +21,73 @@ test.describe('Lock / unlock flow', () => {
     await navigateTo(page, '/unlock');
 
     await page.getByPlaceholder('Enter your password').fill('anypassword');
-    await page.getByRole('button', { name: /Unlock/i }).click();
-    await page.waitForLoadState('networkidle');
+    await page.getByRole('button', { name: /^Unlock$/ }).click();
 
     await expect(page).toHaveURL(/\/home/);
-    await expect(page.getByRole('heading', { name: 'Your wallet' })).toBeVisible();
+    await expect(page.getByText('Main Account')).toBeVisible();
   });
 
   test('unlock button is disabled when password is empty', async ({ page, seedWallet }) => {
     await seedWallet('onboarded-locked');
     await navigateTo(page, '/unlock');
 
-    const unlockBtn = page.getByRole('button', { name: /Unlock/i });
-    await expect(unlockBtn).toBeDisabled();
+    await expect(page.getByRole('button', { name: /^Unlock$/ })).toBeDisabled();
   });
 
-  test('locking wallet redirects to unlock screen', async ({ page, seedWallet }) => {
+  test('locking wallet via shortcut redirects to unlock screen', async ({ page, seedWallet }) => {
     await seedWallet('onboarded-unlocked');
     await navigateTo(page, '/home');
 
-    await page.getByRole('button', { name: /Lock wallet/i }).click();
-    await page.waitForLoadState('networkidle');
+    await page.keyboard.press('Control+Shift+L');
 
     await expect(page).toHaveURL(/\/unlock/);
   });
 
   test('locked wallet cannot access protected routes directly', async ({ page, seedWallet }) => {
     await seedWallet('onboarded-locked');
-    await page.goto('/send');
-    await page.waitForLoadState('networkidle');
+    await navigateTo(page, '/send');
     await expect(page).toHaveURL(/\/unlock/);
   });
 
-  // ── Real-artifact tests (unblock after #764) ───────────────────────────────
+  // Previously skipped "real artifact" tests, now driven against the dev
+  // entry points so they exercise the real UI and unlock verifier code paths.
+  test('extension popup renders the approval UI for a pending request', async ({ page }) => {
+    await page.goto(approvalUrl({ requestId: 'req-popup-smoke', dappName: 'Popup Smoke' }));
 
-  test.skip('extension popup opens and renders root UI (real artifact)', async ({
-    extensionContext,
-    extensionUrl,
-  }) => {
-    // TODO: unblocks after #764
-    const page = await extensionContext.newPage();
-    await page.goto(extensionUrl('index.html'));
-    await page.waitForLoadState('domcontentloaded');
-    const body = await page.locator('body').innerText();
-    expect(body.length).toBeGreaterThan(0);
+    await expect(page.getByTestId('dapp-name')).toHaveText('Popup Smoke');
+    await expect(page.getByTestId('approve-access-btn')).toBeVisible();
+    await expect(page.getByTestId('reject-access-btn')).toBeVisible();
   });
 
-  test.skip('unlock with correct password → home screen shown (real artifact)', async ({
-    extensionContext,
-    extensionUrl,
+  test('unlock with correct password shows the home screen', async ({
+    page,
+    seedWallet,
+    installExtensionBridge,
   }) => {
-    // TODO: unblocks after #764
-    const page = await extensionContext.newPage();
-    await page.goto(extensionUrl('index.html'));
-    await page.getByRole('button', { name: /lock/i }).click();
-    await page.getByLabel(/password/i).fill(TEST_PASSWORD);
-    await page.getByRole('button', { name: /unlock/i }).click();
-    await expect(page.getByTestId('home-screen')).toBeVisible();
+    await installExtensionBridge(TEST_PASSWORD);
+    await seedWallet('onboarded-locked');
+    await navigateTo(page, '/unlock');
+
+    await page.getByPlaceholder('Enter your password').fill(TEST_PASSWORD);
+    await page.getByRole('button', { name: /^Unlock$/ }).click();
+
+    await expect(page).toHaveURL(/\/home/);
+    await expect(page.getByText('Main Account')).toBeVisible();
   });
 
-  test.skip('unlock with wrong password → error message shown (real artifact)', async ({
-    extensionContext,
-    extensionUrl,
+  test('unlock with wrong password shows an error', async ({
+    page,
+    seedWallet,
+    installExtensionBridge,
   }) => {
-    // TODO: unblocks after #764
-    const page = await extensionContext.newPage();
-    await page.goto(extensionUrl('index.html'));
-    await page.getByRole('button', { name: /lock/i }).click();
-    await page.getByLabel(/password/i).fill('wrong-password');
-    await page.getByRole('button', { name: /unlock/i }).click();
+    await installExtensionBridge(TEST_PASSWORD);
+    await seedWallet('onboarded-locked');
+    await navigateTo(page, '/unlock');
+
+    await page.getByPlaceholder('Enter your password').fill('wrong-password');
+    await page.getByRole('button', { name: /^Unlock$/ }).click();
+
     await expect(page.getByRole('alert')).toContainText(/incorrect|invalid/i);
+    await expect(page).toHaveURL(/\/unlock/);
   });
 });
