@@ -24,9 +24,9 @@ declare module 'react-native' {
     onChangeText?: (value: string) => void;
     onPress?: (event?: any) => void;
     onRequestClose?: () => void;
-    onTouchStart?: (event: any) => void;
-    onTouchMove?: (event: any) => void;
-    onTouchEnd?: (event?: any) => void;
+    onTouchStart?: (event: GestureResponderEvent) => void;
+    onTouchMove?: (event: GestureResponderEvent) => void;
+    onTouchEnd?: (event: GestureResponderEvent) => void;
     placeholder?: string;
     placeholderTextColor?: string;
     secureTextEntry?: boolean;
@@ -91,7 +91,12 @@ declare module 'react-native' {
   export type TextStyle = Record<string, any>;
   export type ImageStyle = Record<string, any>;
   export type StyleProp<T> = T | T[] | null | undefined | false;
-  export type GestureResponderEvent = any;
+  export interface GestureResponderEvent {
+    nativeEvent: {
+      pageY?: number;
+      touches?: ArrayLike<{ clientY?: number }>;
+    };
+  }
   export interface ListRenderItemInfo<ItemT> {
     item: ItemT;
     index: number;

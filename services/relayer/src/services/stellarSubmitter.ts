@@ -5,6 +5,27 @@ import { NETWORK_PASSPHRASES } from '@ancore/wallet-shared';
 import type { TransactionSubmitterContract, TransactionSubmissionResult } from '../types';
 import { getEnv } from '../config/env';
 
+type SubmissionFeeDetails = {
+  fee_charged?: string | number;
+  result_xdr?: string;
+};
+
+function hasSubmissionFeeDetails(response: unknown): response is SubmissionFeeDetails {
+  if (typeof response !== 'object' || response === null) {
+    return false;
+  }
+
+  return (
+    (!('fee_charged' in response) ||
+      response.fee_charged === undefined ||
+      typeof response.fee_charged === 'string' ||
+      typeof response.fee_charged === 'number') &&
+    (!('result_xdr' in response) ||
+      response.result_xdr === undefined ||
+      typeof response.result_xdr === 'string')
+  );
+}
+
 export interface StellarSubmitterConfig {
   network: Network;
   networkPassphrase?: string;
@@ -57,33 +78,9 @@ export class StellarTransactionSubmitter implements TransactionSubmitterContract
     const transaction = this.parseTransaction(signedXdr);
     const response = await this.client.submitTransaction(transaction);
 
-    let gasUsed = 0;
-    if (response && typeof response === 'object') {
-      if ('fee_charged' in response && (response as any).fee_charged !== undefined) {
-        const parsed = Number.parseInt(String((response as any).fee_charged), 10);
-        if (!Number.isNaN(parsed)) {
-          gasUsed = parsed;
-        }
-      } else if ('result_xdr' in response && typeof (response as any).result_xdr === 'string') {
-        try {
-          const txResult = xdr.TransactionResult.fromXDR((response as any).result_xdr, 'base64');
-          const parsed = Number.parseInt(txResult.feeCharged().toString(), 10);
-          if (!Number.isNaN(parsed)) {
-            gasUsed = parsed;
-          }
-        } catch {
-          gasUsed = Number.parseInt(String(transaction.fee), 10) || 0;
-        }
-      } else {
-        gasUsed = Number.parseInt(String(transaction.fee), 10) || 0;
-      }
-    } else {
-      gasUsed = Number.parseInt(String(transaction.fee), 10) || 0;
-    }
-
     return {
       transactionHash: response.hash,
-      gasUsed,
+      gasUsed: this.resolveGasUsed(response, transaction),
     };
   }
 
@@ -91,6 +88,25 @@ export class StellarTransactionSubmitter implements TransactionSubmitterContract
     const started = Date.now();
     const healthy = await this.client.isHealthy();
     return { healthy, latencyMs: Date.now() - started };
+  }
+
+  private resolveGasUsed(response: unknown, transaction: Transaction): number {
+    if (hasSubmissionFeeDetails(response)) {
+      if (response.fee_charged !== undefined) {
+        return Number.parseInt(String(response.fee_charged), 10) || 0;
+      }
+
+      if (response.result_xdr !== undefined) {
+        try {
+          const result = xdr.TransactionResult.fromXDR(response.result_xdr, 'base64');
+          return Number.parseInt(result.feeCharged().toString(), 10) || 0;
+        } catch {
+          // Use the transaction fee when Horizon returns malformed result XDR.
+        }
+      }
+    }
+
+    return Number.parseInt(transaction.fee, 10) || 0;
   }
 
   private parseTransaction(signedXdr: string): Transaction {

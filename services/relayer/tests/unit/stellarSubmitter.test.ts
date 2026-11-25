@@ -116,23 +116,27 @@ describe('StellarTransactionSubmitter', () => {
     ).rejects.toThrow(SimulationFailedError);
   });
 
-  it('submits a signed transaction and returns hash and fallback fee when response has no fee details', async () => {
-    const submitTransaction = jest.fn().mockResolvedValue({
-      hash: 'a'.repeat(64),
-    });
-    const isHealthy = jest.fn().mockResolvedValue(true);
-    MockStellarClient.mockImplementation(
-      () => ({ submitTransaction, isHealthy }) as unknown as StellarClient
-    );
+  it.each([{}, { result_xdr: 'invalid-xdr' }])(
+    'returns the hash and transaction fee when the response fee details are %j',
+    async (feeDetails) => {
+      const submitTransaction = jest.fn().mockResolvedValue({
+        hash: 'a'.repeat(64),
+        ...feeDetails,
+      });
+      const isHealthy = jest.fn().mockResolvedValue(true);
+      MockStellarClient.mockImplementation(
+        () => ({ submitTransaction, isHealthy }) as unknown as StellarClient
+      );
 
-    const submitter = new StellarTransactionSubmitter({ network: 'testnet' });
-    const signedXdr = buildSignedTransactionXdr();
-    const result = await submitter.submitSignedTransaction(signedXdr);
+      const submitter = new StellarTransactionSubmitter({ network: 'testnet' });
+      const signedXdr = buildSignedTransactionXdr();
+      const result = await submitter.submitSignedTransaction(signedXdr);
 
-    expect(submitTransaction).toHaveBeenCalledTimes(1);
-    expect(result.transactionHash).toBe('a'.repeat(64));
-    expect(result.gasUsed).toBe(100);
-  });
+      expect(submitTransaction).toHaveBeenCalledTimes(1);
+      expect(result.transactionHash).toBe('a'.repeat(64));
+      expect(result.gasUsed).toBe(100);
+    }
+  );
 
   it('reports actual gasUsed from response.fee_charged instead of pre-set fee (issue #1264)', async () => {
     const submitTransaction = jest.fn().mockResolvedValue({

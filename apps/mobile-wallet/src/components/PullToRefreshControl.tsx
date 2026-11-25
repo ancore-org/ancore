@@ -16,6 +16,13 @@ type Props = {
 
 const PULL_THRESHOLD_PX = 48;
 
+function getPointerY(event: GestureResponderEvent | TouchEvent): number | null {
+  if ('nativeEvent' in event) {
+    return event.nativeEvent.pageY ?? event.nativeEvent.touches?.[0]?.clientY ?? null;
+  }
+  return 'touches' in event ? (event.touches[0]?.clientY ?? null) : null;
+}
+
 export const PullToRefreshControl = ({
   isRefreshing,
   onRefresh,
@@ -34,28 +41,19 @@ export const PullToRefreshControl = ({
   const isPulling = pullDistance > 0 && !isRefreshing;
   const shouldShowIndicator = isPulling || isRefreshing;
 
-  const handleTouchStart = (event: GestureResponderEvent) => {
-    const anyEvent = event as any;
-    const nativeEvent = anyEvent?.nativeEvent ?? anyEvent;
-    startYRef.current =
-      nativeEvent?.pageY ??
-      anyEvent?.touches?.[0]?.clientY ??
-      nativeEvent?.touches?.[0]?.clientY ??
-      null;
+  const handleTouchStart = (event: GestureResponderEvent | TouchEvent) => {
+    startYRef.current = getPointerY(event);
   };
 
-  const handleTouchMove = (event: GestureResponderEvent) => {
+  const handleTouchMove = (event: GestureResponderEvent | TouchEvent) => {
     if (startYRef.current === null || isRefreshing) {
       return;
     }
 
-    const anyEvent = event as any;
-    const nativeEvent = anyEvent?.nativeEvent ?? anyEvent;
-    const nextY =
-      nativeEvent?.pageY ??
-      anyEvent?.touches?.[0]?.clientY ??
-      nativeEvent?.touches?.[0]?.clientY ??
-      startYRef.current;
+    const nextY = getPointerY(event);
+    if (nextY === null) {
+      return;
+    }
     setPullDistance(Math.max(0, Math.min(nextY - startYRef.current, PULL_THRESHOLD_PX)));
   };
 
