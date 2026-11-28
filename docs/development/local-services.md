@@ -121,6 +121,9 @@ DATABASE_URL=postgres://postgres:ancore@localhost:5432/ancore_indexer \
 - `STELLAR_NETWORK` - Stellar network (testnet, mainnet, futurenet, local)
 - `RELAYER_AUTH_SECRET` - Bearer token secret; **unset falls back to a stub that accepts any token**
 - `RELAYER_USE_MOCK_SUBMISSION` - Dev-only: skip Stellar submission entirely
+- `RELAY_RATE_LIMIT_MAX` - Requests per verified caller ID in a 15-minute window on
+  `POST /relay/execute` and `POST /relay/validate`. Authentication runs before this limiter.
+  The global per-IP limit also applies to these routes.
 
 Full table (limits, timers, RPC configuration) and the mock-mode warning:
 [services/relayer/README.md → Environment Variables](../../services/relayer/README.md#environment-variables).

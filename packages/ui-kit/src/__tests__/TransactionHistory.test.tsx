@@ -44,6 +44,21 @@ describe('transaction-formatter', () => {
     expect(formatTransactionAmount('1234.56', 'XLM')).toBe('1,234.56 XLM');
   });
 
+  it.each([
+    ['12345678901234567.1234567', '12,345,678,901,234,567.1234567 XLM'],
+    ['0.0000001', '0.0000001 XLM'],
+    [42, '42.00 XLM'],
+  ])('formats transaction amount %s as %s', (amount, expected) => {
+    expect(formatTransactionAmount(amount)).toBe(expected);
+  });
+
+  it.each(['', 'garbage', 'Infinity', '1e3', '0x10', ' 2 '])(
+    'falls back to zero for invalid transaction amount %j',
+    (amount) => {
+      expect(formatTransactionAmount(amount, 'USDC')).toBe('0 USDC');
+    }
+  );
+
   it('groups transactions by date', () => {
     const groups = groupTransactionsByDate(baseTransactions);
 

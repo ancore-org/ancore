@@ -8,10 +8,10 @@ import { encrypt, decrypt, type EncryptedPayload } from './encryption-primitives
 import type { AccountData, SessionKeysData, StorageAdapter } from './types';
 
 // Current backup schema version
-export const CURRENT_BACKUP_VERSION = 1;
+export const CURRENT_BACKUP_VERSION = 2;
 
 // Supported backup versions for migration
-export const SUPPORTED_BACKUP_VERSIONS = [1];
+export const SUPPORTED_BACKUP_VERSIONS = [1, CURRENT_BACKUP_VERSION];
 
 export interface BackupMetadata {
   version: number;
@@ -27,7 +27,11 @@ export interface BackupPayloadV1 {
   sessionKeys?: EncryptedPayload;
 }
 
-export type BackupPayload = BackupPayloadV1;
+export interface BackupPayloadV2 extends Omit<BackupPayloadV1, 'version'> {
+  version: 2;
+}
+
+export type BackupPayload = BackupPayloadV1 | BackupPayloadV2;
 
 export interface BackupValidationError extends Error {
   code:
@@ -58,7 +62,7 @@ export async function exportBackup(
   storage: StorageAdapter,
   password: string,
   createdBy?: string
-): Promise<BackupPayload> {
+): Promise<BackupPayloadV2> {
   if (typeof password !== 'string' || password.length === 0) {
     throw createBackupError('MALFORMED_BACKUP', 'Password must be a non-empty string');
   }
@@ -66,7 +70,7 @@ export async function exportBackup(
   const accountData = await storage.get('account');
   const sessionKeysData = await storage.get('sessionKeys');
 
-  const backupData: Omit<BackupPayloadV1, 'metadata'> = {
+  const backupData: Omit<BackupPayloadV2, 'metadata'> = {
     version: CURRENT_BACKUP_VERSION,
   };
 
@@ -120,13 +124,6 @@ export async function importBackup(
   // Verify checksum for integrity
   await verifyBackupIntegrity(backup);
 
-  // Handle version migration if needed
-  let migrationResult: MigrationResult | undefined;
-  if (backup.version !== CURRENT_BACKUP_VERSION) {
-    migrationResult = await migrateBackup(backup, password);
-    backup = migrationResult.success ? await migrateToCurrentVersion(backup, password) : backup;
-  }
-
   // Restore account data if present
   if (backup.account) {
     try {
@@ -159,7 +156,14 @@ export async function importBackup(
     }
   }
 
-  return migrationResult;
+  // The encrypted storage schema is shared by v1 and v2.
+  if (backup.version !== CURRENT_BACKUP_VERSION) {
+    return {
+      success: true,
+      migratedFrom: backup.version,
+      migratedTo: CURRENT_BACKUP_VERSION,
+    };
+  }
 }
 
 /**
@@ -185,6 +189,10 @@ function validateBackupStructure(backup: BackupPayload): void {
       `Unsupported backup version: ${version}. Supported versions: ${SUPPORTED_BACKUP_VERSIONS.join(', ')}`
     );
   }
+
+  if (backup.version !== version) {
+    throw createBackupError('INVALID_VERSION', 'Backup payload and metadata versions must match');
+  }
 }
 
 /**
@@ -206,11 +214,7 @@ async function verifyBackupIntegrity(backup: BackupPayload): Promise<void> {
 
   const calculatedChecksum = await calculateChecksum(backupDataForChecksum);
 
-  // Timing-safe comparison: a naive `!==` on the checksum string leaks how many
-  // leading hex characters match via response timing, letting an attacker
-  // incrementally forge a colliding checksum. Both sides are fixed-length
-  // SHA-256 hex digests, so this never affects correctness — only timing.
-  const encoder = new (globalThis as any).TextEncoder();
+  const encoder = new TextEncoder();
   const checksumMatches = timingSafeEqual(
     encoder.encode(checksum),
     encoder.encode(calculatedChecksum)
@@ -227,71 +231,34 @@ async function verifyBackupIntegrity(backup: BackupPayload): Promise<void> {
 /**
  * Calculate SHA-256 checksum of backup data
  */
-async function calculateChecksum(data: unknown): Promise<string> {
-  const crypto = (globalThis as any).crypto;
+async function calculateChecksum(data: Omit<BackupPayload, 'metadata'>): Promise<string> {
+  const crypto = globalThis.crypto;
   if (!crypto?.subtle) {
     throw new Error('WebCrypto API is not available in this environment');
   }
 
-  const dataString = JSON.stringify(data, Object.keys(data as any).sort());
-  const encoder = new (globalThis as any).TextEncoder();
-  const dataBuffer = encoder.encode(dataString);
+  // Legacy backups omitted nested fields from the digest. Keep that algorithm
+  // for v1 restores, whose encrypted payloads are still authenticated by AES-GCM.
+  const dataString =
+    data.version === 1
+      ? JSON.stringify(data, Object.keys(data).sort())
+      : JSON.stringify(data, (_key: string, value: unknown) => {
+          if (value === null || typeof value !== 'object' || Array.isArray(value)) {
+            return value;
+          }
 
+          return Object.fromEntries(
+            Object.entries(value).sort(([left], [right]) =>
+              left < right ? -1 : left > right ? 1 : 0
+            )
+          );
+        });
+  const dataBuffer = new TextEncoder().encode(dataString);
   const hashBuffer = await crypto.subtle.digest('SHA-256', dataBuffer);
-  const hashArray = new Uint8Array(hashBuffer);
 
-  return Array.from(hashArray)
+  return Array.from(new Uint8Array(hashBuffer))
     .map((b) => b.toString(16).padStart(2, '0'))
     .join('');
-}
-
-/**
- * Migrate backup from older version to current version
- */
-async function migrateBackup(backup: BackupPayload, _password: string): Promise<MigrationResult> {
-  const fromVersion = backup.version;
-  const toVersion = CURRENT_BACKUP_VERSION;
-  const warnings: string[] = [];
-
-  try {
-    // For now, version 1 is current, so no migration needed
-    // This function is prepared for future migrations
-    if (fromVersion === toVersion) {
-      return {
-        success: true,
-        migratedFrom: fromVersion,
-        migratedTo: toVersion,
-      };
-    }
-
-    // Future migration logic will go here
-    // Example: if (fromVersion === 1 && toVersion === 2) { ... }
-
-    return {
-      success: true,
-      migratedFrom: fromVersion,
-      migratedTo: toVersion,
-      warnings,
-    };
-  } catch (error) {
-    throw createBackupError(
-      'MIGRATION_ERROR',
-      `Failed to migrate backup from version ${fromVersion} to ${toVersion}: ${error instanceof Error ? error.message : String(error)}`,
-      { error }
-    );
-  }
-}
-
-/**
- * Create a migrated backup payload in current version format
- */
-async function migrateToCurrentVersion(
-  oldBackup: BackupPayload,
-  _password: string
-): Promise<BackupPayload> {
-  // For now, since we only have version 1, just return the backup
-  // This function is prepared for future version migrations
-  return oldBackup;
 }
 
 /**

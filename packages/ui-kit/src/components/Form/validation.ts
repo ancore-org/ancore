@@ -75,7 +75,8 @@ export function parseAmount(value: string): number {
  * Formats a number to a Stellar-safe decimal string (up to 7 decimal places).
  */
 export function formatAmount(value: number, decimals = 7): string {
-  return value.toFixed(decimals).replace(/\.?0+$/, '');
+  const fixed = value.toFixed(decimals);
+  return fixed.includes('.') ? fixed.replace(/\.?0+$/, '') : fixed;
 }
 
 /**
